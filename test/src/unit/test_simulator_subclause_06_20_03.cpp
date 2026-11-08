@@ -238,7 +238,7 @@ TEST(TypeParameterSim, PropertyDeclaredThroughAClassTypeNameIsItsWidth) {
 }
 
 TEST(TypeParameterSim, PortsTakeEachInstancesOverridingType) {
-  const char* kOrders[] = {
+  const char* const kOrders[] = {
       "  ma #(.TP(logic [15:0])) u(x, y);\n  ma v(p, q);\n",
       "  ma v(p, q);\n  ma #(.TP(logic [15:0])) u(x, y);\n",
   };
@@ -297,7 +297,7 @@ TEST(TypeParameterSim, ProgramDataTakesEachInstancesType) {
 }
 
 TEST(TypeParameterSim, InterfaceInstancesKeepTheirOwnTypes) {
-  const char* kOrders[] = {
+  const char* const kOrders[] = {
       "  I u();\n  I #(.T(int)) v();\n  I #(int) w();\n",
       "  I #(int) w();\n  I #(.T(int)) v();\n  I u();\n",
   };

@@ -9,7 +9,6 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_restriction.h"
-#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
