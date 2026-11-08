@@ -143,8 +143,8 @@ TEST(ParamValueAssignability, NamedParameterOfItsTypeIsAcceptedInEveryScope) {
       "  parameter string W = \"w\";\n  if (1) begin : g\n"
       "    parameter int W = 1;\n    c u();\n    defparam u.P = W;\n"
       "  end\nendmodule\n",
-      "parameter int G = 1;\nclass C;\n  parameter P = G;\nendclass\n"
-      "module m;\n  parameter int I = C::P;\nendmodule\n",
+      ("parameter int G = 1;\nclass C;\n  parameter P = G;\nendclass\n"
+       "module m;\n  parameter int I = C::P;\nendmodule\n"),
   };
   ExpectEachAccepted(kSources);
 }
