@@ -440,4 +440,142 @@ TEST(DollarConstantElaboration, DollarParameterIsAParametersValueOnlyAlone) {
       {3, 7, 11, 13, 17, 24, 30, 31, 32, 34, 38, 40, 44});
 }
 
+TEST(DollarConstantElaboration,
+     DollarParameterActualBindsOnlyAFormalThatDollarMayBind) {
+  ElabFixture f;
+  Elaborate(
+      "parameter U = $;\n"
+      "package pk;\n"
+      "  parameter K = $;\n"
+      "endpackage\n"
+      "sequence usop(x, m);\n"
+      "  x ##1 (x == m);\n"
+      "endsequence\n"
+      "sequence usub(x, m);\n"
+      "  x ##[1:m] x;\n"
+      "endsequence\n"
+      "checker cop(x, n, event clk);\n"
+      "  a1: assert property (@clk x == n);\n"
+      "endchecker\n"
+      "checker cub(x, n, event clk);\n"
+      "  a1: assert property (@clk x ##[1:n] x);\n"
+      "endchecker\n"
+      "checker cint(x, int n, event clk);\n"
+      "  a1: assert property (@clk x ##[1:n] x);\n"
+      "endchecker\n"
+      "checker cpass(x, event clk);\n"
+      "  cop inner1(x, U, clk);\n"
+      "  cub inner2(x, U, clk);\n"
+      "  a1: assert property (@clk usop(x, U));\n"
+      "  a2: assert property (@clk usub(x, U));\n"
+      "endchecker\n"
+      "interface ifc(input bit clk);\n"
+      "  parameter P = $;\n"
+      "  bit a;\n"
+      "  i1: assert property (@(posedge clk) usop(a, P));\n"
+      "  i2: assert property (@(posedge clk) usub(a, P));\n"
+      "  cop k1(a, P, posedge clk);\n"
+      "  cub k2(a, P, posedge clk);\n"
+      "endinterface\n"
+      "program prg(input bit clk);\n"
+      "  parameter P = $;\n"
+      "  bit a;\n"
+      "  r1: assert property (@(posedge clk) usop(a, P));\n"
+      "  r2: assert property (@(posedge clk) usub(a, P));\n"
+      "endprogram\n"
+      "module top;\n"
+      "  parameter P = $;\n"
+      "  bit clk, a, b;\n"
+      "  sequence sop(x, m);\n"
+      "    x ##1 (b == m);\n"
+      "  endsequence\n"
+      "  sequence sub(x, m);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  sequence sint(x, int m);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  sequence sunt(x, untyped m);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  property pop(x, m);\n"
+      "    x |-> b == m;\n"
+      "  endproperty\n"
+      "  property pub(x, m);\n"
+      "    x |-> ##[1:m] b;\n"
+      "  endproperty\n"
+      "  sequence sbody1(x);\n"
+      "    sop(x, P);\n"
+      "  endsequence\n"
+      "  sequence sbody2(x);\n"
+      "    sub(x, P);\n"
+      "  endsequence\n"
+      "  property pbody1(x);\n"
+      "    pop(x, P);\n"
+      "  endproperty\n"
+      "  property pbody2(x);\n"
+      "    pub(x, P);\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) sop(a, P));\n"
+      "  a2: assert property (@(posedge clk) sub(a, P));\n"
+      "  a3: assert property (@(posedge clk) sint(a, P));\n"
+      "  a4: assert property (@(posedge clk) sunt(a, P));\n"
+      "  a5: assert property (@(posedge clk) pop(a, P));\n"
+      "  a6: assert property (@(posedge clk) pub(a, P));\n"
+      "  a7: assert property (@(posedge clk) sop(.m(P), .x(a)));\n"
+      "  a8: assert property (@(posedge clk) sub(.m(P), .x(a)));\n"
+      "  a9: assert property (@(posedge clk) usop(a, U));\n"
+      "  a10: assert property (@(posedge clk) usub(a, $unit::U));\n"
+      "  a11: assert property (@(posedge clk) usop(a, $unit::U));\n"
+      "  a12: assert property (@(posedge clk) usop(a, pk::K));\n"
+      "  a13: assert property (@(posedge clk) usub(a, pk::K));\n"
+      "  c1: cover property (@(posedge clk) sop(a, P));\n"
+      "  cop k1(a, P, posedge clk);\n"
+      "  cub k2(a, P, posedge clk);\n"
+      "  cint k3(a, P, posedge clk);\n"
+      "  cop k4(.n(P), .x(a), .clk(posedge clk));\n"
+      "  cub k5(.n(P), .x(a), .clk(posedge clk));\n"
+      "  cpass k6(a, posedge clk);\n"
+      "  ifc i(clk);\n"
+      "  prg p(clk);\n"
+      "  always @(posedge clk) begin\n"
+      "    cop k7(a, P, posedge clk);\n"
+      "    cub k8(a, P, posedge clk);\n"
+      "    assert property (sop(a, P));\n"
+      "    assert property (sub(a, P));\n"
+      "    cop k9(a, P - 1, posedge clk);\n"
+      "  end\n"
+      "  generate if (1) begin : g\n"
+      "    g1: assert property (@(posedge clk) sop(a, P));\n"
+      "    g2: assert property (@(posedge clk) sub(a, P));\n"
+      "    cop k10(a, P, posedge clk);\n"
+      "  end endgenerate\n"
+      "endmodule\n",
+      f);
+  ExpectDollarParamReportedOnlyOn(
+      f, {21, 23, 29, 31, 37, 62, 68, 73, 75,  77,  79, 81,
+          83, 84, 86, 87, 89, 90, 96, 98, 100, 103, 105},
+      {22, 24, 30, 32, 38, 65, 71, 74, 76, 78, 80, 82, 85, 88, 91, 97, 99,
+       104});
+  const char* const kOnlyBounds =
+      "only when that formal is untyped and referenced only as a cycle delay "
+      "range's upper bound";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'm' of 'sop' only", 73,
+                            "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'm' of 'pop' only", 77,
+                            "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'm' of 'sop' only", 79,
+                            "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOnlyBounds, 87, "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'n' of 'cop' only", 87,
+                            "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'n' of 'cint' only", 89,
+                            "6.20.7"));
+}
+
 }  // namespace

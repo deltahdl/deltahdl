@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string_view>
 #include <unordered_set>
 
@@ -27,6 +28,8 @@ void ValidateAssertionExprRules(const ModuleInUnit& scope,
                                 const RtlirModule* mod, const ScopeMap& params,
                                 const PropertyRegistry& registry,
                                 DiagEngine& diag);
+
+bool FormalAdmitsDollar(const ModuleItem* decl, size_t i);
 
 void ValidateAssertionBoundRules(
     const ModuleDecl* decl, const ScopeMap& params,

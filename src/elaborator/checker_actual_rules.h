@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
@@ -10,6 +11,8 @@ class DiagEngine;
 struct TypeShapeTables;
 struct ModuleDecl;
 struct ModuleItem;
+
+bool CheckerFormalAdmitsDollar(const ModuleDecl* checker, size_t i);
 
 void ValidateCheckerActuals(const ModuleItem* item, const ModuleDecl* checker,
                             DiagEngine& diag);

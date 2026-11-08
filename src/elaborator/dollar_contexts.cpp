@@ -1,19 +1,24 @@
 #include "elaborator/dollar_contexts.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <set>
 #include <string_view>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_rules.h"
 #include "elaborator/assertion_walk.h"
+#include "elaborator/checker_actual_rules.h"
 #include "elaborator/declared_types.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/queue_dim.h"
@@ -66,8 +71,15 @@ struct DollarParams {
   std::set<std::pair<std::string_view, std::string_view>> scoped;
 };
 
+struct DollarTaker {
+  const ModuleItem* decl = nullptr;
+  const ModuleDecl* checker = nullptr;
+};
+
+using DollarTakers = std::unordered_map<std::string_view, DollarTaker>;
+
 struct DollarReport {
-  const NameSet& dollar_takers;
+  const DollarTakers& dollar_takers;
   const DollarParams& params;
   DiagEngine& diag;
   std::set<std::tuple<uint32_t, uint32_t, uint32_t>> reported;
@@ -247,31 +259,32 @@ static void NoteLocalNames(const Stmt* s, DollarScope& scope) {
                    [&scope](Stmt* const& sub) { NoteLocalNames(sub, scope); });
 }
 
-static void AddDollarTakerNames(const std::vector<ModuleItem*>& items,
-                                NameSet& names) {
+static void AddDollarTakers(const std::vector<ModuleItem*>& items,
+                            DollarTakers& takers) {
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kSequenceDecl ||
         item->kind == ModuleItemKind::kPropertyDecl) {
-      names.insert(item->name);
+      takers.insert_or_assign(item->name, DollarTaker{item, nullptr});
     }
     const ModuleDecl* nested = item->nested_module_decl;
     if (nested != nullptr && nested->decl_kind == ModuleDeclKind::kChecker)
-      names.insert(nested->name);
-    AddDollarTakerNames(item->clocking_decls, names);
+      takers.insert_or_assign(nested->name, DollarTaker{nullptr, nested});
+    AddDollarTakers(item->clocking_decls, takers);
     for (const ModuleItem* arm = item; arm != nullptr; arm = arm->gen_else)
-      AddDollarTakerNames(arm->gen_body, names);
+      AddDollarTakers(arm->gen_body, takers);
     for (const GenerateCaseItem& arm : item->gen_case_items)
-      AddDollarTakerNames(arm.body, names);
+      AddDollarTakers(arm.body, takers);
   }
 }
 
-static NameSet UnitDollarTakers(const CompilationUnit& unit) {
-  NameSet names;
-  AddDollarTakerNames(unit.cu_items, names);
+static DollarTakers UnitDollarTakers(const CompilationUnit& unit) {
+  DollarTakers takers;
   for (const PackageDecl* pkg : unit.packages)
-    AddDollarTakerNames(pkg->items, names);
-  for (const ModuleDecl* checker : unit.checkers) names.insert(checker->name);
-  return names;
+    AddDollarTakers(pkg->items, takers);
+  for (const ModuleDecl* checker : unit.checkers)
+    takers.insert_or_assign(checker->name, DollarTaker{nullptr, checker});
+  AddDollarTakers(unit.cu_items, takers);
+  return takers;
 }
 
 static bool SelectsANonQueue(const Expr* select, const DollarScan& scan) {
@@ -341,6 +354,81 @@ static void CheckAdmittingLoneDollar(const Expr* e, const DollarScan& scan) {
     return;
   }
   CheckDollarOperand(e, scan);
+}
+
+struct BoundFormal {
+  std::string_view taker;
+  std::string_view name;
+  bool admits_dollar = true;
+  bool of_checker = false;
+};
+
+template <typename Formals, typename Proj>
+static size_t FormalPosition(const Formals& formals, std::string_view name,
+                             size_t position, Proj proj) {
+  if (name.empty()) return position;
+  return static_cast<size_t>(std::ranges::find(formals, name, proj) -
+                             formals.begin());
+}
+
+static BoundFormal FormalOf(const DollarTaker& taker, std::string_view name,
+                            size_t position) {
+  if (taker.checker != nullptr) {
+    const std::vector<PortDecl>& ports = taker.checker->ports;
+    const size_t kAt = FormalPosition(ports, name, position, &PortDecl::name);
+    if (kAt >= ports.size()) return {};
+    return {taker.checker->name, ports[kAt].name,
+            CheckerFormalAdmitsDollar(taker.checker, kAt), true};
+  }
+  const std::vector<std::string_view>& formals = taker.decl->prop_formals;
+  const size_t kAt = FormalPosition(formals, name, position, std::identity{});
+  if (kAt >= formals.size()) return {};
+  return {taker.decl->name, formals[kAt], FormalAdmitsDollar(taker.decl, kAt),
+          false};
+}
+
+static void CheckBoundActual(const Expr* actual, const BoundFormal& formal,
+                             const DollarScan& scan) {
+  const std::string_view kParam =
+      actual != nullptr ? DollarParamNamed(actual, scan) : std::string_view{};
+  if (kParam.empty() || formal.admits_dollar) {
+    CheckAdmittingLoneDollar(actual, scan);
+    return;
+  }
+  if (!MarkReported(actual, scan.report)) return;
+  scan.report.diag.Error(
+      actual->range.start,
+      std::format("parameter '{}' holds '$', so it may stand only where '$' "
+                  "itself may, and '$' may bind the formal '{}' of '{}' only "
+                  "when that formal is untyped and referenced only as a cycle "
+                  "delay range's upper bound{}",
+                  kParam, formal.name, formal.taker,
+                  formal.of_checker
+                      ? ", an instance's actual or a nested checker's default"
+                      : " or an instance's actual"),
+      Subclause("6.20.7"));
+}
+
+static void CheckCallActuals(const Expr* call, const DollarTaker& taker,
+                             const DollarScan& scan) {
+  for (size_t k = 0; k < call->args.size(); ++k) {
+    const std::string_view kName =
+        k < call->arg_names.size() ? call->arg_names[k] : std::string_view{};
+    CheckBoundActual(call->args[k], FormalOf(taker, kName, k), scan);
+  }
+}
+
+static void CheckInstanceActuals(const ModuleItem* item,
+                                 const DollarScan& scan) {
+  const auto kTaker = scan.report.dollar_takers.find(item->inst_module);
+  for (size_t k = 0; k < item->inst_ports.size(); ++k) {
+    const auto& [name, actual] = item->inst_ports[k];
+    if (kTaker != scan.report.dollar_takers.end()) {
+      CheckBoundActual(actual, FormalOf(kTaker->second, name, k), scan);
+    } else {
+      CheckDollarOperand(actual, scan);
+    }
+  }
 }
 
 static void ReportDollarParamsIn(const Expr* e, const DollarScan& scan) {
@@ -414,9 +502,11 @@ static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
     CheckSelect(e, scan);
     return;
   }
-  if (e->kind == ExprKind::kCall &&
-      scan.report.dollar_takers.count(e->callee) != 0) {
-    for (const Expr* actual : e->args) CheckAdmittingLoneDollar(actual, scan);
+  const auto kTaker = e->kind == ExprKind::kCall
+                          ? scan.report.dollar_takers.find(e->callee)
+                          : scan.report.dollar_takers.end();
+  if (kTaker != scan.report.dollar_takers.end()) {
+    CheckCallActuals(e, kTaker->second, scan);
     return;
   }
   ForEachValueChild(
@@ -568,6 +658,8 @@ static void CheckDollarStmt(const Stmt* s, const DollarScan& scan) {
   ForEachChildExpr(s, [&scan, &dims](const Expr* e) {
     if (std::ranges::find(dims, e) == dims.end()) CheckDollarOperand(e, scan);
   });
+  if (s->kind == StmtKind::kCheckerInstantiation && s->decl_item != nullptr)
+    CheckInstanceActuals(s->decl_item, scan);
   if (s->kind == StmtKind::kIf) {
     CheckTakenBranches(s, scan);
     return;
@@ -598,19 +690,6 @@ static void CheckSubroutine(const ModuleItem* item, const DollarScan& outer) {
   for (const Stmt* s : item->func_body_stmts) NoteLocalNames(s, scope);
   const DollarScan kInner{scope, outer.report};
   for (const Stmt* s : item->func_body_stmts) CheckDollarStmt(s, kInner);
-}
-
-static void CheckInstanceActuals(const ModuleItem* item,
-                                 const DollarScan& scan) {
-  const bool kTakesDollar =
-      scan.report.dollar_takers.count(item->inst_module) != 0;
-  for (const auto& [name, actual] : item->inst_ports) {
-    if (kTakesDollar) {
-      CheckAdmittingLoneDollar(actual, scan);
-    } else {
-      CheckDollarOperand(actual, scan);
-    }
-  }
 }
 
 static void CheckDollarItems(const std::vector<ModuleItem*>& items,
@@ -817,8 +896,8 @@ static void CheckDollarItems(const std::vector<ModuleItem*>& items,
 
 void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
                          const InstanceParams& instance, DiagEngine& diag) {
-  NameSet takers = UnitDollarTakers(unit);
-  AddDollarTakerNames(decl->items, takers);
+  DollarTakers takers = UnitDollarTakers(unit);
+  AddDollarTakers(decl->items, takers);
   const DollarParams kParams = UnitDollarParams(unit);
   DollarReport report{takers, kParams, diag, {}};
   DollarScope unit_scope;
@@ -842,7 +921,7 @@ void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,
 }
 
 void CheckUnitDollarOperands(const CompilationUnit& unit, DiagEngine& diag) {
-  const NameSet kTakers = UnitDollarTakers(unit);
+  const DollarTakers kTakers = UnitDollarTakers(unit);
   const DollarParams kParams = UnitDollarParams(unit);
   DollarReport report{kTakers, kParams, diag, {}};
   const DollarScope kRoot;

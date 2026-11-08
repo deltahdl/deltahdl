@@ -125,16 +125,6 @@ void CheckRange(const PropertyExprNode& node, const BoundScope& scope,
              Subclause(always ? "16.12.11" : "16.12.13"));
 }
 
-bool AdmitsDollar(const ModuleItem* decl, size_t i) {
-  std::string_view name = decl->prop_formals[i];
-  FormalReferences refs;
-  CountFormalInBody(decl->seq_linear, name, refs);
-  CountFormalInExpr(decl->prop_body_expr, name, refs);
-  CountFormalInTree(decl->prop_body_tree, name, refs);
-  return decl->prop_formal_type_kw[i] == TokenKind::kKwUntyped &&
-         refs.all == refs.permitted;
-}
-
 const Expr* ActualOf(const Expr* call, const ModuleItem* decl, size_t i) {
   const Expr* actual = i < call->args.size() ? call->args[i] : nullptr;
   return actual != nullptr ? actual : decl->prop_formal_defaults[i];
@@ -145,7 +135,7 @@ void CheckDollarActuals(const Expr* call, const ModuleItem* decl,
   const char* clause =
       decl->kind == ModuleItemKind::kSequenceDecl ? "16.8" : "16.12";
   for (size_t i = 0; i < decl->prop_formals.size(); ++i) {
-    if (!IsNameRef(ActualOf(call, decl, i), "$") || AdmitsDollar(decl, i))
+    if (!IsNameRef(ActualOf(call, decl, i), "$") || FormalAdmitsDollar(decl, i))
       continue;
     diag.Error(call->range.start,
                "$ binds the formal '" + std::string(decl->prop_formals[i]) +
@@ -212,6 +202,16 @@ void CheckTree(const PropertyExprNode* node, const BoundScope& scope,
 }
 
 }  // namespace
+
+bool FormalAdmitsDollar(const ModuleItem* decl, size_t i) {
+  std::string_view name = decl->prop_formals[i];
+  FormalReferences refs;
+  CountFormalInBody(decl->seq_linear, name, refs);
+  CountFormalInExpr(decl->prop_body_expr, name, refs);
+  CountFormalInTree(decl->prop_body_tree, name, refs);
+  return decl->prop_formal_type_kw[i] == TokenKind::kKwUntyped &&
+         refs.all == refs.permitted;
+}
 
 void ValidateAssertionBoundRules(const ModuleDecl* decl, const ScopeMap& params,
                                  const NameSet& unbounded, DiagEngine& diag) {

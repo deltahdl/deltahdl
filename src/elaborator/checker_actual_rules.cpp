@@ -88,12 +88,8 @@ FormalReferences CheckerReferences(const ModuleDecl* decl,
 
 void CheckDollarActual(const ModuleItem* item, const ModuleDecl* checker,
                        size_t i, DiagEngine& diag) {
+  if (CheckerFormalAdmitsDollar(checker, i)) return;
   const PortDecl& port = checker->ports[i];
-  FormalReferences refs = CheckerReferences(checker, port.name);
-  if (port.formal_type == PropertyFormalType::kUntyped &&
-      refs.all == refs.permitted) {
-    return;
-  }
   diag.Error(item->loc,
              "$ binds the formal '" + std::string(port.name) +
                  "' of checker '" + std::string(checker->name) +
@@ -227,6 +223,13 @@ void CheckOutsideFunctionCalls(const ModuleDecl* checker, NamedDecls funcs,
 }
 
 }  // namespace
+
+bool CheckerFormalAdmitsDollar(const ModuleDecl* checker, size_t i) {
+  const PortDecl& port = checker->ports[i];
+  FormalReferences refs = CheckerReferences(checker, port.name);
+  return port.formal_type == PropertyFormalType::kUntyped &&
+         refs.all == refs.permitted;
+}
 
 void ValidateCheckerActuals(const ModuleItem* item, const ModuleDecl* checker,
                             DiagEngine& diag) {
