@@ -1,15 +1,3 @@
-# Every clause and subclause identifier IEEE 1800-2023 defines, one per line.
-#
-# This is the set a Subclause("...") string in src/ has to name. What compares
-# the two is invalid_citations in scripts/assert_subclause_citations/__init__.py,
-# and it exists so that a citation always names something a reader can open.
-# It does not judge whether a citation is the right clause for the rule it
-# reports, which is a reading of the standard rather than a comparison of
-# strings.
-#
-# The list is committed because the standard is a PDF no CI runner has, and
-# it is complete: IEEE 1800-2023 is the one edition deltahdl follows, so the
-# identifiers it defines do not change.
 1
 1.1
 1.10

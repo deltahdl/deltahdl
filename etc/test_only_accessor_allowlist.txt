@@ -1,29 +1,11 @@
-# Accessors that hand back a container and have no caller under src/, each with
-# the reading that says why it is here. assert-no-test-only-accessors in
-# .github/workflows/deltahdl.yml reports exactly this shape, and the job fails
-# both on a name that is not listed and on a line here naming a name it no
-# longer reports, so an entry cannot outlive its reason.
-#
-# There are two reasons an entry is legitimate, and they are not the same:
-# a window a test reads the object through, where production reads the member
-# itself and the accessor is spare; and a defect that is filed, where nothing
-# reads the data at all and the issue says what is to become of it. Nothing
-# else belongs here. An entry with no reason is what this file exists to make
-# impossible.
-#
-# Format: <accessor> <header> <reason>
-
-# Production reads the member directly.
-CellsNotPrecompiled src/elaborator/separate_compilation_bind.h separate_compilation_bind.cpp:128 reports each missing cell and :133 answers from the list being empty
-Entries src/simulator/sva_engine_queues.h sva_engine.cpp:301 :307 mature the deferred reports and :316 :331 take the matured ones out, and :21 :27 :33 mature and flush the pending procedural assertions
-GetDeclaredSpecparamsWithInstance src/simulator/specify.h specify.cpp:582 :591 and specify_pulse.cpp:259 walk the declarations and specify.h:173 builds the name list from them
-GetInterconnectDelays src/simulator/specify.h specify_interconnect.cpp:311 :594 :610 :626 :679 :686 select a delay from it and specify.cpp:486 :489 increment it
-GetPrimitiveDrivers src/simulator/specify.h specify_sdf_device.cpp:52 finds the annotated driver and :65 the one to annotate, and specify_pulse.cpp:168 replaces one rebuilt
-GetSpecparamValues src/simulator/specify.h specify_pulse.cpp:335 :336 read the stored value to increment it
-OpenEnvelopes src/preprocessor/protect_envelope.h protect_envelope.cpp:32 counts them :65 finds the one to close and :91 :94 append a keyword to the innermost
-Partitions src/simulator/mt_sim.h mt_sim.cpp:89 returns when there are none and :107 :115 run each one, in turn or on a thread of its own
-PendingEnvelopeKeywords src/preprocessor/protect_envelope.h protect_envelope.cpp:58 moves them onto the envelope being opened
-ProtectViewports src/preprocessor/preprocessor.h preprocessor_protect_viewport.cpp:91 :101 hand each one to the source manager and :19 :41 set them aside and restore them around a nested envelope
-
-# Nothing under src/ reads the data; each is filed.
-ClosedEnvelopes src/preprocessor/protect_envelope.h #11462
+CellsNotPrecompiled src/elaborator/separate_compilation_bind.h
+ClosedEnvelopes src/preprocessor/protect_envelope.h
+Entries src/simulator/sva_engine_queues.h
+GetDeclaredSpecparamsWithInstance src/simulator/specify.h
+GetInterconnectDelays src/simulator/specify.h
+GetPrimitiveDrivers src/simulator/specify.h
+GetSpecparamValues src/simulator/specify.h
+OpenEnvelopes src/preprocessor/protect_envelope.h
+Partitions src/simulator/mt_sim.h
+PendingEnvelopeKeywords src/preprocessor/protect_envelope.h
+ProtectViewports src/preprocessor/preprocessor.h

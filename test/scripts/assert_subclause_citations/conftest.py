@@ -12,13 +12,7 @@ def repo_root() -> Path:
 @pytest.fixture()
 def clauses_file(tmp_path: Path) -> Path:
     path = tmp_path / "clauses.txt"
-    path.write_text(
-        "# Two clause identifiers of IEEE 1800-2023, one per line.\n"
-        "#\n"
-        "\n"
-        "11.4.14\n"
-        "A.10\n"
-    )
+    path.write_text("11.4.14\nA.10\n")
     return path
 
 

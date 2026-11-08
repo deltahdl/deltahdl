@@ -3,6 +3,7 @@ from pathlib import Path
 
 CLAUSES_FILE = Path(__file__).parent / "clauses.txt"
 
+_CLAUSE_RE = re.compile(r"(?:[0-9]+|[A-Z])(?:\.[0-9]+)*")
 _CITATION_RE = re.compile(r'Subclause\("([^"]*)"\)')
 _CALL_RE = re.compile(r"\b(?:Error|Warning)\s*\(")
 _STRING_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
@@ -83,8 +84,12 @@ def messages_citing_two_subclauses(root: Path) -> dict[str, set[str]]:
 
 def known_subclauses(clauses_file: Path = CLAUSES_FILE) -> set[str]:
     lines = clauses_file.read_text(encoding="utf-8").splitlines()
-    return {line.strip() for line in lines
-            if line.strip() and not line.startswith("#")}
+    for number, line in enumerate(lines, start=1):
+        if not _CLAUSE_RE.fullmatch(line):
+            raise ValueError(
+                f"{clauses_file}:{number}: {line!r} is not a clause identifier"
+            )
+    return set(lines)
 
 
 def citations_in_tree(root: Path) -> dict[str, set[str]]:
