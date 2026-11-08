@@ -11,9 +11,11 @@
 #include <utility>
 #include <vector>
 
+#include "common/array_methods.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/string_methods.h"
+#include "common/system_call_writes.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
@@ -31,11 +33,24 @@ namespace delta {
 
 namespace {
 
-enum class Constness : uint8_t { kWritable, kConstant, kConstantHandle };
+enum class Constness : uint8_t {
+  kWritable,
+  kConstant,
+  kConstantHandle,
+  kEnumMember
+};
+
+enum class EnumMemberTargets : uint8_t { kSkipped, kCounted };
 
 struct DeclaredName {
   Constness constness = Constness::kWritable;
   const ModuleDecl* instance_of = nullptr;
+  size_t unpacked_dims = 0;
+};
+
+struct SelectedObject {
+  std::optional<DeclaredName> declared;
+  size_t selects = 0;
 };
 
 using SubroutineTable = std::unordered_map<std::string_view, const ModuleItem*>;
@@ -76,14 +91,60 @@ std::optional<Constness> ConstnessOfItem(const ModuleItem* item,
   }
 }
 
+bool CountsAsConstant(Constness constness, EnumMemberTargets enum_members) {
+  if (constness == Constness::kEnumMember)
+    return enum_members == EnumMemberTargets::kCounted;
+  return constness != Constness::kWritable;
+}
+
+void ForEachDeclaredEnumMember(
+    const DataType& type, const std::function<void(std::string_view)>& fn) {
+  ForEachEnumTypeIn(type, [&fn](std::string_view, const DataType& enum_type) {
+    for (const EnumMember& member : enum_type.enum_members) {
+      if (member.range_start == nullptr) fn(member.name);
+    }
+  });
+}
+
+const DataType& DeclaredTypeOf(const ModuleItem* item) {
+  return item->kind == ModuleItemKind::kTypedef ? item->typedef_type
+                                                : item->data_type;
+}
+
+const DataType& MemberDeclaredType(const ClassMember* m) {
+  return m->typedef_item != nullptr ? DeclaredTypeOf(m->typedef_item)
+                                    : m->data_type;
+}
+
+bool DeclaresEnumMember(const DataType& type, std::string_view name) {
+  bool declares = false;
+  ForEachDeclaredEnumMember(type, [name, &declares](std::string_view member) {
+    declares = declares || member == name;
+  });
+  return declares;
+}
+
+std::optional<DeclaredName> DeclaredAmong(const std::vector<ModuleItem*>& items,
+                                          std::string_view name,
+                                          const NameSet& class_names) {
+  for (const ModuleItem* item : items) {
+    std::optional<Constness> constness =
+        item->name == name ? ConstnessOfItem(item, class_names) : std::nullopt;
+    if (constness.has_value())
+      return DeclaredName{*constness, nullptr, item->unpacked_dims.size()};
+    if (DeclaresEnumMember(DeclaredTypeOf(item), name))
+      return DeclaredName{Constness::kEnumMember, nullptr, 0};
+  }
+  return std::nullopt;
+}
+
 std::optional<Constness> ConstnessAmong(const std::vector<ModuleItem*>& items,
                                         std::string_view name,
                                         const NameSet& class_names) {
-  for (const ModuleItem* item : items) {
-    if (item->name != name) continue;
-    if (auto constness = ConstnessOfItem(item, class_names)) return constness;
-  }
-  return std::nullopt;
+  std::optional<DeclaredName> declared =
+      DeclaredAmong(items, name, class_names);
+  if (!declared.has_value()) return std::nullopt;
+  return declared->constness;
 }
 
 std::optional<Constness> ConstnessInModule(const ModuleDecl* decl,
@@ -104,6 +165,8 @@ std::optional<Constness> ConstnessInClass(const ClassDecl* cls,
   for (const ClassMember* m : cls->members) {
     if (m->kind == ClassMemberKind::kProperty && m->name == name)
       return m->is_param ? Constness::kConstant : Constness::kWritable;
+    if (DeclaresEnumMember(MemberDeclaredType(m), name))
+      return Constness::kEnumMember;
   }
   return std::nullopt;
 }
@@ -141,6 +204,17 @@ NameSet EnumMembersIn(const std::vector<ModuleItem*>& items) {
                           });
   }
   return names;
+}
+
+std::string_view ScopeRandomizeOf(const Expr* callee) {
+  if (callee == nullptr) return {};
+  if (callee->kind == ExprKind::kIdentifier) {
+    return callee->text == "randomize" ? "randomize" : "";
+  }
+  bool from_std = callee->kind == ExprKind::kMemberAccess &&
+                  ExprIdent(callee->lhs) == "std" &&
+                  ExprIdent(callee->rhs) == "randomize";
+  return from_std ? "std::randomize" : "";
 }
 
 const PackageDecl* FindPackage(const CompilationUnit* unit,
@@ -263,29 +337,38 @@ class ConstantWriteWalk {
   }
   void Restore(const Mark& mark);
   void Declare(std::string_view name, Constness constness,
-               const ModuleDecl* instance_of = nullptr) {
-    names_.emplace_back(name, DeclaredName{constness, instance_of});
+               const ModuleDecl* instance_of = nullptr,
+               size_t unpacked_dims = 0) {
+    names_.emplace_back(name,
+                        DeclaredName{constness, instance_of, unpacked_dims});
   }
   void DeclareItem(const ModuleItem* item);
+  void DeclareEnumMembers(const DataType& type);
   void DeclareClass(const ClassDecl* cls);
   void DeclareClassMembers(const ClassDecl* cls);
   void DeclareLoopVariables(const Stmt* s);
 
   std::optional<DeclaredName> Find(std::string_view name) const;
-  std::optional<Constness> ImportedConstness(std::string_view name) const;
+  std::optional<DeclaredName> ImportedName(std::string_view name) const;
   const ClassDecl* FindClass(std::string_view name) const;
   const ModuleItem* FindSubroutine(std::string_view name) const;
   std::optional<Constness> ScopeMemberConstness(std::string_view scope,
                                                 std::string_view name) const;
+  SelectedObject ObjectSelected(const Expr* object) const;
+  bool NamesAConstantHandle(const Expr* object) const;
+  bool NamesAnArray(const Expr* object) const;
 
-  std::string WrittenConstant(const Expr* target) const;
-  std::string ScopedConstant(std::string_view scope,
-                             std::string_view name) const;
+  std::string WrittenConstant(const Expr* target,
+                              EnumMemberTargets enum_members) const;
+  std::string IdentifiedConstant(std::string_view name,
+                                 EnumMemberTargets enum_members) const;
+  std::string ScopedConstant(std::string_view scope, std::string_view name,
+                             EnumMemberTargets enum_members) const;
   std::string MemberConstant(const Expr* e) const;
   std::string HierarchicalConstant(
       const ModuleDecl* decl, const std::vector<std::string_view>& path) const;
   void ForEachWrittenConstant(
-      const Expr* target,
+      const Expr* target, EnumMemberTargets enum_members,
       const std::function<void(const std::string&)>& report) const;
 
   void WalkItem(const ModuleItem* item);
@@ -295,9 +378,15 @@ class ConstantWriteWalk {
   void WalkStmt(const Stmt* s);
   void CheckStmt(const Stmt* s);
   void CheckExpr(const Expr* e);
-  void CheckStringMethod(const Expr* call);
+  void CheckWrite(const Expr* e);
+  void CheckBuiltInMethod(const Expr* call);
+  void CheckParenlessArrayMethod(const Expr* access);
+  void CheckScopeRandomize(const Expr* call);
+  void CheckSystemCall(const Expr* call);
   void CheckActuals(const Expr* call);
-  void ReportTarget(const Expr* target, SourceLoc loc);
+  void ReportTarget(const Expr* target, SourceLoc loc,
+                    EnumMemberTargets enum_members);
+  void ReportWrittenBy(const Expr* actual, std::string_view writer);
   void ReportNonVariableTarget(const Expr* lhs, const Stmt* s);
 
   const ConstantWriteTables& tables_;
@@ -327,7 +416,7 @@ void ConstantWriteWalk::DeclareModule(const ModuleDecl* decl) {
         port.is_interface_port
             ? FindDefinition(tables_.unit, port.data_type.type_name)
             : nullptr;
-    Declare(port.name, Constness::kWritable, bound);
+    Declare(port.name, Constness::kWritable, bound, port.unpacked_dims.size());
   }
   DeclareItems(decl->items);
 }
@@ -357,7 +446,14 @@ void ConstantWriteWalk::DeclareItem(const ModuleItem* item) {
       break;
   }
   if (auto constness = ConstnessOfItem(item, tables_.class_names))
-    Declare(item->name, *constness);
+    Declare(item->name, *constness, nullptr, item->unpacked_dims.size());
+  DeclareEnumMembers(DeclaredTypeOf(item));
+}
+
+void ConstantWriteWalk::DeclareEnumMembers(const DataType& type) {
+  ForEachDeclaredEnumMember(type, [this](std::string_view member) {
+    Declare(member, Constness::kEnumMember);
+  });
 }
 
 void ConstantWriteWalk::DeclareClass(const ClassDecl* cls) {
@@ -378,9 +474,11 @@ void ConstantWriteWalk::DeclareClassMembers(const ClassDecl* cls) {
     Declare(param, Constness::kConstant);
   }
   for (const ClassMember* m : cls->members) {
+    DeclareEnumMembers(MemberDeclaredType(m));
     if (m->kind == ClassMemberKind::kProperty) {
       Declare(m->name,
-              m->is_param ? Constness::kConstant : Constness::kWritable);
+              m->is_param ? Constness::kConstant : Constness::kWritable,
+              nullptr, m->unpacked_dims.size());
     } else if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
       subroutines_.push_back(m->method);
     }
@@ -403,20 +501,18 @@ std::optional<DeclaredName> ConstantWriteWalk::Find(
   for (auto it = names_.rbegin(); it != names_.rend(); ++it) {
     if (it->first == name) return it->second;
   }
-  if (auto constness = ImportedConstness(name))
-    return DeclaredName{*constness, nullptr};
-  return std::nullopt;
+  return ImportedName(name);
 }
 
-std::optional<Constness> ConstantWriteWalk::ImportedConstness(
+std::optional<DeclaredName> ConstantWriteWalk::ImportedName(
     std::string_view name) const {
   for (const ImportItem* import : imports_) {
     if (!import->is_wildcard && import->item_name != name) continue;
     const PackageDecl* pkg = FindPackage(tables_.unit, import->package_name);
-    std::optional<Constness> constness =
+    std::optional<DeclaredName> declared =
         pkg == nullptr ? std::nullopt
-                       : ConstnessAmong(pkg->items, name, tables_.class_names);
-    if (constness.has_value()) return constness;
+                       : DeclaredAmong(pkg->items, name, tables_.class_names);
+    if (declared.has_value()) return declared;
   }
   return std::nullopt;
 }
@@ -448,32 +544,69 @@ std::optional<Constness> ConstantWriteWalk::ScopeMemberConstness(
   return cls == nullptr ? std::nullopt : ConstnessInClass(cls, name);
 }
 
-std::string ConstantWriteWalk::WrittenConstant(const Expr* target) const {
+SelectedObject ConstantWriteWalk::ObjectSelected(const Expr* object) const {
+  SelectedObject selected;
+  while (object->kind == ExprKind::kSelect && object->base != nullptr) {
+    object = object->base;
+    ++selected.selects;
+  }
+  if (object->kind == ExprKind::kIdentifier)
+    selected.declared = Find(object->text);
+  return selected;
+}
+
+bool ConstantWriteWalk::NamesAConstantHandle(const Expr* object) const {
+  SelectedObject selected = ObjectSelected(object);
+  return selected.declared.has_value() &&
+         selected.declared->constness == Constness::kConstantHandle &&
+         selected.selects >= selected.declared->unpacked_dims;
+}
+
+bool ConstantWriteWalk::NamesAnArray(const Expr* object) const {
+  SelectedObject selected = ObjectSelected(object);
+  return selected.declared.has_value() &&
+         selected.selects < selected.declared->unpacked_dims;
+}
+
+std::string ConstantWriteWalk::WrittenConstant(
+    const Expr* target, EnumMemberTargets enum_members) const {
   const Expr* e = WithoutSelects(target);
   if (e->kind == ExprKind::kIdentifier) {
-    if (e->scope_prefix == "$unit") return ScopedConstant("$unit", e->text);
-    std::optional<DeclaredName> declared = Find(e->text);
-    bool constant =
-        declared.has_value() && declared->constness != Constness::kWritable;
-    return constant ? std::string(e->text) : std::string();
+    return e->scope_prefix == "$unit"
+               ? ScopedConstant("$unit", e->text, enum_members)
+               : IdentifiedConstant(e->text, enum_members);
   }
   if (e->kind != ExprKind::kMemberAccess) return {};
   return e->is_scope_resolution
-             ? ScopedConstant(ExprIdent(e->lhs), ExprIdent(e->rhs))
+             ? ScopedConstant(ExprIdent(e->lhs), ExprIdent(e->rhs),
+                              EnumMemberTargets::kCounted)
              : MemberConstant(e);
 }
 
-std::string ConstantWriteWalk::ScopedConstant(std::string_view scope,
-                                              std::string_view name) const {
+std::string ConstantWriteWalk::IdentifiedConstant(
+    std::string_view name, EnumMemberTargets enum_members) const {
+  std::optional<DeclaredName> declared = Find(name);
+  bool constant = declared.has_value()
+                      ? CountsAsConstant(declared->constness, enum_members)
+                      : enum_members == EnumMemberTargets::kCounted &&
+                            tables_.enum_members.contains(name);
+  return constant ? std::string(name) : std::string();
+}
+
+std::string ConstantWriteWalk::ScopedConstant(
+    std::string_view scope, std::string_view name,
+    EnumMemberTargets enum_members) const {
   std::optional<Constness> constness = ScopeMemberConstness(scope, name);
-  if (!constness.has_value() || *constness == Constness::kWritable) return {};
+  if (!constness.has_value() || !CountsAsConstant(*constness, enum_members))
+    return {};
   return std::format("{}::{}", scope, name);
 }
 
 std::string ConstantWriteWalk::MemberConstant(const Expr* e) const {
   const Expr* root = MemberRoot(e);
   if (root == nullptr) return {};
-  if (root->scope_prefix == "$unit") return ScopedConstant("$unit", root->text);
+  if (root->scope_prefix == "$unit")
+    return ScopedConstant("$unit", root->text, EnumMemberTargets::kSkipped);
   bool from_root = root->scope_prefix == "$root";
   std::optional<DeclaredName> declared =
       from_root ? std::nullopt : Find(root->text);
@@ -501,16 +634,16 @@ std::string ConstantWriteWalk::HierarchicalConstant(
 }
 
 void ConstantWriteWalk::ForEachWrittenConstant(
-    const Expr* target,
+    const Expr* target, EnumMemberTargets enum_members,
     const std::function<void(const std::string&)>& report) const {
   if (target == nullptr) return;
   if (IsLvalueAggregate(target)) {
     for (const Expr* element : target->elements) {
-      ForEachWrittenConstant(element, report);
+      ForEachWrittenConstant(element, enum_members, report);
     }
     return;
   }
-  std::string written = WrittenConstant(target);
+  std::string written = WrittenConstant(target, enum_members);
   if (!written.empty()) report(written);
 }
 
@@ -564,7 +697,8 @@ void ConstantWriteWalk::WalkOutOfBlockMethod(const ModuleItem* item) {
 void ConstantWriteWalk::WalkSubroutine(const ModuleItem* item) {
   Mark mark = Here();
   for (const FunctionArg& formal : item->func_args) {
-    Declare(formal.name, Constness::kWritable);
+    Declare(formal.name, Constness::kWritable, nullptr,
+            formal.unpacked_dims.size());
   }
   for (const Stmt* s : item->func_body_stmts) WalkStmt(s);
   Restore(mark);
@@ -601,7 +735,8 @@ void ConstantWriteWalk::WalkStmt(const Stmt* s) {
         s->var_is_param ? Constness::kConstant
                         : ConstnessOfVariable(s->var_is_const, s->var_decl_type,
                                               tables_.class_names);
-    Declare(s->var_name, constness);
+    DeclareEnumMembers(s->var_decl_type);
+    Declare(s->var_name, constness, nullptr, s->var_unpacked_dims.size());
     return;
   }
   Mark mark = Here();
@@ -615,7 +750,7 @@ void ConstantWriteWalk::CheckStmt(const Stmt* s) {
   switch (s->kind) {
     case StmtKind::kBlockingAssign:
     case StmtKind::kNonblockingAssign:
-      ReportTarget(s->lhs, s->range.start);
+      ReportTarget(s->lhs, s->range.start, EnumMemberTargets::kSkipped);
       ReportNonVariableTarget(s->lhs, s);
       break;
     case StmtKind::kForce:
@@ -632,25 +767,66 @@ void ConstantWriteWalk::CheckStmt(const Stmt* s) {
 
 void ConstantWriteWalk::CheckExpr(const Expr* e) {
   if (e == nullptr) return;
-  if (IsIncOrDec(e) || IsAssignmentExpr(e)) {
-    ReportTarget(e->lhs, e->range.start);
-  } else if (e->kind == ExprKind::kCall) {
-    CheckStringMethod(e);
-    CheckActuals(e);
-  }
-  ForEachExprChild(e, [this](const Expr* child) { CheckExpr(child); });
+  CheckWrite(e);
+  ForEachExprChild(e, [this, e](const Expr* child) {
+    if (e->kind == ExprKind::kCall && child == e->lhs && child != nullptr) {
+      ForEachExprChild(child, [this](const Expr* sub) { CheckExpr(sub); });
+    } else {
+      CheckExpr(child);
+    }
+  });
 }
 
-void ConstantWriteWalk::CheckStringMethod(const Expr* call) {
+void ConstantWriteWalk::CheckWrite(const Expr* e) {
+  if (IsIncOrDec(e) || IsAssignmentExpr(e)) {
+    ReportTarget(e->lhs, e->range.start, EnumMemberTargets::kCounted);
+  } else if (e->kind == ExprKind::kCall) {
+    CheckBuiltInMethod(e);
+    CheckScopeRandomize(e);
+    CheckActuals(e);
+  } else if (e->kind == ExprKind::kSystemCall) {
+    CheckSystemCall(e);
+  } else if (e->kind == ExprKind::kMemberAccess) {
+    CheckParenlessArrayMethod(e);
+  }
+}
+
+void ConstantWriteWalk::CheckBuiltInMethod(const Expr* call) {
   const Expr* callee = call->lhs;
   if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
-      callee->is_scope_resolution || callee->rhs == nullptr ||
-      !StringMethodWritesItsObject(callee->rhs->text))
+      callee->is_scope_resolution || callee->rhs == nullptr)
     return;
-  std::optional<DeclaredName> declared = Find(ExprIdent(callee->lhs));
-  bool handle =
-      declared.has_value() && declared->constness == Constness::kConstantHandle;
-  if (!handle) ReportTarget(callee->lhs, call->range.start);
+  std::string_view method = callee->rhs->text;
+  if (StringMethodWritesItsObject(method) ||
+      ArrayMethodWritesItsArray(method)) {
+    if (!NamesAConstantHandle(callee->lhs))
+      ReportTarget(callee->lhs, call->range.start, EnumMemberTargets::kCounted);
+  } else if (ArrayMethodWritesItsIndex(method) && !call->args.empty() &&
+             NamesAnArray(callee->lhs)) {
+    ReportWrittenBy(call->args.front(), method);
+  }
+}
+
+void ConstantWriteWalk::CheckParenlessArrayMethod(const Expr* access) {
+  if (access->is_scope_resolution || access->lhs == nullptr ||
+      access->rhs == nullptr || !ArrayMethodWritesItsArray(access->rhs->text) ||
+      !NamesAnArray(access->lhs))
+    return;
+  ReportTarget(access->lhs, access->range.start, EnumMemberTargets::kCounted);
+}
+
+void ConstantWriteWalk::CheckScopeRandomize(const Expr* call) {
+  std::string_view randomize = ScopeRandomizeOf(call->lhs);
+  if (randomize.empty()) return;
+  if (randomize == "randomize" && FindSubroutine(randomize) != nullptr) return;
+  for (const Expr* arg : call->args) ReportWrittenBy(arg, randomize);
+}
+
+void ConstantWriteWalk::CheckSystemCall(const Expr* call) {
+  for (size_t i = 0; i < call->args.size(); ++i) {
+    if (SystemCallWritesArgument(call->callee, i))
+      ReportWrittenBy(call->args[i], call->callee);
+  }
 }
 
 void ConstantWriteWalk::CheckActuals(const Expr* call) {
@@ -664,22 +840,37 @@ void ConstantWriteWalk::CheckActuals(const Expr* call) {
     int index = ResolveActualArgIndex(call, i, formal.name, positional);
     if (direction.empty() || index < 0) continue;
     const Expr* actual = call->args[static_cast<size_t>(index)];
-    ForEachWrittenConstant(actual, [&](const std::string& written) {
-      diag_.Error(
-          actual->range.start,
-          std::format("constant '{}' cannot be the actual of {} "
-                      "argument '{}' of '{}'",
-                      written, direction, formal.name, subroutine->name),
-          Subclause("6.20"));
-    });
+    ForEachWrittenConstant(
+        actual, EnumMemberTargets::kCounted, [&](const std::string& written) {
+          diag_.Error(
+              actual->range.start,
+              std::format("constant '{}' cannot be the actual of {} "
+                          "argument '{}' of '{}'",
+                          written, direction, formal.name, subroutine->name),
+              Subclause("6.20"));
+        });
   }
 }
 
-void ConstantWriteWalk::ReportTarget(const Expr* target, SourceLoc loc) {
-  ForEachWrittenConstant(target, [this, loc](const std::string& written) {
-    diag_.Error(loc, std::format("assignment to constant '{}'", written),
-                Subclause("6.20"));
-  });
+void ConstantWriteWalk::ReportTarget(const Expr* target, SourceLoc loc,
+                                     EnumMemberTargets enum_members) {
+  ForEachWrittenConstant(
+      target, enum_members, [this, loc](const std::string& written) {
+        diag_.Error(loc, std::format("assignment to constant '{}'", written),
+                    Subclause("6.20"));
+      });
+}
+
+void ConstantWriteWalk::ReportWrittenBy(const Expr* actual,
+                                        std::string_view writer) {
+  ForEachWrittenConstant(
+      actual, EnumMemberTargets::kCounted,
+      [this, actual, writer](const std::string& written) {
+        diag_.Error(actual->range.start,
+                    std::format("constant '{}' cannot be written by '{}'",
+                                written, writer),
+                    Subclause("6.20"));
+      });
 }
 
 void ConstantWriteWalk::ReportNonVariableTarget(const Expr* lhs,
@@ -693,10 +884,12 @@ void ConstantWriteWalk::ReportNonVariableTarget(const Expr* lhs,
   if (base->kind != ExprKind::kIdentifier) return;
   bool continuous = s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign;
   std::optional<DeclaredName> declared = Find(base->text);
+  bool enum_member = declared.has_value()
+                         ? declared->constness == Constness::kEnumMember
+                         : tables_.enum_members.contains(base->text);
   bool constant =
       declared.has_value() && declared->constness != Constness::kWritable;
-  if (tables_.enum_members.count(base->text) == 0 && !(continuous && constant))
-    return;
+  if (!enum_member && !(continuous && constant)) return;
   std::string_view what = "assignment";
   std::string_view bound;
   std::string_view subclause = "10.4";

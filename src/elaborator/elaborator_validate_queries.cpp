@@ -10,6 +10,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "common/system_call_writes.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -23,27 +24,6 @@
 namespace delta {
 
 namespace {
-
-bool IsPlaSystemTask(std::string_view callee) {
-  if (callee.empty() || callee.front() != '$') return false;
-  std::string_view rest = callee.substr(1);
-  auto take = [&rest]() -> std::string_view {
-    auto pos = rest.find('$');
-    std::string_view tok = rest.substr(0, pos);
-    rest = pos == std::string_view::npos ? std::string_view{}
-                                         : rest.substr(pos + 1);
-    return tok;
-  };
-  std::string_view array_type = take();
-  std::string_view logic = take();
-  std::string_view format = take();
-  if (!rest.empty()) return false;
-  bool ok_type = array_type == "sync" || array_type == "async";
-  bool ok_logic =
-      logic == "and" || logic == "or" || logic == "nand" || logic == "nor";
-  bool ok_format = format == "array" || format == "plane";
-  return ok_type && ok_logic && ok_format;
-}
 
 void CheckPlaOutputOperand(
     const Expr* e, const std::unordered_set<std::string_view>& net_names,

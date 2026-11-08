@@ -1,11 +1,11 @@
 #include "elaborator/resolution_function_body.h"
 
-#include <array>
 #include <format>
 #include <string>
 #include <string_view>
 #include <unordered_set>
 
+#include "common/array_methods.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator_scope_rules_names.h"
@@ -18,10 +18,6 @@
 namespace delta {
 
 namespace {
-
-constexpr std::array<std::string_view, 10> kMutatingMethods = {
-    "delete",    "insert", "push_back", "push_front", "pop_back",
-    "pop_front", "sort",   "rsort",     "reverse",    "shuffle"};
 
 struct BodyScan {
   std::string_view function;
@@ -99,10 +95,7 @@ static bool IsMutatingMethodCall(const Expr* e) {
       e->lhs->is_scope_resolution) {
     return false;
   }
-  for (std::string_view method : kMutatingMethods) {
-    if (e->lhs->rhs->text == method) return true;
-  }
-  return false;
+  return ArrayMethodWritesItsArray(e->lhs->rhs->text);
 }
 
 static void ReportExprStmtWrites(const Expr* e, SourceLoc loc,
