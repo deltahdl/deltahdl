@@ -12,9 +12,9 @@ clause-by-clause reconciliation of the LRM, or any survey whose findings arrive
 over hours — the plan and each finding go into
 GitHub issues as they arise, one indivisible problem per issue, with enough of
 the method in the body that a fresh session can run it from the issue alone.
-The session's task list and scratchpad are not durable.
+The session's scratchpad is not durable.
 
-**Why:** a session can be lost, and its task list and scratchpad with it;
+**Why:** a session can be lost, and its scratchpad with it;
 research recorded only there is lost too.
 
 **How to apply:** unlike a problem met while working, which may be solved rather
