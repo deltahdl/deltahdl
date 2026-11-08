@@ -532,7 +532,8 @@ std::optional<DataType> SystemCallType(const Expr* call,
   }
   if (std::ranges::find(kRealSystemFunctions, call->callee) !=
       kRealSystemFunctions.end()) {
-    return TypeNameToDataType("real");
+    return TypeNameToDataType(call->callee == "$bitstoshortreal" ? "shortreal"
+                                                                 : "real");
   }
   return std::nullopt;
 }

@@ -561,15 +561,9 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
     return MakeLogic4VecVal(arena, 32, fbits);
   }
   if (name == "$bitstoshortreal") {
-    if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
-    auto val = EvalExpr(expr->args[0], ctx, arena);
-    auto fbits = static_cast<uint32_t>(val.ToUint64());
-    float f = 0.0f;
-    std::memcpy(&f, &fbits, sizeof(float));
-    auto d = static_cast<double>(f);
-    uint64_t dbits = 0;
-    std::memcpy(&dbits, &d, sizeof(double));
-    auto result = MakeLogic4VecVal(arena, 64, dbits);
+    uint64_t fbits =
+        expr->args.empty() ? 0 : EvalExpr(expr->args[0], ctx, arena).ToUint64();
+    auto result = MakeLogic4VecVal(arena, 32, fbits & 0xFFFFFFFFu);
     result.is_real = true;
     return result;
   }

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string>
 
 #include "builders_systask.h"
 #include "common/arena.h"
@@ -82,14 +83,12 @@ TEST(SysTask, ShortrealtobitsReinterpretsShortrealAs32Bits) {
 
 TEST(SysTask, BitstoshortrealReinterprets32BitsAsShortreal) {
   SysTaskFixture f;
-  float fval = 1.5f;
-  uint32_t fbits = 0;
-  std::memcpy(&fbits, &fval, sizeof(float));
-  auto* expr = MkSysCall(f.arena, "$bitstoshortreal", {MkInt(f.arena, fbits)});
+  auto* expr =
+      MkSysCall(f.arena, "$bitstoshortreal", {MkInt(f.arena, 0x3DCCCCCDu)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
-  EXPECT_EQ(result.width, 64u);
+  EXPECT_EQ(result.width, 32u);
   EXPECT_TRUE(result.is_real);
-  EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.5);
+  EXPECT_EQ(result.ToUint64(), 0x3DCCCCCDu);
 }
 
 TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
@@ -205,6 +204,42 @@ TEST(ConversionSim, RtoiResultIsASignedInteger) {
                        "endmodule\n",
                        f),
             "-2 -2 1\n");
+}
+
+TEST(ConversionSim, ConversionFunctionsGiveTheirStandardResultTypes) {
+  struct Probe {
+    const char* what;
+    const char* expr;
+    uint64_t expected;
+  };
+  const Probe kProbes[] = {
+      {"$rtoi gives an integer", "type($rtoi(r)) == type(integer)", 1},
+      {"$rtoi does not give an int", "type($rtoi(r)) == type(int)", 0},
+      {"$itor gives a real", "type($itor(3)) == type(real)", 1},
+      {"$bitstoreal gives a real", "type($bitstoreal(64'h0)) == type(real)", 1},
+      {"$realtobits is unsigned", "$realtobits(-1.0) > 0", 1},
+      {"$shortrealtobits is unsigned", "$shortrealtobits(-1.0) > 0", 1},
+      {"$bitstoshortreal is 32 bits wide", "$bits($bitstoshortreal(32'h0))",
+       32},
+      {"$bitstoshortreal gives a shortreal",
+       "type($bitstoshortreal(32'h0)) == type(shortreal)", 1},
+      {"$bitstoshortreal does not give a real",
+       "type($bitstoshortreal(32'h0)) == type(real)", 0},
+      {"$bitstoshortreal round trips through $shortrealtobits",
+       "$shortrealtobits($bitstoshortreal(32'h3DCCCCCD))", 0x3DCCCCCDu},
+      {"$bitstoshortreal widens to the binary32's value",
+       "$realtobits($bitstoshortreal(32'h3DCCCCCD))", 0x3FB99999A0000000u},
+  };
+  for (const Probe& probe : kProbes) {
+    SCOPED_TRACE(probe.what);
+    const std::string kSrc = std::string(
+                                 "module t;\n"
+                                 "  real r = 2.5;\n"
+                                 "  bit [63:0] v;\n"
+                                 "  initial v = ") +
+                             probe.expr + ";\nendmodule\n";
+    EXPECT_EQ(RunAndGet(kSrc, "v"), probe.expected);
+  }
 }
 
 TEST(ConversionSim, ItorAndBitstorealResultsAreReals) {
