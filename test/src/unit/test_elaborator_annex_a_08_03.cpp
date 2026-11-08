@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
+#include "helpers_rtlir_lookup.h"
 
 using namespace delta;
 
@@ -180,6 +184,94 @@ TEST(ExpressionElaboration, ExprOperatorAssignmentElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExpressionElaboration, ConstantMintypmaxParameterValueFoldsToTypical) {
+  struct Source {
+    const char* where;
+    const char* src;
+    const char* read;
+  };
+  const Source kSources[] = {
+      {"parenthesized localparam in a module body",
+       "module m;\n  localparam int P = (1:2:3);\nendmodule\n", "P"},
+      {"parameter in a module body",
+       "module m;\n  parameter int P = 1:2:3;\nendmodule\n", "P"},
+      {"localparam in a module body",
+       "module m;\n  localparam int P = 1:2:3;\nendmodule\n", "P"},
+      {"members written as constant expressions",
+       "module m;\n  localparam int L = 2;\n"
+       "  localparam int P = L - 1:L:L + 1;\nendmodule\n",
+       "P"},
+      {"parameter in a port list",
+       "module m #(parameter int P = 1:2:3);\nendmodule\n", "P"},
+      {"localparam in a port list",
+       "module m #(localparam int P = 1:2:3, int Q = 0);\nendmodule\n", "P"},
+      {"parameter in a package",
+       "package pk;\n  parameter int P = 1:2:3;\nendpackage\n"
+       "module m;\n  localparam int Q = pk::P;\nendmodule\n",
+       "Q"},
+      {"parameter in the compilation unit",
+       "parameter int P = 1:2:3;\nmodule m;\n  localparam int Q = P;\n"
+       "endmodule\n",
+       "Q"},
+      {"localparam in a generate block",
+       "module m;\n  if (1) begin : g\n    localparam int P = 1:2:3;\n"
+       "  end\nendmodule\n",
+       "P"},
+  };
+  for (const Source& source : kSources) {
+    SCOPED_TRACE(source.where);
+    ElabFixture f;
+    auto* design = ElaborateSrc(source.src, f);
+    ASSERT_NE(design, nullptr);
+    EXPECT_FALSE(f.has_errors);
+    const auto* p = FindParam(design, "m", source.read);
+    ASSERT_NE(p, nullptr);
+    EXPECT_TRUE(p->is_resolved);
+    EXPECT_EQ(p->resolved_value, 2);
+  }
+}
+
+TEST(ExpressionElaboration, ConstantMintypmaxClassParameterValueIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C #(int P = 1:2:3);\n"
+      "  parameter int Q = 4:5:6;\n"
+      "endclass\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExpressionElaboration, MintypmaxParameterValueWithAVariableIsReported) {
+  struct Source {
+    const char* where;
+    const char* src;
+    const char* message;
+    uint32_t line;
+    const char* subclause;
+  };
+  const Source kSources[] = {
+      {"variable maximum of a localparam",
+       "module m;\n  int v;\n  localparam int P = 1:2:v;\nendmodule\n",
+       "localparam 'P' initializer is not a constant expression", 3, "6.20.4"},
+      {"variable typical member of a parenthesized parameter",
+       "module m;\n  int v;\n  parameter int P = (1:v:3);\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 3, "6.20.2"},
+      {"variable minimum of a port-list parameter",
+       "int v;\nmodule m #(parameter int P = v:2:3);\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 2, "6.20.2"},
+      {"variable member of a class parameter",
+       "int v;\nclass C #(int P = 1:v:3);\nendclass\n",
+       "class parameter 'P' value is not a constant expression", 2, "6.20.2"},
+  };
+  for (const Source& source : kSources) {
+    SCOPED_TRACE(source.where);
+    ElabFixture f;
+    ElaborateSrc(source.src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), source.message, source.line,
+                              source.subclause));
+  }
 }
 
 }  // namespace

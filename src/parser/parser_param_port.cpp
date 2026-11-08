@@ -102,7 +102,7 @@ struct ParserParamPortHelpers {
     }
     Expr* default_val = nullptr;
     if (p.Match(TokenKind::kEq)) {
-      default_val = p.ParseExpr();
+      default_val = p.ParseMinTypMaxExpr();
     }
 
     if (is_localparam_group && default_val == nullptr) {

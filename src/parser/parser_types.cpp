@@ -721,7 +721,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.1")).text;
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {
-      item->init_expr = ParseExpr();
+      item->init_expr = ParseMinTypMaxExpr();
     } else {
       diag_.Error(item->loc, "parameter declaration requires a default value",
                   Subclause("6.20.1"));
