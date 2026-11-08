@@ -40,9 +40,14 @@ DataType TypeParamOverrideToDataType(const Expr* expr,
                                      const CompilationUnit* unit,
                                      DiagEngine& diag, SourceLoc loc);
 
+const Expr* UntypedPattern(const Expr* value);
+
+bool TakesValueWhole(const RtlirParamDecl& pd, const Expr* value,
+                     const TypedefMap& typedefs);
+
 bool ApplyParamOverride(RtlirParamDecl& pd,
                         const InstanceParamAssignments& assigns,
-                        std::string_view pname, const DataType* dtype,
+                        std::string_view pname, const TypedefMap& typedefs,
                         Arena& arena);
 
 void CheckDollarOverride(const InstanceParamAssignments& assigns,

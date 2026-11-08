@@ -190,7 +190,7 @@ void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
   if (pd.is_localparam || !pd.gen_block_prefix.empty()) return;
   const InstanceParamAssignments* assigns = BodyParamAssignments();
   if (assigns == nullptr) return;
-  ApplyParamOverride(pd, *assigns, item->name, &item->data_type, arena);
+  ApplyParamOverride(pd, *assigns, item->name, tables.typedefs, arena);
   CheckDollarOverride(
       *assigns,
       {item->name, nullptr, &item->data_type, !item->unpacked_dims.empty()},

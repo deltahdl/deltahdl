@@ -44,6 +44,7 @@ class Elaborator : public ElaboratorClassRules {
     int64_t value = 0;
     const Expr* value_expr = nullptr;
     std::optional<double> real{};
+    bool unfolded = false;
   };
 
   using ParamList = std::vector<ParamOverride>;

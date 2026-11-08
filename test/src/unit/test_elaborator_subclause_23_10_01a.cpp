@@ -143,6 +143,35 @@ TEST(DefparamElaboration, RhsRejectsNonConstantExpression) {
                     6, "23.10.1"));
 }
 
+TEST(DefparamElaboration, WholeAggregateRhsRejectsAVariable) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct { int a; logic [7:0] b; } s_t;\n"
+      "module child;\n"
+      "  parameter s_t P = '{a: 1, b: 8'h2};\n"
+      "  parameter int A[2] = '{1, 2};\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter s_t Q = '{a: 3, b: 8'h4};\n"
+      "  parameter int W = 5;\n"
+      "  s_t v;\n"
+      "  int n;\n"
+      "  child u();\n"
+      "  child k();\n"
+      "  defparam u.P = v;\n"
+      "  defparam u.A = '{n, 2};\n"
+      "  defparam k.P = Q;\n"
+      "  defparam k.A = '{W, 2};\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "defparam right-hand side must be a constant expression built from "
+      "numbers and parameters";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 13, "23.10.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 14, "23.10.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 TEST(DefparamElaboration, DefparamInGenerateBlockCannotEscapeScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -194,6 +194,94 @@ TEST(StructureParameterSim, WholeStructureDefparamGivesEveryMember) {
   EXPECT_EQ(ValueOf(f, "d.b"), 2u);
 }
 
+TEST(StructureParameterSim, DefaultNamingAParameterOrATypedPatternIsWhole) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef struct { int a; logic [7:0] b; } s_t;\n"
+                 "typedef int pair_t [2];\n"
+                 "module t;\n"
+                 "  localparam s_t L = '{b: 8'h9, a: 10};\n"
+                 "  parameter s_t R = L;\n"
+                 "  parameter s_t T = s_t'{b: 8'h6, a: 5};\n"
+                 "  parameter int B[2] = '{7, 8};\n"
+                 "  parameter int C[2] = B;\n"
+                 "  parameter int D[2] = pair_t'{3, 4};\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
+                 "R.a, R.b, T.a, T.b, C[0], C[1], D[0], D[1]);\n"
+                 "endmodule\n",
+                 f),
+      "10 9 5 6 7 8 3 4\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StructureParameterSim, OverrideByANameOrATypedPatternGivesEveryMember) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int a; logic [7:0] b; } s_t;\n"
+      "module m #(parameter s_t P = '{a: 1, b: 8'h2});\n"
+      "  int a;\n"
+      "  logic [7:0] b;\n"
+      "  initial begin\n"
+      "    a = P.a;\n"
+      "    b = P.b;\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam s_t L = '{b: 8'h9, a: 10};\n"
+      "  parameter s_t Q = '{b: 8'h4, a: 3};\n"
+      "  m #(.P(L)) w();\n"
+      "  m #(s_t'{b: 8'h7, a: 8}) x();\n"
+      "  m y();\n"
+      "  m z();\n"
+      "  defparam y.P = Q;\n"
+      "  defparam z.P = s_t'{b: 8'h5, a: 11};\n"
+      "endmodule\n",
+      f, "w.a");
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ValueOf(f, "w.a"), 10u);
+  EXPECT_EQ(ValueOf(f, "w.b"), 9u);
+  EXPECT_EQ(ValueOf(f, "x.a"), 8u);
+  EXPECT_EQ(ValueOf(f, "x.b"), 7u);
+  EXPECT_EQ(ValueOf(f, "y.a"), 3u);
+  EXPECT_EQ(ValueOf(f, "y.b"), 4u);
+  EXPECT_EQ(ValueOf(f, "z.a"), 11u);
+  EXPECT_EQ(ValueOf(f, "z.b"), 5u);
+}
+
+TEST(ParameterArraySim, OverrideByANameOrATypedPatternGivesEveryElement) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef int pair_t [2];\n"
+      "module sub;\n"
+      "  parameter int A[2] = '{1, 2};\n"
+      "  int e0, e1;\n"
+      "  initial begin\n"
+      "    e0 = A[0];\n"
+      "    e1 = A[1];\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  localparam int B[2] = '{7, 8};\n"
+      "  parameter int C[2] = '{3, 4};\n"
+      "  sub #(.A(B)) w();\n"
+      "  sub #(pair_t'{5, 6}) x();\n"
+      "  sub y();\n"
+      "  sub z();\n"
+      "  defparam y.A = C;\n"
+      "  defparam z.A = pair_t'{9, 10};\n"
+      "endmodule\n",
+      f, "w.e0");
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ValueOf(f, "w.e0"), 7u);
+  EXPECT_EQ(ValueOf(f, "w.e1"), 8u);
+  EXPECT_EQ(ValueOf(f, "x.e0"), 5u);
+  EXPECT_EQ(ValueOf(f, "x.e1"), 6u);
+  EXPECT_EQ(ValueOf(f, "y.e0"), 3u);
+  EXPECT_EQ(ValueOf(f, "y.e1"), 4u);
+  EXPECT_EQ(ValueOf(f, "z.e0"), 9u);
+  EXPECT_EQ(ValueOf(f, "z.e1"), 10u);
+}
+
 TEST(StructureParameterSim, MemberOfAnElementOfAStructureArrayIsRead) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef struct { int a; logic [7:0] b; } s_t;\n"

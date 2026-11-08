@@ -16,6 +16,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_dump_state.h"
@@ -46,6 +47,20 @@ static void BindParamLayout(const RtlirParamDecl& p, std::string_view full,
   RegisterAggregateLayout(full, type, width, ctx, arena);
 }
 
+static void FillParamArray(std::string_view full, RtlirVariable& var,
+                           const Expr* value, SimContext& ctx, Arena& arena) {
+  const ArrayInfo* source = value->kind == ExprKind::kIdentifier
+                                ? ctx.FindArrayInfo(value->text)
+                                : nullptr;
+  if (source != nullptr) {
+    CopyArrayElements(full, *ctx.FindArrayInfo(full), value->text, *source,
+                      ctx);
+    return;
+  }
+  var.init_expr = UnwrapTypedPattern(value);
+  InitArrayElements(full, var, ctx, arena);
+}
+
 static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
                              SimContext& ctx, Arena& arena) {
   ParamStorageShape shape = ParamStorageShapeOf(p);
@@ -60,7 +75,6 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.is_real = DeclaredTypeIsReal(value_type, ctx);
   var.dtype = &type;
   var.elem_type_kind = type.kind;
-  var.init_expr = p.override_expr == nullptr ? p.default_value : nullptr;
   var.unpacked_dims = p.unpacked_bounds;
   for (const auto& dim : p.unpacked_bounds) {
     var.unpacked_dim_sizes.push_back(dim.Size());
@@ -71,11 +85,13 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.is_descending = outer.left > outer.right;
   var.num_unpacked_dims = static_cast<uint32_t>(p.unpacked_bounds.size());
   CreateArrayElements(full, var, ctx, arena);
-  if (p.override_expr == nullptr) return;
-  var.init_expr = p.override_expr;
+  const Expr* value =
+      p.override_expr != nullptr ? p.override_expr : p.default_value;
+  if (value == nullptr) return;
   std::string own = ctx.ActiveInstancePrefix();
-  ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
-  InitArrayElements(full, var, ctx, arena);
+  if (p.override_expr != nullptr)
+    ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
+  FillParamArray(full, var, value, ctx, arena);
   ctx.SetLoweringInstancePrefix(own);
 }
 
@@ -90,19 +106,25 @@ static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
   return found;
 }
 
-static bool HoldStructParamPattern(const RtlirParamDecl& p,
-                                   std::string_view full, Variable* var,
-                                   SimContext& ctx, Arena& arena) {
+static bool HoldStructParamValue(const RtlirParamDecl& p, std::string_view full,
+                                 Variable* var, SimContext& ctx, Arena& arena) {
   const StructTypeInfo* layout = ctx.GetVariableStructType(full);
   if (layout == nullptr || (p.from_override && p.override_expr == nullptr))
     return false;
-  const Expr* pattern = UnwrapTypedPattern(
-      p.override_expr != nullptr ? p.override_expr : p.default_value);
-  if (pattern->kind != ExprKind::kAssignmentPattern) return false;
+  const Expr* value =
+      p.override_expr != nullptr ? p.override_expr : p.default_value;
+  const Expr* pattern = UnwrapTypedPattern(value);
+  bool is_pattern = pattern->kind == ExprKind::kAssignmentPattern;
+  if (!is_pattern && layout->is_packed) return false;
   std::string own = ctx.ActiveInstancePrefix();
   if (p.override_expr != nullptr)
     ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
-  var->value = EvalStructPatternValue(pattern, layout, ctx, arena);
+  uint32_t width = var->value.width;
+  var->value =
+      is_pattern ? EvalStructPatternValue(pattern, layout, ctx, arena)
+                 : OwnRhsWords(ResizeToWidth(EvalExpr(value, ctx, arena, width),
+                                             width, arena),
+                               arena);
   ctx.SetLoweringInstancePrefix(own);
   return true;
 }
@@ -143,7 +165,7 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   BindParamLayout(p, full, width, ctx_, arena_);
   var->value =
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
-  if (!HoldStructParamPattern(p, full, var, ctx_, arena_) &&
+  if (!HoldStructParamValue(p, full, var, ctx_, arena_) &&
       (p.override_expr != nullptr ||
        !NamesOwnEnumConstant(p.default_value, mod)))
     ReevaluateParamValue(p, var, ctx_, arena_);

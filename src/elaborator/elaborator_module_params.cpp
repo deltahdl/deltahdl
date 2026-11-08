@@ -294,12 +294,31 @@ static std::optional<int64_t> ContextOverrideValue(
   return FoldParamValue(pd, ovr.value_expr, scope);
 }
 
+static bool HoldsUnpackedAggregate(const RtlirParamDecl& pd,
+                                   const TypedefMap& typedefs) {
+  if (pd.unpacked_dims != nullptr) return true;
+  const DataType* type =
+      pd.type_param_actual != nullptr ? pd.type_param_actual : pd.decl_type;
+  if (type == nullptr) return false;
+  std::vector<std::string_view> names;
+  const DataType* resolved = FollowTypedefs(*type, typedefs, names);
+  return resolved != nullptr && IsUnpackedAggregateType(*resolved);
+}
+
+bool TakesValueWhole(const RtlirParamDecl& pd, const Expr* value,
+                     const TypedefMap& typedefs) {
+  return UntypedPattern(value)->kind == ExprKind::kAssignmentPattern ||
+         HoldsUnpackedAggregate(pd, typedefs);
+}
+
 bool ApplyParamOverride(RtlirParamDecl& pd,
                         const InstanceParamAssignments& assigns,
-                        std::string_view pname, const DataType* dtype,
+                        std::string_view pname, const TypedefMap& typedefs,
                         Arena& arena) {
   const auto* ovr = FindParamOverride(assigns.params, pname);
   if (!ovr) return false;
+  if (ovr->unfolded && !TakesValueWhole(pd, ovr->value_expr, typedefs))
+    return false;
   if (ContainsDollar(ovr->value_expr)) {
     pd.from_override = true;
     pd.is_unbounded = IsLoneDollar(ovr->value_expr);
@@ -318,7 +337,7 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
     pd.override_module = assigns.module;
     RecordResolvedHighWords(pd, pd.override_expr, assigns.scope);
   }
-  RecordStringParamValue(pd, ovr->value_expr, dtype, arena);
+  RecordStringParamValue(pd, ovr->value_expr, pd.decl_type, arena);
   return true;
 }
 
@@ -424,7 +443,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     const DataType* param_type =
         has_param_type ? &decl->param_types[i] : nullptr;
     const bool kUnpacked = decl->param_port_unpacked_dims.count(pname) != 0;
-    ApplyParamOverride(pd, kAssigns, pname, param_type, arena_);
+    ApplyParamOverride(pd, kAssigns, pname, typedefs_, arena_);
     CheckDollarOverride(kAssigns, {pname, nullptr, param_type, kUnpacked},
                         kShapeTables, diag_);
     if (!pd.is_resolved && !pd.from_override && pval) {
@@ -495,28 +514,32 @@ static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
          item->data_type.kind == DataTypeKind::kVoid;
 }
 
-static bool IsArrayParamPattern(const ModuleDecl* decl, std::string_view pname,
-                                const Expr* pexpr) {
-  if (pexpr == nullptr || pexpr->kind != ExprKind::kAssignmentPattern)
-    return false;
-  if (decl->param_port_unpacked_dims.count(pname) > 0) return true;
-  const ModuleItem* item = BodyParamDecl(decl, pname);
-  return item != nullptr && !item->unpacked_dims.empty();
+const Expr* UntypedPattern(const Expr* value) {
+  bool typed = value->kind == ExprKind::kCast &&
+               value->lhs->kind == ExprKind::kAssignmentPattern;
+  return typed ? value->lhs : value;
 }
 
-static const DataType* AggregateParamType(const ModuleDecl* decl,
-                                          std::string_view pname) {
+static bool MayHoldAggregate(const ModuleDecl* decl, std::string_view pname) {
+  if (decl->param_port_unpacked_dims.count(pname) > 0) return true;
   const DataType* type = nullptr;
   size_t ports = std::min(decl->params.size(), decl->param_types.size());
   for (size_t i = 0; i < ports; ++i)
     if (decl->params[i].first == pname) type = &decl->param_types[i];
-  if (const ModuleItem* item = BodyParamDecl(decl, pname))
+  if (const ModuleItem* item = BodyParamDecl(decl, pname)) {
+    if (!item->unpacked_dims.empty()) return true;
     type = &item->data_type;
-  if (type == nullptr) return nullptr;
-  bool aggregate = type->kind == DataTypeKind::kStruct ||
-                   type->kind == DataTypeKind::kUnion ||
-                   type->kind == DataTypeKind::kNamed;
-  return aggregate ? type : nullptr;
+  }
+  return type != nullptr && (type->kind == DataTypeKind::kStruct ||
+                             type->kind == DataTypeKind::kUnion ||
+                             type->kind == DataTypeKind::kNamed);
+}
+
+static void PushUnfoldedValue(std::string_view pname, const Expr* pexpr,
+                              Elaborator::ParamList& child_params) {
+  Elaborator::ParamOverride ovr{pname, 0, pexpr};
+  ovr.unfolded = true;
+  child_params.push_back(ovr);
 }
 
 void PushInstParamAssignment(const ModuleDecl* child_decl,
@@ -525,17 +548,14 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
                              Elaborator::ParamList& child_params) {
   bool dollar =
       ContainsDollar(pexpr) && child_decl->type_param_names.count(pname) == 0;
-  if (dollar || IsBodyTypeParam(child_decl, pname) ||
-      IsArrayParamPattern(child_decl, pname, pexpr)) {
+  if (dollar || IsBodyTypeParam(child_decl, pname)) {
     child_params.push_back({pname, 0, pexpr});
     return;
   }
-  const DataType* aggregate =
-      pexpr != nullptr && pexpr->kind == ExprKind::kAssignmentPattern
-          ? AggregateParamType(child_decl, pname)
-          : nullptr;
-  if (aggregate != nullptr) {
-    child_params.push_back({pname, 0, pexpr});
+  bool aggregate = MayHoldAggregate(child_decl, pname);
+  if (aggregate &&
+      UntypedPattern(pexpr)->kind == ExprKind::kAssignmentPattern) {
+    PushUnfoldedValue(pname, pexpr, child_params);
     return;
   }
   if (auto real = RealOverrideValue(pexpr, parent_scope)) {
@@ -544,8 +564,11 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
     child_params.push_back(ovr);
     return;
   }
-  auto val = ConstEvalInt(pexpr, parent_scope);
-  if (val) child_params.push_back({pname, *val, pexpr});
+  if (auto val = ConstEvalInt(pexpr, parent_scope)) {
+    child_params.push_back({pname, *val, pexpr});
+  } else if (aggregate) {
+    PushUnfoldedValue(pname, pexpr, child_params);
+  }
 }
 
 static bool IsLocalParamOf(const ModuleDecl* decl, std::string_view pname) {

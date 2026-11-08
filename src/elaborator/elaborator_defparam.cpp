@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_defparam_walk.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
@@ -313,6 +314,8 @@ struct DefparamOverride {
   const Expr* val_expr;
   const ScopeMap& scope;
   SourceLoc loc;
+  const RtlirModule* writer;
+  bool whole;
 };
 
 using DefparamAppliedKey =
@@ -321,6 +324,13 @@ struct DefparamAppliedRecord {
   std::set<DefparamAppliedKey>& applied;
   const DefparamAppliedKey& key;
 };
+
+static void ReportNonConstantDefparam(DiagEngine& diag, SourceLoc loc) {
+  diag.Error(loc,
+             "defparam right-hand side must be a constant expression built "
+             "from numbers and parameters",
+             Subclause("23.10.1"));
+}
 
 static std::optional<int64_t> EvalDefparamOverride(
     DiagEngine& diag, const DefparamOverride& ovr,
@@ -335,10 +345,7 @@ static std::optional<int64_t> EvalDefparamOverride(
   auto val = FoldParamValue(*ovr.param, ovr.val_expr, ovr.scope);
   if (!val) {
     if (!IsConstantExpr(ovr.val_expr, ovr.scope)) {
-      diag.Error(ovr.loc,
-                 "defparam right-hand side must be a constant expression "
-                 "built from numbers and parameters",
-                 Subclause("23.10.1"));
+      ReportNonConstantDefparam(diag, ovr.loc);
     } else {
       diag.Warning(ovr.loc, "defparam value is not constant",
                    Subclause("23.10.1"));
@@ -373,16 +380,35 @@ static const Expr* DefparamOverrideExpr(const Expr* val_expr) {
   return val_expr->kind == ExprKind::kIntegerLiteral ? val_expr : nullptr;
 }
 
+static bool IsConstantWholeValue(const Expr* value, const ScopeMap& names) {
+  const Expr* pattern = UntypedPattern(value);
+  if (pattern->kind != ExprKind::kAssignmentPattern)
+    return IsConstantExpr(value, names);
+  for (const Expr* item : pattern->elements) {
+    if (!ConstEvalInt(item, names) && !IsConstantWholeValue(item, names))
+      return false;
+  }
+  return true;
+}
+
+static bool WholeValueIsConstant(DiagEngine& diag,
+                                 const DefparamOverride& ovr) {
+  ScopeMap names = ovr.scope;
+  for (const auto& p : ovr.writer->params) names.try_emplace(p.name, 0);
+  if (IsConstantWholeValue(ovr.val_expr, names)) return true;
+  ReportNonConstantDefparam(diag, ovr.loc);
+  return false;
+}
+
 static bool SetWholeAggregateDefparamValue(DiagEngine& diag,
                                            RtlirParamDecl& param,
                                            const DefparamOverride& ovr,
                                            const DefparamAppliedRecord& rec) {
-  if (!DefparamOverrideAllowed(diag, &param, ovr.val_expr, ovr.loc)) {
+  if (!DefparamOverrideAllowed(diag, &param, ovr.val_expr, ovr.loc) ||
+      !WholeValueIsConstant(diag, ovr)) {
     rec.applied.insert(rec.key);
     return false;
   }
-  if (auto folded = FoldParamValue(param, ovr.val_expr, ovr.scope))
-    param.resolved_value = ConvertOverrideValue(*folded, param);
   param.override_expr = ovr.val_expr;
   return true;
 }
@@ -390,7 +416,7 @@ static bool SetWholeAggregateDefparamValue(DiagEngine& diag,
 static bool SetDefparamValue(DiagEngine& diag, RtlirParamDecl& param,
                              const DefparamOverride& ovr,
                              const DefparamAppliedRecord& rec) {
-  if (ovr.val_expr->kind == ExprKind::kAssignmentPattern) {
+  if (ovr.whole) {
     if (!SetWholeAggregateDefparamValue(diag, param, ovr, rec)) return false;
   } else {
     auto value = EvalDefparamOverride(diag, ovr, rec);
@@ -426,7 +452,15 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
       continue;
     }
     RtlirModule* target_mod = rooted.target_mod;
-    DefparamOverride ovr{param, val_expr, scope, site.item->loc};
+    DefparamOverride ovr{
+        param,
+        val_expr,
+        scope,
+        site.item->loc,
+        mod,
+        TakesValueWhole(
+            *param, val_expr,
+            ModuleTypedefTable(typedefs_, FindModule(target_mod->name)))};
     DefparamAppliedRecord rec{applied_defparams_, key};
     if (!SetDefparamValue(diag_, *param, ovr, rec)) continue;
     RecordResolvedHighWords(*param, val_expr, scope);
