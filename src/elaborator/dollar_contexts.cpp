@@ -17,6 +17,32 @@ namespace delta {
 
 namespace {
 
+bool AnyScalarChildContainsDollar(const Expr* e) {
+  const Expr* const kChildren[] = {
+      e->lhs,        e->rhs,          e->condition,   e->true_expr,
+      e->false_expr, e->base,         e->index,       e->index_end,
+      e->with_expr,  e->stream_range, e->repeat_count};
+  for (const Expr* c : kChildren) {
+    if (ContainsDollar(c)) return true;
+  }
+  return false;
+}
+
+}  // namespace
+
+bool ContainsDollar(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kIdentifier && e->text == "$") return true;
+  if (AnyScalarChildContainsDollar(e)) return true;
+  for (const Expr* a : e->args)
+    if (ContainsDollar(a)) return true;
+  for (const Expr* el : e->elements)
+    if (ContainsDollar(el)) return true;
+  return false;
+}
+
+namespace {
+
 struct QueueContextScan {
   const std::unordered_set<std::string_view>& unbounded;
   const std::unordered_set<std::string_view>& queues;

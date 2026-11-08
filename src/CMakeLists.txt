@@ -678,6 +678,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/unpacked_array_type.cpp
     elaborator/simple_bit_vector.cpp
     elaborator/dollar_contexts.cpp
+    elaborator/dollar_parameter_values.cpp
     elaborator/unpacked_dim_reads.cpp
     elaborator/default_pattern_values.cpp
     elaborator/class_property_cont_assign.cpp

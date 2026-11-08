@@ -7,7 +7,10 @@
 
 namespace delta {
 
+struct Expr;
 struct ModuleDecl;
+
+bool ContainsDollar(const Expr* e);
 
 void CheckUnboundedParamsInQueueContexts(
     const ModuleDecl* decl,

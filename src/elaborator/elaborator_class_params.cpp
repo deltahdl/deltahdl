@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/dollar_contexts.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
@@ -83,7 +84,7 @@ static bool MentionsFormalOrSpecparam(const Expr* pexpr,
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              const DataType* type, bool is_array,
                              ClassParamRegistration& reg) {
-  if (!pexpr || IsDollarValue(pexpr)) return;
+  if (!pexpr || ContainsDollar(pexpr)) return;
   is_array = is_array || pexpr->kind == ExprKind::kAssignmentPattern;
   bool is_real = !is_array && TakesRealClassParamValue(pexpr, type);
   std::optional<int64_t> val;
@@ -221,8 +222,8 @@ std::unordered_set<std::string_view> NonIntegralParamNames(
 bool IsConstantClassParamValue(const Expr* e, const ScopeMap& scope) {
   if (e->kind == ExprKind::kAssignmentPattern)
     return PatternItemsConstant(e, scope);
-  return IsDollarValue(e) || NamesUnboundedParam(e) || ConstEvalInt(e, scope) ||
-         ConstEvalReal(e, scope);
+  return ContainsDollar(e) || NamesUnboundedParam(e) ||
+         ConstEvalInt(e, scope) || ConstEvalReal(e, scope);
 }
 
 std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls) {

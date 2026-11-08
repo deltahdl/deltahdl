@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/dollar_contexts.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -57,36 +58,8 @@ bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
   return false;
 }
 
-namespace {
-
-bool ExprContainsDollarSubexpr(const Expr* e);
-
-bool AnyScalarChildContainsDollar(const Expr* e) {
-  const Expr* const kChildren[] = {
-      e->lhs,        e->rhs,          e->condition,   e->true_expr,
-      e->false_expr, e->base,         e->index,       e->index_end,
-      e->with_expr,  e->stream_range, e->repeat_count};
-  for (const Expr* c : kChildren) {
-    if (ExprContainsDollarSubexpr(c)) return true;
-  }
-  return false;
-}
-
-bool ExprContainsDollarSubexpr(const Expr* e) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kIdentifier && e->text == "$") return true;
-  if (AnyScalarChildContainsDollar(e)) return true;
-  for (const Expr* a : e->args)
-    if (ExprContainsDollarSubexpr(a)) return true;
-  for (const Expr* el : e->elements)
-    if (ExprContainsDollarSubexpr(el)) return true;
-  return false;
-}
-
-}  // namespace
-
 bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
-  return ExprContainsDollarSubexpr(e);
+  return ContainsDollar(e);
 }
 
 bool Elaborator::DeclaresNetOrVariable(std::string_view name) const {

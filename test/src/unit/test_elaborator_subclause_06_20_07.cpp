@@ -4,12 +4,14 @@
 #include <cstdint>
 #include <format>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
@@ -451,6 +453,182 @@ TEST(DollarConstantElaboration,
       {9, "R"},  {10, "S"}, {11, "E"}, {12, "T"}, {13, "M"},
       {14, "N"}, {15, "I"}, {16, "U"}, {17, "D"}, {18, "H"}};
   ExpectDollarTypeReported(f, kParams);
+}
+
+TEST(DollarConstantElaboration,
+     DollarAssignedToAClassParameterOfAnotherTypeIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "class C #(real R = $, string S = $, bit [1:0][3:0] M = $,\n"
+      "          int U [2] = $);\n"
+      "  localparam real L = $;\n"
+      "  class N #(shortreal Q = $);\n"
+      "  endclass\n"
+      "endclass\n"
+      "class E #(real F = 1.0, int I = 1);\n"
+      "endclass\n"
+      "package p;\n"
+      "  class K;\n"
+      "    localparam real P = $;\n"
+      "    E #($) h;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "interface i;\n"
+      "  class G #(real V = $);\n"
+      "  endclass\n"
+      "endinterface\n"
+      "module m;\n"
+      "  class D extends E #(.F($));\n"
+      "    localparam string T = $;\n"
+      "  endclass\n"
+      "  E #($, $) e;\n"
+      "  E #(.I($)) d;\n"
+      "  if (1) begin : g\n"
+      "    class H #(real W = $);\n"
+      "    endclass\n"
+      "  end\n"
+      "endmodule\n"
+      "typedef real r_t;\n"
+      "class Z #(r_t X = $);\n"
+      "endclass\n"
+      "E #($) uv;\n"
+      "package q;\n"
+      "  E #(.F($)) pv;\n"
+      "endpackage\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kParams[] = {
+      {1, "R"},  {1, "S"},  {1, "M"},  {2, "U"},  {3, "L"},  {4, "Q"},
+      {11, "P"}, {12, "F"}, {16, "V"}, {20, "F"}, {21, "T"}, {23, "F"},
+      {26, "W"}, {31, "X"}, {33, "F"}, {35, "F"}};
+  ExpectDollarTypeReported(f, kParams);
+  constexpr std::string_view kMessage =
+      "'$' may be assigned only to a parameter of a simple bit vector type";
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 24, "6.20.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'$' may be assigned only to a parameter of a "
+                             "simple bit vector type, and parameter 'I' is "
+                             "not one",
+                             23, "6.20.7"));
+}
+
+TEST(DollarConstantElaboration,
+     DollarAssignedToAClassParameterOfASimpleBitVectorTypeIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int R = $, S = $, bit [3:0] M = $,\n"
+             "          logic signed [7:0] U = $);\n"
+             "  localparam integer L = $;\n"
+             "  class N #(byte Q = $);\n"
+             "  endclass\n"
+             "endclass\n"
+             "class E #(int F = 1, real I = 1.0);\n"
+             "endclass\n"
+             "package p;\n"
+             "  class K;\n"
+             "    localparam longint P = $;\n"
+             "    E #($) h;\n"
+             "  endclass\n"
+             "endpackage\n"
+             "interface i;\n"
+             "  class G #(time V = $);\n"
+             "  endclass\n"
+             "endinterface\n"
+             "module m;\n"
+             "  class D extends E #(.F($));\n"
+             "    localparam shortint T = $;\n"
+             "  endclass\n"
+             "  E #($) e;\n"
+             "  if (1) begin : g\n"
+             "    class H #(reg W = $);\n"
+             "    endclass\n"
+             "  end\n"
+             "endmodule\n"
+             "typedef bit [7:0] b_t;\n"
+             "class Z #(b_t X = $);\n"
+             "endclass\n"
+             "E #($) uv;\n"
+             "package q;\n"
+             "  E #(.F($)) pv;\n"
+             "endpackage\n"));
+}
+
+TEST(DollarConstantElaboration, NonSelfContainedDollarClassParameterIsError) {
+  ElabFixture f;
+  Elaborate(
+      "class C #(int N = $ + 1);\n"
+      "  localparam int L = $ - 1;\n"
+      "  class I #(int J = -$);\n"
+      "  endclass\n"
+      "endclass\n"
+      "class E #(int N = 1, int M = 1);\n"
+      "endclass\n"
+      "package p;\n"
+      "  class K;\n"
+      "    localparam int P = $ * 2;\n"
+      "    E #($ * 2) h;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class D extends E #(.M($ + 1));\n"
+      "    localparam int T = $ ? 1 : 0;\n"
+      "  endclass\n"
+      "  E #(1, 2 + $) e;\n"
+      "  if (1) begin : g\n"
+      "    class G #(int F = $ + $);\n"
+      "    endclass\n"
+      "  end\n"
+      "endmodule\n"
+      "E #($ + 1) uv;\n"
+      "package q;\n"
+      "  E #(.N(1 - $)) pv;\n"
+      "endpackage\n",
+      f);
+  const std::pair<uint32_t, std::string_view> kParams[] = {
+      {1, "N"},  {2, "L"},  {3, "J"},  {10, "P"}, {11, "N"}, {15, "M"},
+      {16, "T"}, {18, "M"}, {20, "F"}, {24, "N"}, {26, "N"}};
+  for (const auto& [line, name] : kParams) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("'$' may only be assigned to parameter '{}' as a "
+                    "complete, self-contained expression",
+                    name),
+        line, "6.20.7"))
+        << line;
+  }
+  for (const Diagnostic& diag : f.diag.Diagnostics()) {
+    EXPECT_EQ(diag.message.find("not a constant expression"), std::string::npos)
+        << diag.message;
+  }
+}
+
+TEST(DollarConstantElaboration, SelfContainedDollarClassParameterIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C #(int N = $);\n"
+             "  localparam int L = $;\n"
+             "  class I #(int J = $);\n"
+             "  endclass\n"
+             "endclass\n"
+             "class E #(int N = 1, int M = 1);\n"
+             "endclass\n"
+             "package p;\n"
+             "  class K;\n"
+             "    localparam int P = $;\n"
+             "    E #($) h;\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module m;\n"
+             "  class D extends E #(.M($));\n"
+             "    localparam int T = $;\n"
+             "  endclass\n"
+             "  E #(1, $) e;\n"
+             "  if (1) begin : g\n"
+             "    class G #(int F = $);\n"
+             "    endclass\n"
+             "  end\n"
+             "endmodule\n"
+             "E #($) uv;\n"
+             "package q;\n"
+             "  E #(.N($)) pv;\n"
+             "endpackage\n"));
 }
 
 TEST(DollarConstantElaboration,
