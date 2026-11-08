@@ -361,6 +361,8 @@ class Elaborator : public ElaboratorClassRules {
                                     const ScopeMap& mod_scope);
   const RtlirParamDecl* ParamWithStepsAfterIt(RtlirModule* mod,
                                               const HierPath& path);
+  bool ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
+                                   const HierPath& path);
 
   void CheckEarlyResolutionAmbiguity(
       RtlirModule* mod, const std::unordered_set<std::string_view>& top_names);

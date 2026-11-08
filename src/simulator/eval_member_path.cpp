@@ -17,6 +17,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -43,11 +44,11 @@ static const StructTypeInfo* StructLayoutOfWholeName(std::string_view name,
     if (local->local_layout != nullptr) return local->local_layout;
     return ctx.GetVariableStructType(name);
   }
-  std::string prefixed = ctx.ActiveInstancePrefix() + std::string(name);
-  if (const StructTypeInfo* info = ctx.GetVariableStructType(prefixed)) {
-    return info;
+  for (const std::string& key : ctx.ScopedObjectKeys(name)) {
+    if (const StructTypeInfo* info = ctx.GetVariableStructType(key))
+      return info;
   }
-  return ctx.GetVariableStructType(name);
+  return nullptr;
 }
 
 const StructTypeInfo* StructLayoutOfName(std::string_view name,
@@ -181,6 +182,19 @@ bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
   if (obj == nullptr) return false;
   out = ResolveClassFieldChain(obj, ctx.FindClassType(declared_key), path, ctx,
                                arena);
+  return true;
+}
+
+bool TryStaticStructMember(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out) {
+  StaticPropertyRef ref;
+  std::string path;
+  if (!ResolveStaticHandlePath(expr, ctx, arena, ref, path)) return false;
+  const ClassTypeInfo::PropertyInfo* prop = ref.owner->FindProperty(ref.name);
+  const StructTypeInfo* layout =
+      prop != nullptr ? ctx.FindStructType(prop->type_name) : nullptr;
+  if (layout == nullptr) return false;
+  out = ExtractStructField(*ref.slot, layout, path, arena);
   return true;
 }
 

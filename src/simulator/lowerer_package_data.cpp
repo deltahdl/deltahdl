@@ -288,6 +288,7 @@ static std::string_view CreatePackageDataItem(const ModuleItem* item,
   ShapePackageVariable(item, var, *qname, ctx, arena);
   if (item->kind != ModuleItemKind::kVarDecl) {
     ctx.Vcd().MarkVcdParameter(*qname);
+    RegisterPackageDataLayout(item, pkg, *qname, ctx, arena);
     CreatePackageAggregate(item, pkg, *qname, ctx, arena);
     return *qname;
   }
@@ -415,7 +416,8 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   const auto& variables = ctx.GetVariables();
   auto found = variables.find(key);
   if (found == variables.end()) return;
-  if (item->kind == ModuleItemKind::kParamDecl) {
+  if (item->kind == ModuleItemKind::kParamDecl &&
+      ctx.GetVariableStructType(key) == nullptr) {
     InitPackageParam(WithPackageOwnType(item, pkg, ctx, arena), found->second,
                      ctx, arena);
     return;

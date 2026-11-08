@@ -140,7 +140,7 @@ TEST(StructureParameterSim, MembersReadTheDefaultOrTheWholeOverride) {
       "endmodule\n"
       "module t;\n"
       "  m d();\n"
-      "  m #(.P('{a: 5, b: 8'h6})) u();\n"
+      "  m #(.P('{b: 8'h6, a: 5})) u();\n"
       "  m #('{a: 7, b: 8'h8}) v();\n"
       "endmodule\n",
       f, "d.a");
@@ -159,11 +159,12 @@ TEST(StructureParameterSim, BodyParameterAndLocalparamMembersAreRead) {
                        "module t;\n"
                        "  parameter s_t Q = '{a: 3, b: 8'h4};\n"
                        "  localparam s_t L = '{b: 8'h9, a: 10};\n"
-                       "  initial $display(\"%0d %0d %0d %0d\", Q.a, Q.b, "
-                       "L.a, L.b);\n"
+                       "  parameter s_t R = Q;\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d\", Q.a, "
+                       "Q.b, L.a, L.b, R.a, R.b);\n"
                        "endmodule\n",
                        f),
-            "3 4 10 9\n");
+            "3 4 10 9 3 4\n");
   EXPECT_FALSE(f.has_errors);
 }
 
@@ -181,14 +182,19 @@ TEST(StructureParameterSim, WholeStructureDefparamGivesEveryMember) {
       "  end\n"
       "endmodule\n"
       "module t;\n"
+      "  parameter s_t Q = '{a: 6, b: 8'h7};\n"
       "  sub u();\n"
+      "  sub c();\n"
       "  sub d();\n"
-      "  defparam u.P = '{a: 9, b: 8'h3};\n"
+      "  defparam u.P = '{b: 8'h3, a: 9};\n"
+      "  defparam c.P = Q;\n"
       "endmodule\n",
       f, "u.a");
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(ValueOf(f, "u.a"), 9u);
   EXPECT_EQ(ValueOf(f, "u.b"), 3u);
+  EXPECT_EQ(ValueOf(f, "c.a"), 6u);
+  EXPECT_EQ(ValueOf(f, "c.b"), 7u);
   EXPECT_EQ(ValueOf(f, "d.a"), 1u);
   EXPECT_EQ(ValueOf(f, "d.b"), 2u);
 }
@@ -198,7 +204,7 @@ TEST(StructureParameterSim, MemberOfAnElementOfAStructureArrayIsRead) {
   EXPECT_EQ(RunCapture("typedef struct { int a; logic [7:0] b; } s_t;\n"
                        "module t;\n"
                        "  parameter s_t S [2] =\n"
-                       "      '{'{a: 1, b: 8'h2}, '{a: 3, b: 8'h4}};\n"
+                       "      '{'{b: 8'h2, a: 1}, '{b: 8'h4, a: 3}};\n"
                        "  initial $display(\"%0d %0d\", S[1].a, S[0].b);\n"
                        "endmodule\n",
                        f),
@@ -211,7 +217,7 @@ TEST(StructureParameterSim, MembersAreReadInAGenerateBlock) {
   EXPECT_EQ(RunCapture("typedef struct { int a; logic [7:0] b; } s_t;\n"
                        "module t;\n"
                        "  if (1) begin : g\n"
-                       "    localparam s_t G = '{a: 17, b: 8'h18};\n"
+                       "    localparam s_t G = '{b: 8'h18, a: 17};\n"
                        "    localparam int A[2] = '{19, 20};\n"
                        "    initial $display(\"%0d %0d %0d\", G.a, G.b, "
                        "A[1]);\n"
@@ -227,7 +233,7 @@ TEST(StructureParameterSim, MembersAreReadFromAPackageAndTheUnit) {
   EXPECT_EQ(RunCapture("typedef struct { int a; logic [7:0] b; } s_t;\n"
                        "parameter s_t U = '{a: 11, b: 8'h12};\n"
                        "package pk;\n"
-                       "  parameter s_t K = '{a: 13, b: 8'h14};\n"
+                       "  parameter s_t K = '{b: 8'h14, a: 13};\n"
                        "  parameter int A[2] = '{15, 16};\n"
                        "endpackage\n"
                        "module t;\n"
@@ -243,7 +249,7 @@ TEST(StructureParameterSim, MembersAreReadInAClass) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef struct { int a; logic [7:0] b; } s_t;\n"
                        "class C;\n"
-                       "  localparam s_t K = '{a: 19, b: 8'h1A};\n"
+                       "  localparam s_t K = '{b: 8'h1A, a: 19};\n"
                        "  localparam int A[2] = '{21, 22};\n"
                        "  static function int f();\n"
                        "    return K.a + A[1];\n"
@@ -266,7 +272,7 @@ TEST(StructureParameterSim, MembersAreReadInAnInterface) {
       "  initial a = P.a + P.b;\n"
       "endinterface\n"
       "module t;\n"
-      "  ifc #(.P('{a: 30, b: 8'h5})) i();\n"
+      "  ifc #(.P('{b: 8'h5, a: 30})) i();\n"
       "  ifc d();\n"
       "endmodule\n",
       f, "i.a");

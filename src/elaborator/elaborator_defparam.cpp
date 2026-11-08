@@ -596,6 +596,43 @@ const RtlirParamDecl* Elaborator::ParamWithStepsAfterIt(RtlirModule* mod,
   return nullptr;
 }
 
+bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
+                                             const HierPath& path) {
+  DefparamTopRooted any{nullptr, path, mod};
+  if (ResolveDefparamSteps(mod, path, {}) != nullptr ||
+      ResolveDefparamFromTop(path, any) != nullptr) {
+    auto block = defparam_writer_blocks_.find(mod);
+    if (block != defparam_writer_blocks_.end() &&
+        block->second.arrayed_interface) {
+      diag_.Error(loc,
+                  "defparam inside an instance whose port actuals refer to "
+                  "an arrayed interface reaches a parameter outside that "
+                  "instance",
+                  Subclause("25.3"));
+      return true;
+    }
+    diag_.Error(loc,
+                "defparam inside a generate block or an array of instances "
+                "reaches a parameter outside that hierarchy",
+                Subclause("23.10.1"));
+    return true;
+  }
+  if (const RtlirParamDecl* whole = ParamWithStepsAfterIt(mod, path)) {
+    diag_.Error(loc,
+                std::format("defparam names a part of parameter '{}', which "
+                            "is overridden only as a whole",
+                            whole->name),
+                Subclause("6.20.2"));
+    return true;
+  }
+  if (!DefparamTargetsSpecparam(mod, path, defparam_top_roots_)) return false;
+  diag_.Error(
+      loc,
+      std::format("defparam cannot override specparam '{}'", path.back().name),
+      Subclause("6.20.5"));
+  return true;
+}
+
 void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                                               const DefparamSite& site,
                                               const ScopeMap& mod_scope) {
@@ -606,42 +643,8 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
     if (applied_defparams_.count(key)) continue;
     const Expr* path_expr = site.item->defparam_assigns[idx].first;
     HierPath path;
-    bool read = CollectPathSteps(path_expr, scope, path);
-    DefparamTopRooted any{nullptr, path, mod};
-    bool reaches = read && (ResolveDefparamSteps(mod, path, {}) != nullptr ||
-                            ResolveDefparamFromTop(path, any) != nullptr);
-    if (reaches) {
-      auto block = defparam_writer_blocks_.find(mod);
-      if (block != defparam_writer_blocks_.end() &&
-          block->second.arrayed_interface) {
-        diag_.Error(site.item->loc,
-                    "defparam inside an instance whose port actuals refer to "
-                    "an arrayed interface reaches a parameter outside that "
-                    "instance",
-                    Subclause("25.3"));
-        continue;
-      }
-      diag_.Error(site.item->loc,
-                  "defparam inside a generate block or an array of instances "
-                  "reaches a parameter outside that hierarchy",
-                  Subclause("23.10.1"));
-      continue;
-    }
-    const RtlirParamDecl* whole =
-        read ? ParamWithStepsAfterIt(mod, path) : nullptr;
-    if (whole != nullptr) {
-      diag_.Error(site.item->loc,
-                  std::format("defparam names a part of parameter '{}', which "
-                              "is overridden only as a whole",
-                              whole->name),
-                  Subclause("6.20.2"));
-      continue;
-    }
-    if (read && DefparamTargetsSpecparam(mod, path, defparam_top_roots_)) {
-      diag_.Error(site.item->loc,
-                  std::format("defparam cannot override specparam '{}'",
-                              path.back().name),
-                  Subclause("6.20.5"));
+    if (CollectPathSteps(path_expr, scope, path) &&
+        ReportUnappliedDefparamPath(mod, site.item->loc, path)) {
       continue;
     }
     diag_.Warning(site.item->loc, "defparam target not found",

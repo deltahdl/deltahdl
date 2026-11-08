@@ -91,6 +91,16 @@ static Logic4Vec ParamDefaultValue(const Expr* expr, uint32_t width,
   return ResizeToWidth(val, width, arena);
 }
 
+static Logic4Vec ParamValueOfType(const DataType& type, const Expr* expr,
+                                  uint32_t width, SimContext& ctx,
+                                  Arena& arena) {
+  const StructTypeInfo* layout = NamedLayout(type, ctx);
+  const Expr* pattern = UnwrapTypedPattern(expr);
+  if (layout != nullptr && pattern->kind == ExprKind::kAssignmentPattern)
+    return EvalStructPatternValue(pattern, layout, ctx, arena);
+  return ParamDefaultValue(expr, width, ctx, arena);
+}
+
 Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
                                  const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
@@ -105,7 +115,7 @@ Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
   bool is_real = type != nullptr && DeclaredTypeIsReal(scoped, ctx);
   uint32_t width =
       type != nullptr && !is_real ? SimParamTypeWidth(scoped, scope_, ctx) : 0;
-  Logic4Vec val = ParamDefaultValue(expr, width, ctx, arena);
+  Logic4Vec val = ParamValueOfType(scoped, expr, width, ctx, arena);
   if (width != 0 && !DeclaredTypeIs4State(scoped, ctx)) CoerceTo2State(val);
   if (is_real) val = ToDeclaredReal(val, &scoped, ctx, arena);
   if (!name.empty() && !val.is_real)

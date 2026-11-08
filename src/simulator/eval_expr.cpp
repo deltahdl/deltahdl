@@ -600,6 +600,7 @@ static bool TryCastMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
 static bool TryMemberOfAValue(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   return TryCastMemberRead(expr, ctx, arena, out) ||
+         TryStaticStructMember(expr, ctx, arena, out) ||
          TryContainerElementMember(expr, ctx, arena, out);
 }
 

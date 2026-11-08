@@ -15,6 +15,8 @@
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
+#include "simulator/statement_assign_internal.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_dump_state.h"
 
@@ -33,9 +35,21 @@ void Lowerer::LowerParams(const RtlirModule* mod) {
   }
 }
 
+static void BindParamLayout(const RtlirParamDecl& p, std::string_view full,
+                            uint32_t width, SimContext& ctx, Arena& arena) {
+  const DataType* type = ParamValueType(p);
+  if (type == nullptr) return;
+  if (type->kind == DataTypeKind::kNamed) {
+    BindNamedLayout(full, *type, ctx);
+    return;
+  }
+  RegisterAggregateLayout(full, type, width, ctx, arena);
+}
+
 static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
                              SimContext& ctx, Arena& arena) {
   ParamStorageShape shape = ParamStorageShapeOf(p);
+  BindParamLayout(p, full, shape.width, ctx, arena);
   const DataType& type = *p.decl_type;
   RtlirVariable var;
   var.name = p.name;
@@ -76,15 +90,21 @@ static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
   return found;
 }
 
-static void BindParamLayout(const RtlirParamDecl& p, std::string_view full,
-                            uint32_t width, SimContext& ctx, Arena& arena) {
-  const DataType* type = ParamValueType(p);
-  if (type == nullptr) return;
-  if (type->kind == DataTypeKind::kNamed) {
-    BindNamedLayout(full, *type, ctx);
-    return;
-  }
-  RegisterAggregateLayout(full, type, width, ctx, arena);
+static bool HoldStructParamPattern(const RtlirParamDecl& p,
+                                   std::string_view full, Variable* var,
+                                   SimContext& ctx, Arena& arena) {
+  const StructTypeInfo* layout = ctx.GetVariableStructType(full);
+  if (layout == nullptr || (p.from_override && p.override_expr == nullptr))
+    return false;
+  const Expr* pattern = UnwrapTypedPattern(
+      p.override_expr != nullptr ? p.override_expr : p.default_value);
+  if (pattern->kind != ExprKind::kAssignmentPattern) return false;
+  std::string own = ctx.ActiveInstancePrefix();
+  if (p.override_expr != nullptr)
+    ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
+  var->value = EvalStructPatternValue(pattern, layout, ctx, arena);
+  ctx.SetLoweringInstancePrefix(own);
+  return true;
 }
 
 void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
@@ -123,7 +143,9 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   BindParamLayout(p, full, width, ctx_, arena_);
   var->value =
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
-  if (p.override_expr != nullptr || !NamesOwnEnumConstant(p.default_value, mod))
+  if (!HoldStructParamPattern(p, full, var, ctx_, arena_) &&
+      (p.override_expr != nullptr ||
+       !NamesOwnEnumConstant(p.default_value, mod)))
     ReevaluateParamValue(p, var, ctx_, arena_);
   var->is_signed = shape.is_signed;
   var->value.is_signed = shape.is_signed;

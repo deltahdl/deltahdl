@@ -80,4 +80,7 @@ bool ResolveStaticHandlePath(const Expr* access, SimContext& ctx, Arena& arena,
 bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
 
+bool TryStaticStructMember(const Expr* expr, SimContext& ctx, Arena& arena,
+                           Logic4Vec& out);
+
 }  // namespace delta
