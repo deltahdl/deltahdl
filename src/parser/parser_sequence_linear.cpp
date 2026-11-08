@@ -31,7 +31,8 @@ bool Parser::AtDollarEndingRange() {
 struct ParserSeqLinearHelpers {
   static bool ParseSeqDelayBound(Parser& p, uint32_t& val, Expr*& expr,
                                  bool dollar, bool bracketed) {
-    if (p.Check(TokenKind::kIntLiteral)) {
+    if (p.Check(TokenKind::kIntLiteral) &&
+        (!bracketed || LiteralEndsBound(p))) {
       val = ParseSeqDelayLiteral(p);
       return true;
     }
@@ -53,6 +54,15 @@ struct ParserSeqLinearHelpers {
     expr = p.ParseExpr();
     if (!bracketed) p.Match(TokenKind::kRParen);
     return true;
+  }
+
+  static bool LiteralEndsBound(Parser& p) {
+    auto saved = p.lexer_.SavePos();
+    p.Consume();
+    const bool kEnds =
+        p.Check(TokenKind::kColon) || p.Check(TokenKind::kRBracket);
+    p.lexer_.RestorePos(saved);
+    return kEnds;
   }
 
   static bool BoundsOrdered(const SeqCycleDelay& bounds) {

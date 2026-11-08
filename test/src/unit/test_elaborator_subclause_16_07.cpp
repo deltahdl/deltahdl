@@ -89,4 +89,30 @@ TEST(CycleDelayElaboration, ParameterAndActualBoundsAreChecked) {
                              "the maximum of a cycle delay range", 10, "16.7"));
 }
 
+TEST(CycleDelayElaboration, ABoundLedByALiteralIsFoldedWhole) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit clk, a, b;\n"
+      "  a1: assert property (@(posedge clk) a ##[2+1:1] b);\n"
+      "  a2: assert property (@(posedge clk) a ##[1+1:3] b);\n"
+      "  sequence s;\n"
+      "    a ##[1:4-5] b;\n"
+      "  endsequence\n"
+      "  a3: assert property (@(posedge clk) s);\n"
+      "  a4: assert property (@(posedge clk) a ##[1:5-4] b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the maximum of a cycle delay range shall be no "
+                            "less than its minimum",
+                            3, "16.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "the maximum of a cycle delay range", 4, "16.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a cycle delay shall be 0 or greater", 6, "16.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "a cycle delay shall be 0 or greater", 9, "16.7"));
+}
+
 }  // namespace
