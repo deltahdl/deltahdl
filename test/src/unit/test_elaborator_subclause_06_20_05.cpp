@@ -465,11 +465,11 @@ TEST(SpecparamElaboration, ParameterValueNamingASpecparamIsReportedEverywhere) {
 TEST(SpecparamElaboration, DefparamAimedAtASpecparamLeavesItsValue) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
-      "module cell;\n"
+      "module leaf;\n"
       "  specparam sp = 1;\n"
       "endmodule\n"
       "module m;\n"
-      "  cell u();\n"
+      "  leaf u();\n"
       "  defparam u.sp = 5;\n"
       "endmodule\n",
       f);
@@ -477,7 +477,7 @@ TEST(SpecparamElaboration, DefparamAimedAtASpecparamLeavesItsValue) {
                             "defparam cannot override specparam 'sp'", 6,
                             "6.20.5"));
   ASSERT_NE(design, nullptr);
-  const RtlirVariable* sp = FindVar(design, "cell", "sp");
+  const RtlirVariable* sp = FindVar(design, "leaf", "sp");
   ASSERT_NE(sp, nullptr);
   ASSERT_NE(sp->init_expr, nullptr);
   EXPECT_EQ(sp->init_expr->int_val, 1u);
