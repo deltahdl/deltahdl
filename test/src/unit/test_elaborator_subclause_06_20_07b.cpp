@@ -305,6 +305,7 @@ TEST(DollarConstantElaboration,
       "  logic clk;\n"
       "  ifc i1();\n"
       "  chk c1(clk);\n"
+      "  prg p1();\n"
       "endmodule\n",
       f);
   ExpectDollarReportedOnlyOn(f, {4, 6, 13, 16, 23, 24}, {7, 12, 25, 26});
