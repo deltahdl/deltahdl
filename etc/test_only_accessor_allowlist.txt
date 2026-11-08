@@ -14,14 +14,16 @@
 # Format: <accessor> <header> <reason>
 
 # Production reads the member directly.
-CellsNotPrecompiled src/elaborator/separate_compilation_bind.h separate_compilation_bind.cpp:154 reports each missing cell and :159 answers from the list being empty
-GetDeclaredSpecparamsWithInstance src/simulator/specify.h specify.cpp:923 walks the declarations and specify.h:337 builds the name list from them
-GetInterconnectDelays src/simulator/specify.h specify_interconnect.cpp:670 :707 :717 :743 :745 select a delay from it and specify.cpp:689 :692 increment it
-GetPrimitiveDrivers src/simulator/specify.h specify.cpp:873 updates each driver and specify_pulse.cpp:117 rebuilds one
-GetSpecparamValues src/simulator/specify.h specify_pulse.cpp:220 reads the stored value to increment it
-OpenEnvelopes src/preprocessor/protect_envelope.h protect_envelope.cpp:32 counts them :74 finds the one to close and :103 :106 append a keyword to the innermost
-PendingEnvelopeKeywords src/preprocessor/protect_envelope.h protect_envelope.cpp:61 moves them onto the envelope being opened
+CellsNotPrecompiled src/elaborator/separate_compilation_bind.h separate_compilation_bind.cpp:128 reports each missing cell and :133 answers from the list being empty
+Entries src/simulator/sva_engine_queues.h sva_engine.cpp:301 :307 mature the deferred reports and :316 :331 take the matured ones out, and :21 :27 :33 mature and flush the pending procedural assertions
+GetDeclaredSpecparamsWithInstance src/simulator/specify.h specify.cpp:582 :591 and specify_pulse.cpp:259 walk the declarations and specify.h:173 builds the name list from them
+GetInterconnectDelays src/simulator/specify.h specify_interconnect.cpp:311 :594 :610 :626 :679 :686 select a delay from it and specify.cpp:486 :489 increment it
+GetPrimitiveDrivers src/simulator/specify.h specify_sdf_device.cpp:52 finds the annotated driver and :65 the one to annotate, and specify_pulse.cpp:168 replaces one rebuilt
+GetSpecparamValues src/simulator/specify.h specify_pulse.cpp:335 :336 read the stored value to increment it
+OpenEnvelopes src/preprocessor/protect_envelope.h protect_envelope.cpp:32 counts them :65 finds the one to close and :91 :94 append a keyword to the innermost
+Partitions src/simulator/mt_sim.h mt_sim.cpp:89 returns when there are none and :107 :115 run each one, in turn or on a thread of its own
+PendingEnvelopeKeywords src/preprocessor/protect_envelope.h protect_envelope.cpp:58 moves them onto the envelope being opened
+ProtectViewports src/preprocessor/preprocessor.h preprocessor_protect_viewport.cpp:91 :101 hand each one to the source manager and :19 :41 set them aside and restore them around a nested envelope
 
 # Nothing under src/ reads the data; each is filed.
-ClosedEnvelopes src/preprocessor/protect_envelope.h #3602
-ProtectViewports src/preprocessor/preprocessor.h #3284
+ClosedEnvelopes src/preprocessor/protect_envelope.h #11462

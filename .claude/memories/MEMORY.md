@@ -27,7 +27,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 
 ## Formatting and prose
 
-- [Formatting with clang-format](clang-format-style-flag.md) — `clang-format -i --style=google` on every touched file; the style flag is required.
+- [Formatting with clang-format](clang-format-style-flag.md) — `clang-format -i --style=google` on every touched file, run from `llvm@<major>` of the major `install-llvm` defaults to; the style flag is required, and Homebrew's newer default lays out braces CI refuses.
 - [clang-format on C++ paths only](clang-format-only-cpp-paths.md) — filter the touched paths to `.cpp`/`.h`; a CMakeLists.txt fed to it is rewritten as C++ and stops parsing.
 - [Ending a scripted function replacement](ending-a-scripted-function-replacement.md) — a script replacing a whole function ends the old body at `"\n}\n"` in column 0, never the first `"}\n"`, which an inner block's brace matches.
 - [Annex files are not edited](annex-files-are-not-edited.md) — `vpi_user.h` is Annex K.2's text byte for byte; a platform shim goes in the build, never in the file.

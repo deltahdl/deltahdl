@@ -182,7 +182,7 @@ TEST(TightSatisfactionLocals, OutputDomainEqualsFlowOfInputDomain) {
           {SeqOr(Samp("v"), Samp("w")), Word{kX}},
           {SeqIntersect(Samp("v"), Samp("w")), Word{kX}},
           {SeqLocalVarDecl("int", "v", Samp("v")), Word{kX}},
-  };
+      };
   const LocalContext kInput{{"u", A({"z"})}};
   for (const auto& item : kCases) {
     const NameSet kExpected = FlowLocals(ContextDomain(kInput), *item.first);
