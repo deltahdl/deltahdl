@@ -8,7 +8,7 @@ metadata:
 
 # No local paths in code or workflows
 
-A comment in `src/` or `test/`, a message in a workflow, a script's note and a test's argument name the standard as `IEEE 1800-2023` (a printed page is "printed page 125 of IEEE 1800-2023"). The path `~/IEEE 1800-2023.pdf` is written only under `.claude/` — the skills and the memories, which are what tell a session where the file is ([lrm-source-of-truth](lrm-source-of-truth.md)).
+Code in `src/` or `test/`, a message in a workflow, a script's output and a test's argument name the standard as `IEEE 1800-2023` (a printed page is "printed page 125 of IEEE 1800-2023"). The path `~/IEEE 1800-2023.pdf` is written only under `.claude/` — the skills and the memories, which are what tell a session where the file is ([lrm-source-of-truth](lrm-source-of-truth.md)).
 
 **Why:** The path is a symbolic link on one machine; a reader of the repository has the standard by its name, not by a file in someone's home directory.
 

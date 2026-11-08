@@ -26,10 +26,6 @@ runs:
         INPUT_PATHS: ${{ inputs.paths }}
       name: Merge profiles
       run: |
-        # A pattern that matches nothing fails the step. Left to the shell it
-        # would reach llvm-profdata as a literal and fail there too, but as a
-        # missing file of that name, where the problem is that a tier or a
-        # shard handed over no profile at all.
         shopt -s nullglob
         set -f
         read -r -a patterns <<< "${INPUT_PATHS}"
@@ -37,7 +33,6 @@ runs:
         files=()
         unmatched=0
         for pattern in "${patterns[@]}"; do
-          # shellcheck disable=SC2206
           matched=( ${pattern} )
           if [ "${#matched[@]}" -eq 0 ]; then
             echo "::error title=No profiles to merge::${pattern} matched" \
@@ -49,11 +44,6 @@ runs:
         if [ "${unmatched}" -ne 0 ]; then
           exit 1
         fi
-        # llvm-profdata merges an empty .profraw without a word, so a process
-        # that left its profile empty would drop its counters unannounced.
-        # It annotates rather than fails: the process's own verdict belongs to
-        # the test that ran it, and whether counters were lost is what the
-        # 100% gate in assert-coverage decides.
         empty=()
         for file in "${files[@]}"; do
           if [ ! -s "${file}" ]; then
@@ -66,13 +56,6 @@ runs:
             "${#files[@]} profiles are empty and contribute no counters," \
             "${empty[0]} among them; the step log lists them all"
         fi
-        # One llvm-profdata merge names none of its inputs and reports only
-        # when it ends, so each input is merged by a call of its own into the
-        # profile built so far, and each call is announced as it starts.
-        # --failure-mode=any is llvm-profdata's default, named so that a
-        # change of default cannot make a corrupt input a warning.
-        # Its diagnostics stream to the log as they come, through tee, and are
-        # kept for the annotations below.
         log=$(mktemp)
         partial=$(mktemp)
         rm -f "${INPUT_OUTPUT}"
@@ -103,8 +86,6 @@ runs:
           fi
         done
         seconds=$(( SECONDS - start ))
-        # Every diagnostic becomes an annotation. GitHub keeps ten of each
-        # kind per step, so a count comes first and survives the cap.
         awk -v out="${INPUT_OUTPUT}" '
           function esc(s) {
             gsub(/%/, "%25", s); gsub(/\r/, "%0D", s); return s
@@ -127,8 +108,6 @@ runs:
             "but left ${INPUT_OUTPUT} missing or empty"
           exit 1
         fi
-        # Empty inputs alone merge into a valid profile of no function, which
-        # llvm-cov would read as nothing covered rather than as no profile.
         functions=$(llvm-profdata show "${INPUT_OUTPUT}" |
           awk -F': ' '/^Total functions:/ { print $2 }')
         if [ "${functions:-0}" -eq 0 ]; then

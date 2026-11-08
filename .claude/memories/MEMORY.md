@@ -19,7 +19,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [No CI-skip directives](no-ci-skip-in-commit-messages.md) — never suppress a run from a commit message; the `on:` triggers already decide.
 - [The length of a commit subject](commit-subject-length.md) — a short subject naming the change, the detail in an unwrapped body.
 - [Sharing code a change mirrors](sharing-code-a-change-mirrors.md) — when a change makes two parallel bodies or two tests equal, share them before pushing; CPD refuses 100 identical tokens.
-- [No comments or docstrings in the Python trees](no-comments-or-docstrings-in-python.md) — `assert-no-comments` refuses both under lib/python, scripts, their tests and scripts.yml; the why goes in the commit message.
+- [No comments in any file](no-comments-in-any-file.md) — no tracked file carries a comment or docstring but clang-format's namespace end comments, the six annex headers and test inputs whose comment is under test; the why goes in the commit message.
 - [The module's own terms](module-terms-in-descriptions.md) — write about module M so a reader who has never heard of its callers understands it.
 - [New struct members go last](new-struct-members-go-last.md) — tests brace-initialize AST structs by position; a member inserted before the last one they name shifts them all and breaks the build.
 - [Names say what a thing does](names-say-what-a-thing-does.md) — an identifier names its thing's meaning, never the clause, table, figure or annex number it was written for, nor a bare serial; editions, mandated names and literals keep their digits.
@@ -98,6 +98,14 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Composite actions](composite-actions.md) — a CI mechanism is `.github/actions/<name>/action.yml`, not a shell script.
 - [Naming an inserted step](naming-an-inserted-pipeline-step.md) — give it a real position or a descriptive name, never "Step 0".
 - [The unpinned CI toolchain](unpinned-ci-toolchain.md) — everything floats to latest, the runner image too, whose new headers move include-cleaner's verdicts; Actions tags stay at their major version.
+- [Never weakening a gate](never-weakening-a-gate.md) — a red gate is fixed in the code: no threshold lowered, no check or job disabled, no name exempted to dodge a rule, no `continue-on-error`.
+- [A failing Pages deployment](a-failing-pages-deployment.md) — fixed in the repository's Pages settings (Source: GitHub Actions), never in the workflow.
+- [The test clang-tidy config mirrors the source one](clang-tidy-test-config-mirrors-src.md) — a change to `etc/clang_tidy/src.yml` or `test_src_unit.yml` is made to both, bar their five intended differences.
+- [Scans stand on their own](scans-stand-on-their-own.md) — no scanning job needs another or a path detector, and each step that reports findings carries `if: ${{ !cancelled() }}`.
+- [A workflow's paths name the programs its jobs run](workflow-paths-name-the-programs-its-jobs-run.md) — a tree whose program a job runs goes in that workflow's `paths` filter and its `assert-no-comments` trees.
+- [Path filters spell out the dot](path-filters-spell-out-the-dot.md) — `**` never enters `.claude/`; give each file type a second entry that writes the dot directory.
+- [The cache budget is two generations](cache-budget-is-two-generations.md) — twice what one run of every cached job stores has to fit in the 10 GB Actions cache.
+- [RETRY_TIMEOUT is set generously](retry-timeout-is-generous.md) — install-llvm's per-attempt bound catches a stall, not a slow mirror; raise it for a long command, never tighten it.
 
 ## Issues
 

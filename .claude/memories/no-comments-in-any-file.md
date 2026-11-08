@@ -1,0 +1,27 @@
+---
+name: no-comments-in-any-file
+description: "No tracked file carries a comment or a docstring, in any language, apart from three exceptions; the reasoning goes in the commit message and the issue."
+metadata:
+  node_type: memory
+  type: feedback
+  originSessionId: 71fdefb1-3397-48b8-838f-7c5e17be7223
+  modified: 2026-11-08T02:14:42.220Z
+---
+
+# No comments in any file
+
+No file deltahdl tracks carries a comment or a docstring. That covers every language in the tree: Python, YAML, the shell inside a workflow's or a composite action's `run:` steps, C, C++, CMake, shell scripts, SystemVerilog and Verilog, and the line-per-entry data files under `etc/` and `scripts/`. Only three kinds of comment stay:
+
+- **Namespace end comments:** `clang-format --style=google` writes `}  // namespace NAME`, or `}  // namespace` for an anonymous namespace, on the brace that closes it, and writes it again when it is deleted.
+- **The six annex headers** in `src/simulator/`, whose comments are the standard's text, per [[annex-files-are-not-edited]].
+- **Test inputs whose comment is under test:** a SystemVerilog or Verilog input under `test/src/` whose test checks how a comment is handled, such as how comments lex or a directive written inside one.
+
+**Why:** No compiler, test or linter checks prose beside code, so it stops being true and nothing says when. A rename leaves every sentence naming the old identifier wrong, in files the change never touched. The reasoning belongs in the commit message and the issue, which are dated and attached to a change. `git log -S '<a phrase>'` finds a deleted comment's text.
+
+**How to apply:**
+
+- Put the why in the commit message and the issue. An instruction to whoever edits a file next becomes a memory, per [[recording-what-a-session-learns]].
+- In Python, a body that would hold only a docstring holds `pass`. A line that would carry `# pragma: no cover` gets a test instead: `runpy.run_module(..., run_name="__main__")` for a `__main__` guard, or `runpy.run_path` on a script package's `__main__.py` with `main` patched. The pylint jobs pass `--disable=missing-*-docstring` on the command line, since inline directives and configuration files are refused by their own gates.
+- `assert-no-comments`, the 10U-Labs tool installed unpinned from PyPI, is the check. Its job in `.github/workflows/scripts.yml` reads that workflow, `lib/__init__.py`, `lib/python/`, `scripts/`, `test/lib/python/` and `test/scripts/`. The jobs in `jsonlint.yml` and `markdownlint.yml` read their own workflow file. The tool spares the namespace end comment itself, and it reads no CMake and no `.txt` file, so nothing but care keeps those clean.
+
+Related: [[module-terms-in-descriptions]], [[verifying-through-ci]].

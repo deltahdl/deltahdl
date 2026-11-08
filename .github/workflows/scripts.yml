@@ -46,6 +46,7 @@ jobs:
           assert-no-comments
           --verbose
           ${{ github.workspace }}/.github/workflows/scripts.yml
+          ${{ github.workspace }}/lib/__init__.py
           ${{ github.workspace }}/lib/python/
           ${{ github.workspace }}/scripts/
           ${{ github.workspace }}/test/lib/python/
@@ -514,6 +515,7 @@ on:
     branches: [main]
     paths:
       - .github/workflows/scripts.yml
+      - lib/__init__.py
       - lib/python/**
       - scripts/**
       - test/lib/python/**

@@ -1,13 +1,13 @@
 ---
 name: lrm-text-is-copyrighted
-description: The LRM's text is IEEE copyright, so a comment, test or commit message paraphrases a clause rather than quoting it verbatim.
+description: The LRM's text is IEEE copyright, so a test, diagnostic, issue or commit message paraphrases a clause rather than quoting it verbatim.
 metadata:
   type: feedback
 ---
 
 # The standard's wording belongs to IEEE
 
-Do not put the LRM's text verbatim in comments. IEEE 1800-2023 is copyrighted, and its sentences do not belong in this repository — not in a source comment, a test comment, a commit message or a memory. Cite the clause by number and state its rule in your own words.
+Do not put the LRM's text verbatim anywhere deltahdl writes. IEEE 1800-2023 is copyrighted, and its sentences do not belong in this repository — not in a test, a diagnostic, an issue, a commit message or a memory. Cite the clause by number and state its rule in your own words.
 
 **Why:** The LRM's text is IEEE's copyright. Publishing the standard's sentences in a public tree redistributes them; a paraphrase carries the rule without the text.
 

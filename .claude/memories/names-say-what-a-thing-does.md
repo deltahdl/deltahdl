@@ -13,8 +13,8 @@ metadata:
 Every identifier, whether a type, function, fixture, constant or variable, in
 `src/`, `lib/`, `test/` or `scripts/`, is named for what the thing is or does.
 A clause, subclause, table, figure or annex number is a citation. It belongs
-in a comment or, for a unit test file, in the file name the house convention
-gives it, never as the part of an identifier that tells it apart from its
+in a commit message, an issue, a diagnostic's `Subclause("…")` or, for a unit
+test file, in the file name the house convention gives it, never as the part of an identifier that tells it apart from its
 neighbours. A serial suffix such as `Src43` is no better. `ParseTimescale31402`
 should be something like `PreprocessAndParse`, and `kTable221` should name the
 keywords the table lists.

@@ -36,8 +36,6 @@ runs:
       run: |
         set -euo pipefail
         archive="${GITHUB_WORKSPACE}/.deps/googletest-${TAG}.tar.gz"
-        # sha256sum ships with coreutils and shasum with perl, and the runners
-        # do not agree on which is present.
         if command -v sha256sum; then
           echo "${EXPECTED_SHA256}  ${archive}" | sha256sum --check
         else

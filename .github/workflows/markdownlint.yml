@@ -3,6 +3,26 @@ concurrency:
   cancel-in-progress: true
   group: markdownlint-${{ github.ref }}
 jobs:
+  assert-no-comments:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/markdownlint.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-comments
+        run: pip install assert-no-comments
+      - name: Assert no comments
+        run: >-
+          assert-no-comments
+          --verbose
+          ${{ github.workspace }}/.github/workflows/markdownlint.yml
   markdownlint:
     runs-on: ubuntu-latest
     steps:
@@ -22,13 +42,6 @@ jobs:
           pip install \
             assert-no-inline-directives \
             assert-no-linter-config-files
-      # ── Steps that report findings of their own ──
-      # Every step from here on carries !cancelled(). Each scans the whole tree
-      # rather than the change, so each can hold a backlog, and a step the job
-      # stopped short of is reported the same way as one that found nothing: a
-      # breach left standing in the first of them hid the rest for as long as
-      # it stood. The job still fails when any of these fails; what changes is
-      # that one run names every breach rather than the earliest.
       - if: ${{ !cancelled() }}
         name: Assert no inline markdownlint disables
         run: >-
@@ -43,14 +56,6 @@ jobs:
           --linters markdownlint
           --verbose
           ${{ github.workspace }}
-      # MD013 is off because a table row is one line and cannot be
-      # wrapped: a row carrying a link outgrows eighty columns without
-      # any way to shorten it but deleting a column.
-      # The checkout's root is passed as a directory, which markdownlint-cli
-      # expands to every *.md and *.markdown file beneath it; --dot is what
-      # puts dot-prefixed directories such as .claude/ in front of the linter,
-      # which it otherwise skips. --disable is variadic, so the directory goes
-      # before it.
       - if: ${{ !cancelled() }}
         name: Lint Markdown
         run: markdownlint . --dot --disable MD013
@@ -73,8 +78,6 @@ jobs:
           assert-no-inline-directives
           assert-no-linter-config-files
           yamllint
-      # Reports whatever the steps ahead of it did, for the reason set out on
-      # markdownlint above.
       - if: ${{ !cancelled() }}
         name: Assert no inline yamllint disables
         run: >-
@@ -100,11 +103,6 @@ on:
   push:
     branches: [main]
     paths:
-      # A path filter matches a dot-prefixed directory only where the pattern
-      # spells the dot out, so '**/*.md' passes over .claude/ and the entry
-      # below is what starts this workflow on a change to the notes or the
-      # skill. Eight pushes carrying nothing but .claude/skills/autopilot/
-      # SKILL.md started no run at all before it was added.
       - '**/*.md'
       - .claude/**/*.md
       - .github/workflows/markdownlint.yml

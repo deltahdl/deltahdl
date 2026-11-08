@@ -2,19 +2,6 @@
 concurrency:
   cancel-in-progress: true
   group: deltahdl-${{ github.ref_name }}
-# SHARD_SLICE is the awk program every sharded job selects its slice with:
-# given n, the matrix width, and s, the shard, it prints the input lines whose
-# hash is s modulo n. A line's shard therefore depends on that line alone.
-# Selecting by position, (NR-1) % n, moved every line after an inserted one to
-# the next shard, and a target registered anywhere but last in
-# test/CMakeLists.txt, which 7 of the 200 commits before this one did, sent
-# most of every slice to a shard whose ccache or ctcache had never held it.
-# The price is evenness: of the 3,421 unit-test targets, the eighteen shards
-# of a build job get 166 to 207 by hash where position would give 190 or 191,
-# and the seventeen of unit-test-coverage 189 to 224 where it would give 201
-# or 202. The hash is a polynomial over the printable ASCII a target name or
-# path is made of, kept below 2^53 so every awk computes it exactly, and s is
-# added to 0 so a shard spelled '07' compares as the number 7.
 env:
   PYTHONUNBUFFERED: "1"
   SHARD_SLICE: >-
@@ -24,12 +11,6 @@ env:
     if (h % n == s + 0) print }
 jobs:
   assert-coverage:
-    # The four tiers whose counters this job merges are named here one by one.
-    # Each of unit-test-coverage, e2e-test-coverage, sv-tests-coverage and
-    # supplemental-integration-test-coverage descends from build-coverage-lib
-    # and from nothing the other three produce, so none of them orders another
-    # and naming one would leave this job downloading an artifact a tier still
-    # running has not uploaded.
     needs:
       - e2e-test-coverage
       - supplemental-integration-test-coverage
@@ -46,10 +27,6 @@ jobs:
         with:
           name: coverage-simulator
           path: build/src/
-      # Each shard arrives already merged, having summed its own pooled
-      # .profraw files into one before uploading it. The files land in one
-      # directory and keep the shard number in their names, so nothing
-      # collides under merge-multiple.
       - name: Download unit profdata
         uses: actions/download-artifact@v8
         with:
@@ -73,16 +50,6 @@ jobs:
           path: profraw/supplemental-integration/
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
-      # The merge takes the unit tier already merged and the other three raw.
-      # llvm-profdata reads a .profdata as readily as a .profraw and sums
-      # counters either way, so the shard merges and the three raw sets give the
-      # same profile the raw sets of every shard used to give.
-      #
-      # Under coverage deltahdl_lib is a shared library, so the executable
-      # carries the instrumentation for main.cpp and the library carries it for
-      # everything else. llvm-cov reads coverage mapping out of the images it is
-      # handed, so both have to be named or src/ reports as absent rather than
-      # as uncovered.
       - name: Merge profiles
         uses: ./.github/actions/merge-profiles
         with:
@@ -100,8 +67,6 @@ jobs:
             --ignore-filename-regex='test/|third_party/' \
             --format=html \
             -output-dir=coverage-html
-      # DO NOT lower this threshold. Uncovered code is untested code —
-      # lowering it hides bugs and lets regressions slip through silently.
       - name: Enforce 100% coverage
         run: |
           llvm-cov report build/src/deltahdl \
@@ -124,43 +89,11 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: coverage-html/
-      # DO NOT add continue-on-error here. If Pages deployment fails,
-      # the repo settings need to be fixed (Settings > Pages > Source =
-      # "GitHub Actions"), not the workflow.
       - if: >-
           github.ref_name == 'main'
           && github.event_name == 'push'
         name: Publish to GitHub Pages
         uses: actions/deploy-pages@v5
-  # A unit test runs only if it has a TEST(...) block and test/CMakeLists.txt
-  # registers it, and registration is by hand. This job holds both ends of that
-  # together, so adding a test and deleting one both have to touch the file and
-  # its entry in the same commit.
-  #
-  # A source with no add_unit_test(...) entry is never compiled, so it can sit
-  # in the tree for months while its cases are assumed to be running. No other
-  # job in this workflow catches that. An entry naming a file that is gone
-  # breaks configuration outright, so the build catches that one in any case
-  # and this job only catches it sooner and without a toolchain.
-  #
-  # One reading of test/CMakeLists.txt answers both questions, and that is what
-  # makes the guarantee hold: the two directions cannot disagree about what an
-  # entry looks like when there is only one pattern that decides. Reading the
-  # file twice let them disagree. The direction that checked registration
-  # matched the whole line as a fixed string, so an entry written
-  # add_unit_test(name)  # annex file, or one carrying trailing whitespace,
-  # was an entry CMake honours and the other direction reads but this one
-  # reported as missing -- and the report then asked for an entry that was
-  # already there, or for the deletion of a file that was compiling and
-  # running.
-  #
-  # The pattern below is the permissive one, matching what CMake accepts.
-  # A name comes from a file under test/src/unit/ or from that pattern, so it
-  # is [A-Za-z0-9_]+ either way and sorts and compares as a plain word. LC_ALL
-  # is set because comm reads the two lists under the collation of the locale
-  # it runs in, and a locale that folds case or ignores the underscore orders
-  # those names differently from the sort that prepared them. The two have to
-  # agree, or comm reports a difference where there is none.
   assert-file-and-registration-sets-agree:
     runs-on: ubuntu-latest
     steps:
@@ -192,19 +125,6 @@ jobs:
             fail=1
           done
           exit $fail
-  # DO NOT edit one of the files below to satisfy a check, a compiler or a
-  # platform. Each is text IEEE 1800-2023 prints, transcribed and verified
-  # against the printed pages named beside it, and the standard is the source of
-  # truth: what a platform needs ahead of one is given by the build (the
-  # top-level CMakeLists.txt gives macOS <stdint.h> ahead of vpi_user.h), and a
-  # check the annex's text trips is excluded from the file
-  # (ExcludeHeaderFilterRegex in etc/clang_tidy/src.yml and
-  # test_src_unit.yml). CI holds no copy of the standard, so the verified text
-  # is pinned here by its SHA-256, and this job fails when a file's content no
-  # longer matches its pin. A departure the annex itself allows, or that the
-  # file's own comment names as the one it makes, is part of the pinned text.
-  # A change to one of these files is a re-verification against the annex and
-  # a new pin in the same commit, and nothing else.
   assert-lrm-mandated-files:
     runs-on: ubuntu-latest
     steps:
@@ -228,22 +148,6 @@ jobs:
           49b4915aa0bb9ecbe08937d6b3cb4fe6d402913813d773507e0e6161b5e08ea8 src/simulator/svdpi_sv31a.h Annex-H.14.2
           PINS
           exit $fail
-  # Each unit test source compiles into an executable of its own, and
-  # gtest_discover_tests registers every case into CTest under the bare
-  # Suite.Name with no binary to qualify it. Two files declaring one name
-  # therefore produce two CTest tests called the same thing: --gtest_filter and
-  # ctest -R select both, and a failure report names the suite and the test but
-  # not the file, so a red run does not say which declaration broke. The scan
-  # below spans the newline between the suite and the test name, because
-  # clang-format wraps a long declaration at the comma and a line-at-a-time
-  # grep would not see those. It crosses whitespace after the open paren
-  # for the same reason: once a name passes 72 characters it no longer fits
-  # the columns left after the continuation indent, so clang-format stops
-  # breaking at the comma and breaks after the paren instead. Flattened,
-  # that leaves a space where an identifier was expected, and the
-  # declaration was skipped -- silently, and for exactly the longest and
-  # most specific names, which are the ones a near-duplicate is likeliest
-  # to reuse.
   assert-no-duplicate-test-names:
     runs-on: ubuntu-latest
     steps:
@@ -259,11 +163,6 @@ jobs:
               | sed "s|\$| $f|"
           done | sort > "$names"
           fail=0
-          # The pattern above is the only thing standing between a
-          # declaration and the comparison, and when it stops matching a
-          # spelling it says nothing -- the name simply never arrives, and
-          # a second declaration of it passes. Counting what was opened
-          # against what was read turns that silence into a failure.
           opened=$(cat test/src/unit/*.cpp \
             | grep -cE '^(TYPED_)?TEST(_[FP])?\(')
           read_back=$(wc -l < "$names")
@@ -284,33 +183,6 @@ jobs:
             fail=1
           done
           exit $fail
-  # A source that has lost its last TEST(...) block builds an executable that
-  # observes nothing.
-  # This job fails when one class, struct, union or enum is defined at one
-  # namespace scope by two headers. Such a pair compiles for as long as no
-  # translation unit sees both, and fails everywhere the moment one does.
-  # `enum class AssertionSeverity : uint8_t` stood in both
-  # src/simulator/dpi_runtime.h and src/simulator/sva_engine_sequences.h with
-  # the same four enumerators until 473260321 made src/simulator/sim_context.h
-  # include a header reaching the second; every clang-tidy-test-shard-* job of
-  # run 33185965619 then failed with "redefinition of 'AssertionSeverity'", and
-  # a2effe1ab removed the duplicate.
-  #
-  # What that cost was the delay and the misattribution. The duplicate was
-  # written long before the commit that broke the build, and that commit added
-  # no definition at all -- it added one #include. A reader of the red run saw
-  # twenty failing shards and a commit about assertion sampling, with nothing
-  # connecting them to the two headers.
-  #
-  # copy-paste-src does not cover it: jscpd measures a duplicated token run
-  # against a minimum size, and a duplicated enumeration is about six lines,
-  # which is under that minimum by the nature of the thing being duplicated.
-  #
-  # It needs no build and no compiler, so it sits here with
-  # assert-no-oversized-source-files and assert-subclause-citations rather than
-  # behind cache-googletest, and reports in seconds where the shards report in
-  # minutes. Its unit tests run in .github/workflows/scripts.yml; it reads
-  # src/, lib/ and test/ and so belongs in this workflow, which watches them.
   assert-no-duplicate-type-definitions:
     runs-on: ubuntu-latest
     steps:
@@ -334,15 +206,6 @@ jobs:
             fi
           done
           exit $fail
-      # A header under lib/cpp/ reaches a test only by being included, and an
-      # #include writes the basename. So a basename no source writes in an
-      # #include is a file the compiler never opens: it is in no
-      # translation unit, the coverage build never instruments it, and
-      # clang-tidy never reads it, because clang-tidy takes its work from
-      # compile_commands.json and that holds .cpp files. Nothing else in this
-      # workflow can report such a header, which is how the sixteen deleted
-      # under #2996 survived. Each lost its last #include when a later commit
-      # rewrote the one test that included it.
       - name: Check every lib/cpp header is included somewhere
         run: |
           fail=0
@@ -356,21 +219,6 @@ jobs:
             fi
           done
           exit $fail
-      # A helper in an included header is compiled, so this catches what the
-      # step above cannot: a function the compiler does read and no test
-      # calls. -Wunused-function does not report one, because every helper
-      # here is declared inline and that warning covers static functions.
-      #
-      # The scan is by name rather than by call, since a helper can be named
-      # without being called -- ReadOnceCb and ReadTwiceCb in
-      # helpers_vpi_save_restore_probe.h are passed to the VPI registration
-      # as function pointers. Requiring a following "(" would report both as
-      # dead.
-      #
-      # A helper is alive on either of two counts: another file uses it, or
-      # its own file does, below the line declaring it. Counting the second
-      # is what keeps a helper written for one other helper in the same
-      # header out of the report.
       - name: Check every lib/cpp helper is used outside its own declaration
         run: |
           fail=0
@@ -392,59 +240,6 @@ jobs:
             done
           done
           exit $fail
-      # This step fails when one name is declared inline at namespace scope
-      # in two headers under lib/cpp. Such a pair is one name with two
-      # definitions, and inline gives each of them external linkage. A test
-      # file that includes both headers does not compile: the report is a
-      # redefinition standing at a line in neither of the two headers the
-      # test was written to use. Two translation units of one executable
-      # that took different definitions break the one-definition rule, and
-      # no linker is obliged to say so.
-      #
-      # No unit test can cover this. Observing the collision means including
-      # both headers in one translation unit, which is the compile failure
-      # the step exists to prevent.
-      #
-      # #3416 is the pair that prompted the step.
-      # lib/cpp/test_fixtures/fixture_protect_read.h and
-      # lib/cpp/test_fixtures/fixture_protect_encoding.h each declared
-      # kExchangeKey, with a different key in each, and nothing broke only
-      # because no translation unit includes both. Adding the step reported
-      # kSealedDesign and kBlockOpening as well, declared by
-      # fixture_protect_encoding.h and lib/cpp/test_helpers/
-      # helpers_protect_region.h, and all three pairs were renamed apart.
-      #
-      # The match is anchored at column 0 because clang-format
-      # --style=google leaves a namespace-scope declaration there and
-      # indents one written inside a struct, a class or a function body.
-      # `grep -rE '^[[:space:]]+inline (constexpr|const) '` over lib/cpp
-      # reports nothing, so the anchor drops no declaration the step is
-      # written to read.
-      #
-      # The `=` is what tells a variable from a function, so ElaborateSrc in
-      # lib/cpp/test_fixtures/fixture_synthesizer.h is not read as a name.
-      # The span before it admits no quote, because a value such as
-      # kAnyEncoding's "`pragma protect encoding=" carries an `=` of its own
-      # and the last one on the line is not the one that ends the name. A
-      # declaration written static rather than inline has internal linkage,
-      # and two of those are not one name.
-      #
-      # A function is read as well as a variable, and it is keyed on its
-      # parameter types rather than on its name. Overloading one name across
-      # the fixtures is deliberate -- FindDiag takes an ElabFixture, a
-      # ParseResult, a SimFixture or a SynthFixture, one overload per header
-      # -- and a step keyed on the name alone would report those four and
-      # five families like them. What is not legal is one name with one
-      # parameter list and two bodies, which is what #3422 records for
-      # RegionBody and DataBlockOf. Parameter names are cut out of the key
-      # because they are the declaration's own words rather than part of its
-      # signature.
-      #
-      # The key is the declaration's own line, so a parameter list broken
-      # across lines is keyed on the part before the break. Two declarations
-      # in different headers that agree that far are reported, which is a
-      # report worth making even where a later parameter would tell them
-      # apart.
       - name: Check no name is declared in two lib/cpp headers
         run: |
           decls=$(mktemp)
@@ -467,33 +262,6 @@ jobs:
             fail=1
           done
           exit $fail
-  # This job fails when a file under src/elaborator/ names one of Stmt's
-  # scalar child-statement links -- then_branch, else_branch or for_body --
-  # and is not listed in etc/elaborator_stmt_link_allowlist.txt. It also fails
-  # when a line in that file names no such file any more, so a conversion
-  # deletes its own entry instead of leaving one standing.
-  #
-  # ForEachChildStmt in src/elaborator/elaborator_validate_internal.h is meant
-  # to be the one place Stmt's thirteen child-statement links are written. A
-  # walk that writes out six of them enforces its rule over part of a
-  # procedure while reading as though it enforced it over all of one, and
-  # nothing about the walk says which six. That has cost this repository real
-  # work: #3301, #3305, #3307, #3318, #3319 and #3320 converted a hundred and
-  # nineteen walks between them, every one found by a person reading, and each
-  # conversion left the next reader no way to know what remained.
-  #
-  # The three links are the key because only a walk over statements reads
-  # them. #3317 proposed case_items as the second key and it is the wrong one:
-  # seven files under src/elaborator/ read ci.patterns or ci.is_default and
-  # walk no statement, so the allow-list would have recorded which files read
-  # a case item's expressions rather than which walks still write their own
-  # list, and no conversion would ever shorten it. fork_stmts is wrong for the
-  # reason #3317 itself gives -- it is a link the hand-written walks omit, so
-  # a search keyed on it finds none of them.
-  #
-  # The allow-list is a tracked file rather than a string in this job so that
-  # reading what remains does not mean reading a job definition, and so that
-  # the entry a conversion deletes shows in the diff as a line.
   assert-no-hand-written-stmt-link-lists:
     runs-on: ubuntu-latest
     steps:
@@ -522,9 +290,6 @@ jobs:
             fi
           done
           exit $fail
-  # DO NOT disable this job. Inline suppression comments (NOLINT,
-  # clang-format off, etc.) hide problems instead of fixing them and make the
-  # codebase progressively harder to maintain.
   assert-no-inline-directives:
     runs-on: ubuntu-latest
     steps:
@@ -545,14 +310,6 @@ jobs:
           assert-no-inline-directives
           --tools clang-tidy,clang-format,clang-diagnostic
           ${{ github.workspace }}
-  # DO NOT disable this job. A pylint, mypy or yamllint configuration file in
-  # the tree relaxes a rule for every file it covers, and it does so where
-  # nobody reading the job that runs the linter would see it. The settings each
-  # linter runs under are written into the command that runs it instead.
-  #
-  # scripts.yml runs this same scan over the same workspace. The two workflows
-  # watch different paths, so a push touching only src/ starts this one and not
-  # that one, and neither copy covers what the other does.
   assert-no-linter-config-files:
     runs-on: ubuntu-latest
     steps:
@@ -574,34 +331,6 @@ jobs:
           --linters pylint,mypy,yamllint
           --verbose
           ${{ github.workspace }}
-  # This job fails when a .cpp or .h under src, test or lib/cpp holds 950 lines
-  # or more. It used to fail at 1001 and warn at 950, and the warning is what
-  # this replaces. A warning cannot put the split in front of the author,
-  # because nothing has to answer it: a file could sit in the band across any
-  # number of changes, each of them adding to it in the knowledge that the job
-  # stayed green, until some later change carried it to 1001 and its author
-  # met the split as an obstacle in front of work already written. That is the
-  # failure the warning was added to prevent, and it is the one it produced.
-  # cc443c650 is what it looks like: src/parser/parser_port.cpp returned to
-  # 1000 by folding a three-line comment into two, which
-  # .claude/memories/prose-length-over-column-fitting.md rules against --
-  # the shorter word chosen to fit a column is paid for out of the accuracy
-  # the prose exists to carry.
-  #
-  # One comparison replaces two, so the limit the number describes is the limit
-  # the job enforces and a file reaching it is red rather than noted. The 50
-  # lines the band used to hold are still there to write a split in; what has
-  # changed is that they are spent before the limit rather than after it.
-  #
-  # src/simulator/vpi_user.h is the one file the find leaves out. Annex K.1 of
-  # IEEE 1800-2023 says every SystemVerilog simulator shall provide the file and
-  # K.2 prints its source, about 1,000 lines of it, so its length is the
-  # standard's and not this repository's to split: the file is what the annex
-  # prints and nothing else, and a second file it pulled in to get under the
-  # limit would be the umbrella the include check exists to refuse. The
-  # exemption names the one file rather than a pattern, because Annex M's
-  # sv_vpi_user.h and Annex L's vpi_compatibility.h fit under the limit as
-  # printed and stay under it.
   assert-no-oversized-source-files:
     runs-on: ubuntu-latest
     steps:
@@ -619,22 +348,6 @@ jobs:
             fi
           done
           exit $fail
-  # A report names the subclause of IEEE 1800-2023 whose rule it enforces in
-  # its Subclause argument, and DiagEngine::Emit appends that field to the
-  # sentence. A message that also spells out the same subclause therefore
-  # prints it twice, as the recursive-let report did until #3002, and this job
-  # fails on such a message. A literal citing some other subclause is a
-  # cross-reference and is left alone: src/parser/parser_sequence_local_var.cpp
-  # says "the types allowed in §16.6" under Subclause("16.8.2"), and both are
-  # wanted.
-  #
-  # src/common/diagnostic.h and src/common/diagnostic.cpp are exempt because
-  # DiagEngine::Emit writes the section sign every report carries.
-  #
-  # The check strips // comments before it reads a file, since the comment
-  # above a report cites the subclause the report enforces and would otherwise
-  # be read as the message doing so. A string literal holding // is truncated
-  # by that, which can only hide a site from this check, never invent one.
   assert-no-repeated-subclause:
     runs-on: ubuntu-latest
     steps:
@@ -673,59 +386,6 @@ jobs:
             done
           done
           exit $fail
-  # This job fails when a file anywhere under src/ hands DiagEngine::Error or
-  # DiagEngine::Warning an empty location: {}, SourceLoc{} or SourceLoc().
-  # SourceManager::FormatLoc in src/common/source_mgr.cpp renders one as
-  # "<unknown location>", and DiagEngine::Emit then skips the source
-  # line and the caret because there is no line to quote. A report given one
-  # tells somebody whose source description was rejected what went wrong and
-  # not where, and a source description holding several of the construct under
-  # test produces one sentence with nothing to tell the failures apart.
-  #
-  # A report about the run rather than about a construct written in a source
-  # description says so with SourceLoc::None(), declared in
-  # src/common/source_loc.h. That value is what lets this job cover the
-  # whole tree rather than src/simulator alone: a source description that
-  # cannot be read has no position to stand at, and before #3006 the only way
-  # to say so read the same as passing nothing.
-  #
-  # The scan joins each file into one line first, because clang-format wraps a
-  # long report after the open parenthesis and a line-at-a-time grep would not
-  # see a location on the next line. The pattern then reads the whole location
-  # argument rather than its first token, so a location reached through a
-  # conditional fails as readily as a literal standing first;
-  # src/simulator/eval_function.cpp passed call ? call->range.start :
-  # SourceLoc{} until #3006, inside the one directory this job already covered.
-  # The span cannot cross a comma, a semicolon or a closing parenthesis, so it
-  # never runs past the end of the location argument. That is also what keeps
-  # a {} inside a format string from counting, since the message is a later
-  # argument and a comma always stands between the open parenthesis and its
-  # braces. SourceLoc{} needs no alternative of its own, because the braces
-  # ending it are the {} the first alternative matches, and SourceLoc::None()
-  # matches neither alternative, because it holds no {} and the text
-  # SourceLoc() is not a substring of it.
-  # This job fails when a public accessor that hands back a container has no
-  # caller under src/, unless etc/test_only_accessor_allowlist.txt names it with
-  # the reading that says why. It also fails when a line in that file names an
-  # accessor the scan no longer reports, so an exemption cannot outlive the
-  # thing it exempted.
-  #
-  # A member that only tests call is a member production does not need, and
-  # coverage cannot say so: a test executed it, so it is covered.
-  # SimContext::AddSensitivity and GetSensitiveProcesses were that shape --
-  # a map written for every always_comb in every design, read by two unit tests
-  # that asserted it held what was put in it, and by nothing that wakes a
-  # process. #3312 removed them after a person found them by hand while tracing
-  # something else, and #3313 asked for the job that would have said so.
-  #
-  # The shape is narrow on purpose. The rule as first proposed -- any public
-  # member function whose references outside its own declaration are all under
-  # test/ -- reports 331 names, nearly all of them an accessor a test reads an
-  # object through while production reads the member itself, and a job
-  # reporting 331 names is one nobody keeps green. Restricting it to the shape
-  # the defect had, an accessor returning a reference to a container, reports
-  # seventeen, and two of those were already-filed defects when the rule was
-  # calibrated.
   assert-no-test-only-accessors:
     runs-on: ubuntu-latest
     steps:
@@ -792,100 +452,6 @@ jobs:
             fi
           done
           exit $fail
-  # A test that hands deltahdl an illegal source shows the rule it covers is
-  # enforced only if it names the report: a substring of the message, the line
-  # of the test's own source the report stands at, and the exact Subclause("…")
-  # text the emission site passes, in one call to ReportedError in
-  # lib/cpp/test_helpers/helpers_reported_error.h. EXPECT_TRUE(f.has_errors),
-  # EXPECT_TRUE(f.diag.HasErrors()), EXPECT_FALSE(ParseOk(...)) and
-  # EXPECT_EQ(..., CompileOutcome::kFailed) are each satisfied by any rejection,
-  # so a test written for one rule passes when a different rule fired, and
-  # passes when the source never reached the construct the test is about.
-  # SinglePassPrecompile.DescriptionClaimedByTwoLibrariesNamesBothInItsDiagnostic
-  # in test/src/unit/test_parser_subclause_33_05_01.cpp did exactly that until
-  # 28234b4ac. #2961 states the defect in full, and the commits closing #3017,
-  # #3018, #3019, #3020, #3021, #3088, #3112 and #3113 converted every site the
-  # tree then held. This job is what keeps them converted: no test observes an
-  # assertion another test file did not make, so nothing else can report a new
-  # one written the old way.
-  #
-  # Two rules, because the shapes are not equally wrong.
-  #
-  # EXPECT_TRUE or ASSERT_TRUE on has_errors, or on any name ending in
-  # HasErrors(, names no report at all, so it fails wherever it stands. The
-  # name is matched with a prefix so a file-local wrapper is caught too:
-  # EXPECT_TRUE(LexHasErrors("…")) hid five such assertions in
-  # test/src/unit/test_lexer_annex_a_08_08.cpp from the reading behind #3017.
-  #
-  # Every other shape also stands as an outcome check beside a ReportedError for
-  # the same run, which 6e204800b records as wanted, so each fails only in a TEST
-  # body that names its report nowhere. Those shapes are:
-  #
-  #   EXPECT_FALSE on a call ending in Ok(;
-  #   EXPECT_EQ against CompileOutcome::kFailed;
-  #   EXPECT_TRUE on the boolean an `auto [tokens, errors] = LexWithDiag(…)`
-  #     binding produced, which carries no member, helper or error word of its
-  #     own, so the scan reads the binding to learn the name;
-  #   EXPECT_EQ against diags.size() or Diagnostics().size() of one or more;
-  #   EXPECT_FALSE on diags.empty() or Diagnostics().empty();
-  #   EXPECT_EQ against ErrorCount() of one or more;
-  #   a const Diagnostic* bound out of the record, however it was selected, and
-  #     read field by field afterwards. The binding is what the scan matches
-  #     rather than the name of the finder, because a file-local finder hides one
-  #     as readily as FindDiag does: test_elaborator_subclause_35_05_02.cpp and
-  #     test_elaborator_subclause_33_05_03.cpp each declared one, as
-  #     EXPECT_TRUE(LexHasErrors("…")) hid five assertions from #3017;
-  #   diags.front().subclause, which the comment on FindDiag in
-  #     lib/cpp/test_fixtures/fixture_parser.h documents as the wrong report to
-  #     read when a source is rejected twice.
-  #
-  # A count is worse than the boolean it replaces rather than better:
-  # ASSERT_EQ(diags.size(), 1u) states how many reports a run made and nothing
-  # about which rule any of them enforced, and it goes red when a second report
-  # is added for an unrelated reason.
-  #
-  # A body that calls DiagEngine::Error or DiagEngine::Warning itself is reading
-  # back a report it wrote rather than one a source provoked, so there is no rule
-  # of the standard for it to name and the shapes above do not apply to it. The
-  # eleven bodies in test/src/unit/test_non_lrm_diagnostic.cpp are all of them.
-  #
-  # ReportedWarning in the same header answers the three questions of a warning,
-  # for a rule the program enforces with one: §23.3.2.1 has the binder warn about
-  # an ordered port connection past the last port rather than reject the source.
-  #
-  # An assertion that a source was ACCEPTED reads the same members and is sound,
-  # because the claim there is that nothing was reported and there is no report
-  # to name. That is why every shape is anchored on the assertion macro:
-  # EXPECT_FALSE(f.diag.HasErrors()) and EXPECT_TRUE(ParseOk(…)) have to pass a
-  # scan that fails their opposites.
-  #
-  # The scan reads a TEST body rather than a line, and joins each file with
-  # tr '\n' ' ' before it matches, because clang-format wraps an assertion whose
-  # argument is a multi-line source string, and because the ReportedError call
-  # answering an EXPECT_FALSE(ElabOk(…)) stands on a later line than the
-  # assertion it answers. // comments are stripped first, so that a shape quoted
-  # in a comment is not read as an assertion; a string literal holding // is
-  # truncated by that, which can only hide a body from this scan, never invent
-  # one.
-  #
-  # Eleven bodies are exempt, and every one is sound as written. Six pin what a
-  # fixture helper returns, which is the construct under test there rather than
-  # a rule the source breaks, and each is paired with an acceptance of the same
-  # call. Two sweep Table B.1 through a fixed template whose control run shows
-  # the frame parses, and each word lands in a different parser path, so no one
-  # message or subclause holds across the sweep. 6e204800b records both
-  # readings. Three drive Parser::Expect through the fixture in
-  # test/src/unit/test_non_lrm_parser_expect.cpp with a subclause the case picks
-  # itself, so the report they read back is one the case chose rather than one a
-  # rule of the standard decided.
-  #
-  # The list is here rather than in a marker comment in the sources, because an
-  # inline marker hides the exemption where nobody reading this job would see
-  # it, which is what assert-no-inline-directives exists to stop. Nothing else
-  # belongs on it: an assertion that cannot name a report because the rule has
-  # no report is a defect in the program, and it is fixed rather than exempted.
-  # DefparamElaboration.RhsRejectsNonConstantExpression was the one such body,
-  # and #3070 is what took it off this list.
   assert-no-unnamed-rejections:
     runs-on: ubuntu-latest
     steps:
@@ -967,48 +533,12 @@ jobs:
             fi
           done
           exit $fail
-  # A report names the subclause of IEEE 1800-2023 whose rule it enforces, and
-  # this fails on either of two things being wrong about those names.
-  #
-  # It fails when one of them is a subclause the standard does not have. Two
-  # elaborator reports cited §6.20.3.1 until #3068 and nothing said so, because
-  # a unit test over a diagnostic reads the string the emission site passes,
-  # which is the value under suspicion.
-  #
-  # It fails when one message is reported under two subclauses. Five were until
-  # #3119, so one sentence sent a reader to a different clause depending on
-  # which site emitted it, and a test naming that message could not say which
-  # rule it covered.
-  #
-  # It judges no citation to be the wrong clause for its rule. That is a
-  # reading of the standard and stays a reviewer's job; what the second check
-  # answers is whether two sites agree with each other.
-  #
-  # The check is written in Python and its unit tests run in
-  # .github/workflows/scripts.yml, but it reads src/ and so belongs here, with
-  # assert-no-unlocated-diagnostics and assert-no-repeated-subclause, which read
-  # the same tree for the same reason. It ran in scripts.yml until #3156, and
-  # that workflow does not watch src/, so a push changing only src/ -- which is
-  # the push that adds an emission site -- started no run of it.
   assert-subclause-citations:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - name: Assert every citation names a clause and every message one rule
         run: PYTHONPATH=.:scripts python3 -m assert_subclause_citations
-  # Annex H.5 has svdpi.h be the include file an application that uses the DPI
-  # with C code needs, so this job writes a C application that includes it and
-  # uses a type, a constant, a macro and a function of each kind the subclause
-  # lists, and compiles it as strict C99 with every warning an error. The
-  # translation unit is C, not C++, which is what the unit tests, being C++,
-  # cannot check.
-  #
-  # -Wno-shift-negative-value is there for one line of the header: Annex I.3
-  # (printed page 1294) spells SV_MASK(N) as the complement of -1 shifted
-  # left by N, and the application's SV_GET_UNSIGNED_BITS expands to it. A
-  # left shift of a negative value is undefined in C99, so gcc's -Wextra
-  # warns on it in C99 mode and -Werror would fail the step; the file is the
-  # standard's, so the flag yields rather than the line.
   assert-svdpi-compiles-as-c:
     runs-on: ubuntu-latest
     steps:
@@ -1039,14 +569,6 @@ jobs:
           EOF
           cc -std=c99 -Wall -Wextra -pedantic -Werror -fsyntax-only \
             -Wno-shift-negative-value -Isrc "$app"
-  # Annex H.3 has every name the DPI C layer introduces follow one of its
-  # four conventions, and svdpi.h is where the layer introduces them, so this
-  # job reads that header and fails on a function or type name that is not sv
-  # followed by initially capitalized words with no separator, and on a
-  # symbolic constant or macro that is neither sv_ in lowercase nor SV_ in
-  # uppercase. test/src/unit/test_simulator_annex_h_03.cpp checks the names the
-  # header holds today by spelling; this job is what catches a name added to
-  # the header without being added there.
   assert-svdpi-naming:
     runs-on: ubuntu-latest
     steps:
@@ -1078,21 +600,6 @@ jobs:
             fi
           done
           exit $fail
-  # §36.7 has vpi_user.h and sv_vpi_user.h be the C include files a PLI
-  # application that uses the VPI includes, Annex K.1 has every simulator
-  # provide the first and Annexes K.2, L.2 and M.2 print the three files, so
-  # this job writes a C application that includes the two the clause names,
-  # under the names the clause gives them, and uses a handle, a value, a time,
-  # a callback record with its routine, a system task record with its routine,
-  # a constant of each of the object, property, callback and value-format
-  # kinds, an edge macro, an Annex M name and a routine call, and compiles it as
-  # strict C99 with every warning an error. It compiles the same application a
-  # second time with one VPI_COMPATIBILITY_VERSION_ symbol defined, which is
-  # how §36.12.2.1 has an application select a mode and what has vpi_user.h
-  # read vpi_compatibility.h to effect. The translation unit is C, not C++,
-  # which is what the unit tests, being C++, cannot check, and it is the check
-  # that the file is the C include file the clause names rather than a C++
-  # header under the same name.
   assert-vpi-user-compiles-as-c:
     runs-on: ubuntu-latest
     steps:
@@ -1176,10 +683,6 @@ jobs:
             ccache-build-asan-ubsan-shard-${{
               matrix.shard }}-
             ccache-build-asan-ubsan-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run,
-      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
@@ -1189,10 +692,6 @@ jobs:
         with:
           sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
           tag: ${{ needs.cache-googletest.outputs.tag }}
-      # -gline-tables-only rather than Debug's -g: a sanitizer report needs a
-      # file and line for each frame and nothing else DWARF holds, and the rest
-      # of it is what made build-coverage-lib's objects six to eight times the
-      # size ccache has to store (see the comment above its Build step).
       - name: Build
         run: |
           cmake -B build -G Ninja \
@@ -1210,21 +709,11 @@ jobs:
             | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
               "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
-      # to compile, and this step bounds the cache instead: it evicts every
-      # entry older than the time Reset ccache statistics wrote, leaving
-      # exactly the entries this build stored or read, as the step of the same
-      # name in unit-test-coverage does and for the reasons the comment above
-      # that job gives. A 200M cap applied during the build is what this
-      # replaces, and it was the one unit-test-coverage measured costing up to
-      # 31 misses a shard on a commit that changed one test source.
       - name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -1240,61 +729,16 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   build-coverage-lib:
-    # Every coverage shard compiled the whole instrumented deltahdl target
-    # before its slice of the unit tests, so the same 284 translation units
-    # were compiled once per shard a run and stored once per shard in the cache.
-    # Compile them once here and hand the shards the object tree.
-    #
-    # The cache is not capped while the build runs and is pared after it to
-    # what the build used, as the coverage shards do it. Under the 200M this
-    # job carried as its
-    # CCACHE_MAXSIZE, sized when the library was 284 objects at a quarter of a
-    # megabyte apiece, run 35657769589 restored the entry saved at 561cc0211,
-    # a commit no C++ file had changed since, and still reported 161 misses
-    # of 518 with 99 cleanups and the cache at 99.76% of the cap: the
-    # instrumented library no longer fits, so every run evicted a third of it
-    # during the build and compiled that third again, 188 of the build step's
-    # 201 seconds. Level 10 is the compression the shards measured as costing
-    # nothing over ccache's own level and leaving a slice fifteen percent
-    # smaller; the 517 Debug objects of the library compressed to 298 MiB at
-    # ccache's own level and 237 MiB at level 10 before instrumentation, when
-    # they still carried the debug information the Build step now leaves out.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: '0'
     needs: [cache-googletest]
-    # The major this job installed, published so unit-test-coverage installs
-    # the same one. .github/actions/install-llvm floats to the newest stable
-    # release and each caller discovers separately, so a release landing after
-    # this job would otherwise leave a shard compiling and linking against the
-    # objects below with a compiler that did not produce them.
     outputs:
       llvm-major: ${{ steps.llvm.outputs.major }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # This job used to open by running jlumbroso/free-disk-space, which
-      # deletes the preinstalled Android library, .NET runtime, Haskell runtime
-      # and Docker images to reclaim about 21 GiB. Commit c62540b78 added that
-      # step to build-coverage, a job that compiled the instrumented deltahdl
-      # target and every unit-test executable on one machine and had a final
-      # link fail with "No space left on device". Commit 50e7edbff split this
-      # job out of that one and the step came across unexamined, though what is
-      # left here is 284 instrumented src/ objects and one shared library.
-      #
-      # The room is there without it. unit-test-coverage runs on the same
-      # ubuntu-latest image and #2991 measured it: the runner mounts 145G on /,
-      # a shard reaches the same point in its own steps with 88G of it
-      # available, and a shard's whole footprint is about 5G. A shard also
-      # unpacks the build tree this job uploads and then compiles its slice of
-      # the unit tests on top of it, so it holds everything this job holds and
-      # 2 to 3G of .profraw besides.
-      #
-      # What the reclaim cost was time every other coverage job waits on. It
-      # took 37 seconds in run 31071689608, 68 in run 31071176358 and 82 in run
-      # 31070141115. The two readings below are what would catch the day the
-      # headroom goes.
       - name: Report free space before the build
         run: df -h /
       - id: llvm
@@ -1302,9 +746,6 @@ jobs:
         uses: ./.github/actions/install-llvm
       - name: Install ccache and Ninja
         run: sudo apt-get install -y ccache ninja-build
-      # The key prefix is deliberately not ccache-build-coverage-, which is the
-      # last restore-key a shard falls back on. Sharing it would let a shard
-      # restore this cache, which holds no unit-test objects at all.
       - name: Restore ccache
         uses: actions/cache@v5
         with:
@@ -1316,11 +757,6 @@ jobs:
           restore-keys: |
             ccache-build-lib-coverage-${{ hashFiles('**/CMakeLists.txt') }}-
             ccache-build-lib-coverage-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
-      # The time written beside them is where Evict what the build did not use
-      # draws its line, as it is in unit-test-coverage.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
@@ -1330,28 +766,6 @@ jobs:
         with:
           sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
           tag: ${{ needs.cache-googletest.outputs.tag }}
-      # The generator chosen here is the one every coverage shard inherits, and
-      # a shard asks for its whole slice in one cmake --build naming 137
-      # targets. Make takes those as 137 separate goals and re-checks a build
-      # system carrying 2,736 unit-test targets before each of them: 161 to 320
-      # seconds of a shard's 290-to-494-second build step went on those checks,
-      # with nothing compiling or linking, and --parallel had no two goals in
-      # flight at once to overlap. Ninja scans the graph once and runs the whole
-      # set four wide.
-      #
-      # The flags this configure chooses are also the ones every shard compiles
-      # with, and they carry no debug information. Debug's -g made DWARF about
-      # seven eighths of every object ccache stores: compiled with the coverage
-      # flags and compressed at level 10, test_simulator_subclause_31_06b.cpp
-      # was 1,830 KiB with -g and 230 KiB with -g0,
-      # test_elaborator_subclause_06_14.cpp 842 and 139, and
-      # test_synthesizer_subclause_09_04.cpp 499 and 82, and the compile took
-      # a fifth less time without it. Nothing here reads DWARF: llvm-cov reports
-      # from the coverage mapping -fcoverage-mapping writes, and a failing unit
-      # test names its file and line through googletest's own macros. With -g a
-      # shard's slice outgrew the cap that held it, so run 36323338286, whose
-      # commit changed two test files, missed 66 to 85 of every shard's 182
-      # compilations and spent three to four minutes compiling them again.
       - name: Build
         run: |
           cmake -B build -G Ninja \
@@ -1364,59 +778,19 @@ jobs:
             -DCMAKE_C_FLAGS_DEBUG=-g0 \
             -DDELTAHDL_COVERAGE=ON
           cmake --build build --parallel 4 --target deltahdl
-      # Read after the compile because that is where the disk this job asks for
-      # goes: 284 instrumented objects and the shared library linked from them.
-      # Pack the build tree below writes a second copy of the tree as a tar, so
-      # the true peak comes later by the size of that tar, and the difference
-      # between this figure and the one before the build is what the compile
-      # itself costs.
       - name: Report free space after the build
         run: df -h /
-      # The size the build left: the whole library plus the earlier versions of
-      # whatever changed since the restored entry was saved. The du after the
-      # eviction below is the library alone, so the difference between the two
-      # is what the eviction removed.
       - name: Report the ccache size the build left
         run: du -sk "$CCACHE_DIR"
-      # This step is the only thing that bounds the cache, the build above
-      # having run under the job's CCACHE_MAXSIZE of 0, ccache's spelling of no
-      # limit. It evicts every entry older than the time Reset ccache
-      # statistics wrote, leaving exactly the entries this build stored or
-      # read, as the step of the same name in unit-test-coverage does and for
-      # the reasons the comment above that job gives. It replaces a fixed 300M
-      # cap, sized from run 35661247203's 216,044 KiB for the library when its
-      # objects carried debug information, which a library that kept growing
-      # would have outgrown as the unit-test slices outgrew theirs. A step that
-      # fails ends the job before this one, so a partial build is never
-      # evicted down to what it reached.
       - name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration. du reports the size
-      # because ccache -s rounds it to a tenth of a GiB and prints no
-      # percentage under a CCACHE_MAXSIZE of 0.
       - name: Report ccache statistics
         run: |
           ccache -s
           du -sk "$CCACHE_DIR"
-      # The tree travels as a tar because actions/upload-artifact uploads a set
-      # of files and so carries no empty directory, and a configured tree is
-      # full of them: one object output directory per target nobody has built
-      # yet, including the 2,700-odd unit-test targets and googletest's. A shard
-      # that unpacked the lossy form died on the first of those, clang reporting
-      # it could not open _deps/googletest-build/googletest/CMakeFiles/gtest.dir
-      # /src/gtest-all.cc.o. The tar is left uncompressed for upload-artifact to
-      # compress in transit.
-      #
-      # The object files travel with it, unlike every other build artifact here.
-      # The build tool holds deltahdl_lib stale unless the objects it was linked
-      # from are present, so slimming them out would have each shard recompile
-      # the src/ tree this job exists to compile once. The tree is also left
-      # configured, so a shard can build a target without re-running cmake over
-      # every one of those unit-test targets.
       - name: Pack the build tree
         run: tar -C build -cf build.tar .
       - name: Upload build
@@ -1425,18 +799,6 @@ jobs:
           name: build-coverage-lib
           path: build.tar
           retention-days: 1
-      # The instrumented simulator is all the coverage report and the sv-tests
-      # and simulation suites need, and this job is where it is linked.
-      # Publishing it on its own spares them the alternative: downloading a
-      # coverage shard's whole build tree, 2.2 GB of unit-test executables, to
-      # read the same tens of megabytes out of it. It travels beside the tar
-      # rather than instead of it because the tar carries a configured tree with
-      # its object files, which is a different thing for a different consumer.
-      #
-      # The library goes with it. Under coverage deltahdl_lib is shared, so it
-      # holds the instrumentation for everything outside main.cpp: the simulator
-      # will not start without it and llvm-cov has nothing to report from
-      # without it either.
       - name: Upload simulator
         uses: actions/upload-artifact@v7
         with:
@@ -1466,10 +828,6 @@ jobs:
           restore-keys: |
             ccache-build-macos-arm64-${{ hashFiles('**/CMakeLists.txt') }}-
             ccache-build-macos-arm64-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run,
-      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
@@ -1488,21 +846,11 @@ jobs:
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_BUILD_TYPE=Release
           cmake --build build --parallel 2
-      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
-      # to compile, and this step bounds the cache instead: it evicts every
-      # entry older than the time Reset ccache statistics wrote, leaving
-      # exactly the entries this build stored or read, as the step of the same
-      # name in unit-test-coverage does and for the reasons the comment above
-      # that job gives. A 200M cap applied during the build is what this
-      # replaces, and it was the one unit-test-coverage measured costing up to
-      # 31 misses a shard on a commit that changed one test source.
       - name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -1539,10 +887,6 @@ jobs:
             ccache-build-tsan-shard-${{
               matrix.shard }}-
             ccache-build-tsan-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run,
-      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
@@ -1552,10 +896,6 @@ jobs:
         with:
           sha256: ${{ needs.cache-googletest.outputs.archive-sha256 }}
           tag: ${{ needs.cache-googletest.outputs.tag }}
-      # -gline-tables-only rather than Debug's -g: a sanitizer report needs a
-      # file and line for each frame and nothing else DWARF holds, and the rest
-      # of it is what made build-coverage-lib's objects six to eight times the
-      # size ccache has to store (see the comment above its Build step).
       - name: Build
         run: |
           cmake -B build -G Ninja \
@@ -1573,21 +913,11 @@ jobs:
             | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
               "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
-      # to compile, and this step bounds the cache instead: it evicts every
-      # entry older than the time Reset ccache statistics wrote, leaving
-      # exactly the entries this build stored or read, as the step of the same
-      # name in unit-test-coverage does and for the reasons the comment above
-      # that job gives. A 200M cap applied during the build is what this
-      # replaces, and it was the one unit-test-coverage measured costing up to
-      # 31 misses a shard on a commit that changed one test source.
       - name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -1628,10 +958,6 @@ jobs:
             ccache-build-clang-release-shard-${{
               matrix.shard }}-
             ccache-build-clang-release-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run,
-      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
@@ -1655,21 +981,11 @@ jobs:
             | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
               "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
-      # to compile, and this step bounds the cache instead: it evicts every
-      # entry older than the time Reset ccache statistics wrote, leaving
-      # exactly the entries this build stored or read, as the step of the same
-      # name in unit-test-coverage does and for the reasons the comment above
-      # that job gives. A 200M cap applied during the build is what this
-      # replaces, and it was the one unit-test-coverage measured costing up to
-      # 31 misses a shard on a commit that changed one test source.
       - name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -1710,10 +1026,6 @@ jobs:
             ccache-build-gcc-release-shard-${{
               matrix.shard }}-
             ccache-build-gcc-release-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run,
-      # and write the time Evict what the build did not use draws its line at.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
@@ -1737,21 +1049,11 @@ jobs:
             | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
               "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # CCACHE_MAXSIZE is 0 so that the build never evicts objects it has yet
-      # to compile, and this step bounds the cache instead: it evicts every
-      # entry older than the time Reset ccache statistics wrote, leaving
-      # exactly the entries this build stored or read, as the step of the same
-      # name in unit-test-coverage does and for the reasons the comment above
-      # that job gives. A 200M cap applied during the build is what this
-      # replaces, and it was the one unit-test-coverage measured costing up to
-      # 31 misses a shard on a commit that changed one test source.
       - name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
       - name: Report ccache statistics
         run: ccache -s
       - name: Slim build output
@@ -1766,16 +1068,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-  # Decides which googletest release the run builds against, and makes sure
-  # its archive is in the cache before any job that configures the test tree
-  # starts. The release is whichever one google/googletest has published most
-  # recently, resolved on every run, so a release is taken up by the first
-  # push after it lands and no file in this repository names a version. On a
-  # hit nothing is downloaded and the job is a fast no-op. A miss covers a new
-  # release and an entry GitHub evicted alike, and on one this job makes the
-  # single request to github.com the whole run needs. Before it existed each
-  # of the 22 jobs that configure the test tree made that request for itself,
-  # and 14 of them made it at once on the cold run 32057806620.
   cache-googletest:
     outputs:
       archive-sha256: ${{ steps.archive.outputs.sha256 }}
@@ -1803,41 +1095,14 @@ jobs:
           set -euo pipefail
           archive="${GITHUB_WORKSPACE}/.deps/googletest-${TAG}.tar.gz"
           mkdir -p "$(dirname "${archive}")"
-          # curl retries 408, 429, 500, 502, 503 and 504 under --retry, and
-          # --retry-all-errors adds the transport failures a degraded
-          # github.com also returns. Run 32039919698 lost
-          # clang-tidy-test-shard-00 to an HTTP 429 and then a 503, and that
-          # is the failure this download is written to ride out. CMake cannot
-          # stand in for it: its download step retries the six curl transport
-          # codes at Modules/ExternalProject/download.cmake.in:103 and no HTTP
-          # status at all.
           if [ ! -f "${archive}" ]; then
             curl --fail --location --show-error \
               --retry 8 --retry-all-errors --retry-delay 5 \
               --retry-max-time 600 --output "${archive}" \
               "https://github.com/google/googletest/archive/refs/tags/${TAG}.tar.gz"
           fi
-          # Published so that .github/actions/fetch-googletest can check the
-          # copy it restores. This is not a pin and verifies nothing about
-          # upstream: it describes the archive this run downloaded, so what it
-          # catches is a cache entry that came back damaged.
           echo "sha256=$(sha256sum "${archive}" | cut -d" " -f1)" \
             >>"$GITHUB_OUTPUT"
-  # Ensures sv-tests is cached for integration-test jobs. Resolves the
-  # latest remote SHA on every run, then clones and saves only when the
-  # cache holds no entry under that SHA. On a hit the lookup downloads
-  # nothing, so the job is a fast no-op. A miss covers a new upstream
-  # commit and an entry GitHub evicted alike, so an evicted entry is
-  # rebuilt on the next push rather than waiting on an upstream commit.
-  #
-  # The clone also checks out the two submodules conf/runners/libs.json
-  # names, third_party/tests/uvm and third_party/tests/uvm-1.2: the
-  # suite compiles a file tagged `uvm` or `uvm-1.2` behind that
-  # library's uvm_pkg.sv with its src directory on the include path, and
-  # scripts/run_sv_tests does the same, exiting before running anything
-  # when a library the json names is not on disk. The key carries
-  # "with-libraries" so an entry saved before the submodules were part
-  # of the clone is not restored as if it held them.
   cache-sv-tests:
     needs:
       - build-coverage-lib
@@ -1888,39 +1153,6 @@ jobs:
           find src test lib/cpp -name '*.cpp' -o -name '*.h' | \
             xargs clang-format \
             --dry-run --Werror --style=google
-  # misc-include-cleaner, which clang-tidy-src and clang-tidy-test run, judges
-  # the includes of the translation unit it is given and never those of a
-  # header that unit pulls in, so on its own it leaves every header under src/
-  # and lib/cpp free to include what it does not use and to use what it does
-  # not include. This job runs the same analysis on each of those headers as a
-  # translation unit of its own, through clang-include-cleaner, the standalone
-  # tool built on the library the check uses. A header has no entry in
-  # compile_commands.json, so the step writes one for each from the flags of a
-  # unit test's translation unit: those carry the src/, lib/cpp and googletest
-  # include paths, which is every path a header under either tree can need,
-  # and -x c++ tells the driver to compile the header as C++ rather than as a
-  # precompiled header. Each header prints one line saying its includes match
-  # its uses; a header that fails prints what the tool would change and fails
-  # the step, and one that does not compile on its own fails it the same way.
-  #
-  # The headers are split across seventeen shards by SHARD_SLICE, at the top of
-  # this file, drawn once over their paths relative to the checkout and written
-  # to a list both steps after it read, since the compile commands name each
-  # header by its absolute path and the check by its relative one. A shard
-  # whose slice is empty writes no compile command and checks nothing: xargs
-  # -r runs no command on empty input.
-  #
-  # src/simulator/vpi_user.h is the one header both finds leave out. It is the
-  # C include file Annex K.2 of IEEE 1800-2023 prints, and the annex's
-  # portability help (printed page 1306) selects by platform the header that
-  # provides the int64_t and uint64_t its PLI_INT64 and PLI_UINT64 are
-  # typedefs of: <stdint.h> under __MINGW32__, <inttypes.h> under __linux,
-  # <sys/types.h> otherwise, and MSVC's own typedefs. Read as C++, which
-  # -x c++ makes every header here, the tool names <cstdint> as the provider
-  # of those two names and asks for an include the annex does not print. The
-  # file's includes are the standard's, and assert-vpi-user-compiles-as-c is
-  # the check on them: it compiles the file as the C the annex writes it in,
-  # on Linux, where <inttypes.h> is where int64_t comes from.
   clang-include-cleaner-headers:
     name: clang-include-cleaner-headers-shard-${{ matrix.shard }}
     needs: [cache-googletest]
@@ -1980,11 +1212,6 @@ jobs:
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
                 '10', '11', '12', '13', '14', '15', '16']
-  # The shards start once every clang-include-cleaner-headers shard has
-  # finished, whatever it concluded: that job is in `needs` for the ordering
-  # alone, and `!cancelled()` stands in for the condition `needs` sets by
-  # default, that every need succeeded, so a red or skipped header shard holds
-  # nothing back.
   clang-tidy-src:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
@@ -2015,28 +1242,12 @@ jobs:
           path: .ctcache
           restore-keys: |
             ctcache-src-${{ matrix.shard }}-
-      # BUILD_TESTING off because this job lints src/ and nothing under src/
-      # includes a googletest header. CMakeLists.txt:38-40 turns it on by
-      # default and adds test/, whose CMakeLists.txt fetches googletest while
-      # it configures, so leaving it on would hold this job behind
-      # cache-googletest for translation units the pattern below discards.
       - name: Generate compile_commands.json
         run: |
           cmake -B build \
             -DBUILD_TESTING=OFF \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      # run-clang-tidy takes its positional argument as a Python regular
-      # expression and searches it against each absolute path in
-      # compile_commands.json, so this shard's slice is named as an alternation
-      # of the paths awk left it. The slice is drawn from every .cpp outside the
-      # test tree, which is what this configuration lints; the exclusion is on
-      # /test/ rather than on any directory the sources happen to sit in today.
-      # Only the dot is escaped: nothing else a path holds here means anything
-      # to the regular expression engine, and $ anchors the match at the end so
-      # no longer path can carry a slice member as a prefix. A slice awk leaves
-      # empty would make the pattern (), which matches every path, so such a
-      # shard stops before run-clang-tidy instead of linting the whole tree.
       - name: >-
           Run clang-tidy (src, shard ${{ matrix.shard }}/${{
           strategy.job-total }})
@@ -2067,10 +1278,6 @@ jobs:
       matrix:
         shard: ['00', '01', '02', '03', '04', '05', '06', '07', '08', '09',
                 '10', '11', '12', '13', '14', '15', '16']
-  # The shards start once every clang-tidy-src shard has finished, whatever it
-  # concluded: clang-tidy-src is in `needs` for the ordering alone, and the
-  # condition tests only cache-googletest, whose outputs name the archive the
-  # shard fetches, so a red or skipped clang-tidy-src shard holds nothing back.
   clang-tidy-test:
     env:
       CTCACHE_DIR: ${{ github.workspace }}/.ctcache
@@ -2111,17 +1318,6 @@ jobs:
           cmake -B build \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-      # The positional argument is a Python regular expression searched against
-      # each absolute path in compile_commands.json, so this shard's slice of
-      # the unit test tree is named as an alternation of the paths awk left it.
-      # The paths are whole rather than basenames, which keeps a source file
-      # sharing a test file's basename out of a configuration written for the
-      # tests. Only the dot is escaped: nothing else a path holds here means
-      # anything to the regular expression engine, and $ anchors the match at
-      # the end so no longer path can carry a slice member as a prefix. A slice
-      # awk leaves empty would make the pattern (), which matches every path,
-      # so such a shard stops before run-clang-tidy rather than linting the
-      # sources as well with a configuration written for the tests.
       - name: >-
           Run clang-tidy (test, shard ${{ matrix.shard }}/${{
           strategy.job-total }})
@@ -2160,19 +1356,6 @@ jobs:
         id: pmd
         name: Resolve latest PMD release
         run: |
-          # The releases API is rate-limited per source IP, and shared runner
-          # IPs exhaust the unauthenticated allowance readily, so the request
-          # carries the workflow token and is retried with backoff -- the same
-          # treatment the LLVM discovery in .github/actions/install-llvm needs
-          # for the same reason.
-          #
-          # The result is checked here rather than left to the consumer. A bare
-          # `ver=$(curl ...)` reports success even when the request 403s,
-          # because command substitution discards curl's exit status, and the
-          # empty version then reaches the download step as the URL
-          # .../download/pmd_releases%2F/pmd-dist--bin.zip. That 404s, so the
-          # job failed two steps later with a wget exit code and no mention of
-          # the API call that actually went wrong.
           ver=""
           for attempt in 1 2 3 4 5; do
             resp=$(curl -fSL \
@@ -2222,19 +1405,6 @@ jobs:
         id: pmd
         name: Resolve latest PMD release
         run: |
-          # The releases API is rate-limited per source IP, and shared runner
-          # IPs exhaust the unauthenticated allowance readily, so the request
-          # carries the workflow token and is retried with backoff -- the same
-          # treatment the LLVM discovery in .github/actions/install-llvm needs
-          # for the same reason.
-          #
-          # The result is checked here rather than left to the consumer. A bare
-          # `ver=$(curl ...)` reports success even when the request 403s,
-          # because command substitution discards curl's exit status, and the
-          # empty version then reaches the download step as the URL
-          # .../download/pmd_releases%2F/pmd-dist--bin.zip. That 404s, so the
-          # job failed two steps later with a wget exit code and no mention of
-          # the API call that actually went wrong.
           ver=""
           for attempt in 1 2 3 4 5; do
             resp=$(curl -fSL \
@@ -2276,21 +1446,6 @@ jobs:
           --language cpp
           --dir test/src/
           --dir lib/cpp/
-  # The e2e and integration jobs below, and supplemental-integration-test-coverage
-  # and sv-tests-coverage further on, each test the jobs they need rather than
-  # the health of the run. !cancelled() supplies a status function so a skipped
-  # need does not carry the skip onwards by default, and the result tests put
-  # back exactly what the default condition provided: run when what this job
-  # depends on succeeded, stay out when it did not.
-  #
-  # `!failure()` stood here before, and it is true only when nothing anywhere in
-  # the run has failed. sv-tests-coverage depends on nothing the unit tier
-  # produces, and a red unit shard skipped it in every run for over a hundred
-  # pushes; when it finally ran it reported 132 failing sv-tests that no
-  # run in that window had said anything about. A job held back by a failure it
-  # has no relation to reports nothing, and a job that did not run is recorded
-  # neither green nor red, so the tier's state stopped being visible at exactly
-  # the times it was most likely to be drifting.
   e2e-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -2324,23 +1479,12 @@ jobs:
           path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
-      # test can be killed while creating one. See seed-profile-pools.
       - name: Seed profile pools
         uses: ./.github/actions/seed-profile-pools
         with:
           images: build/src/deltahdl
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
-      # RunOnDeepStack in src/main.cpp runs the simulation on a thread with a
-      # 1 GiB stack, and on the main thread when pthread_create refuses that
-      # thread. An address space limited to 768 MiB leaves the binary room to
-      # load and run hello.sv but none for the stack, so this run takes the
-      # fallback and must still print what hello.expected records. It is a step
-      # of this job rather than an e2e case because a sanitizer runtime reserves
-      # its shadow memory against the same limit and could not start under it,
-      # and this job is the one that runs the unsanitized coverage binary whose
-      # profile assert-coverage merges.
       - name: E2E test with no room for the simulation thread's stack
         run: |
           expected=$(cat test/src/e2e/hello.expected)
@@ -2418,13 +1562,6 @@ jobs:
         run: chmod +x build/src/deltahdl
       - name: E2E tests
         run: PYTHONPATH=.:scripts python3 -m run_sim_tests
-  # DO NOT lower the sv-tests pass threshold. Every failing test
-  # represents a real LRM conformance gap — lowering it hides parser
-  # and elaboration bugs instead of fixing them.
-  #
-  # Each integration-test job runs on a fresh runner with an empty
-  # filesystem, so cache/restore is always needed to download sv-tests
-  # from persistent storage — even though cache-sv-tests already saved it.
   integration-test-asan-ubsan:
     env:
       ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
@@ -2551,51 +1688,6 @@ jobs:
       - name: Run sv-tests
         run: PYTHONPATH=.:scripts python3 -m run_sv_tests
   prune-ccache:
-    # Every ccache and ctcache key here ends in github.sha, so no run ever
-    # reuses a stale entry as its primary key — and so every commit mints a
-    # whole new generation while nothing retires the last one. The repository
-    # gets 10 GB of cache for all jobs together, and GitHub reclaims an overage
-    # by evicting whatever was least recently used, so a generation left behind
-    # does not cost the job that made it: it costs some other job its entire
-    # cache. Every ccache job here saves what its build used and nothing else,
-    # so a generation costs what one run of every cached job compiles. A new
-    # entry is written before this job removes
-    # the superseded one, so the figure that has to fit under 10 GB is two
-    # generations, and adding a cached job means budgeting twice what one
-    # build of it stores.
-    # What is kept is the newest entry per cache identity, not the entry for
-    # this commit. Not every identity has an entry for this commit: actions/cache
-    # declares post-if: "success()" on its save step, so every job here that
-    # still uses it saves nothing on a run that goes red, and a job an if:
-    # condition skipped saves nothing either. Keying on the current sha would
-    # then either delete the last good generation or never run at all.
-    # Newest-per-identity is correct whichever happened: it keeps whatever the
-    # restore-keys would have found. The coverage unit-test shards are the one
-    # exception, saving from an explicit step that runs red or green, and the
-    # rule needs no exception made for them -- their newest entry is simply
-    # always this commit's.
-    #
-    # Nothing is pruned out from under a job that has not restored yet. The five
-    # jobs below are the last in this graph to write a cache, and two of the
-    # others that do — build-coverage-lib and the coverage unit-test shards — are
-    # ancestors of all five through assert-coverage, so naming them here as well
-    # would add no ordering. The clang-tidy shards start at the root of the graph
-    # and nothing waits on them, so they can still be running when this job does;
-    # what protects them is the rule below rather than any ordering. The newest entry per identity is what is kept and the newest
-    # is what a restore-key match would have found, so a shard yet to restore
-    # finds the same entry it would have found had this job never run, and one
-    # that has already restored is retiring a generation it is done with.
-    # Only on a push to main, so a pull-request run cannot delete the caches main
-    # builds against.
-    #
-    # !cancelled() is what makes the five reachable rather than merely ordered. A
-    # single failing unit test skips assert-coverage and so skips all five, and
-    # the default is for a job to be skipped along with any dependency that did
-    # not succeed; !cancelled() runs it anyway. That is the difference between run
-    # 30504953092, which lacked the guard and skipped this job while the coverage
-    # shards ahead of the gate had already deposited a fresh 8 GB generation, and
-    # run 30506064344, equally red with all five equally skipped, where it ran and
-    # retired that generation. A red main is precisely when the quota needs this.
     if: >-
       !cancelled()
       && github.ref_name == 'main'
@@ -2615,19 +1707,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         name: Delete superseded cache entries
         run: |
-          # Every key here is <identity>-<CMakeLists hash>-<sha>, so dropping
-          # the last two hyphen-separated fields leaves the identity: one
-          # build job, or one shard of one. Newest first, the first sighting of
-          # an identity is the entry to keep and the rest are superseded. The
-          # CMakeLists hash has to be dropped along with the sha, because
-          # registering a unit test changes it and every generation would
-          # otherwise be an identity of its own with nothing ever superseded.
-          #
-          # The selection is awk rather than grep so that finding nothing is an
-          # exit code of 0: there is nothing wrong with a run that has no
-          # superseded entries, and this step runs under `set -o pipefail`.
-          # sv-tests-*, pmd-* and pip-* are keyed by the thing they hold rather
-          # than by commit, so they never go stale and are left alone.
           keys=$(gh cache list --limit 1000 --json createdAt,key \
             --jq '.[] | select(.key | test("^(ccache-build-|ctcache-)"))
               | "\(.createdAt)\t\(.key)"' \
@@ -2638,15 +1717,6 @@ jobs:
                 if (identity in newest) print $2
                 newest[identity] = 1
               }')
-          # A failed deletion warns and the loop goes on. `run:` executes under
-          # `bash -e`, so without the `||` one transient error from the API ends
-          # the step, fails the job, reddens the whole run, and leaves every key
-          # after it unattempted. That is the wrong trade for this step: an entry
-          # that survives costs one extra generation against the 10 GB budget and
-          # the next run's prune takes it, while a red job says nothing about the
-          # commit that triggered it and reads exactly like a real break. Run
-          # 33227867139 lost the eighth of fifteen deletions to an HTTP 502 and
-          # failed for it.
           for key in ${keys}; do
             echo "Deleting superseded cache entry: ${key}"
             gh cache delete "${key}" || echo "::warning::could not delete ${key}"
@@ -2708,10 +1778,6 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
-  # The integration tests deltahdl keeps for itself, in test/src/integration/,
-  # covering what the sv-tests suite does not. They run under the coverage build
-  # alone, and their counters join the unit, e2e and sv-tests tiers' in
-  # assert-coverage.
   supplemental-integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw
@@ -2727,8 +1793,6 @@ jobs:
           path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
-      # test can be killed while creating one. See seed-profile-pools.
       - name: Seed profile pools
         uses: ./.github/actions/seed-profile-pools
         with:
@@ -2741,12 +1805,6 @@ jobs:
           name: profraw-supplemental-integration
           path: profraw/
           retention-days: 1
-  # This job downloads the simulator build-coverage-lib uploads, and cache-sv-tests
-  # is what orders the two: it needs build-coverage-lib, so the artifact is
-  # uploaded before this job is scheduled and naming build-coverage-lib here as
-  # well would add no ordering. The condition is covered along the same path --
-  # build-coverage-lib failing skips cache-sv-tests, whose result is then
-  # 'skipped' rather than 'success', which is what this job tests.
   sv-tests-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw
@@ -2770,8 +1828,6 @@ jobs:
           path: build/src/
       - name: Fix permissions
         run: chmod +x build/src/deltahdl
-      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
-      # test can be killed while creating one. See seed-profile-pools.
       - name: Seed profile pools
         uses: ./.github/actions/seed-profile-pools
         with:
@@ -2812,61 +1868,6 @@ jobs:
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
   unit-test-coverage:
-    # A shard compiles and runs its slice of the unit tests, caching the
-    # instrumented objects it makes and nothing else, src/ arriving prebuilt.
-    #
-    # The cache a shard saves is what its build used and nothing else: after
-    # the build, every entry it neither stored nor read is evicted, which
-    # ccache can tell because reading an entry rewrites its modification time:
-    # ccache 4.9.1, the version apt installs here, does so in LocalStorage::get
-    # "to save file from LRU cleanup". Nothing is estimated, so nothing goes
-    # stale. An object whose source has changed leaves on the first run that
-    # stops reading it, and a slice that grows keeps all of itself.
-    #
-    # That step used to apply a cap computed from the slice, 1,377 kB a target
-    # plus 15%, 1,377 being what run 31071176358 measured an object at. The
-    # objects outgrew it: by run 36323338286 shard 01's build left 369,840 KiB
-    # against the 285M its 180 targets were allowed, and on a commit that
-    # changed two test files every shard missed 66 to 85 of its 182
-    # compilations, each run evicting what the next one needed. A cap stated in
-    # kilobytes an object is wrong from the day the objects grow, and only the
-    # misses ever said so.
-    #
-    # What a cap guarded was the repository's 10 GB cache quota, which every job
-    # shares, and the objects no longer strain it. Compiled without debug
-    # information (see build-coverage-lib), a unit-test object stores at 80 to
-    # 230 KiB where it stored at 500 to 1,830, so a slice is tens of megabytes.
-    # Two generations of the matrix exist between a save and prune-ccache, and
-    # both fit several times over.
-    #
-    # CCACHE_MAXSIZE stays 0 while the build runs, because a cap there has the
-    # build evict objects it has not compiled yet and then compile them. ccache
-    # cannot store without first getting under the cap, and what it gives up is
-    # whatever nothing has read recently, which partway through a build is
-    # whatever is still queued. Commit 3370b9bbc changed one test source, which
-    # one shard owns, so one miss was all the whole matrix could honestly take;
-    # in run 31064569103 six sampled shards took 9, 18, 20, 22, 22 and 31, each
-    # of them restoring an entry ccache reported at 99.06% to 99.94% of the cap.
-    # Lifting the cap off the build and evicting in a step after it took that to
-    # 2 to 12 on an unchanged tree, and the median Build step from 36 seconds to
-    # 28.
-    #
-    # CCACHE_COMPRESSLEVEL is zstd 10 rather than the level ccache picks for
-    # itself. It was chosen when a slice had to fit under a cap, and it stays
-    # because it spends the least quota for no extra time. Run 31069471362
-    # recompressed each shard's cache at four levels and measured it after
-    # each, on the eighteen-shard slices of 154 and 155 targets. ccache's own
-    # level leaves a slice at 236,004 to 245,956 KiB, level 3 at 224,340 to
-    # 233,520, level 6 at 205,816 to 214,248 and level 10 at 200,304 to
-    # 208,516. Level 19 leaves 174,696 to 181,848 and costs 167 to 262 seconds
-    # to write a whole slice, against 7.8 to 10.5 for level 10 and 5.3 to 10.6
-    # for level 6. Ten costs what the levels below it cost, and the level above
-    # it costs twenty times as much.
-    #
-    # The shards start once every clang-tidy-test shard has finished, whatever
-    # it concluded: clang-tidy-test is in `needs` for the ordering alone, and
-    # the condition tests only build-coverage-lib, whose artifact the shard
-    # unpacks, so a red or skipped clang-tidy shard holds nothing back.
     env:
       CCACHE_COMPRESSLEVEL: '10'
       CCACHE_DIR: ${{ github.workspace }}/.ccache
@@ -2878,47 +1879,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # A shard used to open by running jlumbroso/free-disk-space, which deletes
-      # the preinstalled Android, .NET, Haskell and Docker images to reclaim
-      # 21 GiB. It was added on the hypothesis that #2857's truncated shards had
-      # filled the disk, and the df readings added alongside it settled that the
-      # other way. The runner mounts 145G on /, a shard reaches this point with
-      # 88G of it available, and a shard's own footprint is about 5G: roughly 2G
-      # of checkout, LLVM, ccache and linked executables, and 2 to 3G of
-      # .profraw. It therefore ends around 63G of 145G used without the reclaim,
-      # and it ended at 44G with the reclaim even in run 30507450012, when the
-      # executables were still statically linked and measured 2.2 GB a shard.
-      #
-      # What the reclaim cost was time on the path everything else waits on. It
-      # took 22 to 85 seconds a shard in run 31071689608, 80 of them on
-      # unit-test-coverage-shard-17, and that shard is the one cache-sv-tests
-      # and the three coverage jobs behind it were held up by. The readings
-      # below stay, because they are what would catch the day the headroom goes.
-      #
-      # A shard runs three programs out of the toolchain: clang++ compiles its
-      # slice, ld.lld links it, and llvm-profdata merges the counters its tests
-      # write. It runs no clang-tidy and no clang-format, which have jobs of
-      # their own, and no llvm-cov, which assert-coverage runs from its own
-      # install. Naming only the packages that carry the three leaves out most
-      # of the 879 MB the whole toolchain unpacked to in run 31072713369:
-      # llvm-22-dev alone was 405 MB, and nothing asks for it, apt offering it
-      # as a recommendation of clang-22 and this action installing with
-      # --no-install-recommends. libclang-rt-@MAJOR@-dev is named because
-      # -fprofile-instr-generate links libclang_rt.profile-x86_64.a out of it,
-      # and it too arrives only as a recommendation, of
-      # libclang-common-@MAJOR@-dev.
-      #
-      # llvm-@MAJOR@ is the package llvm-profdata comes in, and it is here for
-      # the Merge profraw step below. Commit 18537c1c3 dropped it on the stated
-      # grounds that this shard runs no llvm-profdata, and that step stops that
-      # being true. The step installed the other three in 12 seconds in run
-      # 31074983813, against 21 seconds in build-coverage-lib, which installs
-      # the whole default toolchain, so the package costs a few seconds against
-      # the 40 to 62 a shard used to spend uploading raw counters.
-      #
-      # The major comes from build-coverage-lib rather than from a discovery of
-      # this shard's own, so the compiler here is the one that compiled the
-      # objects in the artifact this job unpacks and links against.
       - name: Install LLVM
         uses: ./.github/actions/install-llvm
         with:
@@ -2937,36 +1897,11 @@ jobs:
           mkdir -p build
           tar -C build -xf build.tar
           rm build.tar
-      # The tar restores the modification times the tree was packed with, and
-      # those predate this job's own checkout, so every object in the artifact
-      # reads as older than the source it was compiled from. Left alone the
-      # build recompiles the src/ tree the artifact exists to supply, and
-      # regenerates the build system for all 2,700-odd unit-test targets. The
-      # artifact was built from this very commit, so nothing in it can
-      # legitimately be out of date, and the fix is to make the sources say so.
-      #
-      # The sources are stamped into the past rather than the tree into the
-      # present, because Ninja does not read the mtime of the object on disk.
-      # It compares two mtimes it recorded when it built that object -- one in
-      # .ninja_log for the object, one in .ninja_deps for the headers the
-      # object was found to depend on -- against those inputs as they stand
-      # now, and both recordings were made on the machine that packed the tar,
-      # minutes before this job checked its sources out. Touching the tree
-      # forward leaves both records untouched and every src/ object dirty;
-      # `ninja -t restat` rewrites the first log but has nothing to say about
-      # the second, which is why it cleaned the dependency scans and left the
-      # 283 compiles behind them. Dating the sources before the artifact was
-      # packed satisfies every such comparison at once, whichever log holds it.
       - name: Stamp the sources as older than the prebuilt tree
         run: |
           find . \( -path ./build -o -path ./.git -o -path ./.ccache \) \
             -prune -o -print0 |
             xargs -0 touch -d '2001-01-01T00:00:00Z'
-      # The key prefix names no job, and deliberately so: prune-ccache selects
-      # what it retires with test("^(ccache-build-|ctcache-)"), so a prefix
-      # renamed to match this job would fall outside that filter and these
-      # entries would gain a generation per commit with nothing ever removing
-      # them.
       - id: ccache
         name: Restore ccache
         uses: actions/cache/restore@v5
@@ -2981,24 +1916,10 @@ jobs:
             ccache-build-coverage-shard-${{
               matrix.shard }}-
             ccache-build-coverage-
-      # ccache keeps its counters inside the cache directory, so the restore
-      # above brings back every earlier run's totals and `ccache -s` would
-      # report a lifetime average. Zero them so the figure describes this run.
-      #
-      # The time written beside them is where the eviction below draws its line:
-      # every entry this build stores or reads is stamped later than it, and
-      # every entry the restore brought back that the build never touched keeps
-      # the older time it was saved with, because tar restores modification
-      # times.
       - name: Reset ccache statistics
         run: |
           ccache --zero-stats
           date +%s > "$RUNNER_TEMP/ccache-epoch"
-      # The compiler, its launcher and the coverage flags all come from the
-      # CMake cache inside the downloaded tree, so this shard configures
-      # nothing: it compiles its slice of the unit tests and links each one
-      # against the library build-coverage-lib already archived. The slice is
-      # the one SHARD_SLICE, at the top of this file, assigns the shard.
       - name: Build
         run: |
           targets=$(grep -oP 'add_unit_test\(\K[^)]+' \
@@ -3006,100 +1927,32 @@ jobs:
             | awk -v n=${{ strategy.job-total }} -v s=${{ matrix.shard }} \
               "$SHARD_SLICE")
           cmake --build build --parallel 4 --target $targets
-      # Read here because this is the fullest the disk gets: the objects are on
-      # it and so are the executables linked from them. Slim build output below
-      # deletes the objects, and both readings after it are therefore taken with
-      # the objects already gone.
       - name: Report free space after the build
         run: df -h /
-      # The size the build left. The du in Report ccache statistics below runs
-      # after the eviction, so the difference between the two is what it
-      # evicted: the entries of sources that have since changed, and on a
-      # shard that restored another shard's entry, that shard's slice. Both
-      # run on the same condition as the save, so a shard that died before
-      # restoring runs neither on a directory that is not there.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Report the ccache size the build left
         run: du -sk "$CCACHE_DIR"
-      # This step is the only thing that bounds the cache, the build above
-      # having run under the job's CCACHE_MAXSIZE of 0, ccache's spelling of no
-      # limit. It evicts every entry older than the time Reset ccache
-      # statistics wrote, which leaves exactly the entries this build stored or
-      # read, and so the whole slice however large its objects grow. The
-      # comment above the job says why that replaced a cap in megabytes.
-      # --evict-older-than wants its age with a unit, d or s. The five
-      # seconds of margin keep an entry the build touched within a second of
-      # the stamp, ccache reading its own clock a moment after this step reads
-      # the shell's.
-      #
-      # It runs only when the build succeeded. A build that stopped partway
-      # never read the entries of the targets it did not reach, and evicting
-      # them would have the next run compile them again. The save below still
-      # runs, so a red shard saves what it restored plus what it compiled, and
-      # the next green run evicts the difference. The condition also asks
-      # whether the restore ran, so a shard that died before it -- on the LLVM
-      # or ccache it installs, on the build tree it unpacks -- reports that one
-      # failure rather than three. cache-primary-key is the key the restore
-      # attempted, so it is set on a complete miss as much as on a hit.
       - if: ${{ success() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Evict what the build did not use
         run: |
           age=$(( $(date +%s) - $(cat "$RUNNER_TEMP/ccache-epoch") + 5 ))
           echo "Evicting entries unused for the last ${age} seconds"
           ccache --evict-older-than "${age}s"
-      # The hit rate decides whether the job rebuilds from scratch, so record it
-      # rather than inferring it from the build duration.
-      #
-      # du reports the size because ccache -s rounds it to a tenth of a GiB and
-      # prints no percentage under a CCACHE_MAXSIZE of 0. This reading is the
-      # size that gets saved, and the one before the eviction is the size the
-      # build left; #2990 went a long way on an estimate of neither, because
-      # actions/cache reports the archive it restored, which is measured
-      # before the build adds to it.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Report ccache statistics
         run: |
           ccache -s
           du -sk "$CCACHE_DIR"
-      # Saved by an explicit step rather than by actions/cache's post step,
-      # because that post step declares post-if: "success()" and so a shard that
-      # goes red saves nothing at all. The entry then stays pinned at that
-      # shard's last green commit while the restore-key keeps finding it, so the
-      # shard absorbs every commit since, and a shard whose tests are being
-      # iterated on is exactly the one that pays. In run 31063780546
-      # unit-test-coverage-shard-03 failed one test and saved nothing; in run
-      # 31064569103 it restored the entry written for 6745a665a two commits back,
-      # missed 133 of 157 and spent 267 seconds building against a 63-second
-      # median across the matrix. assert-coverage waits on the slowest shard and
-      # gates the rest of this file, and that shard finished 91 seconds after the
-      # next-slowest.
-      #
-      # Placed before the tests rather than after them so the objects also
-      # survive a run the concurrency group cancels mid-test. The key is read
-      # back off the restore step rather than written out a second time, so the
-      # two cannot drift.
       - if: ${{ always() && steps.ccache.outputs.cache-primary-key != '' }}
         name: Save ccache
         uses: actions/cache/save@v5
         with:
           key: ${{ steps.ccache.outputs.cache-primary-key }}
           path: .ccache
-      # The objects are dead once the executables above are linked. Deleting
-      # them was first a way to shrink an artifact for the journey to another
-      # machine, and then a way to free the disk the tests were about to write a
-      # .profraw per process into. Neither reason survives, the tests having
-      # more than 80G to write into. The step stays because it ran in 0 to 1
-      # second on every shard of run 31071689608, so leaving on the disk only
-      # what is still live costs nothing.
       - name: Slim build output
         run: find build -name '*.o' -delete
-      # Reported on either side of the tests so a shard that dies mid-run leaves
-      # evidence of how much room it had, rather than only the silence it dies
-      # in. The reading after them runs unconditionally for that reason.
       - name: Report free space before tests
         run: df -h /
-      # The pools LLVM_PROFILE_FILE names with %m are created whole before any
-      # test can be killed while creating one. See seed-profile-pools.
       - name: Seed profile pools
         uses: ./.github/actions/seed-profile-pools
         with:
@@ -3112,33 +1965,6 @@ jobs:
       - if: always()
         name: Report free space after tests
         run: df -h /
-      # Sum this slice's counters here so that one file crosses the job
-      # boundary rather than one per instrumented image. LLVM_PROFILE_FILE
-      # above names each profile with %m, after the image that writes it, so
-      # the processes ctest starts, one per TEST case since gtest_discover_tests
-      # in test/CMakeLists.txt registers each case as a CTest test of its own,
-      # add their counters into one pool per test binary and one for
-      # libdeltahdl_lib.so. Named with %p, one profile per process, the shard
-      # left 1,774 of them on unit-test-coverage-shard-07 in run 31074983813,
-      # 2 to 3G in all, and merging them one call each took 273 seconds on
-      # shard 04 in run 41325046840. Counter addition
-      # is associative, so merging a shard's own files here and merging every
-      # shard's result there gives the profile that job builds today.
-      #
-      # -sparse drops the functions whose counters are all zero in this slice,
-      # and the report cannot tell. A function another shard covered arrives
-      # from that shard's profile, and a function no shard covered is missing
-      # from merged.profdata either way: llvm-cov reports it uncovered from the
-      # coverage mapping in build/src/deltahdl and build/src/libdeltahdl_lib.so.
-      #
-      # The name carries the shard number because assert-coverage downloads
-      # every shard's artifact into one directory with merge-multiple: true,
-      # where a shared name would collide.
-      #
-      # The duration and the size are printed rather than estimated. They are
-      # the two figures that say whether the merge belongs in the shard at all,
-      # and the next change to this matrix should argue against them rather
-      # than against a guess at them.
       - name: Merge profraw
         uses: ./.github/actions/merge-profiles
         with:
@@ -3245,27 +2071,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-  # Nothing is held behind this job. The argument that a linter is only as
-  # trustworthy as the file defining it would put every scanning job in this
-  # workflow behind it, and acting on it would let a YAML breach leave the
-  # formatting check, the length cap, the assertions and the copy-paste
-  # detectors recorded neither green nor red. A job that did not run reports
-  # nothing. Each scan stands on its own instead.
-  #
-  # Nothing stands in front of this job either. A pair of jobs deciding from
-  # the changed paths whether the lint was necessary stood there, and the same
-  # argument condemns them: on a push that touched neither this file nor
-  # etc/clang_tidy/, this job skipped, and a skip reports neither green nor
-  # red. Linting three paths on every run costs one runner and answers the
-  # question in the run graph.
-  #
-  # .github/actions/*/action.yml is linted here rather than in one of the other
-  # two workflows holding a yamllint job, because this is the workflow whose
-  # on: push: paths: watches .github/actions/**, and the only one whose jobs
-  # call those actions. A composite action is expanded when a job reaches its
-  # uses: step, so a malformed action.yml otherwise fails every calling job
-  # after each has spent its checkout and its cache restore, rather than
-  # failing one lint in seconds.
   yamllint:
     runs-on: ubuntu-latest
     steps:
@@ -3305,14 +2110,6 @@ on:
       - CMakeLists.txt
       - etc/**
       - lib/cpp/**
-      # The five Python trees below hold programs this workflow's own jobs run,
-      # and their unit tests live under test/scripts/ and test/lib/python/ and
-      # run in .github/workflows/scripts.yml instead. Without these entries a
-      # change to one of them is exercised by its unit tests alone and never by
-      # the job that runs it: lib/python/run_tests_common/,
-      # scripts/run_integration_tests/, scripts/run_sim_tests/ and
-      # scripts/run_sv_tests/ by the integration and e2e jobs,
-      # scripts/assert_subclause_citations/ by assert-subclause-citations.
       - lib/python/run_tests_common/**
       - scripts/assert_subclause_citations/**
       - scripts/run_integration_tests/**

@@ -48,7 +48,6 @@ runs:
         unmatched=0
         for pattern in "${patterns[@]}"; do
           found=0
-          # shellcheck disable=SC2206
           matched=( ${pattern} )
           for file in "${matched[@]}"; do
             if [ -f "${file}" ] && [ -x "${file}" ]; then
