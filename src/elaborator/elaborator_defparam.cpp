@@ -411,8 +411,7 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     if (applied_defparams_.count(key)) continue;
     const auto& [path_expr, val_expr] = site.item->defparam_assigns[idx];
     HierPath path;
-    if (!CollectPathSteps(path_expr, scope, path) || path.back().has_index)
-      continue;
+    if (!CollectPathSteps(path_expr, scope, path)) continue;
     DefparamTopRooted rooted{mod, path, mod};
     auto* param =
         ResolveDefparamSteps(mod, path, site.path, &rooted.target_mod);
@@ -604,11 +603,9 @@ const RtlirParamDecl* Elaborator::ParamAtPathFromAnyRoot(RtlirModule* mod,
 
 const RtlirParamDecl* Elaborator::ParamOfWhichPathNamesAPart(
     RtlirModule* mod, const HierPath& path) {
-  size_t last = path.back().has_index ? path.size() : path.size() - 1;
-  for (size_t len = 1; len <= last; ++len) {
+  for (size_t len = 1; len < path.size(); ++len) {
     HierPath whole(path.begin(),
                    path.begin() + static_cast<std::ptrdiff_t>(len));
-    whole.back().has_index = false;
     if (const RtlirParamDecl* p = ParamAtPathFromAnyRoot(mod, whole)) return p;
   }
   return nullptr;
@@ -616,14 +613,6 @@ const RtlirParamDecl* Elaborator::ParamOfWhichPathNamesAPart(
 
 bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
                                              const HierPath& path) {
-  if (const RtlirParamDecl* whole = ParamOfWhichPathNamesAPart(mod, path)) {
-    diag_.Error(loc,
-                std::format("defparam names a part of parameter '{}', which "
-                            "is overridden only as a whole",
-                            whole->name),
-                Subclause("6.20.2"));
-    return true;
-  }
   DefparamTopRooted any{nullptr, path, mod};
   if (ResolveDefparamSteps(mod, path, {}) != nullptr ||
       ResolveDefparamFromTop(path, any) != nullptr) {
@@ -641,6 +630,14 @@ bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
                 "defparam inside a generate block or an array of instances "
                 "reaches a parameter outside that hierarchy",
                 Subclause("23.10.1"));
+    return true;
+  }
+  if (const RtlirParamDecl* whole = ParamOfWhichPathNamesAPart(mod, path)) {
+    diag_.Error(loc,
+                std::format("defparam names a part of parameter '{}', which "
+                            "is overridden only as a whole",
+                            whole->name),
+                Subclause("6.20.2"));
     return true;
   }
   if (!DefparamTargetsSpecparam(mod, path, defparam_top_roots_)) return false;

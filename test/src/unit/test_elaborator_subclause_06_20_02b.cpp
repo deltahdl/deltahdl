@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <string>
-#include <utility>
 
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
@@ -588,47 +587,31 @@ TEST(AggregateParameters, DefparamNamingAPartOfAParameterIsReported) {
                             "23.10.1"));
 }
 
-TEST(AggregateParameters,
-     DefparamNamingAnElementOrABlockParameterPartIsReported) {
+TEST(AggregateParameters, DefparamNamingAMemberOfABlockParameterIsReported) {
   ElabFixture f;
   RtlirDesign* design =
       ElaborateSrc(std::string(kStructureDesign) +
                        "module top;\n"
-                       "  parameter int B[2] = '{1, 2};\n"
-                       "  sub u();\n"
                        "  if (1) begin : h\n"
                        "    parameter s_t P = '{a: 1, b: 8'h2};\n"
                        "  end\n"
                        "  for (genvar i = 0; i < 2; i++) begin : l\n"
                        "    parameter s_t P = '{a: i, b: 8'h2};\n"
                        "  end\n"
-                       "  defparam u.A[0] = 5;\n"
-                       "  defparam u.S[1] = '{a: 2, b: 8'h3};\n"
-                       "  defparam B[1] = 5;\n"
-                       "  defparam top.B[0] = 6;\n"
                        "  defparam h.P.a = 4;\n"
                        "  defparam top.h.P.b = 8'h5;\n"
                        "  defparam l[1].P.a = 7;\n"
                        "endmodule\n",
                    f);
-  const std::pair<uint32_t, const char*> kParts[] = {
-      {20, "'A'"}, {21, "'S'"}, {22, "'B'"}, {23, "'B'"},
-      {24, "'P'"}, {25, "'P'"}, {26, "'P'"}};
-  for (const auto& [line, name] : kParts) {
-    EXPECT_TRUE(
-        ReportedError(f.diag.Diagnostics(),
-                      std::string("defparam names a part of parameter ") + name,
-                      line, "6.20.2"))
+  for (uint32_t line : {18u, 19u, 20u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "defparam names a part of parameter 'P'", line,
+                              "6.20.2"))
         << "line " << line;
   }
   const RtlirModule* top = FindModule(design, "top");
   ASSERT_NE(top, nullptr);
   for (const auto& p : top->params) EXPECT_FALSE(p.from_override) << p.name;
-  for (const auto& child : top->children) {
-    for (const auto& p : child.resolved->params) {
-      EXPECT_FALSE(p.from_override) << p.name;
-    }
-  }
 }
 
 TEST(AggregateParameters, DefparamOfAWholeAggregateParameterIsAccepted) {

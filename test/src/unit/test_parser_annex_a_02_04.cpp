@@ -382,8 +382,10 @@ TEST(DeclarationAssignmentParsing,
       "  defparam p::P = 8;\n"
       "  defparam $unit::P = 9;\n"
       "  defparam c.P[0] = 3;\n"
+      "  defparam P[1] = 4;\n"
+      "  defparam $root.m.c.P[0] = 5;\n"
       "endmodule\n");
-  for (uint32_t line : {3u, 4u, 5u, 6u, 7u, 8u}) {
+  for (uint32_t line : {3u, 4u, 5u, 6u, 7u, 8u, 9u, 10u}) {
     EXPECT_TRUE(ReportedError(r.diags,
                               "a defparam's target is a hierarchical parameter "
                               "name, not an expression",
