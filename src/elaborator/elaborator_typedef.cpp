@@ -312,9 +312,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->typedef_type, item->loc, mod);
   ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
                                  {mod->params, typedefs_, class_names_}, diag_);
-  ReportSpecializationBindingErrors(item->typedef_type, item->loc,
-                                    {typedefs_, unit_, class_names_}, diag_);
-  ReportSpecializationValues(item->typedef_type, mod);
+  ReportSpecializationErrors(item->typedef_type, item->loc, mod);
   ResolveTypeRefIndexDims(
       item->unpacked_dims,
       [&](DataType& type) { ResolveTypeRef(type, item->loc, mod); }, arena_);

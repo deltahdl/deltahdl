@@ -249,8 +249,8 @@ TEST(ParamValueAssignability, SpecializationArgumentOfItsTypeIsAccepted) {
       "    parameter string W = \"g\";\n    C #(.S(W)) h;\n  end\n"
       "  initial begin : b\n    parameter string W = \"b\";\n"
       "    C #(.S(W)) h;\n  end\nendmodule\n",
-      "interface i #(parameter int N = 1);\nendinterface\nmodule m;\n"
-      "  virtual i #(.N(2)) v;\nendmodule\n",
+      ("interface i #(parameter int N = 1);\nendinterface\nmodule m;\n"
+       "  virtual i #(.N(2)) v;\nendmodule\n"),
   };
   ExpectEachAccepted(kSources);
 }

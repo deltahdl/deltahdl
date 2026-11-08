@@ -244,8 +244,8 @@ TEST(ParamValueAssignability, ArrayParameterGivenAnEqualArrayIsAccepted) {
       "class K;\nendclass\nmodule m;\n"
       "  parameter K KA[2] = '{null, null};\n  parameter K KB[2] = KA;\n"
       "endmodule\n",
-      "class C #(int N = 2, int A[N] = '{1, 2}, int B[2] = A,\n"
-      "          int D[N] = B);\nendclass\nmodule m;\nendmodule\n",
+      ("class C #(int N = 2, int A[N] = '{1, 2}, int B[2] = A,\n"
+       "          int D[N] = B);\nendclass\nmodule m;\nendmodule\n"),
   };
   ExpectEachAccepted(kSources);
 }

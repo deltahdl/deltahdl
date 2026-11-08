@@ -155,7 +155,7 @@ class Elaborator : public ElaboratorClassRules {
   void AddProcedure(ModuleItem* item, RtlirModule* mod, RtlirProcessKind kind);
   void ReportProcedureParamTypes(const ModuleItem* item, const RtlirModule* mod,
                                  const ScopeMap& scope);
-  void ReportSpecializationValues(const DataType& written,
+  void ReportSpecializationErrors(const DataType& written, SourceLoc loc,
                                   const RtlirModule* mod);
   void AddInferenceCallees(const Stmt* body);
   void ResolveStaticAssertionClock(ModuleItem* item,

@@ -484,8 +484,11 @@ std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
   return adopted_enumeration;
 }
 
-void Elaborator::ReportSpecializationValues(const DataType& written,
+void Elaborator::ReportSpecializationErrors(const DataType& written,
+                                            SourceLoc loc,
                                             const RtlirModule* mod) {
+  ReportSpecializationBindingErrors(written, loc,
+                                    {typedefs_, unit_, class_names_}, diag_);
   if (written.type_params.empty()) return;
   const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
   ReportSpecializationValueTypes(written, {*mod, gen_prefix_},
@@ -496,9 +499,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->is_genvar) return;
 
   ReportUndeclaredTypeName(item);
-  ReportSpecializationBindingErrors(item->data_type, item->loc,
-                                    {typedefs_, unit_, class_names_}, diag_);
-  ReportSpecializationValues(item->data_type, mod);
+  ReportSpecializationErrors(item->data_type, item->loc, mod);
 
   std::string_view adopted_enumeration = ResolveVarDeclTypeRefs(item, mod);
 

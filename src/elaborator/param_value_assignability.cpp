@@ -277,10 +277,10 @@ bool SameIdentity(const ParamValueShape& target, const ParamValueShape& value) {
   return value.identity == 0 || value.identity == target.identity;
 }
 
-const DataType& Resolved(const DataType& type, const TypedefMap& typedefs) {
+const DataType* Resolved(const DataType* type, const TypedefMap& typedefs) {
   std::vector<std::string_view> names;
-  const DataType* resolved = FollowTypedefs(type, typedefs, names);
-  return resolved != nullptr ? *resolved : type;
+  const DataType* resolved = FollowTypedefs(*type, typedefs, names);
+  return resolved != nullptr ? resolved : type;
 }
 
 bool DimsMatch(uint64_t target, uint64_t value) {
@@ -291,8 +291,8 @@ bool ArraysAssignable(const ParamValueShape& target,
                       const ParamValueShape& value,
                       const TypedefMap& typedefs) {
   return std::ranges::equal(target.dims, value.dims, DimsMatch) &&
-         TypesEquivalent(Resolved(target.element, typedefs),
-                         Resolved(value.element, typedefs));
+         TypesEquivalent(*Resolved(&target.element, typedefs),
+                         *Resolved(&value.element, typedefs));
 }
 
 bool ShapeAssignable(const ParamValueShape& target,
@@ -470,8 +470,8 @@ ParamShapeLookup ModuleScopeShapes(const ModuleLookup& where,
 ParamValueShape ModuleParamShape(const ModuleLookup& where, std::size_t index,
                                  const ParamValueScope& scope) {
   const RtlirParamDecl& pd = where.site.module.params[index];
-  const ParamValueShape kTarget = ParamDeclTargetShape(pd, scope);
-  if (kTarget.kind != Kind::kUnknown || pd.from_override) return kTarget;
+  ParamValueShape target = ParamDeclTargetShape(pd, scope);
+  if (target.kind != Kind::kUnknown || pd.from_override) return target;
   where.untyped_names.push_back(pd.name);
   const ParamValueScope kDeclared{
       scope.tables, scope.constants, scope.unit,
@@ -479,7 +479,7 @@ ParamValueShape ModuleParamShape(const ModuleLookup& where, std::size_t index,
                          where.untyped_names,
                          index},
                         scope)};
-  return ValueOrTargetShape(kTarget, pd.default_value, kDeclared);
+  return ValueOrTargetShape(target, pd.default_value, kDeclared);
 }
 
 ParamShapeLookup ModuleScopeShapes(const ModuleLookup& where,
