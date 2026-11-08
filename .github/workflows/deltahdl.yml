@@ -148,6 +148,40 @@ jobs:
           49b4915aa0bb9ecbe08937d6b3cb4fe6d402913813d773507e0e6161b5e08ea8 src/simulator/svdpi_sv31a.h Annex-H.14.2
           PINS
           exit $fail
+  assert-no-comments:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Restore pip cache
+        uses: actions/cache@v5
+        with:
+          key: >-
+            pip-${{ github.job }}-${{
+            hashFiles('.github/workflows/deltahdl.yml') }}
+          path: ~/.cache/pip
+          restore-keys: |
+            pip-${{ github.job }}-
+      - name: Install assert-no-comments
+        run: pip install assert-no-comments
+      - name: Assert no comments
+        run: >-
+          assert-no-comments
+          --verbose
+          --exclude
+          'vpi_user.h,sv_vpi_user.h,vpi_compatibility.h,svdpi.h,svdpi_src.h,svdpi_sv31a.h,*/test/src/e2e/source_text_comments_only.sv'
+          ${{ github.workspace }}/.github/actions/
+          ${{ github.workspace }}/.github/workflows/deltahdl.yml
+          ${{ github.workspace }}/CMakeLists.txt
+          ${{ github.workspace }}/etc/
+          ${{ github.workspace }}/lib/cpp/
+          ${{ github.workspace }}/lib/python/run_tests_common/
+          ${{ github.workspace }}/scripts/assert_subclause_citations/
+          ${{ github.workspace }}/scripts/run_integration_tests/
+          ${{ github.workspace }}/scripts/run_sim_tests/
+          ${{ github.workspace }}/scripts/run_sv_tests/
+          ${{ github.workspace }}/src/
+          ${{ github.workspace }}/test/CMakeLists.txt
+          ${{ github.workspace }}/test/src/
   assert-no-duplicate-test-names:
     runs-on: ubuntu-latest
     steps:
