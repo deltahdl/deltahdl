@@ -19,6 +19,7 @@
 #include "elaborator/queue_dim.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "parser/ast_covergroup.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -556,13 +557,18 @@ static void CheckProcedure(const Stmt* body, const DollarScan& outer) {
   CheckDollarStmt(body, {scope, outer.report});
 }
 
-static void CheckSubroutine(const ModuleItem* item, const DollarScan& outer) {
-  DollarScope scope;
-  scope.outer = &outer.scope;
-  for (const FunctionArg& arg : item->func_args) {
+static void NoteFormals(const std::vector<FunctionArg>& formals,
+                        const DollarScan& outer, DollarScope& scope) {
+  for (const FunctionArg& arg : formals) {
     CheckDollarOperand(arg.default_value, outer);
     NoteDeclaredName(arg.name, arg.data_type, arg.unpacked_dims, scope);
   }
+}
+
+static void CheckSubroutine(const ModuleItem* item, const DollarScan& outer) {
+  DollarScope scope;
+  scope.outer = &outer.scope;
+  NoteFormals(item->func_args, outer, scope);
   for (const Stmt* s : item->func_body_stmts) NoteLocalNames(s, scope);
   const DollarScan kInner{scope, outer.report};
   for (const Stmt* s : item->func_body_stmts) CheckDollarStmt(s, kInner);
@@ -605,6 +611,9 @@ static void CheckGenerate(const ModuleItem* item, const DollarScan& scan) {
 
 static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer);
 
+static void CheckDollarCovergroup(const CovergroupDecl* group,
+                                  const DollarScan& outer);
+
 static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
   switch (item->kind) {
     case ModuleItemKind::kVarDecl:
@@ -635,6 +644,84 @@ static void CheckDollarItem(const ModuleItem* item, const DollarScan& scan) {
   for (const ModuleItem* decl : item->clocking_decls)
     CheckDollarItem(decl, scan);
   if (item->class_decl != nullptr) CheckDollarClass(item->class_decl, scan);
+  if (item->covergroup != nullptr)
+    CheckDollarCovergroup(item->covergroup, scan);
+}
+
+static void CheckCovergroupRanges(
+    const std::vector<CovergroupValueRange>& ranges, const DollarScan& scan) {
+  for (const CovergroupValueRange& range : ranges) {
+    const bool kBounds = range.kind == CovergroupValueRangeKind::kRange;
+    const auto kCheck = kBounds ? CheckAdmittingLoneDollar : CheckDollarOperand;
+    kCheck(range.lo, scan);
+    kCheck(range.hi, scan);
+  }
+}
+
+static void CheckTransitions(const std::vector<TransSet>& sets,
+                             const DollarScan& scan) {
+  for (const TransSet& set : sets) {
+    for (const TransRangeList& step : set.steps) {
+      CheckCovergroupRanges(step.items, scan);
+      CheckDollarOperand(step.repeat_lo, scan);
+      CheckDollarOperand(step.repeat_hi, scan);
+    }
+  }
+}
+
+static void CheckBinsOrOptions(const BinsOrOptions& bins,
+                               const DollarScan& scan) {
+  CheckDollarOperand(bins.option.value, scan);
+  CheckDollarOperand(bins.array_size, scan);
+  CheckCovergroupRanges(bins.ranges, scan);
+  CheckDollarOperand(bins.with_expr, scan);
+  CheckDollarOperand(bins.set_expr, scan);
+  CheckTransitions(bins.transitions, scan);
+  CheckDollarOperand(bins.iff, scan);
+}
+
+static void CheckCoverPoint(const CoverPointDecl* point,
+                            const DollarScan& scan) {
+  if (point->has_data_type) CheckDeclaredDims(point->data_type, {}, scan);
+  CheckDollarOperand(point->expr, scan);
+  CheckDollarOperand(point->iff, scan);
+  for (const BinsOrOptions& bins : point->bins) CheckBinsOrOptions(bins, scan);
+}
+
+static void CheckSelectExpression(const SelectExpression* select,
+                                  const DollarScan& scan) {
+  if (select == nullptr) return;
+  CheckCovergroupRanges(select->intersect, scan);
+  CheckSelectExpression(select->lhs, scan);
+  CheckSelectExpression(select->rhs, scan);
+  CheckDollarOperand(select->expr, scan);
+  CheckAdmittingLoneDollar(select->matches, scan);
+}
+
+static void CheckCoverCross(const CoverCrossDecl* cross,
+                            const DollarScan& scan) {
+  CheckDollarOperand(cross->iff, scan);
+  for (const CrossBodyItem& item : cross->body) {
+    if (item.function != nullptr) CheckDollarItem(item.function, scan);
+    CheckDollarOperand(item.option.value, scan);
+    CheckSelectExpression(item.bins.select, scan);
+    CheckDollarOperand(item.bins.iff, scan);
+  }
+}
+
+static void CheckDollarCovergroup(const CovergroupDecl* group,
+                                  const DollarScan& outer) {
+  DollarScope scope;
+  scope.outer = &outer.scope;
+  NoteFormals(group->formals, outer, scope);
+  NoteFormals(group->event.sample_formals, outer, scope);
+  const DollarScan kScan{scope, outer.report};
+  CheckEvents(group->event.clocking, kScan);
+  for (const CoverageSpecOrOption& item : group->items) {
+    CheckDollarOperand(item.option.value, kScan);
+    if (item.cover_point != nullptr) CheckCoverPoint(item.cover_point, kScan);
+    if (item.cover_cross != nullptr) CheckCoverCross(item.cover_cross, kScan);
+  }
 }
 
 static void NoteClassNames(const ClassDecl* cls, const DollarParams& params,
@@ -663,6 +750,7 @@ static void CheckDollarClass(const ClassDecl* cls, const DollarScan& outer) {
     if (m->method != nullptr) CheckDollarItem(m->method, kScan);
     CheckConstraintItems(m->constraint_items, kScan);
     if (m->nested_class != nullptr) CheckDollarClass(m->nested_class, kScan);
+    if (m->covergroup != nullptr) CheckDollarCovergroup(m->covergroup, kScan);
   }
 }
 
