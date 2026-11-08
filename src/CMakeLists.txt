@@ -279,6 +279,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_match.cpp
     elaborator/type_eval_named.cpp
     elaborator/type_param_scope_prefix.cpp
+    elaborator/type_param_restriction.cpp
     elaborator/type_eval_aggregate.cpp
     elaborator/uwire_drivers.cpp
     elaborator/viewport_resolution.cpp

@@ -8,6 +8,7 @@
 #include "common/source_loc.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_restriction.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -33,17 +34,19 @@ const DataType* TypeRefThroughBoundPrefix(std::string_view prefix,
                                           std::string_view name,
                                           const TypedefMap& typedefs);
 
-void ReportSpecializationPrefixNotAClass(const DataType& written, SourceLoc loc,
-                                         const CompilationUnit* unit,
-                                         DiagEngine& diag);
+void ReportSpecializationBindingErrors(const DataType& written, SourceLoc loc,
+                                       const TypeParamRestrictionScope& scope,
+                                       DiagEngine& diag);
 
-void ReportItemPrefixesNotAClass(const ModuleItem& item,
-                                 const TypeParamPrefixScope& scope,
-                                 DiagEngine& diag);
+void ReportItemTypeParamErrors(const ModuleItem& item,
+                               const TypeParamPrefixScope& scope,
+                               const TypeParamRestrictionScope& restriction,
+                               DiagEngine& diag);
 
-void ReportUnitScopePrefixesNotAClass(const CompilationUnit* unit,
-                                      DiagEngine& diag);
+void ReportUnitScopeTypeParamErrors(const TypeParamRestrictionScope& scope,
+                                    DiagEngine& diag);
 
-void ReportUnitSpecializations(const CompilationUnit* unit, DiagEngine& diag);
+void ReportUnitSpecializations(const TypeParamRestrictionScope& scope,
+                               DiagEngine& diag);
 
 }  // namespace delta

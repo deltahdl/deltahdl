@@ -19,6 +19,8 @@ struct ParamPortList {
   std::vector<DataType>* param_types;
   std::unordered_map<std::string_view, std::vector<Expr*>>* unpacked_dims;
   std::vector<SourceLoc>* locs = nullptr;
+  std::unordered_map<std::string_view, DataTypeKind>* type_param_restrictions =
+      nullptr;
 };
 
 }  // namespace delta

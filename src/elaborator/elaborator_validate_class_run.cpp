@@ -5,6 +5,7 @@
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
 
 namespace delta {
@@ -32,9 +33,12 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   ValidateRestrictedScopePrefixInClasses();
 
-  ReportUnitSpecializations(unit_, diag_);
+  ReportUnitSpecializations({typedefs_, unit_, class_names_}, diag_);
 
-  ReportUnitScopePrefixesNotAClass(unit_, diag_);
+  ReportUnitScopeTypeParamErrors({typedefs_, unit_, class_names_}, diag_);
+
+  ReportClassTypeParamsOutsideRestrictions({typedefs_, unit_, class_names_},
+                                           diag_);
 
   ValidateChainingConstructors();
 

@@ -24,6 +24,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -87,101 +88,6 @@ void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-const DataType* ResolveNamedTypeChain(const DataType* dtype,
-                                      const TypedefMap& typedefs) {
-  for (int hops = 0; hops < 8 && dtype->kind == DataTypeKind::kNamed; ++hops) {
-    auto td = typedefs.find(dtype->type_name);
-    if (td == typedefs.end()) break;
-    dtype = &td->second;
-  }
-  return dtype;
-}
-
-struct ClassTypeLookup {
-  const CompilationUnit* unit;
-  const std::unordered_set<std::string_view>* names;
-};
-
-void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
-                           const DataType& resolved,
-                           const ClassTypeLookup& lookup, DiagEngine& diag) {
-  const bool kWantsInterface = fwd == DataTypeKind::kVoid;
-  const std::string_view kRestriction =
-      kWantsInterface ? "an interface class" : "a class";
-  if (resolved.kind != DataTypeKind::kNamed) {
-    diag.Error(item->loc,
-               std::format("type parameter '{}' is restricted to {} type but "
-                           "is assigned a type that is not a class",
-                           item->name, kRestriction),
-               Subclause("6.20.3"));
-    return;
-  }
-  const ClassDecl* cls = FindClassDecl(resolved.type_name, lookup.unit);
-  const bool kIsKnownClass = cls || lookup.names->count(resolved.type_name) > 0;
-  if (!kIsKnownClass) {
-    diag.Error(item->loc,
-               std::format("type parameter '{}' is restricted to {} type but "
-                           "is assigned '{}', which no class declaration "
-                           "defines",
-                           item->name, kRestriction, resolved.type_name),
-               Subclause("6.20.3"));
-    return;
-  }
-  const bool kIsInterface = cls && cls->is_interface;
-  if (kIsInterface == kWantsInterface) return;
-  diag.Error(
-      item->loc,
-      std::format("type parameter '{}' is restricted to {} type but is "
-                  "assigned '{}', which is {}",
-                  item->name, kRestriction, resolved.type_name,
-                  kIsInterface ? "an interface class" : "an ordinary class"),
-      Subclause("6.20.3"));
-}
-
-void CheckTypeParamIsEnumStructOrUnion(const ModuleItem* item, DataTypeKind fwd,
-                                       const DataType& resolved,
-                                       DiagEngine& diag) {
-  if (resolved.kind == DataTypeKind::kNamed || resolved.kind == fwd) return;
-  static const auto kBasicName = [](DataTypeKind k) -> std::string_view {
-    switch (k) {
-      case DataTypeKind::kEnum:
-        return "enum";
-      case DataTypeKind::kStruct:
-        return "struct";
-      case DataTypeKind::kUnion:
-        return "union";
-      default:
-        return "type";
-    }
-  };
-  diag.Error(item->loc,
-             std::format("type parameter '{}' is assigned a type that does "
-                         "not conform to the required {} kind",
-                         item->name, kBasicName(fwd)),
-             Subclause("6.20.3"));
-}
-
-void CheckTypeParamConformsToForwardKind(const ModuleItem* item,
-                                         const DataType& assigned,
-                                         const TypedefMap& typedefs,
-                                         const ClassTypeLookup& lookup,
-                                         DiagEngine& diag) {
-  DataTypeKind fwd = item->forward_type_kind;
-  bool enum_struct_or_union_restriction = fwd == DataTypeKind::kEnum ||
-                                          fwd == DataTypeKind::kStruct ||
-                                          fwd == DataTypeKind::kUnion;
-  bool class_restriction =
-      fwd == DataTypeKind::kNamed || fwd == DataTypeKind::kVoid;
-  if (!enum_struct_or_union_restriction && !class_restriction) return;
-
-  const DataType* resolved = ResolveNamedTypeChain(&assigned, typedefs);
-  if (class_restriction) {
-    CheckTypeParamIsClass(item, fwd, *resolved, lookup, diag);
-    return;
-  }
-  CheckTypeParamIsEnumStructOrUnion(item, fwd, *resolved, diag);
-}
-
 void PopulateValueParamInfo(
     RtlirParamDecl& pd, const ModuleItem* item,
     std::unordered_set<std::string_view>& real_param_names,
@@ -236,18 +142,23 @@ bool ResolveTypeOperatorDefault(
   return item->typedef_type.kind != DataTypeKind::kImplicit;
 }
 
-std::optional<DataType> AssignedTypeParamType(const ModuleItem* item,
-                                              RtlirParamDecl& pd,
-                                              const RtlirModule* mod,
-                                              const CompilationUnit* unit,
-                                              DiagEngine& diag) {
+struct AssignedTypeParam {
+  DataType type;
+  SourceLoc loc;
+};
+
+std::optional<AssignedTypeParam> AssignedTypeParamType(
+    const ModuleItem* item, RtlirParamDecl& pd, const RtlirModule* mod,
+    const CompilationUnit* unit, DiagEngine& diag) {
   const InstanceParamAssignments* assigns =
       pd.is_localparam || !pd.gen_block_prefix.empty() ? nullptr
                                                        : BodyParamAssignments();
   const Elaborator::ParamOverride* ovr =
       assigns == nullptr ? nullptr
                          : FindParamOverride(assigns->params, item->name);
-  if (ovr == nullptr || ovr->value_expr == nullptr) return item->typedef_type;
+  if (ovr == nullptr || ovr->value_expr == nullptr) {
+    return AssignedTypeParam{item->typedef_type, item->loc};
+  }
   const SourceLoc kLoc = ovr->value_expr->range.start;
   DataType resolved =
       TypeParamOverrideToDataType(ovr->value_expr, unit, diag, kLoc);
@@ -260,7 +171,17 @@ std::optional<DataType> AssignedTypeParamType(const ModuleItem* item,
     return std::nullopt;
   }
   pd.from_override = true;
-  return resolved;
+  return AssignedTypeParam{resolved, kLoc};
+}
+
+void ReportAssignedTypeOutsideRestriction(
+    const ModuleItem* item, const AssignedTypeParam& assigned,
+    const TypeParamRestrictionScope& scope, DiagEngine& diag) {
+  const RestrictedTypeParam kParam{item->name, item->forward_type_kind};
+  ReportTypeOutsideRestriction(kParam, item->typedef_type, item->loc, scope,
+                               diag);
+  ReportTypeOutsideRestriction(kParam, assigned.type, assigned.loc, scope,
+                               diag);
 }
 
 void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
@@ -333,11 +254,11 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
                                    {mod->params, typedefs_, class_names_},
                                    diag_);
-    if (auto type = AssignedTypeParamType(item, pd, mod, unit_, diag_)) {
-      CheckTypeParamConformsToForwardKind(
-          item, *type, typedefs_, ClassTypeLookup{unit_, &class_names_}, diag_);
-      typedefs_[item->name] = *type;
-      pd.resolved_type = arena_.Create<DataType>(*type);
+    if (auto assigned = AssignedTypeParamType(item, pd, mod, unit_, diag_)) {
+      ReportAssignedTypeOutsideRestriction(
+          item, *assigned, {typedefs_, unit_, class_names_}, diag_);
+      typedefs_[item->name] = assigned->type;
+      pd.resolved_type = arena_.Create<DataType>(assigned->type);
     }
   }
   const ScopeMap kScope = BuildParamScope(mod);

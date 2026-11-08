@@ -487,7 +487,8 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->is_genvar) return;
 
   ReportUndeclaredTypeName(item);
-  ReportSpecializationPrefixNotAClass(item->data_type, item->loc, unit_, diag_);
+  ReportSpecializationBindingErrors(item->data_type, item->loc,
+                                    {typedefs_, unit_, class_names_}, diag_);
 
   std::string_view adopted_enumeration = ResolveVarDeclTypeRefs(item, mod);
 

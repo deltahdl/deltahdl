@@ -398,6 +398,9 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
           TypeParamSourcesFor(&top_item, instance_param_overrides_,
                               config_inst_path_),
           mod_decl, typedefs_, unit_, diag_);
+      ReportChildTypeParamsOutsideRestrictions(mod_decl, applied_type_params,
+                                               {typedefs_, unit_, class_names_},
+                                               diag_);
     }
     pending_type_param_types_ = std::move(applied_type_params.written);
     auto* top = ElaborateModule(mod_decl, top_params);

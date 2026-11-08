@@ -573,6 +573,8 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   auto applied_type_params = ApplyChildTypeParams(
       TypeParamSourcesFor(item, instance_param_overrides_, config_inst_path_),
       child_decl, typedefs_, unit_, diag_);
+  ReportChildTypeParamsOutsideRestrictions(
+      child_decl, applied_type_params, {typedefs_, unit_, class_names_}, diag_);
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
     nested_default_clock_ = DefaultClockingEvent(mod);

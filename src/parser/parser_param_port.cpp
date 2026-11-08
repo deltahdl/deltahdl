@@ -22,13 +22,12 @@ struct ParamPortGroup {
 struct ParserParamPortHelpers {
   static void ParseTypeParamPortDecl(Parser& p, ParamPortList& out,
                                      bool is_localparam_group) {
-    if (p.Match(TokenKind::kKwInterface)) {
-      p.Expect(TokenKind::kKwClass, Subclause("6.20.3"));
-    } else if (p.Check(TokenKind::kKwEnum) || p.Check(TokenKind::kKwStruct) ||
-               p.Check(TokenKind::kKwUnion) || p.Check(TokenKind::kKwClass)) {
-      p.Consume();
-    }
+    const DataTypeKind kRestriction = p.ParseTypeParamRestriction();
     auto name = p.Expect(TokenKind::kIdentifier, Subclause("6.20.3"));
+    if (kRestriction != DataTypeKind::kImplicit &&
+        out.type_param_restrictions != nullptr) {
+      (*out.type_param_restrictions)[name.text] = kRestriction;
+    }
     bool has_default = false;
     DataType def_type;
     if (p.Match(TokenKind::kEq)) {

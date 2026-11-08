@@ -611,4 +611,203 @@ TEST(TypeParameterElab, TypeParamPrefixInEveryPlaceMustResolveToAClass) {
   }
 }
 
+struct RestrictedKind {
+  const char* keyword;
+  const char* conforming;
+  const char* other;
+  const char* message;
+};
+
+const RestrictedKind kRestrictedKinds[] = {
+    {"struct", "s_t", "u_t",
+     "type parameter 'P' is assigned a type that does not conform to the "
+     "required struct kind"},
+    {"union", "u_t", "s_t",
+     "type parameter 'P' is assigned a type that does not conform to the "
+     "required union kind"},
+    {"enum", "e_t", "s_t",
+     "type parameter 'P' is assigned a type that does not conform to the "
+     "required enum kind"},
+    {"class", "cl", "ic",
+     "type parameter 'P' is restricted to a class type but is assigned 'ic', "
+     "which is an interface class"},
+    {"interface class", "ic", "cl",
+     "type parameter 'P' is restricted to an interface class type but is "
+     "assigned 'cl', which is an ordinary class"},
+};
+
+const char kRestrictedKindTypes[] =
+    "typedef union packed { int a; } u_t;\n"
+    "typedef struct packed { int a; } s_t;\n"
+    "typedef enum { A, B } e_t;\n"
+    "interface class ic; endclass\n"
+    "class cl; endclass\n";
+
+struct RestrictionSite {
+  const char* where;
+  const char* text;
+  int line;
+};
+
+std::string FillRestrictionSite(std::string text, const RestrictedKind& kind,
+                                const char* assigned) {
+  text.replace(text.find('%'), 1, kind.keyword);
+  if (auto at = text.find('$'); at != std::string::npos)
+    text.replace(at, 1, kind.conforming);
+  text.replace(text.find('@'), 1, assigned);
+  return kRestrictedKindTypes + text;
+}
+
+void ExpectRestrictionEnforced(const RestrictionSite& site) {
+  for (const RestrictedKind& kind : kRestrictedKinds) {
+    SCOPED_TRACE(std::string(site.where) + ", " + kind.keyword);
+    EXPECT_TRUE(ElabOk(FillRestrictionSite(site.text, kind, kind.conforming)));
+    ElabFixture f;
+    ElaborateSrc(FillRestrictionSite(site.text, kind, kind.other), f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kind.message, site.line, "6.20.3"));
+  }
+}
+
+TEST(TypeParameterElab, RestrictedDefaultInEveryPlaceMustConform) {
+  const RestrictionSite kSites[] = {
+      {"module parameter port list",
+       "module m #(parameter type % P = @);\nendmodule\n", 6},
+      {"module body", "module m;\n  parameter type % P = @;\nendmodule\n", 7},
+      {"interface parameter port list",
+       "interface i #(parameter type % P = @);\nendinterface\n"
+       "module m; i u(); endmodule\n",
+       6},
+      {"interface body",
+       "interface i;\n  parameter type % P = @;\nendinterface\n"
+       "module m; i u(); endmodule\n",
+       7},
+      {"program parameter port list",
+       "program p #(parameter type % P = @);\nendprogram\n"
+       "module m; p u(); endmodule\n",
+       6},
+      {"program body",
+       "program p;\n  parameter type % P = @;\nendprogram\n"
+       "module m; p u(); endmodule\n",
+       7},
+      {"generate block",
+       "module m;\n  if (1) begin : g\n    parameter type % P = @;\n  end\n"
+       "endmodule\n",
+       8},
+      {"initial block",
+       "module m;\n  initial begin\n    parameter type % P = @;\n  end\n"
+       "endmodule\n",
+       8},
+      {"function",
+       "module m;\n  function void f();\n    parameter type % P = @;\n"
+       "  endfunction\nendmodule\n",
+       8},
+      {"task",
+       "module m;\n  task k();\n    parameter type % P = @;\n  endtask\n"
+       "endmodule\n",
+       8},
+      {"package",
+       "package pk;\n  parameter type % P = @;\nendpackage\n"
+       "module m; endmodule\n",
+       7},
+      {"compilation unit", "parameter type % P = @;\nmodule m; endmodule\n", 6},
+      {"class parameter port list",
+       "class c #(type % P = @);\nendclass\nmodule m; endmodule\n", 6},
+      {"class body",
+       "class c;\n  parameter type % P = @;\nendclass\nmodule m; endmodule\n",
+       7},
+      {"class method",
+       "class c;\n  function void f();\n    parameter type % P = @;\n"
+       "  endfunction\nendclass\nmodule m; endmodule\n",
+       8},
+      {"function, through a local typedef",
+       "module m;\n  function void f();\n    typedef @ t;\n"
+       "    parameter type % P = t;\n  endfunction\nendmodule\n",
+       9},
+      {"package, through a local typedef",
+       "package pk;\n  typedef @ t;\n  parameter type % P = t;\nendpackage\n"
+       "module m; endmodule\n",
+       8},
+  };
+  for (const RestrictionSite& site : kSites) ExpectRestrictionEnforced(site);
+}
+
+TEST(TypeParameterElab, RestrictedDefaultMustConformWhenAnOverrideReplacesIt) {
+  const RestrictionSite kSites[] = {
+      {"module parameter port list",
+       "module c #(parameter type % P = @);\nendmodule\n"
+       "module m; c #(.P($)) u(); endmodule\n",
+       6},
+      {"module body",
+       "module c;\n  parameter type % P = @;\nendmodule\n"
+       "module m; c #(.P($)) u(); endmodule\n",
+       7},
+      {"class parameter port list",
+       "class c #(type % P = @);\nendclass\n"
+       "module m; c #(.P($)) h; endmodule\n",
+       6},
+  };
+  for (const RestrictionSite& site : kSites) ExpectRestrictionEnforced(site);
+}
+
+TEST(TypeParameterElab, RestrictedParameterWithoutAnAssignmentIsNotJudged) {
+  EXPECT_TRUE(ElabOk(std::string(kRestrictedKindTypes) +
+                     "module c #(parameter type enum P);\nendmodule\n"
+                     "module m;\n  c #(.P(e_t)) u();\nendmodule\n"));
+  EXPECT_TRUE(
+      ElabOk(std::string(kRestrictedKindTypes) +
+             "class c #(type enum P = e_t, type struct Q = s_t);\nendclass\n"
+             "module m;\n  c #(e_t) h;\nendmodule\n"));
+}
+
+TEST(TypeParameterElab, RestrictedOverrideMustConform) {
+  const RestrictionSite kSites[] = {
+      {"module port list, by name",
+       "module c #(parameter type % P = $);\nendmodule\n"
+       "module m;\n  c #(.P(@)) u();\nendmodule\n",
+       9},
+      {"module port list, by position",
+       "module c #(parameter type % P = $);\nendmodule\n"
+       "module m;\n  c #(@) u();\nendmodule\n",
+       9},
+      {"module body, by name",
+       "module c;\n  parameter type % P = $;\nendmodule\n"
+       "module m;\n  c #(.P(@)) u();\nendmodule\n",
+       10},
+      {"module body, by position",
+       "module c;\n  parameter type % P = $;\nendmodule\n"
+       "module m;\n  c #(@) u();\nendmodule\n",
+       10},
+      {"interface port list",
+       "interface c #(parameter type % P = $);\nendinterface\n"
+       "module m;\n  c #(.P(@)) u();\nendmodule\n",
+       9},
+      {"program port list",
+       "program c #(parameter type % P = $);\nendprogram\n"
+       "module m;\n  c #(.P(@)) u();\nendmodule\n",
+       9},
+      {"class specialization by name",
+       "class c #(type % P = $);\nendclass\n"
+       "module m;\n  c #(.P(@)) h;\nendmodule\n",
+       9},
+      {"class specialization by position",
+       "class c #(type % P = $);\nendclass\n"
+       "module m;\n  c #(@) h;\nendmodule\n",
+       9},
+      {"class specialization in a module typedef",
+       "class c #(type % P = $);\nendclass\n"
+       "module m;\n  typedef c #(@) h_t;\nendmodule\n",
+       9},
+      {"class specialization in a unit typedef",
+       "class c #(type % P = $);\nendclass\n"
+       "typedef c #(@) h_t;\nmodule m; endmodule\n",
+       8},
+      {"class specialization as a property",
+       "class c #(type % P = $);\nendclass\n"
+       "class d;\n  c #(@) h;\nendclass\nmodule m; endmodule\n",
+       9},
+  };
+  for (const RestrictionSite& site : kSites) ExpectRestrictionEnforced(site);
+}
+
 }  // namespace

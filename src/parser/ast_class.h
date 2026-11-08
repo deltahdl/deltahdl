@@ -156,6 +156,8 @@ struct ClassMember {
   std::string_view covergroup_extends_base;
 
   CovergroupDecl* covergroup = nullptr;
+
+  DataTypeKind type_param_restriction = DataTypeKind::kImplicit;
 };
 
 struct InterfaceRef {
@@ -185,6 +187,8 @@ struct ClassDecl {
       param_port_unpacked_dims;
   std::unordered_set<std::string_view> type_param_names;
   std::unordered_set<std::string_view> localparam_port_names;
+  std::vector<SourceLoc> param_port_locs;
+  std::unordered_map<std::string_view, DataTypeKind> type_param_restrictions;
 };
 
 }  // namespace delta

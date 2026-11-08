@@ -237,9 +237,13 @@ ClassDecl* Parser::ParseClassDecl() {
   if (Check(TokenKind::kHash)) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("8.25"));
-    ParamPortList out{decl->params, decl->type_param_names,
-                      decl->localparam_port_names, &decl->param_types,
-                      &decl->param_port_unpacked_dims};
+    ParamPortList out{decl->params,
+                      decl->type_param_names,
+                      decl->localparam_port_names,
+                      &decl->param_types,
+                      &decl->param_port_unpacked_dims,
+                      &decl->param_port_locs};
+    out.type_param_restrictions = &decl->type_param_restrictions;
     ParseParamPortDecls(out);
     Expect(TokenKind::kRParen, Subclause("8.25"));
   }
@@ -376,8 +380,7 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
 
 static bool IsLocalTypeParam(const ModuleItem* item) {
   return item->data_type.kind == DataTypeKind::kVoid && item->is_localparam &&
-         item->typedef_type.kind != DataTypeKind::kImplicit &&
-         item->forward_type_kind == DataTypeKind::kImplicit;
+         item->typedef_type.kind != DataTypeKind::kImplicit;
 }
 
 void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
@@ -389,6 +392,8 @@ void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
     m->name = param_items[i]->name;
     if (IsLocalTypeParam(param_items[i])) {
       param_items[i]->kind = ModuleItemKind::kTypedef;
+      m->type_param_restriction = std::exchange(
+          param_items[i]->forward_type_kind, DataTypeKind::kImplicit);
       m->kind = ClassMemberKind::kTypedef;
       m->typedef_item = param_items[i];
       members.push_back(m);

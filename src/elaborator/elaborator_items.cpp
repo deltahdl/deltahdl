@@ -336,8 +336,8 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   type_ref_mod_ = mod;
   WalkItemExprsForTypeRefArg(item);
   FoldItemTypeRefCompares(item, kFold);
-  ReportItemPrefixesNotAClass(*item, {mod->params, typedefs_, class_names_},
-                              diag_);
+  ReportItemTypeParamErrors(*item, {mod->params, typedefs_, class_names_},
+                            {typedefs_, unit_, class_names_}, diag_);
   if (ElaborateDeclItem(item, mod)) return;
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);

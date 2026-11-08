@@ -12,6 +12,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_restriction.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -70,6 +71,7 @@ using LocalTypeNames = std::vector<LocalTypeName>;
 
 struct PrefixWalk {
   const TypeParamPrefixScope* outer;
+  const TypeParamRestrictionScope& restriction;
   DiagEngine& diag;
   bool outer_type_refs = false;
 };
@@ -122,10 +124,26 @@ void JudgeTypeRef(const DataType& type, SourceLoc loc,
   JudgePrefix(TypeRefPrefix(type), loc, locals, walk, walk.outer_type_refs);
 }
 
+bool NamesLocal(const DataType& type, const LocalTypeName& local) {
+  return type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
+         type.type_name == local.name;
+}
+
+void JudgeRestriction(const ModuleItem& item, const LocalTypeNames& locals,
+                      const PrefixWalk& walk) {
+  const DataType* bound = &item.typedef_type;
+  for (auto it = locals.rbegin(); it != locals.rend(); ++it) {
+    if (NamesLocal(*bound, *it)) bound = it->bound;
+  }
+  ReportTypeOutsideRestriction({item.name, item.forward_type_kind}, *bound,
+                               item.loc, walk.restriction, walk.diag);
+}
+
 void DeclareTypeName(const ModuleItem& item, bool is_param,
                      LocalTypeNames& locals, const PrefixWalk& walk) {
   JudgePrefix(item.typedef_type.scope_name, item.loc, locals, walk, true);
   JudgeTypeRef(item.typedef_type, item.loc, locals, walk);
+  if (is_param) JudgeRestriction(item, locals, walk);
   locals.push_back({item.name, &item.typedef_type, is_param});
 }
 
@@ -185,21 +203,29 @@ void WalkScopeItems(const std::vector<ModuleItem*>& items,
 
 }  // namespace
 
-void ReportItemPrefixesNotAClass(const ModuleItem& item,
-                                 const TypeParamPrefixScope& scope,
-                                 DiagEngine& diag) {
+void ReportItemTypeParamErrors(const ModuleItem& item,
+                               const TypeParamPrefixScope& scope,
+                               const TypeParamRestrictionScope& restriction,
+                               DiagEngine& diag) {
   if (DeclaresChecker(item)) {
-    WalkScopeItems(item.nested_module_decl->items, {&scope, diag, true});
+    WalkScopeItems(item.nested_module_decl->items,
+                   {&scope, restriction, diag, true});
     return;
   }
-  WalkProcedure(item, {}, {&scope, diag});
+  WalkProcedure(item, {}, {&scope, restriction, diag});
 }
 
-void ReportUnitScopePrefixesNotAClass(const CompilationUnit* unit,
-                                      DiagEngine& diag) {
-  for (const PackageDecl* pkg : unit->packages)
-    WalkScopeItems(pkg->items, {nullptr, diag});
-  WalkScopeItems(unit->cu_items, {nullptr, diag});
+void ReportUnitScopeTypeParamErrors(const TypeParamRestrictionScope& scope,
+                                    DiagEngine& diag) {
+  const PrefixWalk kWalk{nullptr, scope, diag};
+  for (const PackageDecl* pkg : scope.unit->packages)
+    WalkScopeItems(pkg->items, kWalk);
+  WalkScopeItems(scope.unit->cu_items, kWalk);
+  for (const ClassDecl* cls : AllClassDecls(scope.unit)) {
+    for (const ClassMember* m : cls->members) {
+      if (m->method != nullptr) WalkProcedure(*m->method, {}, kWalk);
+    }
+  }
 }
 
 void ReportTypeRefPrefixNotAClass(const Expr* ref, SourceLoc loc,
@@ -244,9 +270,10 @@ static bool BodySelectsThrough(const ClassDecl& cls, std::string_view name) {
   });
 }
 
-void ReportSpecializationPrefixNotAClass(const DataType& written, SourceLoc loc,
-                                         const CompilationUnit* unit,
-                                         DiagEngine& diag) {
+static void ReportSpecializationPrefixNotAClass(const DataType& written,
+                                                SourceLoc loc,
+                                                const CompilationUnit* unit,
+                                                DiagEngine& diag) {
   if (written.kind != DataTypeKind::kNamed || !written.scope_name.empty())
     return;
   const ClassDecl* cls = FindClassDecl(written.type_name, unit);
@@ -268,24 +295,32 @@ void ReportSpecializationPrefixNotAClass(const DataType& written, SourceLoc loc,
   }
 }
 
-void ReportUnitSpecializations(const CompilationUnit* unit, DiagEngine& diag) {
-  for (const ModuleItem* item : unit->cu_items) {
+void ReportSpecializationBindingErrors(const DataType& written, SourceLoc loc,
+                                       const TypeParamRestrictionScope& scope,
+                                       DiagEngine& diag) {
+  ReportSpecializationPrefixNotAClass(written, loc, scope.unit, diag);
+  ReportSpecializationOutsideRestrictions(written, loc, scope, diag);
+}
+
+void ReportUnitSpecializations(const TypeParamRestrictionScope& scope,
+                               DiagEngine& diag) {
+  for (const ModuleItem* item : scope.unit->cu_items) {
     if (item->kind == ModuleItemKind::kTypedef) {
-      ReportSpecializationPrefixNotAClass(item->typedef_type, item->loc, unit,
-                                          diag);
+      ReportSpecializationBindingErrors(item->typedef_type, item->loc, scope,
+                                        diag);
     } else if (item->kind == ModuleItemKind::kVarDecl) {
-      ReportSpecializationPrefixNotAClass(item->data_type, item->loc, unit,
-                                          diag);
+      ReportSpecializationBindingErrors(item->data_type, item->loc, scope,
+                                        diag);
     }
   }
-  for (const ClassDecl* cls : unit->classes) {
+  for (const ClassDecl* cls : scope.unit->classes) {
     for (const ClassMember* m : cls->members) {
       if (m->kind == ClassMemberKind::kProperty) {
-        ReportSpecializationPrefixNotAClass(m->data_type, m->loc, unit, diag);
+        ReportSpecializationBindingErrors(m->data_type, m->loc, scope, diag);
       } else if (m->kind == ClassMemberKind::kTypedef &&
                  m->typedef_item != nullptr) {
-        ReportSpecializationPrefixNotAClass(m->typedef_item->typedef_type,
-                                            m->loc, unit, diag);
+        ReportSpecializationBindingErrors(m->typedef_item->typedef_type, m->loc,
+                                          scope, diag);
       }
     }
   }

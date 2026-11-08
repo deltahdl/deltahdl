@@ -641,18 +641,23 @@ static DataTypeKind ForwardTypeKindForToken(TokenKind tk) {
   }
 }
 
+DataTypeKind Parser::ParseTypeParamRestriction() {
+  if (!IsForwardTypeParamToken(CurrentToken().kind)) {
+    return DataTypeKind::kImplicit;
+  }
+  if (Match(TokenKind::kKwInterface)) {
+    Expect(TokenKind::kKwClass, Subclause("6.20.3"));
+    return DataTypeKind::kVoid;
+  }
+  const DataTypeKind kRestriction =
+      ForwardTypeKindForToken(CurrentToken().kind);
+  Consume();
+  return kRestriction;
+}
+
 void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
                                 bool localparam) {
-  DataTypeKind fwd = DataTypeKind::kImplicit;
-  if (IsForwardTypeParamToken(CurrentToken().kind)) {
-    if (Match(TokenKind::kKwInterface)) {
-      Expect(TokenKind::kKwClass, Subclause("6.20.3"));
-      fwd = DataTypeKind::kVoid;
-    } else {
-      fwd = ForwardTypeKindForToken(CurrentToken().kind);
-      Consume();
-    }
-  }
+  const DataTypeKind kRestriction = ParseTypeParamRestriction();
 
   do {
     auto* item = arena_.Create<ModuleItem>();
@@ -660,7 +665,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
     item->is_localparam = localparam;
     item->loc = loc;
     item->data_type.kind = DataTypeKind::kVoid;
-    item->forward_type_kind = fwd;
+    item->forward_type_kind = kRestriction;
     auto name_tok = Expect(TokenKind::kIdentifier, Subclause("6.20.3"));
     item->name = name_tok.text;
     bool has_default = false;

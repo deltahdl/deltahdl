@@ -511,6 +511,7 @@ struct ModuleDecl {
   bool has_net_directives = false;
   NetType default_nettype = NetType::kWire;
   NetType unconnected_drive = NetType::kWire;
+  std::unordered_map<std::string_view, DataTypeKind> type_param_restrictions;
 };
 
 struct PackageDecl {

@@ -489,6 +489,7 @@ class Parser {
   void ParseImplicitParamRange(DataType& dtype);
   void ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
                           bool localparam = false);
+  DataTypeKind ParseTypeParamRestriction();
   ModuleItem* ParseAlwaysBlock(AlwaysKind kind);
   ModuleItem* ParseInitialBlock();
   ModuleItem* ParseFinalBlock();

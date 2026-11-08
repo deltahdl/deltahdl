@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_restriction.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -61,7 +62,12 @@ static const Expr* ConfigTypeParamOverride(const TypeParamAssignments& from,
   return nullptr;
 }
 
-static std::optional<DataType> ResolveChildTypeParam(
+struct ChildTypeParamBinding {
+  DataType type;
+  const Expr* override_expr = nullptr;
+};
+
+static std::optional<ChildTypeParamBinding> ResolveChildTypeParam(
     const TypeParamAssignments& from, const ModuleDecl* child_decl, size_t i,
     const CompilationUnit* unit, DiagEngine& diag) {
   const ModuleItem* item = from.item;
@@ -75,7 +81,9 @@ static std::optional<DataType> ResolveChildTypeParam(
   }
   if (ov != nullptr) {
     DataType resolved = TypeParamOverrideToDataType(ov, unit, diag, item->loc);
-    if (resolved.kind != DataTypeKind::kImplicit) return resolved;
+    if (resolved.kind != DataTypeKind::kImplicit) {
+      return ChildTypeParamBinding{resolved, ov};
+    }
     diag.Error(item->loc,
                std::format("parameter value assignment for type parameter '{}' "
                            "of '{}' does not name a type",
@@ -85,7 +93,7 @@ static std::optional<DataType> ResolveChildTypeParam(
   }
   if (i < child_decl->param_types.size() &&
       child_decl->param_types[i].kind != DataTypeKind::kImplicit) {
-    return child_decl->param_types[i];
+    return ChildTypeParamBinding{child_decl->param_types[i]};
   }
   diag.Error(item->loc,
              std::format("type parameter '{}' of '{}' has no default type "
@@ -116,11 +124,15 @@ AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
   for (size_t i = 0; i < child_decl->params.size(); ++i) {
     std::string_view pname = child_decl->params[i].first;
     if (child_decl->type_param_names.count(pname) == 0) continue;
-    auto resolved = ResolveChildTypeParam(from, child_decl, i, unit, diag);
-    if (!resolved) continue;
-    resolved_params.emplace_back(pname,
-                                 InInstantiatingScope(*resolved, typedefs));
-    applied.written[pname] = *resolved;
+    auto binding = ResolveChildTypeParam(from, child_decl, i, unit, diag);
+    if (!binding) continue;
+    DataType in_scope = InInstantiatingScope(binding->type, typedefs);
+    if (binding->override_expr != nullptr) {
+      applied.overrides.push_back(
+          {pname, in_scope, binding->override_expr->range.start});
+    }
+    resolved_params.emplace_back(pname, std::move(in_scope));
+    applied.written[pname] = binding->type;
   }
   for (auto& [pname, type] : resolved_params) {
     SavedTypedef s;
@@ -132,6 +144,25 @@ AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
     typedefs[pname] = std::move(type);
   }
   return applied;
+}
+
+void ReportChildTypeParamsOutsideRestrictions(
+    const ModuleDecl* decl, const AppliedTypeParams& applied,
+    const TypeParamRestrictionScope& scope, DiagEngine& diag) {
+  const auto& restrictions = decl->type_param_restrictions;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    auto restriction = restrictions.find(decl->params[i].first);
+    if (restriction == restrictions.end()) continue;
+    ReportTypeOutsideRestriction({restriction->first, restriction->second},
+                                 decl->param_types.at(i),
+                                 decl->param_port_locs.at(i), scope, diag);
+  }
+  for (const OverridingType& ov : applied.overrides) {
+    auto restriction = restrictions.find(ov.name);
+    if (restriction == restrictions.end()) continue;
+    ReportTypeOutsideRestriction({ov.name, restriction->second}, ov.type,
+                                 ov.loc, scope, diag);
+  }
 }
 
 bool AllTypeParamsHaveDefaults(const ModuleDecl* decl) {

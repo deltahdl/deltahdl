@@ -463,6 +463,7 @@ void Parser::ParseParamsPortsAndSemicolon(ModuleDecl& decl) {
                       &decl.param_types,
                       &decl.param_port_unpacked_dims,
                       &decl.param_port_locs};
+    out.type_param_restrictions = &decl.type_param_restrictions;
     ParseParamPortDecls(out);
     Expect(TokenKind::kRParen, Subclause("23.2.3"));
   }

@@ -5,7 +5,9 @@
 #include <utility>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_restriction.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -48,9 +50,16 @@ TypeParamAssignments TypeParamSourcesFor(const ModuleItem* item,
   return from;
 }
 
+struct OverridingType {
+  std::string_view name;
+  DataType type;
+  SourceLoc loc;
+};
+
 struct AppliedTypeParams {
   std::vector<SavedTypedef> saved;
   TypedefMap written;
+  std::vector<OverridingType> overrides;
 };
 
 AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
@@ -58,6 +67,10 @@ AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
                                        TypedefMap& typedefs,
                                        const CompilationUnit* unit,
                                        DiagEngine& diag);
+
+void ReportChildTypeParamsOutsideRestrictions(
+    const ModuleDecl* decl, const AppliedTypeParams& applied,
+    const TypeParamRestrictionScope& scope, DiagEngine& diag);
 
 bool AllTypeParamsHaveDefaults(const ModuleDecl* decl);
 
