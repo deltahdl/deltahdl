@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 71fdefb1-3397-48b8-838f-7c5e17be7223
-  modified: 2026-11-08T02:14:42.220Z
+  modified: 2026-11-08T02:29:07.607Z
 ---
 
 # No comments in any file
@@ -22,6 +22,6 @@ No file deltahdl tracks carries a comment or a docstring. That covers every lang
 
 - Put the why in the commit message and the issue. An instruction to whoever edits a file next becomes a memory, per [[recording-what-a-session-learns]].
 - In Python, a body that would hold only a docstring holds `pass`. A line that would carry `# pragma: no cover` gets a test instead: `runpy.run_module(..., run_name="__main__")` for a `__main__` guard, or `runpy.run_path` on a script package's `__main__.py` with `main` patched. The pylint jobs pass `--disable=missing-*-docstring` on the command line, since inline directives and configuration files are refused by their own gates.
-- `assert-no-comments`, the 10U-Labs tool installed unpinned from PyPI, is the check. Its job in `.github/workflows/scripts.yml` reads that workflow, `lib/__init__.py`, `lib/python/`, `scripts/`, `test/lib/python/` and `test/scripts/`. The jobs in `jsonlint.yml` and `markdownlint.yml` read their own workflow file. The tool spares the namespace end comment itself, and it reads no CMake and no `.txt` file, so nothing but care keeps those clean.
+- `assert-no-comments`, the 10U-Labs tool installed unpinned from PyPI, is the check. Its job in `.github/workflows/scripts.yml` reads that workflow, `lib/__init__.py`, `lib/python/`, `scripts/`, `test/lib/python/` and `test/scripts/`. The jobs in `jsonlint.yml` and `markdownlint.yml` read their own workflow file. The tool spares the namespace end comment itself, and it reads no `.txt` file. It has no CMake reader either: 10U-Labs/assert-no-comments#11 closed as not planned, since the only `tree-sitter-cmake` on PyPI ships a Windows wheel alone. The three CMake files, `CMakeLists.txt`, `src/CMakeLists.txt` and `test/CMakeLists.txt`, carry no comment, and no job can read them for one, so a `#` line added there is caught only by whoever reviews the change.
 
 Related: [[module-terms-in-descriptions]], [[verifying-through-ci]].

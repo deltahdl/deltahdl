@@ -1,11 +1,3 @@
-# A static deltahdl_lib is copied whole into everything that links it, and
-# under coverage that is 2,700-odd unit-test executables carrying an
-# instrumented copy each: 16 MB apiece, 2.2 GB of build tree per shard, and a
-# link time that dominated what those shards actually spent compiling. A shared
-# library is referenced rather than embedded, so it is linked once and measured
-# once. Coverage is the only configuration that asks for it: the released
-# binary has to stand on its own with nothing beside it, so every other
-# configuration keeps the static form.
 if(DELTAHDL_COVERAGE)
     set(DELTAHDL_LIB_LINKAGE SHARED)
 else()
@@ -926,13 +918,6 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
 target_include_directories(deltahdl_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(deltahdl main.cpp)
-# §36.6 makes a PLI application's C functions part of the tool, and Annexes
-# K.1, M.1 and I have the tool provide the routines vpi_user.h, sv_vpi_user.h
-# and svdpi.h declare, which code deltahdl loads (-sv_lib, Annex J.4) calls as
-# the tool's own. Nothing main.cpp reaches calls most of them, so a static
-# deltahdl_lib is linked whole to keep their objects, and the executable
-# exports its symbols to the libraries it loads. A shared deltahdl_lib holds
-# them in a shared object already.
 if(DELTAHDL_LIB_LINKAGE STREQUAL "STATIC")
     target_link_libraries(deltahdl PRIVATE
         "$<LINK_LIBRARY:WHOLE_ARCHIVE,deltahdl_lib>")
@@ -941,11 +926,6 @@ else()
 endif()
 set_target_properties(deltahdl PROPERTIES ENABLE_EXPORTS ON)
 
-# A shared deltahdl_lib has to be found at run time, and the executable is
-# published on its own and unpacked wherever its consumer put it. $ORIGIN
-# resolves against the executable's own directory, which is the directory the
-# library sits in, so it travels with the pair rather than with the absolute
-# path this tree happened to be built at.
 if(DELTAHDL_COVERAGE)
     set_target_properties(deltahdl PROPERTIES BUILD_RPATH "$ORIGIN")
 endif()

@@ -1,12 +1,5 @@
 include(FetchContent)
 
-# The googletest archive a build fetches when DELTAHDL_GOOGLETEST_URL is not
-# set in its environment. No CI job takes this path: the cache-googletest job
-# in .github/workflows/deltahdl.yml resolves the newest published googletest
-# release on every run, downloads that tarball once, and every job that
-# configures this tree names the restored copy in DELTAHDL_GOOGLETEST_URL.
-# This default states the same always-newest rule for a build that resolves
-# nothing, so it takes the head of googletest's default branch.
 set(DELTAHDL_GOOGLETEST_URL_DEFAULT
     "https://github.com/google/googletest/archive/refs/heads/main.tar.gz")
 
@@ -19,21 +12,6 @@ endif()
 FetchContent_Declare(
     googletest
     URL "${DELTAHDL_GOOGLETEST_URL}"
-    # There is no URL_HASH because there is no pin. The archive this build
-    # compiles is whichever release googletest published most recently, so no
-    # checksum for it can be written down ahead of the release that carries it.
-    # What replaces the check is narrower: the cache-googletest job measures
-    # the SHA256 of the copy it downloaded and .github/actions/fetch-googletest
-    # checks the restored copy against that figure, which catches a cache entry
-    # that arrived damaged and does not check the archive against upstream.
-    #
-    # The sed below is the upstream fix for googletest issue #4762:
-    # gtest-printers.h converted char8_t/char16_t to char32_t implicitly, which
-    # the newer clang rejects under -Wcharacter-conversion. v1.18.0 carries the
-    # explicit static_cast already, so on that release the expression matches
-    # nothing and the file is rewritten byte for byte as it arrived. It stays
-    # for a release that predates the fix, since sed reports no error when a
-    # substitution finds nothing to do.
     PATCH_COMMAND sed -i.bak
         -e "s/ImplicitCast_<char32_t>(c)/static_cast<char32_t>(c)/"
         googletest/include/gtest/gtest-printers.h
@@ -50,10 +28,6 @@ function(add_unit_test name)
         ${CMAKE_SOURCE_DIR}/lib/cpp/test_fixtures
         ${CMAKE_SOURCE_DIR}/lib/cpp/test_helpers
         ${CMAKE_SOURCE_DIR}/lib/cpp/test_models)
-    # Coverage builds deltahdl_lib shared, so a test executable has to find it
-    # at run time. $ORIGIN resolves against the executable's own directory, one
-    # level below the build tree's root beside the library's own directory, so
-    # the tree can be unpacked anywhere and still run.
     if(DELTAHDL_COVERAGE)
         set_target_properties(${name} PROPERTIES
             BUILD_RPATH "$ORIGIN/../src")
