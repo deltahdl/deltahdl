@@ -454,8 +454,10 @@ static bool TryLowerEventVarInit(std::string_view name,
 
 Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
                                       uint32_t width) {
-  if (val.is_real != var.is_real && !var.is_string && !val.is_string &&
-      !var.is_event && !var.is_chandle)
+  const bool kRealConversion =
+      val.is_real != var.is_real || (var.is_real && val.width != width);
+  if (kRealConversion && !var.is_string && !val.is_string && !var.is_event &&
+      !var.is_chandle)
     val = ConvertRealForKnownLhs(val, var.is_real, width, arena_);
   if (val.width != width && !var.is_real && !var.is_string)
     val = ResizeToWidth(val, width, arena_);

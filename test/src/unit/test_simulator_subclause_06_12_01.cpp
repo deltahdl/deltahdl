@@ -5,6 +5,7 @@
 
 #include "fixture_real.h"
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -166,6 +167,39 @@ TEST(RealConversion, DeclInitRealToIntTiesAwayFromZero) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(),
             static_cast<uint32_t>(-2));
+}
+
+TEST(RealConversion, IntegerConvertsToRealByItsSignedOrUnsignedValue) {
+  struct Place {
+    const char* where;
+    const char* decls;
+    const char* setup;
+    uint64_t widened;
+  };
+  const Place kPlaces[] = {
+      {"int assigned to a real", "  int n = -3;\n  real s;\n", "    s = n;\n",
+       0xC008000000000000u},
+      {"real initializer", "  real s = -3;\n", "", 0xC008000000000000u},
+      {"byte assigned to a shortreal", "  byte n = -3;\n  shortreal s;\n",
+       "    s = n;\n", 0xC008000000000000u},
+      {"shortreal initializer", "  shortreal s = -3;\n", "",
+       0xC008000000000000u},
+      {"longint assigned to a real by nonblocking assignment",
+       "  longint n = -3;\n  real s;\n", "    s <= n;\n    #1;\n",
+       0xC008000000000000u},
+      {"unsigned vector assigned to a real",
+       "  bit [7:0] n = 8'hFD;\n  real s;\n", "    s = n;\n",
+       0x406FA00000000000u},
+  };
+  for (const Place& place : kPlaces) {
+    SCOPED_TRACE(place.where);
+    const std::string kSrc = std::string("module t;\n") + place.decls +
+                             "  real w;\n  bit [63:0] b;\n  initial begin\n" +
+                             place.setup +
+                             "    w = s;\n    b = $realtobits(w);\n"
+                             "  end\nendmodule\n";
+    EXPECT_EQ(RunAndGet(kSrc, "b"), place.widened);
+  }
 }
 
 TEST(RealConversion, DeclInitIntToReal) {

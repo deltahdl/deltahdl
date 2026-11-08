@@ -84,7 +84,7 @@ TEST(RealDataType, ShortrealHoldsTheNearestBinary32InEveryPlaceItIsGiven) {
        "    x = 0.1;\n  endtask\n",
        "    k(s);\n", "s"},
       {"input port",
-       "module c(input shortreal x, output real y);\n  assign y = x;\n"
+       "module c(input var shortreal x, output real y);\n  assign y = x;\n"
        "endmodule\n",
        "  real r = 0.1;\n  real y;\n  c u(r, y);\n", "    #1;\n", "y"},
   };

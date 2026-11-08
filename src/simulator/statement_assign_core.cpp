@@ -308,7 +308,9 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
     uint64_t raw = rhs_val.nwords > 0
                        ? (rhs_val.words[0].aval & ~rhs_val.words[0].bval)
                        : 0;
-    auto d = static_cast<double>(raw);
+    auto d = rhs_val.is_signed
+                 ? static_cast<double>(SignExtend(raw, rhs_val.width))
+                 : static_cast<double>(raw);
     return ConvertToRealIfNeeded(d, target_width, arena);
   }
   if (rhs_val.is_real && lhs_is_real && rhs_val.width != target_width) {
