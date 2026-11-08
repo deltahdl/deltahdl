@@ -593,4 +593,35 @@ TEST(ScopeRulesElaboration,
       "    endsequence");
 }
 
+TEST(ScopeRulesElaboration, AWrittenCompilationUnitConstantIsNotUndeclared) {
+  const char* const kSources[] = {
+      "parameter int G = 1;\nmodule m;\n  initial G = 2;\nendmodule\n",
+      "localparam int G = 1;\nmodule m;\n  initial G = 2;\nendmodule\n",
+      "parameter int G = 1;\nmodule m;\n  initial $unit::G = 2;\n"
+      "endmodule\n",
+      "typedef enum {G, H} e_t;\nmodule m;\n  initial G = H;\nendmodule\n",
+  };
+  for (const char* src : kSources) {
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "undeclared identifier", 3,
+                               "23.9"));
+    EXPECT_TRUE(f.diag.HasErrors());
+  }
+}
+
+TEST(ScopeRulesElaboration,
+     ATargetTheCompilationUnitDoesNotDeclareIsUndeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "parameter int G = 1;\n"
+      "module m;\n"
+      "  initial H = 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'H'",
+                            3, "23.9"));
+}
+
 }  // namespace

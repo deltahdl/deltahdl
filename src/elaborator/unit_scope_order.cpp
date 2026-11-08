@@ -142,13 +142,25 @@ void CheckUnitScopedName(const Expr* ref, const CompilationUnit* unit,
 
 }  // namespace
 
+static bool DeclaresUnitConstant(const ModuleItem* item,
+                                 std::string_view name) {
+  return (item->kind == ModuleItemKind::kParamDecl && item->name == name) ||
+         DeclaresEnumMember(item, name);
+}
+
+bool UnitDeclaresConstant(const CompilationUnit* unit, std::string_view name,
+                          SourceLoc reference) {
+  return std::ranges::any_of(unit->cu_items, [&](const ModuleItem* item) {
+    return DeclaresUnitConstant(item, name) &&
+           PrecedesInText(item->loc, reference);
+  });
+}
+
 bool UnitConstantDeclaredOnlyAfter(const CompilationUnit* unit,
                                    std::string_view name, SourceLoc reference) {
   bool declared_after = false;
   for (const auto* item : unit->cu_items) {
-    bool declares_constant =
-        (item->kind == ModuleItemKind::kParamDecl && item->name == name) ||
-        DeclaresEnumMember(item, name);
+    bool declares_constant = DeclaresUnitConstant(item, name);
     if (item->name != name && !declares_constant) continue;
     if (PrecedesInText(item->loc, reference)) return false;
     if (declares_constant) declared_after = true;

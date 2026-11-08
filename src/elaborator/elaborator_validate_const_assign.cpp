@@ -265,7 +265,8 @@ class ConstantWriteWalk {
                                                 std::string_view name) const;
 
   std::string WrittenConstant(const Expr* target) const;
-  std::string ScopedConstant(const Expr* e) const;
+  std::string ScopedConstant(std::string_view scope,
+                             std::string_view name) const;
   std::string MemberConstant(const Expr* e) const;
   std::string HierarchicalConstant(
       const ModuleDecl* decl, const std::vector<std::string_view>& path) const;
@@ -436,18 +437,20 @@ std::optional<Constness> ConstantWriteWalk::ScopeMemberConstness(
 std::string ConstantWriteWalk::WrittenConstant(const Expr* target) const {
   const Expr* e = WithoutSelects(target);
   if (e->kind == ExprKind::kIdentifier) {
+    if (e->scope_prefix == "$unit") return ScopedConstant("$unit", e->text);
     std::optional<DeclaredName> declared = Find(e->text);
     bool constant =
         declared.has_value() && declared->constness != Constness::kWritable;
     return constant ? std::string(e->text) : std::string();
   }
   if (e->kind != ExprKind::kMemberAccess) return {};
-  return e->is_scope_resolution ? ScopedConstant(e) : MemberConstant(e);
+  return e->is_scope_resolution
+             ? ScopedConstant(ExprIdent(e->lhs), ExprIdent(e->rhs))
+             : MemberConstant(e);
 }
 
-std::string ConstantWriteWalk::ScopedConstant(const Expr* e) const {
-  std::string_view scope = ExprIdent(e->lhs);
-  std::string_view name = ExprIdent(e->rhs);
+std::string ConstantWriteWalk::ScopedConstant(std::string_view scope,
+                                              std::string_view name) const {
   std::optional<Constness> constness = ScopeMemberConstness(scope, name);
   if (!constness.has_value() || *constness == Constness::kWritable) return {};
   return std::format("{}::{}", scope, name);
@@ -456,18 +459,19 @@ std::string ConstantWriteWalk::ScopedConstant(const Expr* e) const {
 std::string ConstantWriteWalk::MemberConstant(const Expr* e) const {
   const Expr* root = MemberRoot(e);
   if (root == nullptr) return {};
-  std::optional<DeclaredName> declared = Find(root->text);
-  const ModuleDecl* scope = nullptr;
-  if (declared.has_value()) {
-    if (declared->constness == Constness::kConstant)
-      return std::string(root->text);
-    scope = declared->instance_of;
-  } else {
-    scope = FindDefinition(tables_.unit, root->text);
-  }
+  if (root->scope_prefix == "$unit") return ScopedConstant("$unit", root->text);
+  bool from_root = root->scope_prefix == "$root";
+  std::optional<DeclaredName> declared =
+      from_root ? std::nullopt : Find(root->text);
+  if (declared.has_value() && declared->constness == Constness::kConstant)
+    return std::string(root->text);
+  const ModuleDecl* scope = declared.has_value()
+                                ? declared->instance_of
+                                : FindDefinition(tables_.unit, root->text);
   std::vector<std::string_view> path;
   if (scope == nullptr || !AppendMemberPath(e, path)) return {};
-  return HierarchicalConstant(scope, path);
+  std::string written = HierarchicalConstant(scope, path);
+  return from_root && !written.empty() ? "$root." + written : written;
 }
 
 std::string ConstantWriteWalk::HierarchicalConstant(

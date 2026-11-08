@@ -250,7 +250,8 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
            ImportsProvideName(unit_, pkg_provided_names_,
                               kEnclosingImports.above, name) ||
            ImportsProvideName(unit_, pkg_provided_names_, kUnitBefore, name) ||
-           UnitDeclaresData(unit_, name, decl->range.start);
+           UnitDeclaresData(unit_, name, decl->range.start) ||
+           UnitDeclaresConstant(unit_, name, decl->range.start);
   };
   for (const auto& [name, loc] : walk.proc_lhs) {
     if (target_visible(name)) continue;

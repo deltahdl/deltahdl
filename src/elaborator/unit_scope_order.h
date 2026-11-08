@@ -23,6 +23,9 @@ const ModuleItem* UnitNetBefore(const CompilationUnit* unit,
 bool UnitDataDeclaredOnlyAfter(const CompilationUnit* unit,
                                std::string_view name, SourceLoc reference);
 
+bool UnitDeclaresConstant(const CompilationUnit* unit, std::string_view name,
+                          SourceLoc reference);
+
 bool UnitConstantDeclaredOnlyAfter(const CompilationUnit* unit,
                                    std::string_view name, SourceLoc reference);
 

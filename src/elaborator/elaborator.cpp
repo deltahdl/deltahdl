@@ -368,6 +368,8 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidatePerDeclarationRulesInUnitScopes();
 
+  ValidateUnitConstAssignments();
+
   ValidateTimescaleConsistency();
 
   UnitScopeTables::ForEachUnit(*this, [this] { ValidateTimescaleOrder(); });

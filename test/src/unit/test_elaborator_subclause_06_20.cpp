@@ -371,11 +371,13 @@ struct ConstantWrite {
 TEST(ConstAssignElaboration, AWriteToAConstantIsReportedInEveryFormAndPlace) {
   const ConstantWrite kWrites[] = {
       {"a const declared in a function",
-       "module m;\n  function void f();\n    const int c = 1;\n    c = 5;\n"
+       "module m;\n  function void f();\n    const static int c = 1;\n    c = "
+       "5;\n"
        "  endfunction\nendmodule\n",
        "assignment to constant 'c'", 4},
       {"a const declared in a named block",
-       "module m;\n  initial begin : b\n    const int c = 1;\n    c = 5;\n"
+       "module m;\n  initial begin : b\n    const static int c = 1;\n    c = "
+       "5;\n"
        "  end\nendmodule\n",
        "assignment to constant 'c'", 4},
       {"a localparam declared in a task",
@@ -503,6 +505,14 @@ TEST(ConstAssignElaboration, AWriteToAConstantIsReportedInEveryFormAndPlace) {
        "module c(i ifc);\n  initial ifc.P = 2;\nendmodule\nmodule m;\n"
        "  i u();\n  c v(u);\nendmodule\n",
        "assignment to constant 'ifc.P'", 5},
+      {"a module's own parameter, by a name from $root",
+       "module m;\n  parameter int P = 1;\n  initial $root.m.P = 2;\n"
+       "endmodule\n",
+       "assignment to constant '$root.m.P'", 3},
+      {"a member of a compilation-unit const struct, by $unit",
+       "typedef struct { int a; } s_t;\nconst s_t S = '{a: 1};\nmodule m;\n"
+       "  initial $unit::S.a = 2;\nendmodule\n",
+       "assignment to constant '$unit::S'", 4},
       {"a module's own parameter, by an upward name",
        "module m;\n  parameter int P = 1;\n  initial m.P = 2;\nendmodule\n",
        "assignment to constant 'm.P'", 3},
@@ -599,7 +609,8 @@ TEST(ConstAssignElaboration,
       "    P = 2;\n    P++;\n  end\nendmodule\n",
       "module m;\n  parameter int P = 1;\n"
       "  initial for (int P = 0; P < 2; P++) ;\nendmodule\n",
-      "module m;\n  int c;\n  initial begin : a\n    const int c = 1;\n  end\n"
+      "module m;\n  int c;\n  initial begin : a\n    const static int c = 1;\n "
+      " end\n"
       "  initial c = 5;\nendmodule\n",
       "module m;\n  parameter int P = 1;\n  int i;\n  initial begin\n"
       "    i = P + 1;\n    i++;\n    --i;\n    i += P;\n    i = (i = P);\n"

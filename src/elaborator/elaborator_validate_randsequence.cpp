@@ -246,7 +246,6 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckPatternsInClass(cls);
     ReportClassImplicationOperators(cls, diag_);
   }
-  ValidateUnitConstAssignments();
 }
 
 }  // namespace delta
