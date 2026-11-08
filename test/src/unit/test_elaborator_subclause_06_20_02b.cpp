@@ -491,6 +491,19 @@ TEST(ValueParameters, ValueSetFromAVariableANetOrAHierarchicalNameIsReported) {
        "module top;\n  int x;\nendmodule\nclass C;\n"
        "  parameter int P = top.x;\nendclass\n",
        "class parameter 'P' value is not a constant expression", 5, "6.20.2"},
+      {"module body parameter from an element a variable selects",
+       "module m;\n  int i;\n  parameter int A[2] = '{1, 2};\n"
+       "  parameter int P = A[i];\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 4, "6.20.2"},
+      {"module body localparam from a member's element a variable selects",
+       "module m;\n  typedef struct { int arr [2]; } s_t;\n  int i;\n"
+       "  parameter s_t S = '{arr: '{1, 2}};\n"
+       "  localparam int L = S.arr[i];\nendmodule\n",
+       "localparam 'L' initializer is not a constant expression", 5, "6.20.4"},
+      {"module body parameter from a member of a variable",
+       "module m;\n  typedef struct { int a; } s_t;\n  s_t v;\n"
+       "  parameter int P = v.a;\nendmodule\n",
+       "parameter 'P' value contains a hierarchical reference", 4, "6.20.2"},
   };
   for (const ValueSource& source : kSources) {
     SCOPED_TRACE(source.where);
@@ -513,6 +526,11 @@ TEST(ValueParameters, ValueSetFromConstantsAndAggregateMembersIsAccepted) {
       "module m;\n  typedef struct { int a; int b; } s_t;\n"
       "  parameter s_t S = '{3, 4};\n  parameter int W = S.b;\n"
       "  localparam int L = S.a;\nendmodule\n",
+      "module m;\n  typedef struct { int arr [2]; } s_t;\n"
+      "  parameter int N = 1;\n  parameter s_t S = '{arr: '{1, 2}};\n"
+      "  parameter int M [2][2] = '{default: 3};\n"
+      "  parameter int P = S.arr[N];\n  localparam int L = M[N][0];\n"
+      "endmodule\n",
       "interface i;\n  localparam int L = 2;\n  parameter int P = L;\n"
       "endinterface\nmodule m;\n  i u();\nendmodule\n",
       "program p;\n  localparam int L = 2;\n  parameter int P = L;\n"

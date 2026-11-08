@@ -93,8 +93,7 @@ static uint32_t MethodClassTypedefWidth(std::string_view name,
 }
 
 static void CollectChainNames(const Expr* e, std::vector<const Expr*>& names) {
-  while (e != nullptr &&
-         (e->kind == ExprKind::kMemberAccess || e->kind == ExprKind::kSelect)) {
+  while (e->kind == ExprKind::kMemberAccess || e->kind == ExprKind::kSelect) {
     if (e->kind == ExprKind::kMemberAccess) {
       e = e->lhs;
       continue;
@@ -114,13 +113,10 @@ static void CollectRunningNames(const Expr* bound,
   });
 }
 
-static std::optional<uint64_t> RunningSpan(const Expr* left, const Expr* right,
-                                           SimContext& ctx) {
-  Logic4Vec l = EvalExpr(left, ctx, ctx.GetArena());
-  Logic4Vec r = EvalExpr(right, ctx, ctx.GetArena());
-  if (!l.IsKnown() || !r.IsKnown()) return std::nullopt;
-  int64_t lv = SelectBoundValue(l);
-  int64_t rv = SelectBoundValue(r);
+static uint64_t RunningSpan(const Expr* left, const Expr* right,
+                            SimContext& ctx) {
+  int64_t lv = SelectBoundValue(EvalExpr(left, ctx, ctx.GetArena()));
+  int64_t rv = SelectBoundValue(EvalExpr(right, ctx, ctx.GetArena()));
   return static_cast<uint64_t>((lv >= rv ? lv - rv : rv - lv) + 1);
 }
 
@@ -140,11 +136,8 @@ static uint32_t RunningPackedDimProduct(const DataType& type, SimContext& ctx) {
     if (ctx.FindVariable(name->text) == nullptr) return 0;
   }
   uint64_t product = 1;
-  for (const auto& [left, right] : dims) {
-    std::optional<uint64_t> span = RunningSpan(left, right, ctx);
-    if (!span) return 0;
-    product *= *span;
-  }
+  for (const auto& [left, right] : dims)
+    product *= RunningSpan(left, right, ctx);
   return static_cast<uint32_t>(product);
 }
 

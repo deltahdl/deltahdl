@@ -455,6 +455,9 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
       return ReplicatedStringChars(expr);
     case ExprKind::kSystemCall:
       return ConstTypenameChars(expr);
+    case ExprKind::kSelect:
+    case ExprKind::kMemberAccess:
+      return ConstEvalAggregatePartString(expr, RegisteredModuleScope());
     default:
       return std::nullopt;
   }

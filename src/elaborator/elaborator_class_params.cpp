@@ -39,20 +39,18 @@ struct ClassParamRegistration {
   const std::unordered_set<std::string_view>* specparams = nullptr;
 };
 
-static bool TakesRealClassParamValue(const Expr* pexpr, const DataType* type) {
-  if (type != nullptr && IsRealType(type->kind)) return true;
-  bool untyped =
-      type == nullptr || (type->kind == DataTypeKind::kImplicit &&
-                          !type->is_signed && type->packed_dim_left == nullptr);
+static bool TakesRealClassParamValue(const Expr* pexpr, const DataType& type) {
+  if (IsRealType(type.kind)) return true;
+  bool untyped = type.kind == DataTypeKind::kImplicit && !type.is_signed &&
+                 type.packed_dim_left == nullptr;
   return untyped && HasRealOperand(pexpr);
 }
 
 static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
-                                                    const DataType* type,
+                                                    const DataType& type,
                                                     const ScopeMap& values) {
-  if (type == nullptr) return ConstEvalInt(pexpr, values);
   if (auto rounded = FoldRealValueAsInteger(pexpr, values)) return rounded;
-  return FoldDeclaredParamValue(pexpr, *type, values);
+  return FoldDeclaredParamValue(pexpr, type, values);
 }
 
 static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
@@ -62,13 +60,6 @@ static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
   return std::ranges::all_of(e->elements, [&values](const Expr* item) {
     return PatternItemsConstant(item, values);
   });
-}
-
-static std::optional<int64_t> ClassParamTwoStateReading(
-    const Expr* pexpr, const DataType* type, int64_t val,
-    const ScopeMap& values) {
-  if (type == nullptr) return std::nullopt;
-  return TwoStateReading(pexpr, *type, values, val);
 }
 
 static bool MentionsFormalOrSpecparam(const Expr* pexpr,
@@ -90,7 +81,7 @@ static void ReportNonConstantClassParam(std::string_view pname,
 }
 
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
-                             const DataType* type,
+                             const DataType& type,
                              const std::vector<Expr*>& dims,
                              ClassParamRegistration& reg) {
   if (!pexpr || ContainsDollar(pexpr)) return;
@@ -107,16 +98,14 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
     ReportNonConstantClassParam(pname, pexpr, reg);
     return;
   }
-  static const DataType kUntyped;
-  RegisterUnitAggregateParam({reg.key_prefix, pname, pexpr,
-                              type != nullptr ? *type : kUntyped, dims,
-                              reg.values});
+  RegisterUnitAggregateParam(
+      {reg.key_prefix, pname, pexpr, type, dims, reg.values});
   if (is_array || is_real) return;
   auto* qname = reg.arena.Create<std::string>(std::string(reg.key_prefix) +
                                               "." + std::string(pname));
   reg.cu_param_scope[*qname] = *val;
   reg.values[pname] = *val;
-  auto reading = ClassParamTwoStateReading(pexpr, type, *val, reg.values);
+  auto reading = TwoStateReading(pexpr, type, reg.values, *val);
   SetTwoStateReading(reg.values, pname, reading);
   SetTwoStateReading(reg.cu_param_scope, *qname, reading);
 }
@@ -129,19 +118,20 @@ static const std::vector<Expr*>& PortParamDims(const ClassDecl& cls,
 }
 
 static void RegisterOneClassParams(ClassParamRegistration& reg) {
+  static const DataType kUntyped;
   UnitNamePrefixGuard prefix_guard(reg.key_prefix);
   const auto& params = reg.cls->params;
   const auto& types = reg.cls->param_types;
   for (size_t i = 0; i < params.size(); ++i) {
     const auto& [pname, pexpr] = params[i];
     if (reg.cls->type_param_names.count(pname)) continue;
-    RecordClassParam(pname, pexpr, i < types.size() ? &types[i] : nullptr,
+    RecordClassParam(pname, pexpr, i < types.size() ? types[i] : kUntyped,
                      PortParamDims(*reg.cls, pname), reg);
   }
   for (const auto* m : reg.cls->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
     DataType type = InClassScope(m->data_type, *reg.cls, reg.type_scope);
-    RecordClassParam(m->name, m->init_expr, &type, m->unpacked_dims, reg);
+    RecordClassParam(m->name, m->init_expr, type, m->unpacked_dims, reg);
   }
 }
 

@@ -245,6 +245,9 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalRealSysCall(expr, scope);
     case ExprKind::kSystemCall:
       return ConstEvalRealSysCall(expr, scope);
+    case ExprKind::kSelect:
+    case ExprKind::kMemberAccess:
+      return ConstEvalAggregatePartReal(expr, scope);
     default:
       return std::nullopt;
   }

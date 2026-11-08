@@ -12,6 +12,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
@@ -24,7 +25,19 @@ namespace delta {
 
 namespace {
 
-constexpr int kMaxAggregateHops = 64;
+constexpr int kMaxTypedefHops = 64;
+constexpr int kMaxLocateDepth = 256;
+int g_locate_depth = 0;
+
+class LocateDepth {
+ public:
+  LocateDepth() { ++g_locate_depth; }
+  ~LocateDepth() { --g_locate_depth; }
+  LocateDepth(const LocateDepth&) = delete;
+  LocateDepth& operator=(const LocateDepth&) = delete;
+  LocateDepth(LocateDepth&&) = delete;
+  LocateDepth& operator=(LocateDepth&&) = delete;
+};
 
 const TypedefMap& Typedefs() {
   static const TypedefMap kNone;
@@ -32,19 +45,20 @@ const TypedefMap& Typedefs() {
   return map != nullptr ? *map : kNone;
 }
 
-const DataType* ResolvedType(const DataType& type) {
+const DataType& ResolvedType(const DataType& type) {
   const DataType* resolved = &type;
-  for (int hops = 0; hops < kMaxAggregateHops && resolved != nullptr &&
-                     resolved->kind == DataTypeKind::kNamed;
-       ++hops)
-    resolved = FindNamedType(*resolved, Typedefs());
-  return resolved;
+  for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
+    const DataType* named = FindNamedType(*resolved, Typedefs());
+    if (named == nullptr) break;
+    resolved = named;
+  }
+  return *resolved;
 }
 
 bool HoldsAggregate(const DataType& type) {
-  const DataType* resolved = ResolvedType(type);
-  return resolved != nullptr && (resolved->kind == DataTypeKind::kStruct ||
-                                 resolved->kind == DataTypeKind::kUnion);
+  const DataType& resolved = ResolvedType(type);
+  return resolved.kind == DataTypeKind::kStruct ||
+         resolved.kind == DataTypeKind::kUnion;
 }
 
 struct ValueFrame {
@@ -82,28 +96,47 @@ struct PartState {
   const Expr* value = nullptr;
   ValueFrame frame;
   PartShape shape;
-  bool broadcast = false;
+  bool inherited = false;
 };
 
 struct LocatedPart {
   PartState state;
   PartShape reader;
+  uint32_t offset = 0;
 };
 
-struct PartStep {
-  std::string_view member;
-  int64_t position = 0;
+struct Slot {
+  size_t position = 0;
+  const StructMember* member = nullptr;
+  int64_t index = 0;
 };
 
 struct PickedItem {
   const Expr* value = nullptr;
-  bool from_default = false;
+  bool inherited = false;
 };
 
+struct PackedLevel {
+  const Expr* left = nullptr;
+  const Expr* right = nullptr;
+  DataType element;
+  bool is_signed = false;
+};
+
+struct PackedPart {
+  ConstVal value{0, 0, false};
+  uint32_t width = 0;
+};
+
+enum class LeafKind { kAggregate, kIntegral, kReal, kString };
+
+bool IsTypedPattern(const Expr* value) {
+  return value->kind == ExprKind::kCast &&
+         value->lhs->kind == ExprKind::kAssignmentPattern;
+}
+
 const Expr* Untyped(const Expr* value) {
-  bool typed = value->kind == ExprKind::kCast && value->lhs != nullptr &&
-               value->lhs->kind == ExprKind::kAssignmentPattern;
-  return typed ? value->lhs : value;
+  return IsTypedPattern(value) ? value->lhs : value;
 }
 
 bool IsPattern(const Expr* value) {
@@ -111,11 +144,8 @@ bool IsPattern(const Expr* value) {
 }
 
 bool IsPartStep(const Expr* expr) {
-  if (expr->kind == ExprKind::kSelect)
-    return expr->base != nullptr && expr->index != nullptr &&
-           expr->index_end == nullptr;
-  return expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution &&
-         expr->lhs != nullptr && expr->rhs != nullptr;
+  if (expr->kind == ExprKind::kSelect) return expr->index_end == nullptr;
+  return expr->kind == ExprKind::kMemberAccess && !expr->is_scope_resolution;
 }
 
 const Expr* StepBase(const Expr* step) {
@@ -127,14 +157,10 @@ ValueFrame CurrentFrame(const ScopeMap& scope) {
                     CurrentUnitNamePrefix()};
 }
 
-bool NamesDims(const std::vector<Expr*>* dims) {
-  return dims != nullptr && !dims->empty();
-}
+bool NamesDims(const std::vector<Expr*>* dims) { return dims != nullptr; }
 
 const DataType* ParamValueType(const RtlirParamDecl& pd) {
-  static const DataType kImplicit;
-  if (pd.type_param_actual != nullptr) return pd.type_param_actual;
-  return pd.decl_type != nullptr ? pd.decl_type : &kImplicit;
+  return pd.type_param_actual != nullptr ? pd.type_param_actual : pd.decl_type;
 }
 
 bool IsImplicitType(const DataType& type) {
@@ -145,8 +171,8 @@ bool IsImplicitType(const DataType& type) {
 std::optional<PartState> ModuleParamState(const RtlirParamDecl& pd,
                                           const ScopeMap& scope) {
   const DataType* type = ParamValueType(pd);
-  if (pd.is_type_param) return std::nullopt;
-  if (!NamesDims(pd.unpacked_dims) && !HoldsAggregate(*type))
+  if (type == nullptr ||
+      (!NamesDims(pd.unpacked_dims) && !HoldsAggregate(*type)))
     return std::nullopt;
   PartState state{pd.default_value, CurrentFrame(scope),
                   PartShape{*type, pd.unpacked_dims, 0, &scope}};
@@ -173,8 +199,7 @@ PartState UnitParamState(const UnitAggregateParam& param) {
 const UnitAggregateParam* UnitRoot(const Expr* root) {
   if (root->kind == ExprKind::kMemberAccess) {
     if (!root->is_scope_resolution) return nullptr;
-    std::optional<std::string> key = ScopedNameKey(root);
-    return key ? FindUnitAggregateParam(*key) : nullptr;
+    return FindUnitAggregateParam(ScopedNameKey(root).value_or(""));
   }
   if (root->kind != ExprKind::kIdentifier) return nullptr;
   if (root->scope_prefix == "$unit") return FindUnitAggregateParam(root->text);
@@ -208,20 +233,17 @@ std::optional<int64_t> PositionOf(const PartShape& shape, const Expr* index,
   return pos;
 }
 
-std::optional<int64_t> IndexAt(const PartShape& shape, int64_t pos) {
-  std::optional<RtlirUnpackedDim> dim = ShapeDim(shape);
-  if (!dim) return std::nullopt;
-  return dim->left <= dim->right ? dim->left + pos : dim->left - pos;
+int64_t IndexAt(const PartShape& shape, int64_t pos) {
+  RtlirUnpackedDim dim = ShapeDim(shape).value_or(RtlirUnpackedDim{});
+  return dim.left <= dim.right ? dim.left + pos : dim.left - pos;
 }
 
 const StructMember* MemberNamed(const DataType& type, std::string_view name,
                                 size_t& index) {
-  const DataType* resolved = ResolvedType(type);
-  if (resolved == nullptr || resolved->struct_members.empty()) return nullptr;
-  const std::vector<StructMember>* members = &resolved->struct_members;
-  auto it = std::ranges::find(*members, name, &StructMember::name);
-  if (it == members->end()) return nullptr;
-  index = static_cast<size_t>(it - members->begin());
+  const std::vector<StructMember>& members = ResolvedType(type).struct_members;
+  auto it = std::ranges::find(members, name, &StructMember::name);
+  if (it == members.end()) return nullptr;
+  index = static_cast<size_t>(it - members.begin());
   return &*it;
 }
 
@@ -232,23 +254,21 @@ PartShape MemberShape(const PartShape& owner, const StructMember& member) {
       owner.scope};
 }
 
-std::optional<PartStep> ReaderStep(const Expr* step, PartShape& shape,
-                                   const ScopeMap& scope) {
+std::optional<Slot> ReaderStep(const Expr* step, PartShape& shape,
+                               const ScopeMap& scope) {
   if (step->kind == ExprKind::kSelect) {
     if (!shape.HasDims()) return std::nullopt;
     std::optional<int64_t> pos = PositionOf(shape, step->index, scope);
     if (!pos) return std::nullopt;
     ++shape.dim_at;
-    return PartStep{{}, *pos};
+    return Slot{static_cast<size_t>(*pos), nullptr, 0};
   }
-  size_t index = 0;
-  const StructMember* member =
-      shape.HasDims() ? nullptr
-                      : MemberNamed(shape.type, step->rhs->text, index);
-  if (member == nullptr) return std::nullopt;
-  std::string_view name = member->name;
-  shape = MemberShape(shape, *member);
-  return PartStep{name, 0};
+  if (shape.HasDims()) return std::nullopt;
+  Slot slot;
+  slot.member = MemberNamed(shape.type, step->rhs->text, slot.position);
+  if (slot.member == nullptr) return std::nullopt;
+  shape = MemberShape(shape, *slot.member);
+  return slot;
 }
 
 bool IsDefaultKey(const Expr* key) {
@@ -259,125 +279,160 @@ bool IsTypeNameKey(const Expr* key) {
   return key->kind == ExprKind::kIdentifier && IsTypeKey(key->text, Typedefs());
 }
 
-bool IsKeyed(const Expr* pattern) {
-  return !pattern->pattern_keys.empty() &&
-         pattern->pattern_keys.size() == pattern->elements.size();
-}
-
-std::optional<PickedItem> DefaultItem(const Expr* pattern) {
-  for (size_t i = 0; i < pattern->pattern_keys.size(); ++i) {
-    if (IsDefaultKey(pattern->pattern_keys[i]))
-      return PickedItem{pattern->elements[i], true};
-  }
-  return std::nullopt;
-}
+bool IsKeyed(const Expr* pattern) { return !pattern->pattern_keys.empty(); }
 
 std::optional<PickedItem> PositionalItem(const Expr* pattern, size_t pos) {
-  if (const Expr* rep = PatternReplication(pattern)) {
-    if (rep->elements.empty()) return std::nullopt;
+  if (const Expr* rep = PatternReplication(pattern))
     return PickedItem{rep->elements[pos % rep->elements.size()], false};
-  }
   if (pos >= pattern->elements.size()) return std::nullopt;
   return PickedItem{pattern->elements[pos], false};
 }
 
-std::optional<PickedItem> KeyedMember(const Expr* pattern,
-                                      const StructMember& member) {
-  const std::vector<Expr*>& keys = pattern->pattern_keys;
-  for (size_t i = 0; i < keys.size(); ++i) {
-    if (keys[i]->kind == ExprKind::kIdentifier && keys[i]->text == member.name)
+std::optional<PackedLevel> PackedOuter(const DataType& type) {
+  const DataType& written =
+      type.packed_dim_left != nullptr ? type : ResolvedType(type);
+  if (written.packed_dim_left == nullptr) return std::nullopt;
+  PackedLevel level{written.packed_dim_left, written.packed_dim_right, written,
+                    written.is_signed};
+  DataType& element = level.element;
+  element.is_signed = false;
+  element.packed_dim_left = nullptr;
+  element.packed_dim_right = nullptr;
+  if (!element.extra_packed_dims.empty()) {
+    element.packed_dim_left = element.extra_packed_dims.front().first;
+    element.packed_dim_right = element.extra_packed_dims.front().second;
+    element.extra_packed_dims.erase(element.extra_packed_dims.begin());
+  }
+  return level;
+}
+
+bool Opens(const PartShape& shape) {
+  if (shape.HasDims()) return true;
+  if (std::optional<PackedLevel> level = PackedOuter(shape.type)) {
+    return ResolvedType(level->element).packed_dim_left != nullptr ||
+           HoldsAggregate(level->element);
+  }
+  return ResolvedType(shape.type).kind == DataTypeKind::kStruct;
+}
+
+bool TypeKeyMatches(const Expr* key, const PartShape& target) {
+  return !target.HasDims() && IsTypeNameKey(key) &&
+         TypeKeyMatchesType(key->text, target.type, Typedefs());
+}
+
+std::optional<LocatedPart> LocatePart(const Expr* expr, const ScopeMap& scope);
+
+bool AppliesWhole(const Expr* value, const PartState& state) {
+  if (IsTypedPattern(value)) return true;
+  FrameGuard guard(state.frame);
+  std::optional<LocatedPart> part = LocatePart(value, *state.frame.scope);
+  return part.has_value() && Opens(part->reader);
+}
+
+std::optional<PickedItem> TypeOrDefault(const PartState& state,
+                                        const PartShape& target) {
+  const Expr* pattern = Untyped(state.value);
+  const Expr* typed = nullptr;
+  const Expr* fallback = nullptr;
+  for (size_t i = 0; i < pattern->pattern_keys.size(); ++i) {
+    const Expr* key = pattern->pattern_keys[i];
+    if (IsDefaultKey(key))
+      fallback = pattern->elements[i];
+    else if (TypeKeyMatches(key, target))
+      typed = pattern->elements[i];
+  }
+  if (typed != nullptr) return PickedItem{typed, false};
+  if (Opens(target) && (fallback == nullptr || !AppliesWhole(fallback, state)))
+    return PickedItem{state.value, true};
+  if (fallback == nullptr) return std::nullopt;
+  return PickedItem{fallback, false};
+}
+
+bool KeyNamesSlot(const Expr* key, const Slot& slot, const ScopeMap& scope) {
+  if (slot.member != nullptr) return key->text == slot.member->name;
+  return ConstEvalInt(key, scope) == slot.index;
+}
+
+std::optional<PickedItem> Pick(const PartState& state, const Slot& slot,
+                               const PartShape& target) {
+  if (state.inherited) return TypeOrDefault(state, target);
+  const Expr* pattern = Untyped(state.value);
+  if (!IsKeyed(pattern)) return PositionalItem(pattern, slot.position);
+  for (size_t i = 0; i < pattern->pattern_keys.size(); ++i) {
+    if (KeyNamesSlot(pattern->pattern_keys[i], slot, *state.frame.scope))
       return PickedItem{pattern->elements[i], false};
   }
-  for (size_t i = 0; i < keys.size(); ++i) {
-    if (IsTypeNameKey(keys[i]) &&
-        TypeKeyMatchesMember(keys[i]->text, member, Typedefs()))
-      return PickedItem{pattern->elements[i], true};
-  }
-  return DefaultItem(pattern);
+  return TypeOrDefault(state, target);
 }
 
-std::optional<PickedItem> KeyedElement(const Expr* pattern,
-                                       const PartState& state, int64_t pos) {
-  std::optional<int64_t> index = IndexAt(state.shape, pos);
-  if (!index) return std::nullopt;
-  const std::vector<Expr*>& keys = pattern->pattern_keys;
-  for (size_t i = 0; i < keys.size(); ++i) {
-    if (IsDefaultKey(keys[i]) || IsTypeNameKey(keys[i])) continue;
-    std::optional<int64_t> key = ConstEvalInt(keys[i], *state.frame.scope);
-    if (key && *key == *index) return PickedItem{pattern->elements[i], false};
-  }
-  bool element_is_leaf = state.shape.dim_at + 1 == state.shape.dims->size();
-  for (size_t i = 0; element_is_leaf && i < keys.size(); ++i) {
-    if (IsTypeNameKey(keys[i]) &&
-        TypeKeyMatchesType(keys[i]->text, state.shape.type, Typedefs()))
-      return PickedItem{pattern->elements[i], true};
-  }
-  return DefaultItem(pattern);
-}
-
-void TakeItem(PartState& state, const PickedItem& item) {
-  state.value = item.value;
-  state.broadcast = item.from_default && !IsPattern(item.value);
-}
-
-bool AdvanceMember(PartState& state, std::string_view name) {
-  size_t index = 0;
-  const StructMember* member = state.shape.HasDims()
-                                   ? nullptr
-                                   : MemberNamed(state.shape.type, name, index);
-  if (member == nullptr) return false;
-  if (!state.broadcast) {
-    const Expr* pattern = Untyped(state.value);
-    std::optional<PickedItem> item = IsKeyed(pattern)
-                                         ? KeyedMember(pattern, *member)
-                                         : PositionalItem(pattern, index);
-    if (!item) return false;
-    TakeItem(state, *item);
-  }
-  state.shape = MemberShape(state.shape, *member);
-  return true;
-}
-
-bool AdvanceElement(PartState& state, int64_t pos) {
-  if (!state.shape.HasDims()) return false;
-  if (!state.broadcast) {
-    const Expr* pattern = Untyped(state.value);
-    std::optional<PickedItem> item =
-        IsKeyed(pattern) ? KeyedElement(pattern, state, pos)
-                         : PositionalItem(pattern, static_cast<size_t>(pos));
-    if (!item) return false;
-    TakeItem(state, *item);
-  }
-  ++state.shape.dim_at;
-  return true;
-}
-
-bool Advance(PartState& state, const PartStep& step) {
+bool Descend(PartState& state, const Slot& slot, PartShape target) {
   FrameGuard guard(state.frame);
-  if (step.member.empty()) return AdvanceElement(state, step.position);
-  return AdvanceMember(state, step.member);
+  std::optional<PickedItem> item = Pick(state, slot, target);
+  if (!item) return false;
+  state.value = item->value;
+  state.inherited = item->inherited;
+  state.shape = std::move(target);
+  return true;
 }
 
-std::optional<LocatedPart> LocatePart(const Expr* expr, const ScopeMap& scope,
-                                      int depth);
+bool Advance(PartState& state, Slot slot) {
+  if (state.shape.HasDims() != (slot.member == nullptr)) return false;
+  if (slot.member != nullptr)
+    return Descend(state, slot, MemberShape(state.shape, *slot.member));
+  slot.index = IndexAt(state.shape, static_cast<int64_t>(slot.position));
+  PartShape target = state.shape;
+  ++target.dim_at;
+  return Descend(state, slot, std::move(target));
+}
 
-bool Normalize(PartState& state, int depth) {
-  for (int hop = 0; hop < kMaxAggregateHops; ++hop) {
-    if (state.broadcast || IsPattern(state.value)) return true;
-    std::optional<LocatedPart> followed;
-    {
-      FrameGuard guard(state.frame);
-      followed = LocatePart(state.value, *state.frame.scope, depth + 1);
-    }
-    if (!followed) return false;
-    state = std::move(followed->state);
+bool IsPackedLevel(const PartShape& shape) {
+  return !shape.HasDims() && !IsUnpackedAggregateType(ResolvedType(shape.type));
+}
+
+uint32_t PartWidth(const DataType& type, const ScopeMap& scope) {
+  uint32_t width = DeclaredParamTypeWidth(type, scope);
+  return width == 0 ? 32 : width;
+}
+
+bool SliceStep(LocatedPart& part, const Expr* step) {
+  if (step->kind != ExprKind::kMemberAccess) return false;
+  size_t index = 0;
+  const StructMember* member =
+      MemberNamed(part.reader.type, step->rhs->text, index);
+  if (member == nullptr) return false;
+  const DataType& owner = ResolvedType(part.reader.type);
+  for (size_t i = index + 1;
+       owner.kind == DataTypeKind::kStruct && i < owner.struct_members.size();
+       ++i) {
+    part.offset += PartWidth(MemberWrittenType(owner.struct_members[i]),
+                             *part.reader.scope);
   }
-  return false;
+  part.reader.type = MemberWrittenType(*member);
+  return true;
 }
 
-std::optional<LocatedPart> LocatePart(const Expr* expr, const ScopeMap& scope,
-                                      int depth) {
-  if (depth > kMaxAggregateHops) return std::nullopt;
+bool Normalize(PartState& state) {
+  if (state.inherited || IsPattern(state.value)) return true;
+  LocateDepth depth;
+  std::optional<LocatedPart> followed;
+  {
+    FrameGuard guard(state.frame);
+    followed = LocatePart(state.value, *state.frame.scope);
+  }
+  if (!followed) return false;
+  state = std::move(followed->state);
+  return Normalize(state);
+}
+
+bool TakeStep(LocatedPart& part, const Expr* step, const ScopeMap& scope) {
+  if (IsPackedLevel(part.reader)) return SliceStep(part, step);
+  std::optional<Slot> slot = ReaderStep(step, part.reader, scope);
+  return slot && Normalize(part.state) && Advance(part.state, *slot);
+}
+
+std::optional<LocatedPart> LocatePart(const Expr* expr, const ScopeMap& scope) {
+  LocateDepth depth;
+  if (g_locate_depth > kMaxLocateDepth) return std::nullopt;
   std::vector<const Expr*> chain;
   const Expr* root = expr;
   while (IsPartStep(root)) {
@@ -386,39 +441,123 @@ std::optional<LocatedPart> LocatePart(const Expr* expr, const ScopeMap& scope,
   }
   std::optional<PartState> state = RootState(root, scope);
   if (!state) return std::nullopt;
-  PartShape reader = state->shape;
+  LocatedPart part{*state, state->shape};
   for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
-    std::optional<PartStep> step = ReaderStep(*it, reader, scope);
-    if (!step || !Normalize(*state, depth) || !Advance(*state, *step))
-      return std::nullopt;
+    if (!TakeStep(part, *it, scope)) return std::nullopt;
   }
-  return LocatedPart{std::move(*state), std::move(reader)};
+  return part;
 }
 
-const DataType* LeafType(const PartShape& shape) {
-  if (shape.HasDims()) return nullptr;
-  const DataType* type = ResolvedType(shape.type);
-  if (type == nullptr || IsUnpackedAggregateType(*type) ||
-      IsRealType(type->kind))
-    return nullptr;
-  return type;
+std::optional<ConstVal> FoldPacked(const PartState& state);
+
+bool AppendPart(std::vector<PackedPart>& parts, const PartState& owner,
+                const Slot& slot, const PartShape& target) {
+  PartState part = owner;
+  if (!Descend(part, slot, target)) return false;
+  std::optional<ConstVal> value = FoldPacked(part);
+  if (!value) return false;
+  parts.push_back(PackedPart{*value, PartWidth(target.type, *target.scope)});
+  return true;
+}
+
+ConstVal JoinedParts(const std::vector<PackedPart>& parts, bool is_signed) {
+  uint32_t total = 0;
+  for (const PackedPart& part : parts) total += part.width;
+  std::vector<uint64_t> words(total / 64 + 1, 0);
+  uint32_t offset = 0;
+  for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
+    for (uint32_t bit = 0; bit < it->width; ++bit) {
+      if (ConstValBit(it->value, bit))
+        words[(offset + bit) / 64] |= uint64_t{1} << ((offset + bit) % 64);
+    }
+    offset += it->width;
+  }
+  return ConstValOfWords(words, total, is_signed);
+}
+
+std::optional<ConstVal> ComposeMembers(const PartState& state) {
+  const DataType& type = ResolvedType(state.shape.type);
+  std::vector<PackedPart> parts;
+  for (size_t i = 0; i < type.struct_members.size(); ++i) {
+    const StructMember& member = type.struct_members[i];
+    if (!AppendPart(parts, state, Slot{i, &member, 0},
+                    MemberShape(state.shape, member)))
+      return std::nullopt;
+  }
+  return JoinedParts(parts, type.is_signed);
+}
+
+std::optional<ConstVal> ComposeElements(const PartState& state,
+                                        const PackedLevel& level) {
+  const ScopeMap& bounds = *state.shape.scope;
+  int64_t left = ConstEvalInt(level.left, bounds).value_or(0);
+  int64_t right = ConstEvalInt(level.right, bounds).value_or(0);
+  int64_t count = (left >= right ? left - right : right - left) + 1;
+  PartShape element{level.element, nullptr, 0, state.shape.scope};
+  std::vector<PackedPart> parts;
+  for (int64_t pos = 0; pos < count; ++pos) {
+    Slot slot{static_cast<size_t>(pos), nullptr,
+              left <= right ? left + pos : left - pos};
+    if (!AppendPart(parts, state, slot, element)) return std::nullopt;
+  }
+  return JoinedParts(parts, level.is_signed);
+}
+
+std::optional<ConstVal> FoldPacked(const PartState& state) {
+  if (state.inherited || IsPattern(state.value)) {
+    if (std::optional<PackedLevel> level = PackedOuter(state.shape.type))
+      return ComposeElements(state, *level);
+    return ComposeMembers(state);
+  }
+  FrameGuard guard(state.frame);
+  const ScopeMap& scope = *state.frame.scope;
+  const DataType& type = state.shape.type;
+  if (IsImplicitType(type)) return ConstEvalFull(state.value, scope);
+  std::optional<int64_t> folded = FoldRealValueAsInteger(state.value, scope);
+  if (!folded) folded = FoldDeclaredParamValue(state.value, type, scope);
+  if (!folded) return std::nullopt;
+  return NormalizeConstVal(*folded, PartWidth(type, *state.shape.scope),
+                           IsSignedType(type, Typedefs()));
+}
+
+ConstVal SlicedBits(const ConstVal& whole, uint32_t offset, uint32_t width,
+                    bool is_signed) {
+  std::vector<uint64_t> words(width / 64 + 1, 0);
+  for (uint32_t bit = 0; bit < width; ++bit) {
+    if (ConstValBit(whole, offset + bit))
+      words[bit / 64] |= uint64_t{1} << (bit % 64);
+  }
+  return ConstValOfWords(words, width, is_signed);
+}
+
+LeafKind KindOfLeaf(const PartShape& reader) {
+  const DataType& type = ResolvedType(reader.type);
+  if (reader.HasDims() || IsUnpackedAggregateType(type))
+    return LeafKind::kAggregate;
+  if (IsRealType(type.kind)) return LeafKind::kReal;
+  return type.kind == DataTypeKind::kString ? LeafKind::kString
+                                            : LeafKind::kIntegral;
+}
+
+std::optional<ConstVal> FoldIntegral(const LocatedPart& part) {
+  std::optional<ConstVal> whole = FoldPacked(part.state);
+  const DataType& type = part.reader.type;
+  if (!whole || IsImplicitType(type)) return whole;
+  return SlicedBits(*whole, part.offset, PartWidth(type, *part.reader.scope),
+                    IsSignedType(type, Typedefs()));
 }
 
 std::optional<ConstVal> FoldLeaf(const LocatedPart& part) {
-  const DataType& type = part.reader.type;
-  const PartState& state = part.state;
-  FrameGuard guard(state.frame);
-  const ScopeMap& scope = *state.frame.scope;
-  if (IsImplicitType(type)) return ConstEvalFull(state.value, scope);
-  const Expr* pattern = Untyped(state.value);
-  std::optional<int64_t> folded =
-      pattern->kind == ExprKind::kAssignmentPattern
-          ? FoldPackedStructPattern(pattern, type, Typedefs(), scope)
-          : FoldDeclaredParamValue(state.value, type, scope);
-  if (!folded) return std::nullopt;
-  uint32_t width = DeclaredParamTypeWidth(type, *part.reader.scope);
-  return NormalizeConstVal(*folded, width == 0 ? 32 : width,
-                           IsSignedType(type, Typedefs()));
+  LeafKind kind = KindOfLeaf(part.reader);
+  if (kind == LeafKind::kIntegral) return FoldIntegral(part);
+  if (kind != LeafKind::kString) return std::nullopt;
+  FrameGuard guard(part.state.frame);
+  return ConstEvalStringLiteral(part.state.value);
+}
+
+std::optional<LocatedPart> LocateRead(const Expr* expr, const ScopeMap& scope) {
+  if (!IsPartStep(expr)) return std::nullopt;
+  return LocatePart(expr, scope);
 }
 
 }  // namespace
@@ -430,27 +569,57 @@ bool NamesAggregateParam(const Expr* expr) {
 
 std::optional<ConstVal> ConstEvalAggregatePart(const Expr* expr,
                                                const ScopeMap& scope) {
-  if (!IsPartStep(expr)) return std::nullopt;
-  std::optional<LocatedPart> part = LocatePart(expr, scope, 0);
-  if (!part || LeafType(part->reader) == nullptr) return std::nullopt;
+  LocateDepth depth;
+  std::optional<LocatedPart> part = LocateRead(expr, scope);
+  if (!part) return std::nullopt;
   return FoldLeaf(*part);
+}
+
+std::optional<double> ConstEvalAggregatePartReal(const Expr* expr,
+                                                 const ScopeMap& scope) {
+  LocateDepth depth;
+  std::optional<LocatedPart> part = LocateRead(expr, scope);
+  if (!part) return std::nullopt;
+  if (KindOfLeaf(part->reader) != LeafKind::kReal) {
+    return FoldLeaf(*part).transform(
+        [](const ConstVal& value) { return static_cast<double>(value.value); });
+  }
+  FrameGuard guard(part->state.frame);
+  bool is_short =
+      ResolvedType(part->reader.type).kind == DataTypeKind::kShortreal;
+  return ConstEvalReal(part->state.value, *part->state.frame.scope)
+      .transform([is_short](double value) {
+        return is_short ? static_cast<double>(static_cast<float>(value))
+                        : value;
+      });
+}
+
+bool IsRealAggregatePart(const Expr* expr) {
+  LocateDepth depth;
+  std::optional<LocatedPart> part = LocateRead(expr, RegisteredModuleScope());
+  return part.has_value() && KindOfLeaf(part->reader) == LeafKind::kReal;
+}
+
+std::optional<std::string> ConstEvalAggregatePartString(const Expr* expr,
+                                                        const ScopeMap& scope) {
+  LocateDepth depth;
+  std::optional<LocatedPart> part = LocateRead(expr, scope);
+  if (!part || KindOfLeaf(part->reader) != LeafKind::kString)
+    return std::nullopt;
+  FrameGuard guard(part->state.frame);
+  return ConstEvalString(part->state.value);
 }
 
 std::optional<PackedRange> AggregatePartRange(const Expr* expr,
                                               const ScopeMap& scope) {
-  if (!IsPartStep(expr)) return std::nullopt;
-  std::optional<LocatedPart> part = LocatePart(expr, scope, 0);
+  LocateDepth depth;
+  std::optional<LocatedPart> part = LocateRead(expr, scope);
   if (!part) return std::nullopt;
-  const DataType* type = LeafType(part->reader);
-  if (type == nullptr || type->packed_dim_left == nullptr ||
-      type->packed_dim_right == nullptr)
-    return std::nullopt;
-  std::optional<int64_t> left =
-      ConstEvalInt(type->packed_dim_left, *part->reader.scope);
-  std::optional<int64_t> right =
-      ConstEvalInt(type->packed_dim_right, *part->reader.scope);
-  if (!left || !right) return std::nullopt;
-  return PackedRange{*left, *right};
+  std::optional<PackedLevel> level = PackedOuter(part->reader.type);
+  if (!level) return std::nullopt;
+  const ScopeMap& bounds = *part->reader.scope;
+  return PackedRange{ConstEvalInt(level->left, bounds).value_or(0),
+                     ConstEvalInt(level->right, bounds).value_or(0)};
 }
 
 }  // namespace delta

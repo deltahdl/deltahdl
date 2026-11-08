@@ -46,6 +46,8 @@ static bool IsRealOperand(const Expr* e) {
     const ModuleItem* fn = RegisteredConstFunc(e);
     if (fn != nullptr) return IsConstFuncRealType(fn->return_type);
   }
+  if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess)
+    return IsRealAggregatePart(e);
   if (e->kind != ExprKind::kSystemCall && e->kind != ExprKind::kCall)
     return false;
   return e->callee == "$itor" || e->callee == "$bitstoreal" ||

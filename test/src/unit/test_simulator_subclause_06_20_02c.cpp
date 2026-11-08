@@ -316,4 +316,448 @@ TEST(AggregateParameterConstantReads, ReadsFoldInAFunctionAndANamedBlock) {
   ExpectValues(f, {{"nf", 509}, {"nb", 415}});
 }
 
+TEST(AggregateParameterConstantReads, TypeAndDefaultKeysReachNestedParts) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int x; logic [3:0] y; } in_t;\n"
+      "typedef struct { int arr [2]; in_t in; byte b; } o_t;\n"
+      "module t;\n"
+      "  parameter o_t P = '{int: 7, default: 3};\n"
+      "  parameter o_t Q = '{in: '{x: 2, default: 5}, default: 4};\n"
+      "  parameter o_t R = '{int: 6, int: 9, byte: 2, default: 1};\n"
+      "  parameter o_t D = '{default: 2};\n"
+      "  parameter int G [2][2] = '{default: 3};\n"
+      "  parameter int H [2][2] = '{int: 6};\n"
+      "  parameter int K [3] = '{1: 5, byte: 2, default: 8};\n"
+      "  parameter byte KB [3] = '{1: 5, byte: 2, default: 8};\n"
+      "  logic [P.arr[1]-1:0] v1;\n"
+      "  logic [P.in.x-1:0] v2;\n"
+      "  logic [P.in.y-1:0] v3;\n"
+      "  logic [P.b-1:0] v4;\n"
+      "  logic [Q.in.x-1:0] v5;\n"
+      "  logic [Q.in.y-1:0] v6;\n"
+      "  logic [Q.arr[0]-1:0] v7;\n"
+      "  logic [Q.b-1:0] v8;\n"
+      "  logic [R.in.x-1:0] v9;\n"
+      "  logic [R.in.y-1:0] v10;\n"
+      "  logic [R.b-1:0] v11;\n"
+      "  logic [D.in.x-1:0] v12;\n"
+      "  logic [D.arr[1]-1:0] v13;\n"
+      "  logic [G[1][0]-1:0] v14;\n"
+      "  logic [H[0][1]-1:0] v15;\n"
+      "  logic [K[1]-1:0] v16;\n"
+      "  logic [K[0]-1:0] v17;\n"
+      "  logic [KB[0]-1:0] v18;\n"
+      "  logic [KB[1]-1:0] v19;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10;\n"
+      "  int n11, n12, n13, n14, n15, n16, n17, n18, n19;\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "    n6 = $bits(v6);\n"
+      "    n7 = $bits(v7);\n"
+      "    n8 = $bits(v8);\n"
+      "    n9 = $bits(v9);\n"
+      "    n10 = $bits(v10);\n"
+      "    n11 = $bits(v11);\n"
+      "    n12 = $bits(v12);\n"
+      "    n13 = $bits(v13);\n"
+      "    n14 = $bits(v14);\n"
+      "    n15 = $bits(v15);\n"
+      "    n16 = $bits(v16);\n"
+      "    n17 = $bits(v17);\n"
+      "    n18 = $bits(v18);\n"
+      "    n19 = $bits(v19);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 7},
+                   {"n2", 7},
+                   {"n3", 3},
+                   {"n4", 3},
+                   {"n5", 2},
+                   {"n6", 5},
+                   {"n7", 4},
+                   {"n8", 4},
+                   {"n9", 9},
+                   {"n10", 1},
+                   {"n11", 2},
+                   {"n12", 2},
+                   {"n13", 2},
+                   {"n14", 3},
+                   {"n15", 6},
+                   {"n16", 5},
+                   {"n17", 8},
+                   {"n18", 2},
+                   {"n19", 5}});
+}
+
+TEST(AggregateParameterConstantReads,
+     DefaultNamingAWholeValueFillsAggregateParts) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int x; logic [3:0] y; } in_t;\n"
+      "typedef struct { in_t p; in_t q; int k; } two_t;\n"
+      "typedef int row_t [2];\n"
+      "module t;\n"
+      "  parameter in_t I = '{x: 12, y: 4'h6};\n"
+      "  parameter two_t T = '{k: 1, default: I};\n"
+      "  parameter two_t U = '{k: 2, default: in_t'{5, 4'h2}};\n"
+      "  parameter int ROW [2] = '{5, 6};\n"
+      "  parameter int G [2][2] = '{default: ROW};\n"
+      "  parameter int F [2][2] = '{default: row_t'{7, 8}};\n"
+      "  parameter int C [2] = '{int'(3), 4};\n"
+      "  logic [T.q.x-1:0] v1;\n"
+      "  logic [T.p.y-1:0] v2;\n"
+      "  logic [T.k-1:0] v3;\n"
+      "  logic [U.q.x-1:0] v4;\n"
+      "  logic [U.p.y-1:0] v5;\n"
+      "  logic [G[1][0]-1:0] v6;\n"
+      "  logic [G[0][1]-1:0] v7;\n"
+      "  logic [F[1][1]-1:0] v8;\n"
+      "  logic [F[0][0]-1:0] v9;\n"
+      "  logic [C[0]-1:0] v10;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10;\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "    n6 = $bits(v6);\n"
+      "    n7 = $bits(v7);\n"
+      "    n8 = $bits(v8);\n"
+      "    n9 = $bits(v9);\n"
+      "    n10 = $bits(v10);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 12},
+                   {"n2", 6},
+                   {"n3", 1},
+                   {"n4", 5},
+                   {"n5", 2},
+                   {"n6", 5},
+                   {"n7", 6},
+                   {"n8", 8},
+                   {"n9", 7},
+                   {"n10", 3}});
+}
+
+TEST(AggregateParameterConstantReads, PackedPartsFoldFromPatternsAndIntegers) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct packed { logic [3:0] hi; logic [3:0] lo; } ps_t;\n"
+      "typedef struct packed { logic signed [3:0] hi; logic [3:0] lo; }\n"
+      "    sg_t;\n"
+      "typedef union packed { logic [7:0] a; logic [7:0] b; } u_t;\n"
+      "typedef logic [3:0] nib_t;\n"
+      "typedef logic [0:3] rev_t;\n"
+      "typedef struct {\n"
+      "  ps_t p;\n"
+      "  logic [1:0][3:0] q;\n"
+      "  int k;\n"
+      "  nib_t n;\n"
+      "  sg_t s;\n"
+      "  ps_t [1:0] pa;\n"
+      "  rev_t r;\n"
+      "} w_t;\n"
+      "module t;\n"
+      "  parameter w_t W = '{p: '{lo: 4'h3, hi: 4'h1}, q: '{4'h1, 4'h2},\n"
+      "                      k: 2, n: 4'h9, s: 8'hF2,\n"
+      "                      pa: '{1: 8'h12, 0: 8'h34}, r: 4'h8};\n"
+      "  parameter w_t X = '{p: 8'h25, q: 8'h34, k: 1, n: 4'h1, s: 8'h12,\n"
+      "                      pa: 16'h0, r: 4'h0};\n"
+      "  parameter w_t Y = '{default: 4'h1};\n"
+      "  parameter w_t Z = '{nib_t: 9, default: 0};\n"
+      "  parameter ps_t PS = '{lo: 4'h7, hi: 4'h2};\n"
+      "  parameter u_t U = 8'h2A;\n"
+      "  logic [W.p-1:0] v1;\n"
+      "  logic [W.p.lo-1:0] v2;\n"
+      "  logic [W.p.hi-1:0] v3;\n"
+      "  logic [W.q-1:0] v4;\n"
+      "  logic [W.r[3]:0] v5;\n"
+      "  logic [X.p.lo-1:0] v6;\n"
+      "  logic [X.p.hi-1:0] v7;\n"
+      "  logic [X.q-1:0] v8;\n"
+      "  logic [Y.p-1:0] v9;\n"
+      "  logic [Y.q-1:0] v10;\n"
+      "  logic [Y.k-1:0] v11;\n"
+      "  logic [Y.n-1:0] v12;\n"
+      "  logic [Z.p-1:0] v13;\n"
+      "  logic [Z.q-1:0] v14;\n"
+      "  logic [Z.n-1:0] v15;\n"
+      "  logic [Z.k:0] v16;\n"
+      "  logic [PS.lo-1:0] v17;\n"
+      "  logic [PS.hi-1:0] v18;\n"
+      "  logic [U.b-1:0] v19;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10;\n"
+      "  int n11, n12, n13, n14, n15, n16, n17, n18, n19, br;\n"
+      "  if (W.s.hi < 0 && X.s.hi > 0 && W.pa == 16'h1234 &&\n"
+      "      Y.pa == 16'h1111 && Z.r == 0) begin : g\n"
+      "    initial br = 1;\n"
+      "  end else begin : g\n"
+      "    initial br = 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "    n6 = $bits(v6);\n"
+      "    n7 = $bits(v7);\n"
+      "    n8 = $bits(v8);\n"
+      "    n9 = $bits(v9);\n"
+      "    n10 = $bits(v10);\n"
+      "    n11 = $bits(v11);\n"
+      "    n12 = $bits(v12);\n"
+      "    n13 = $bits(v13);\n"
+      "    n14 = $bits(v14);\n"
+      "    n15 = $bits(v15);\n"
+      "    n16 = $bits(v16);\n"
+      "    n17 = $bits(v17);\n"
+      "    n18 = $bits(v18);\n"
+      "    n19 = $bits(v19);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f,
+               {{"n1", 19}, {"n2", 3},  {"n3", 1},    {"n4", 18},   {"n5", 1},
+                {"n6", 5},  {"n7", 2},  {"n8", 52},   {"n9", 17},   {"n10", 17},
+                {"n11", 1}, {"n12", 1}, {"n13", 153}, {"n14", 153}, {"n15", 9},
+                {"n16", 1}, {"n17", 7}, {"n18", 2},   {"n19", 42},  {"br", 1}});
+}
+
+TEST(AggregateParameterConstantReads, TypeKeysMatchMembersOfAnEquivalentType) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct {\n"
+      "  logic [7:0] a;\n"
+      "  bit b;\n"
+      "  bit signed [31:0] c;\n"
+      "  string s;\n"
+      "} sa;\n"
+      "module t;\n"
+      "  parameter sa S1 = '{int: 1, default: 0, string: \"\"};\n"
+      "  parameter sa S2 = '{int: 5, default: 2, string: \"abc\"};\n"
+      "  parameter sa S3 = '{a: 8'h1, b: 1, s: \"x\", int: 4};\n"
+      "  logic [S1.c:0] v1;\n"
+      "  logic [S1.a:0] v2;\n"
+      "  logic [S1.s.len():0] v3;\n"
+      "  logic [S2.c-1:0] v4;\n"
+      "  logic [S2.a-1:0] v5;\n"
+      "  logic [S2.b:0] v6;\n"
+      "  logic [S2.s.len()-1:0] v7;\n"
+      "  logic [S3.c-1:0] v8;\n"
+      "  logic [S3.s.len():0] v9;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9;\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "    n6 = $bits(v6);\n"
+      "    n7 = $bits(v7);\n"
+      "    n8 = $bits(v8);\n"
+      "    n9 = $bits(v9);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 2},
+                   {"n2", 1},
+                   {"n3", 1},
+                   {"n4", 5},
+                   {"n5", 2},
+                   {"n6", 1},
+                   {"n7", 3},
+                   {"n8", 4},
+                   {"n9", 2}});
+}
+
+TEST(AggregateParameterConstantReads, RealAndStringPartsFold) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { real r; shortreal sr; int i; string s; } rs_t;\n"
+      "module t;\n"
+      "  parameter rs_t P = '{r: 2.6, sr: 0.1, i: 2.6, s: \"hey\"};\n"
+      "  parameter real RA [2] = '{1.5, 3.25};\n"
+      "  parameter string SA [2] = '{\"ab\", \"wxyz\"};\n"
+      "  localparam int RI = P.r;\n"
+      "  localparam RR = P.r * 2;\n"
+      "  localparam real RE = RA[1] * 4;\n"
+      "  localparam real RK = P.i / 2.0;\n"
+      "  localparam string S = P.s;\n"
+      "  logic [RI-1:0] v1;\n"
+      "  logic [$rtoi(RR)-1:0] v2;\n"
+      "  logic [$rtoi(RE)-1:0] v3;\n"
+      "  logic [$rtoi(RK * 4)-1:0] v4;\n"
+      "  logic [P.i-1:0] v5;\n"
+      "  logic [$rtoi((P.sr - 0.1) * 1.0e9) + 1:0] v6;\n"
+      "  logic [S.len()-1:0] v7;\n"
+      "  logic [P.s.len()-1:0] v8;\n"
+      "  logic [SA[1].len()-1:0] v9;\n"
+      "  logic [P.s.getc(1) - 100:0] v10;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, n8, n9, n10, br;\n"
+      "  if (P.s == \"hey\") begin : g\n"
+      "    initial br = 1;\n"
+      "  end else begin : g\n"
+      "    initial br = 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "    n6 = $bits(v6);\n"
+      "    n7 = $bits(v7);\n"
+      "    n8 = $bits(v8);\n"
+      "    n9 = $bits(v9);\n"
+      "    n10 = $bits(v10);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 3},
+                   {"n2", 5},
+                   {"n3", 13},
+                   {"n4", 6},
+                   {"n5", 3},
+                   {"n6", 3},
+                   {"n7", 3},
+                   {"n8", 3},
+                   {"n9", 4},
+                   {"n10", 2},
+                   {"br", 1}});
+}
+
+TEST(AggregateParameterConstantReads,
+     AliasesTypeParametersAndImplicitTypesFold) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int x; logic [3:0] y; } in_t;\n"
+      "typedef struct { int arr [2]; in_t in; } o_t;\n"
+      "module t;\n"
+      "  parameter int M [2][2] = '{'{1, 2}, '{3, 4}};\n"
+      "  parameter int R [2] = M[1];\n"
+      "  parameter o_t O = '{arr: '{9, 10}, in: '{x: 11, y: 4'h3}};\n"
+      "  parameter in_t I = O.in;\n"
+      "  parameter int D [0:1] = '{1: 5, 0: 6};\n"
+      "  parameter int A [1:0] = D;\n"
+      "  parameter N [2] = '{3, 4};\n"
+      "  parameter signed S [2] = '{-2, 5};\n"
+      "  parameter [3:0] Q [2] = '{20, 3};\n"
+      "  logic [R[0]-1:0] v1;\n"
+      "  logic [I.x-1:0] v2;\n"
+      "  logic [A[1]-1:0] v3;\n"
+      "  logic [A[0]-1:0] v4;\n"
+      "  logic [N[1]-1:0] v5;\n"
+      "  logic [Q[0]-1:0] v6;\n"
+      "  logic [S[1]-1:0] v7;\n"
+      "  int n1, n2, n3, n4, n5, n6, n7, br;\n"
+      "  if (S[0] < 0) begin : g\n"
+      "    initial br = 1;\n"
+      "  end else begin : g\n"
+      "    initial br = 2;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "    n6 = $bits(v6);\n"
+      "    n7 = $bits(v7);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 3},
+                   {"n2", 11},
+                   {"n3", 6},
+                   {"n4", 5},
+                   {"n5", 4},
+                   {"n6", 4},
+                   {"n7", 5},
+                   {"br", 1}});
+}
+
+TEST(AggregateParameterConstantReads, ValuesTypedByATypeParameterFold) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int a; logic [7:0] b; } s_t;\n"
+      "typedef struct { logic [3:0] z; int a; } z_t;\n"
+      "module m #(type T = s_t, parameter T P = '{a: 3, b: 8'h4});\n"
+      "  logic [P.a-1:0] v;\n"
+      "  int n;\n"
+      "  initial n = $bits(v);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  m d();\n"
+      "  m #(.T(z_t), .P('{4'h1, 7})) o();\n"
+      "endmodule\n",
+      f, "d.n");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"d.n", 3}, {"o.n", 7}});
+}
+
+TEST(AggregateParameterConstantReads,
+     ParametersOfAnInlineTypeFoldOutsideModules) {
+  SimFixture f;
+  RunAndFindVar(
+      "parameter union packed { logic [7:0] a; logic [7:0] b; } U = 8'h9;\n"
+      "parameter struct { int a; logic [7:0] b; } V = '{a: 4, b: 8'h3};\n"
+      "package pk;\n"
+      "  parameter struct { int a; logic [7:0] b; } K = '{a: 5, b: 8'h6};\n"
+      "endpackage\n"
+      "class C;\n"
+      "  localparam struct { int a; } CK = '{a: 2};\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [U.b-1:0] v1;\n"
+      "  logic [V.a-1:0] v2;\n"
+      "  logic [pk::K.a-1:0] v3;\n"
+      "  logic [pk::K.b-1:0] v4;\n"
+      "  logic [C::CK.a-1:0] v5;\n"
+      "  int n1, n2, n3, n4, n5;\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 9}, {"n2", 4}, {"n3", 5}, {"n4", 6}, {"n5", 2}});
+}
+
+TEST(AggregateParameterConstantReads, ElementMembersSizeProceduralRanges) {
+  SimFixture f;
+  RunAndFindVar(
+      "typedef struct { int a; logic [7:0] b; } s_t;\n"
+      "module t;\n"
+      "  int n;\n"
+      "  initial begin : b\n"
+      "    localparam s_t S [2] = '{'{a: 3, b: 8'h1}, '{a: 6, b: 8'h2}};\n"
+      "    logic [S[1].a-1:0] v;\n"
+      "    logic [0:S[0].a-1] w;\n"
+      "    n = $bits(v) * 100 + $bits(w);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n", 603}});
+}
+
 }  // namespace

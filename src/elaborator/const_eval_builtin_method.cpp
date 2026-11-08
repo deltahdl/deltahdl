@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -91,8 +92,10 @@ const std::vector<RtlirEnumMember>* EnumMembers(const Expr* operand) {
   return &it->second;
 }
 
-std::optional<std::string_view> StringParamValue(const Expr* operand) {
-  if (!operand || operand->kind != ExprKind::kIdentifier) return std::nullopt;
+std::optional<std::string> StringParamValue(const Expr* operand,
+                                            const ScopeMap& scope) {
+  if (operand->kind != ExprKind::kIdentifier)
+    return ConstEvalAggregatePartString(operand, scope);
   const RtlirModule* mod = RegisteredModule();
   if (!mod) return std::nullopt;
   for (const auto& param : mod->params) {
@@ -101,7 +104,7 @@ std::optional<std::string_view> StringParamValue(const Expr* operand) {
                                 RegisteredGenPrefixes()))
       continue;
     if (!param.is_string_value) return std::nullopt;
-    return param.resolved_string;
+    return std::string(param.resolved_string);
   }
   return std::nullopt;
 }
@@ -127,13 +130,13 @@ std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr,
   if (!member) return std::nullopt;
   const std::string_view kMethod = member->rhs->text;
   if (kMethod == "getc") {
-    auto str = StringParamValue(member->lhs);
+    auto str = StringParamValue(member->lhs, scope);
     if (!str) return std::nullopt;
     return StringParamChar(expr, *str, scope);
   }
   if (expr->kind == ExprKind::kCall && !expr->args.empty()) return std::nullopt;
   if (kMethod == "len") {
-    auto str = StringParamValue(member->lhs);
+    auto str = StringParamValue(member->lhs, scope);
     if (!str) return std::nullopt;
     return ConstVal{static_cast<int64_t>(str->size()), 32, true};
   }

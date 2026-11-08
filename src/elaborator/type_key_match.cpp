@@ -5,9 +5,11 @@
 #include <optional>
 #include <string_view>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "common/source_loc.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/type_eval.h"
@@ -44,15 +46,28 @@ constexpr std::array<IntegerAtom, 6> kIntegerAtoms = {{
     {"time", DataTypeKind::kTime, {true, false, 63, 0}},
 }};
 
-std::optional<IntegralShape> AtomShapeOfKeyword(std::string_view key) {
+constexpr std::array<std::pair<std::string_view, IntegralShape>, 3>
+    kVectorKeywords = {{
+        {"bit", {false, false, 0, 0}},
+        {"logic", {true, false, 0, 0}},
+        {"reg", {true, false, 0, 0}},
+    }};
+
+std::optional<IntegralShape> ShapeOfKeyword(std::string_view key) {
   for (const IntegerAtom& atom : kIntegerAtoms)
     if (atom.keyword == key) return atom.shape;
+  for (const auto& [keyword, shape] : kVectorKeywords)
+    if (keyword == key) return shape;
   return std::nullopt;
 }
 
 std::optional<IntegralShape> IntegralShapeOf(const DataType& t) {
-  for (const IntegerAtom& atom : kIntegerAtoms)
-    if (atom.kind == t.kind) return atom.shape;
+  for (const IntegerAtom& atom : kIntegerAtoms) {
+    if (atom.kind != t.kind) continue;
+    IntegralShape shape = atom.shape;
+    shape.is_signed = t.is_signed;
+    return shape;
+  }
   if (t.kind != DataTypeKind::kBit && t.kind != DataTypeKind::kLogic &&
       t.kind != DataTypeKind::kReg)
     return std::nullopt;
@@ -86,9 +101,9 @@ bool TypeKeyMatchesType(std::string_view key, const DataType& type,
   if (t == nullptr) return false;
   auto it = typedefs.find(key);
   if (it == typedefs.end()) {
-    if (TypeKeyMatchesKind(key, t->kind) && t->packed_dim_left == nullptr)
-      return true;
-    return IntegralShapesMatch(AtomShapeOfKeyword(key), *t);
+    if (std::optional<IntegralShape> shape = ShapeOfKeyword(key))
+      return IntegralShapesMatch(shape, *t);
+    return TypeKeyMatchesKind(key, t->kind) && t->packed_dim_left == nullptr;
   }
   const DataType* k = FollowTypedefs(it->second, typedefs, names);
   if (k == nullptr) return false;
@@ -105,16 +120,8 @@ bool TypeKeyMatchesType(std::string_view key, const DataType& type,
 
 bool TypeKeyMatchesMember(std::string_view key, const StructMember& member,
                           const TypedefMap& typedefs) {
-  if (!member.unpacked_dims.empty()) return false;
-  if (member.nested_type != nullptr)
-    return TypeKeyMatchesType(key, *member.nested_type, typedefs);
-  DataType dt;
-  dt.kind = member.type_kind;
-  dt.type_name = member.type_name;
-  dt.packed_dim_left = member.packed_dim_left;
-  dt.packed_dim_right = member.packed_dim_right;
-  dt.extra_packed_dims = member.extra_packed_dims;
-  return TypeKeyMatchesType(key, dt, typedefs);
+  return member.unpacked_dims.empty() &&
+         TypeKeyMatchesType(key, MemberWrittenType(member), typedefs);
 }
 
 }  // namespace delta

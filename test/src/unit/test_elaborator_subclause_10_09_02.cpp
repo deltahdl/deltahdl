@@ -273,6 +273,46 @@ TEST(StructPatternElaboration, TypeKeyCoversOnlyMatchingMembers) {
                              4, "10.9.2"));
 }
 
+TEST(StructPatternElaboration, TypeKeyCoversMembersOfAMatchingVectorType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  struct { bit signed [31:0] c; logic [7:0] a; } s = '{int: 1, a: 2};\n"
+      "  struct { bit [31:0] c; logic [7:0] a; } t = '{int: 1, a: 2};\n"
+      "  struct packed { bit signed [31:0] c; byte b; } u = '{int: 1, b: 2};\n"
+      "  struct { logic signed [31:0] d; } w = '{integer: 1};\n"
+      "  struct { logic signed [31:0] d; } x = '{int: 1};\n"
+      "  struct { bit signed [0:31] e; } y = '{int: 1};\n"
+      "  struct { int unsigned g; } z = '{int: 1};\n"
+      "  struct { logic signed h; } q = '{logic: 1};\n"
+      "  struct { bit [0:0] k; reg m; } r = '{bit: 0, logic: 1};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'c' not covered by assignment pattern", 3,
+                            "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'd' not covered by assignment pattern", 6,
+                            "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'e' not covered by assignment pattern", 7,
+                            "10.9.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not covered by assignment",
+                             2, "10.9.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not covered by assignment",
+                             4, "10.9.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not covered by assignment",
+                             5, "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'g' not covered by assignment pattern", 8,
+                            "10.9.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "member 'h' not covered by assignment pattern", 9,
+                            "10.9.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "not covered by assignment",
+                             10, "10.9.2"));
+}
+
 TEST(StructPatternElaboration, RulesReachEveryStructurePattern) {
   ElabFixture f;
   ElaborateSrc(

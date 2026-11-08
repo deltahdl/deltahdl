@@ -38,7 +38,6 @@ static std::string UnitKey(std::string_view scope, std::string_view name) {
 }
 
 static bool MayHoldAggregate(const UnitParamSource& source) {
-  if (source.value == nullptr) return false;
   return !source.dims.empty() || source.type.kind == DataTypeKind::kNamed ||
          source.type.kind == DataTypeKind::kStruct ||
          source.type.kind == DataTypeKind::kUnion;

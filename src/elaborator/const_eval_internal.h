@@ -225,6 +225,14 @@ bool NamesAggregateParam(const Expr* expr);
 std::optional<ConstVal> ConstEvalAggregatePart(const Expr* expr,
                                                const ScopeMap& scope);
 
+std::optional<double> ConstEvalAggregatePartReal(const Expr* expr,
+                                                 const ScopeMap& scope);
+
+std::optional<std::string> ConstEvalAggregatePartString(const Expr* expr,
+                                                        const ScopeMap& scope);
+
+bool IsRealAggregatePart(const Expr* expr);
+
 std::optional<PackedRange> AggregatePartRange(const Expr* expr,
                                               const ScopeMap& scope);
 
