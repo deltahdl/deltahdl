@@ -260,6 +260,21 @@ static DataType InPackage(DataType type, const PackageDecl& pkg) {
   return type;
 }
 
+static DeclaredValue ValueInPackage(DeclaredValue value,
+                                    const PackageDecl* pkg) {
+  if (pkg != nullptr) value.type = InPackage(std::move(value.type), *pkg);
+  return value;
+}
+
+static std::optional<DeclaredValue> UnitScopeValue(
+    std::span<ModuleItem* const> items, const PackageDecl* pkg,
+    std::string_view name, const OuterScope& outer) {
+  std::optional<DeclaredValue> value =
+      ScopeValue(items, pkg != nullptr ? pkg->name : "$unit", name, outer);
+  if (!value) return ImportedValue(items, name, outer);
+  return ValueInPackage(*std::move(value), pkg);
+}
+
 // §26.3: the typedef the package `pkg` declares by the name `type` is
 // written with, where `type` is written bare; none otherwise.
 static const ModuleItem* PackageTypedefNamed(const PackageDecl& pkg,
@@ -591,27 +606,12 @@ void ElaboratorOperationRules::InUnitExprTypeScope(
   const std::span<ModuleItem* const> kItems =
       pkg != nullptr ? std::span<ModuleItem* const>(pkg->items)
                      : std::span<ModuleItem* const>(unit_->cu_items);
-  // §23.9 with §26.3: a name the procedure declares hides the scope's own,
-  // which hides one the scope imports.
   scope.value_named =
       [&](std::string_view name) -> std::optional<DeclaredValue> {
-    std::optional<DeclaredValue> value;
-    if (const BlockValue* local = InnermostBlockValue(name)) {
-      value = UnderDims(*local->type, *local->dims, scope);
-    } else {
-      value = ScopeValue(kItems, pkg != nullptr ? pkg->name : "$unit", name,
-                         kOuter);
-      // An imported value's type is already read behind its own package.
-      if (!value) return ImportedValue(kItems, name, kOuter);
-    }
-    // A type the package's procedure writes by one of its typedefs' names is
-    // recorded behind the package.
-    if (value && pkg != nullptr) value->type = InPackage(value->type, *pkg);
-    return value;
+    if (const BlockValue* local = InnermostBlockValue(name))
+      return ValueInPackage(UnderDims(*local->type, *local->dims, scope), pkg);
+    return UnitScopeValue(kItems, pkg, name, kOuter);
   };
-  // §26.3 with §3.12.1: a name behind a package's scope is that package's;
-  // one behind `$unit::` the compilation unit's, which a package never names
-  // (§26.2).
   scope.scoped_value =
       [&](std::string_view prefix,
           std::string_view name) -> std::optional<DeclaredValue> {
