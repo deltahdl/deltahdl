@@ -116,7 +116,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one rule with every case listed, or one defect with one fix; split two rules, merge cases of one.
 - [Research lives in issues](research-lives-in-issues.md) — file a plan that outlives the session, and each finding, as it arises.
 - [Issues have no fixed form](issues-have-no-fixed-form.md) — no house style; write each so a fresh session can act on it alone.
-- [Issues carry a standard label and a clause label](issues-carry-a-standard-and-a-clause-label.md) — a standard's issue carries its standard's label and its `§N` or `Annex X`; a coverage or harness issue neither.
+- [Issues carry a standard label and a clause label](issues-carry-a-standard-and-a-clause-label.md) — a standard's issue carries its standard's label and its `§N` or `Annex X`, as does a defect whose fix rewrites a rule's tests; a coverage or harness issue neither.
 - [Issue sections take headings](issue-sections-take-headings.md) — open each section of an issue body with `## Heading`, never a bolded first sentence.
 - [Guarding an issue body rewrite](guarding-an-issue-body-rewrite.md) — chain fetch, edit and `--body-file` with `&&` and a size check; recover an emptied body through GraphQL `userContentEdits`.
 - [Issues define their terms](issues-define-their-terms.md) — say what each file, term and cited clause is and why it is there.

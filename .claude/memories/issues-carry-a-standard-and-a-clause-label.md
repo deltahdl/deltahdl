@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 0ce081b6-fd14-4da5-87da-08ca53aae436
-  modified: 2026-10-09T12:24:05.641Z
+  modified: 2026-11-08T04:04:57.156Z
 ---
 
 # Issues carry a standard label and a clause label
@@ -18,6 +18,12 @@ clauses and lettered annexes, so the same rule holds for each. An issue about
 deltahdl itself rather than a standard's rule, such as an `assert-coverage`
 gap in one file or a defect in the test harness, falls under no standard and
 carries neither.
+
+A defect in deltahdl's own code still concerns a rule when the tests of that
+rule rest on it. Such a defect is state that only tests read, kept beside the
+code that really applies the rule. Its fix has to rewrite those tests to
+assert what deltahdl produces, so the issue lists the rule's cases and carries
+the rule's two labels.
 
 **Why:** the `§N` and `Annex X` labels are shared by the three standards, and
 each label's description says only that it is that clause of the standard the
