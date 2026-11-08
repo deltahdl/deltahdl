@@ -19,6 +19,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -382,19 +383,143 @@ void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
   }
 }
 
-void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kParamDecl) continue;
-    if (!item->init_expr) continue;
-    for (const auto& sp : specparam_names_) {
-      if (ExprContainsIdent(item->init_expr, sp)) {
-        diag_.Error(item->loc,
-                    std::format("parameter references specparam '{}'", sp),
-                    Subclause("6.20.5"));
-        break;
-      }
+namespace {
+
+void ReportSpecparamIn(const Expr* value, SourceLoc loc, std::string_view what,
+                       const NameSet& visible, DiagEngine& diag) {
+  if (value == nullptr) return;
+  for (std::string_view specparam : visible) {
+    if (!ExprContainsIdent(value, specparam)) continue;
+    diag.Error(loc,
+               std::format("{} references specparam '{}'", what, specparam),
+               Subclause("6.20.5"));
+    return;
+  }
+}
+
+NameSet WithoutNames(NameSet visible, const NameSet& declared) {
+  for (std::string_view name : declared) visible.erase(name);
+  return visible;
+}
+
+void CollectStmtDeclaredNames(const Stmt* s, NameSet& names) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kVarDecl) names.insert(s->var_name);
+  ForEachChildStmt(
+      s, [&names](const Stmt* sub) { CollectStmtDeclaredNames(sub, names); });
+}
+
+void ReportSpecparamInStmt(const Stmt* s, const NameSet& visible,
+                           DiagEngine& diag) {
+  if (s == nullptr) return;
+  if (s->kind == StmtKind::kVarDecl && s->var_is_param)
+    ReportSpecparamIn(s->var_init, s->range.start, "parameter", visible, diag);
+  ForEachChildStmt(s, [&visible, &diag](const Stmt* sub) {
+    ReportSpecparamInStmt(sub, visible, diag);
+  });
+}
+
+void ReportSpecparamInProcedure(const ModuleItem* item, const NameSet& visible,
+                                DiagEngine& diag) {
+  NameSet declared;
+  for (const auto& arg : item->func_args) declared.insert(arg.name);
+  for (const Stmt* s : item->func_body_stmts)
+    CollectStmtDeclaredNames(s, declared);
+  CollectStmtDeclaredNames(item->body, declared);
+  const NameSet kInner = WithoutNames(visible, declared);
+  for (const Stmt* s : item->func_body_stmts)
+    ReportSpecparamInStmt(s, kInner, diag);
+  ReportSpecparamInStmt(item->body, kInner, diag);
+}
+
+void ReportSpecparamInClass(const ClassDecl* cls, const NameSet& visible,
+                            DiagEngine& diag) {
+  if (cls == nullptr) return;
+  NameSet declared;
+  for (const auto& [name, value] : cls->params) declared.insert(name);
+  for (const ClassMember* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty) declared.insert(m->name);
+  }
+  const NameSet kInner = WithoutNames(visible, declared);
+  for (const auto& [name, value] : cls->params) {
+    if (value != nullptr)
+      ReportSpecparamIn(value, value->range.start, "parameter", kInner, diag);
+  }
+  for (const ClassMember* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param) {
+      ReportSpecparamIn(m->init_expr, m->loc, "parameter", kInner, diag);
+    } else if (m->kind == ClassMemberKind::kMethod && m->method != nullptr) {
+      ReportSpecparamInProcedure(m->method, kInner, diag);
+    } else if (m->kind == ClassMemberKind::kClassDecl) {
+      ReportSpecparamInClass(m->nested_class, kInner, diag);
     }
   }
+}
+
+void ReportSpecparamInOverrides(const ModuleItem* item, const NameSet& visible,
+                                DiagEngine& diag) {
+  for (const auto& [name, value] : item->inst_params)
+    ReportSpecparamIn(value, item->loc, "parameter override", visible, diag);
+}
+
+void ReportSpecparamInItems(const std::vector<ModuleItem*>& items,
+                            const NameSet& visible, DiagEngine& diag);
+
+void ReportSpecparamInGenerateBlock(const std::vector<ModuleItem*>& items,
+                                    const NameSet& visible, DiagEngine& diag) {
+  NameSet declared;
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kParamDecl ||
+        item->kind == ModuleItemKind::kVarDecl ||
+        item->kind == ModuleItemKind::kNetDecl)
+      declared.insert(item->name);
+  }
+  ReportSpecparamInItems(items, WithoutNames(visible, declared), diag);
+}
+
+void ReportSpecparamInGenerate(const ModuleItem* item, const NameSet& visible,
+                               DiagEngine& diag) {
+  NameSet body_visible = visible;
+  if (item->kind == ModuleItemKind::kGenerateFor && item->gen_init &&
+      item->gen_init->lhs)
+    body_visible.erase(item->gen_init->lhs->text);
+  ReportSpecparamInGenerateBlock(item->gen_body, body_visible, diag);
+  if (item->gen_else) ReportSpecparamInGenerate(item->gen_else, visible, diag);
+  for (const auto& ci : item->gen_case_items)
+    ReportSpecparamInGenerateBlock(ci.body, visible, diag);
+}
+
+void ReportSpecparamInItems(const std::vector<ModuleItem*>& items,
+                            const NameSet& visible, DiagEngine& diag) {
+  for (const ModuleItem* item : items) {
+    switch (item->kind) {
+      case ModuleItemKind::kParamDecl:
+        ReportSpecparamIn(item->init_expr, item->loc, "parameter", visible,
+                          diag);
+        break;
+      case ModuleItemKind::kModuleInst:
+        ReportSpecparamInOverrides(item, visible, diag);
+        break;
+      case ModuleItemKind::kGenerateIf:
+      case ModuleItemKind::kGenerateCase:
+      case ModuleItemKind::kGenerateFor:
+        ReportSpecparamInGenerate(item, visible, diag);
+        break;
+      case ModuleItemKind::kClassDecl:
+        ReportSpecparamInClass(item->class_decl, visible, diag);
+        break;
+      default:
+        ReportSpecparamInProcedure(item, visible, diag);
+        break;
+    }
+  }
+}
+
+}  // namespace
+
+void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
+  if (specparam_names_.empty()) return;
+  ReportSpecparamInItems(decl->items, specparam_names_, diag_);
 }
 
 namespace {
@@ -665,8 +790,10 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
 void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
                                  const ScopeMap& scope, DiagEngine& diag) {
   GenerateParamCtx ctx{mod, diag};
-  ValidateValueParamsInGenerate(item, WithEveryDeclaredConstant(scope, mod, {}),
-                                {}, ctx);
+  ValidateValueParamsInGenerate(
+      item,
+      WithEveryDeclaredConstant(scope, mod, DeclaredSpecparamNames(mod->decl)),
+      {}, ctx);
 }
 
 void Elaborator::ValidatePackageValueParams() {

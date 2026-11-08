@@ -1,5 +1,6 @@
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <optional>
 #include <set>
 #include <string>
@@ -529,6 +530,25 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   }
 }
 
+static bool StepsEndAtSpecparam(RtlirModule* root, const HierPath& steps) {
+  std::vector<PathDescent> descents;
+  const RtlirModule* owner = DescendDefparamPath(root, steps, {}, descents);
+  return owner != nullptr &&
+         DeclaredSpecparamNames(owner->decl).contains(steps.back().name);
+}
+
+static bool DefparamTargetsSpecparam(RtlirModule* mod, const HierPath& path,
+                                     const std::vector<RtlirModule*>& tops) {
+  if (path.empty()) return false;
+  if (StepsEndAtSpecparam(mod, path)) return true;
+  for (RtlirModule* top : tops) {
+    if (path.size() < 2 || top->name != path.front().name) continue;
+    if (StepsEndAtSpecparam(top, HierPath(path.begin() + 1, path.end())))
+      return true;
+  }
+  return false;
+}
+
 void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                                               const DefparamSite& site,
                                               const ScopeMap& mod_scope) {
@@ -558,6 +578,13 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                   "defparam inside a generate block or an array of instances "
                   "reaches a parameter outside that hierarchy",
                   Subclause("23.10.1"));
+      continue;
+    }
+    if (read && DefparamTargetsSpecparam(mod, path, defparam_top_roots_)) {
+      diag_.Error(site.item->loc,
+                  std::format("defparam cannot override specparam '{}'",
+                              path.back().name),
+                  Subclause("6.20.5"));
       continue;
     }
     diag_.Warning(site.item->loc, "defparam target not found",

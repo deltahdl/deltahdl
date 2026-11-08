@@ -367,7 +367,8 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   }
   RegisterClassTypedefKeys(item->class_decl, item->class_decl->name,
                            {unit_, typedefs_, td_array_dims_, arena_});
-  RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
+  const ScopeMap kModuleScope = BuildParamScope(mod);
+  RegisterModuleClassParams(item->class_decl, {kModuleScope, specparam_names_},
                             cu_param_scope_, arena_, diag_);
   ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
   auto resolve = [&](DataType& dt, SourceLoc loc) {

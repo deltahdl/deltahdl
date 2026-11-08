@@ -34,6 +34,7 @@ struct ClassParamRegistration {
   ScopeMap& cu_param_scope;
   Arena& arena;
   DiagEngine& diag;
+  const std::unordered_set<std::string_view>* specparams = nullptr;
 };
 
 static bool IsDollarValue(const Expr* e) {
@@ -72,6 +73,13 @@ static std::optional<int64_t> ClassParamTwoStateReading(
   return TwoStateReading(pexpr, *type, values, val);
 }
 
+static bool MentionsFormalOrSpecparam(const Expr* pexpr,
+                                      const ClassParamRegistration& reg) {
+  if (reg.specparams != nullptr && ExprMentionsAny(pexpr, *reg.specparams))
+    return true;
+  return ExprMentionsAny(pexpr, reg.formals);
+}
+
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              const DataType* type, bool is_array,
                              ClassParamRegistration& reg) {
@@ -86,7 +94,7 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                   : is_real ? ConstEvalReal(pexpr, reg.values).has_value()
                             : val.has_value();
   if (!constant) {
-    if (!ExprMentionsAny(pexpr, reg.formals)) {
+    if (!MentionsFormalOrSpecparam(pexpr, reg)) {
       reg.diag.Error(pexpr->range.start,
                      std::format("class parameter '{}' value is not a constant "
                                  "expression",
@@ -132,8 +140,9 @@ static void RegisterClassTreeParams(ClassParamRegistration& reg) {
     auto* scope = reg.arena.Create<std::string>(
         std::string(reg.type_scope) + "::" + std::string(inner->name));
     ClassParamRegistration nested{
-        inner,      ClassParamNames(inner), *prefix,   *scope,
-        reg.values, reg.cu_param_scope,     reg.arena, reg.diag};
+        inner,         ClassParamNames(inner), *prefix,   *scope,
+        reg.values,    reg.cu_param_scope,     reg.arena, reg.diag,
+        reg.specparams};
     RegisterClassTreeParams(nested);
   }
 }
@@ -154,12 +163,18 @@ void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
 }
 
 void RegisterModuleClassParams(const ClassDecl* cls,
-                               const ScopeMap& module_scope,
+                               const ModuleClassScope& module_scope,
                                ScopeMap& cu_param_scope, Arena& arena,
                                DiagEngine& diag) {
-  ClassParamRegistration reg{
-      cls,          ClassParamNames(cls), cls->name, cls->name,
-      module_scope, cu_param_scope,       arena,     diag};
+  ClassParamRegistration reg{cls,
+                             ClassParamNames(cls),
+                             cls->name,
+                             cls->name,
+                             module_scope.values,
+                             cu_param_scope,
+                             arena,
+                             diag,
+                             &module_scope.specparams};
   RegisterClassTreeParams(reg);
 }
 

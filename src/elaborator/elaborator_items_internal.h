@@ -30,8 +30,13 @@ void SubstituteBooleanSpec(ModuleItem* item, Arena& arena);
 void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                          Arena& arena, DiagEngine& diag);
 
+struct ModuleClassScope {
+  const ScopeMap& values;
+  const std::unordered_set<std::string_view>& specparams;
+};
+
 void RegisterModuleClassParams(const ClassDecl* cls,
-                               const ScopeMap& module_scope,
+                               const ModuleClassScope& module_scope,
                                ScopeMap& cu_param_scope, Arena& arena,
                                DiagEngine& diag);
 

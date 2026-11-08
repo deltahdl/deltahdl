@@ -25,6 +25,7 @@
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -84,6 +85,22 @@ bool HasParamPortWithoutDefault(const ModuleDecl* decl) {
     if (expr == nullptr) return true;
   }
   return false;
+}
+
+std::unordered_set<std::string_view> DeclaredSpecparamNames(
+    const ModuleDecl* decl) {
+  std::unordered_set<std::string_view> names;
+  if (decl == nullptr) return names;
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kSpecparam) names.insert(item->name);
+    if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
+    for (const SpecifyItem* sp : item->specify_items) {
+      if (sp->kind != SpecifyItemKind::kSpecparam || sp->is_pathpulse) continue;
+      if (sp->param_name.starts_with("PATHPULSE$")) continue;
+      names.insert(sp->param_name);
+    }
+  }
+  return names;
 }
 
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {

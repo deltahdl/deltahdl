@@ -153,6 +153,9 @@ const ClassDecl* FindClassDecl(std::string_view name,
 
 bool HasParamPortWithoutDefault(const ModuleDecl* decl);
 
+std::unordered_set<std::string_view> DeclaredSpecparamNames(
+    const ModuleDecl* decl);
+
 const ClassDecl* FindBaseClass(const ClassDecl* cls,
                                const CompilationUnit* unit);
 

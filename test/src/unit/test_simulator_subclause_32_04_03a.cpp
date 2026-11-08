@@ -255,6 +255,23 @@ TEST(SdfLabelAnnotation, LabelOverridesASpecparamDeclaredFromALocalparam) {
   EXPECT_EQ(d.DesignValue("L"), 9u);
 }
 
+TEST(SdfLabelAnnotation, LabelNamingAParameterOrLocalparamChangesNothing) {
+  Design d;
+  ASSERT_TRUE(
+      d.Build("module m;\n"
+              "  parameter P = 7;\n"
+              "  localparam L = 9;\n"
+              "  specparam sp = P + L;\n"
+              "endmodule\n"));
+  ASSERT_EQ(d.DesignValue("sp"), 16u);
+
+  d.Annotate(SdfLabel("(ABSOLUTE (P 42) (L 43))"));
+
+  EXPECT_EQ(d.DesignValue("P"), 7u);
+  EXPECT_EQ(d.DesignValue("L"), 9u);
+  EXPECT_EQ(d.DesignValue("sp"), 16u);
+}
+
 TEST(SdfLabelAnnotation, LabelBodyThatIsNotAValueSectionAnnotatesNothing) {
   Design d;
   ASSERT_TRUE(d.Build(kClockSrc));
