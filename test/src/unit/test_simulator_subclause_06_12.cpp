@@ -95,8 +95,9 @@ TEST(RealDataType, ShortrealHoldsTheNearestBinary32InEveryPlaceItIsGiven) {
        "interface ifc;\n  shortreal s = 0.1;\nendinterface\n", "  ifc i();\n",
        "", "i.s"},
       {"program variable initializer",
-       "program p;\n  shortreal s = 0.1;\nendprogram\n", "  p u();\n", "",
-       "u.s"},
+       "program p(output real y);\n  shortreal s = 0.1;\n  assign y = s;\n"
+       "endprogram\n",
+       "  real y;\n  p u(y);\n", "    #1;\n", "y"},
       {"generate block variable initializer", "",
        "  if (1) begin : g\n    shortreal s = 0.1;\n  end\n", "", "g.s"},
       {"loop generate block variable initializer", "",
