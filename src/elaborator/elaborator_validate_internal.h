@@ -444,8 +444,7 @@ void WarnDiscardedReturn(SourceLoc loc, std::string_view callee,
                          std::string_view remedy, DiagEngine& diag);
 
 void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
-                                 const ScopeMap& scope,
-                                 const CompilationUnit* unit, DiagEngine& diag);
+                                 const ScopeMap& scope, DiagEngine& diag);
 
 void ValidateUnitClassCallArgs(const CompilationUnit& unit, DiagEngine& diag);
 

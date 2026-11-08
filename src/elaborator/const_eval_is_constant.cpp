@@ -116,6 +116,9 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
   if (expr->lhs->has_param_spec &&
       !AllElementsConstant(expr->lhs->elements, scope))
     return false;
+  if (!builtin && !expr->is_scope_resolution &&
+      IsConstantExpr(expr->lhs, scope))
+    return true;
   std::optional<std::string> key = ScopedNameKey(expr);
   return key && scope.count(*key) > 0;
 }
@@ -164,6 +167,10 @@ bool IsConstantExpr(const Expr* expr, const ScopeMap& scope) {
       return AllElementsConstant(expr->args, scope);
     case ExprKind::kMemberAccess:
       return IsConstantMemberAccessExpr(expr, scope);
+    case ExprKind::kMinTypMax:
+      return IsConstantExpr(expr->lhs, scope) &&
+             IsConstantExpr(expr->condition, scope) &&
+             IsConstantExpr(expr->rhs, scope);
     default:
       return false;
   }

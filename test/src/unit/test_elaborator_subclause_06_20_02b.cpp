@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
+#include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_param_value.h"
@@ -414,6 +417,130 @@ TEST(TypedefParameterType, ParameterOfARealTypedefIsReal) {
     ASSERT_NE(p, nullptr) << name;
     EXPECT_TRUE(p->is_real_value) << name;
     EXPECT_DOUBLE_EQ(p->resolved_real, 2.75) << name;
+  }
+}
+
+struct ValueSource {
+  const char* where;
+  const char* src;
+  const char* message;
+  uint32_t line;
+  const char* subclause;
+};
+
+TEST(ValueParameters, ValueSetFromAVariableANetOrAHierarchicalNameIsReported) {
+  const ValueSource kSources[] = {
+      {"module body parameter from a variable",
+       "module m;\n  int x;\n  parameter int P = x;\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 3, "6.20.2"},
+      {"module body parameter from a net",
+       "module m;\n  wire w;\n  parameter int P = w + 1;\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 3, "6.20.2"},
+      {"interface body parameter from a variable",
+       "interface i;\n  int x;\n  parameter int P = x;\nendinterface\n"
+       "module m;\n  i u();\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 3, "6.20.2"},
+      {"program body parameter from a variable",
+       "program p;\n  int x;\n  parameter int P = x;\nendprogram\n"
+       "module m;\n  p u();\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 3, "6.20.2"},
+      {"module port list parameter from a compilation-unit variable",
+       "int v;\nmodule m #(parameter int P = v);\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 2, "6.20.2"},
+      {"interface port list parameter from a compilation-unit variable",
+       "int v;\ninterface i #(parameter int P = v);\nendinterface\n"
+       "module m;\n  i u();\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 2, "6.20.2"},
+      {"program port list parameter from a compilation-unit variable",
+       "int v;\nprogram p #(parameter int P = v);\nendprogram\n"
+       "module m;\n  p u();\nendmodule\n",
+       "parameter 'P' value is not a constant expression", 2, "6.20.2"},
+      {"module port list localparam from a compilation-unit variable",
+       "int v;\nmodule m #(localparam int P = v);\nendmodule\n",
+       "localparam 'P' initializer is not a constant expression", 2, "6.20.4"},
+      {"module body specparam from a variable",
+       "module m;\n  int v;\n  specparam t = v;\nendmodule\n",
+       "specparam 't' value is not a constant expression", 3, "6.20.2"},
+      {"module body specparam whose typical value is a variable",
+       "module m;\n  int v;\n  specparam t = 1:v:3;\nendmodule\n",
+       "specparam 't' value is not a constant expression", 3, "6.20.2"},
+      {"specify block specparam from a variable",
+       "module m(input a, output b);\n  int v;\n  specify\n"
+       "    specparam t = v;\n  endspecify\nendmodule\n",
+       "specparam 't' value is not a constant expression", 4, "6.20.2"},
+      {"specify block PATHPULSE$ specparam with a variable error limit",
+       "module m(input a, output b);\n  int v;\n  specify\n"
+       "    specparam PATHPULSE$ = (1, v);\n  endspecify\nendmodule\n",
+       "specparam 'PATHPULSE$' value is not a constant expression", 4,
+       "6.20.2"},
+      {"module body specparam from a hierarchical name",
+       "module c;\n  int x;\nendmodule\nmodule m;\n  c u();\n"
+       "  specparam t = u.x;\nendmodule\n",
+       "specparam 't' value contains a hierarchical reference", 6, "6.20.2"},
+      {"specify block specparam from a hierarchical name",
+       "module c;\n  int x;\nendmodule\nmodule m(input a, output b);\n"
+       "  c u();\n  specify\n    specparam t = u.x;\n  endspecify\n"
+       "endmodule\n",
+       "specparam 't' value contains a hierarchical reference", 7, "6.20.2"},
+      {"class port parameter from a hierarchical name",
+       "module top;\n  int x;\nendmodule\nclass C #(int P = top.x);\n"
+       "endclass\n",
+       "class parameter 'P' value is not a constant expression", 4, "6.20.2"},
+      {"class body parameter from a hierarchical name",
+       "module top;\n  int x;\nendmodule\nclass C;\n"
+       "  parameter int P = top.x;\nendclass\n",
+       "class parameter 'P' value is not a constant expression", 5, "6.20.2"},
+  };
+  for (const ValueSource& source : kSources) {
+    SCOPED_TRACE(source.where);
+    ElabFixture f;
+    ElaborateSrc(source.src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), source.message, source.line,
+                              source.subclause));
+  }
+}
+
+TEST(ValueParameters, ValueSetFromConstantsAndAggregateMembersIsAccepted) {
+  const char* const kSources[] = {
+      "module m;\n  localparam int L = 2;\n  parameter int P = L + 1;\n"
+      "endmodule\n",
+      "module m;\n  parameter int A[2] = '{1, 2};\n"
+      "  parameter int B = A[1];\n  localparam int C = A[0];\nendmodule\n",
+      "module m;\n  typedef struct packed { int a; int b; } s_t;\n"
+      "  parameter s_t S = '{a: 3, b: 4};\n  parameter int W = S.b;\n"
+      "  localparam int L = S.a;\nendmodule\n",
+      "module m;\n  typedef struct { int a; int b; } s_t;\n"
+      "  parameter s_t S = '{3, 4};\n  parameter int W = S.b;\n"
+      "  localparam int L = S.a;\nendmodule\n",
+      "interface i;\n  localparam int L = 2;\n  parameter int P = L;\n"
+      "endinterface\nmodule m;\n  i u();\nendmodule\n",
+      "program p;\n  localparam int L = 2;\n  parameter int P = L;\n"
+      "endprogram\nmodule m;\n  p u();\nendmodule\n",
+      "parameter int CP = 3;\nmodule m #(parameter int P = CP);\n"
+      "endmodule\n",
+      "parameter int CP = 3;\ninterface i #(parameter int P = CP);\n"
+      "endinterface\nmodule m;\n  i u();\nendmodule\n",
+      "parameter int CP = 3;\nprogram p #(parameter int P = CP);\n"
+      "endprogram\nmodule m;\n  p u();\nendmodule\n",
+      "parameter int CP = 3;\nmodule m #(localparam int P = CP);\n"
+      "endmodule\n",
+      "module m;\n  parameter int P = 2;\n  specparam t = P + 1;\n"
+      "  specparam u = 1:P:3;\n  specparam w = t;\nendmodule\n",
+      "module m(input a, output b);\n  parameter int P = 2;\n  specify\n"
+      "    specparam t = P;\n    specparam u = t:t + 1:t + 2;\n"
+      "    specparam PATHPULSE$ = (P, P + 1);\n  endspecify\nendmodule\n",
+      "package pk;\n  parameter int N = 4;\nendpackage\n"
+      "class C #(int P = pk::N);\n  parameter int Q = pk::N + 1;\n"
+      "endclass\n",
+  };
+  for (const char* src : kSources) {
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    for (const Diagnostic& diag : f.diag.Diagnostics()) {
+      if (diag.severity == DiagSeverity::kError)
+        ADD_FAILURE() << "line " << diag.loc.line << ": " << diag.message;
+    }
   }
 }
 

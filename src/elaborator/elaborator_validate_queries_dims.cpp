@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
@@ -21,6 +22,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 
 namespace delta {
@@ -433,9 +435,7 @@ void CheckDeclRangesForSpecparam(
 
 }  // namespace
 
-static void ReportHierRefInDeclRange(const ModuleItem* item,
-                                     const CompilationUnit* unit,
-                                     DiagEngine& diag);
+static void ReportHierRefInDeclRange(const ModuleItem* item, DiagEngine& diag);
 
 void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
@@ -445,44 +445,43 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
     if (!specparam_names_.empty()) {
       CheckDeclRangesForSpecparam(item, specparam_names_, diag_);
     }
-    ReportHierRefInDeclRange(item, unit_, diag_);
+    ReportHierRefInDeclRange(item, diag_);
   }
 }
 
-static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit);
+static bool ExprContainsHierRef(const Expr* e, const ScopeMap& constants);
 
 static bool AnyExprContainsHierRef(const std::vector<Expr*>& list,
-                                   const CompilationUnit* unit) {
+                                   const ScopeMap& constants) {
   for (auto* sub : list) {
-    if (ExprContainsHierRef(sub, unit)) return true;
+    if (ExprContainsHierRef(sub, constants)) return true;
   }
   return false;
 }
 
-static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
+static bool ExprContainsHierRef(const Expr* e, const ScopeMap& constants) {
   if (!e) return false;
 
   if (e->kind == ExprKind::kTypeRef) return false;
 
   if (e->kind == ExprKind::kCall && e->lhs != nullptr &&
       e->lhs->kind == ExprKind::kMemberAccess) {
-    return ExprContainsHierRef(e->lhs->lhs, unit) ||
-           AnyExprContainsHierRef(e->args, unit);
+    return ExprContainsHierRef(e->lhs->lhs, constants) ||
+           AnyExprContainsHierRef(e->args, constants);
   }
   if (e->kind == ExprKind::kMemberAccess && BuiltinMethodMember(e) != nullptr)
-    return ExprContainsHierRef(e->lhs, unit);
-  if (e->kind == ExprKind::kMemberAccess) return !e->is_scope_resolution;
+    return ExprContainsHierRef(e->lhs, constants);
+  if (e->kind == ExprKind::kMemberAccess)
+    return !e->is_scope_resolution && !IsConstantExpr(e->lhs, constants);
   for (const Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
-    if (ExprContainsHierRef(sub, unit)) return true;
+    if (ExprContainsHierRef(sub, constants)) return true;
   }
-  return AnyExprContainsHierRef(e->elements, unit) ||
-         AnyExprContainsHierRef(e->args, unit);
+  return AnyExprContainsHierRef(e->elements, constants) ||
+         AnyExprContainsHierRef(e->args, constants);
 }
 
-static void ReportHierRefInDeclRange(const ModuleItem* item,
-                                     const CompilationUnit* unit,
-                                     DiagEngine& diag) {
+static void ReportHierRefInDeclRange(const ModuleItem* item, DiagEngine& diag) {
   std::vector<Expr*> ranges{item->data_type.packed_dim_left,
                             item->data_type.packed_dim_right};
   for (const auto& [left, right] : item->data_type.extra_packed_dims) {
@@ -491,7 +490,7 @@ static void ReportHierRefInDeclRange(const ModuleItem* item,
   }
   ranges.insert(ranges.end(), item->unpacked_dims.begin(),
                 item->unpacked_dims.end());
-  if (!AnyExprContainsHierRef(ranges, unit)) return;
+  if (!AnyExprContainsHierRef(ranges, ScopeMap{})) return;
   diag.Error(item->loc,
              std::format("the range of '{}' contains a hierarchical "
                          "reference, which is no constant expression",
@@ -501,23 +500,77 @@ static void ReportHierRefInDeclRange(const ModuleItem* item,
 
 namespace {
 
-void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
-                           DiagEngine& diag) {
+enum class ValueParamKind : uint8_t { kParameter, kLocalparam, kSpecparam };
+
+struct ValueParamValue {
+  ValueParamKind kind;
+  std::string_view name;
+  const Expr* value;
+  SourceLoc loc;
+};
+
+void ReportNonConstantValue(const ValueParamValue& param,
+                            const ScopeMap& constants, DiagEngine& diag) {
+  if (param.value == nullptr) return;
+  std::string_view noun =
+      param.kind == ValueParamKind::kSpecparam ? "specparam" : "parameter";
+  if (ExprContainsHierRef(param.value, constants)) {
+    diag.Error(param.loc,
+               std::format("{} '{}' value contains a hierarchical reference",
+                           noun, param.name),
+               Subclause("6.20.2"));
+    return;
+  }
+  if (IsConstantExpr(param.value, constants)) return;
+  if (param.kind == ValueParamKind::kLocalparam) {
+    diag.Error(param.loc,
+               std::format("localparam '{}' initializer is not a constant "
+                           "expression",
+                           param.name),
+               Subclause("6.20.4"));
+    return;
+  }
+  diag.Error(param.loc,
+             std::format("{} '{}' value is not a constant expression", noun,
+                         param.name),
+             Subclause("6.20.2"));
+}
+
+ScopeMap WithEveryDeclaredConstant(
+    ScopeMap scope, const RtlirModule* mod,
+    const std::unordered_set<std::string_view>& specparams) {
+  for (const auto& param : mod->params) scope.try_emplace(param.name, 0);
+  for (std::string_view specparam : specparams) scope.try_emplace(specparam, 0);
+  return scope;
+}
+
+void ValidatePortListValueParams(const ModuleDecl* decl,
+                                 const ScopeMap& constants, DiagEngine& diag) {
   for (const auto& [pname, pval] : decl->params) {
-    if (!pval) continue;
-    if (ExprContainsHierRef(pval, unit)) {
-      diag.Error(pval->range.start,
-                 std::format("parameter '{}' value contains a hierarchical "
-                             "reference",
-                             pname),
-                 Subclause("6.20.2"));
+    if (!pval || decl->type_param_names.count(pname)) continue;
+    ValueParamKind kind = decl->localparam_port_names.count(pname)
+                              ? ValueParamKind::kLocalparam
+                              : ValueParamKind::kParameter;
+    ReportNonConstantValue({kind, pname, pval, pval->range.start}, constants,
+                           diag);
+  }
+}
+
+void ValidateSpecifyBlockSpecparams(const ModuleItem* block,
+                                    const ScopeMap& constants,
+                                    DiagEngine& diag) {
+  for (const auto* sp : block->specify_items) {
+    if (sp->kind != SpecifyItemKind::kSpecparam) continue;
+    for (const Expr* value : {sp->param_value, sp->pathpulse_error}) {
+      ReportNonConstantValue(
+          {ValueParamKind::kSpecparam, sp->param_name, value, sp->loc},
+          constants, diag);
     }
   }
 }
 
-void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
-                           const CompilationUnit* unit, DiagEngine& diag,
-                           bool parameter_is_local = false) {
+void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& constants,
+                           DiagEngine& diag, bool parameter_is_local = false) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
       item->typedef_type.kind != DataTypeKind::kImplicit)
     return;
@@ -528,27 +581,14 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
         Subclause("6.20.1"));
     return;
   }
-
-  if (ExprContainsHierRef(item->init_expr, unit)) {
-    diag.Error(item->loc,
-               std::format("parameter '{}' value contains a hierarchical "
-                           "reference",
-                           item->name),
-               Subclause("6.20.2"));
-  }
-
-  if ((item->is_localparam || parameter_is_local) &&
-      !IsConstantExpr(item->init_expr, param_scope)) {
-    diag.Error(item->loc,
-               std::format("localparam '{}' initializer is not a constant "
-                           "expression",
-                           item->name),
-               Subclause("6.20.4"));
-  }
+  ValueParamKind kind = item->is_localparam || parameter_is_local
+                            ? ValueParamKind::kLocalparam
+                            : ValueParamKind::kParameter;
+  ReportNonConstantValue({kind, item->name, item->init_expr, item->loc},
+                         constants, diag);
 }
 
 struct GenerateParamCtx {
-  const CompilationUnit* unit;
   const RtlirModule* mod;
   DiagEngine& diag;
 };
@@ -589,7 +629,7 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
     if (item->kind == ModuleItemKind::kParamDecl) {
       {
         RegisteredGenScopeGuard in_block(prefixes);
-        ValidateOneValueParam(item, scope, ctx.unit, ctx.diag, true);
+        ValidateOneValueParam(item, scope, ctx.diag, true);
       }
       scope[item->name] = 0;
       AddInstancePrefixes(item, ctx.mod, prefixes);
@@ -606,21 +646,27 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
-  ScopeMap param_scope = BuildParamScope(mod);
+  const ScopeMap kConstants =
+      WithEveryDeclaredConstant(BuildParamScope(mod), mod, specparam_names_);
   for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kParamDecl)
-      ValidateOneValueParam(item, param_scope, unit_, diag_);
+    if (item->kind == ModuleItemKind::kParamDecl) {
+      ValidateOneValueParam(item, kConstants, diag_);
+    } else if (item->kind == ModuleItemKind::kSpecparam) {
+      ReportNonConstantValue(
+          {ValueParamKind::kSpecparam, item->name, item->init_expr, item->loc},
+          kConstants, diag_);
+    } else if (item->kind == ModuleItemKind::kSpecifyBlock) {
+      ValidateSpecifyBlockSpecparams(item, kConstants, diag_);
+    }
   }
-
-  CheckParamMapHierRefs(decl, unit_, diag_);
+  ValidatePortListValueParams(decl, kConstants, diag_);
 }
 
 void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
-                                 const ScopeMap& scope,
-                                 const CompilationUnit* unit,
-                                 DiagEngine& diag) {
-  GenerateParamCtx ctx{unit, mod, diag};
-  ValidateValueParamsInGenerate(item, scope, {}, ctx);
+                                 const ScopeMap& scope, DiagEngine& diag) {
+  GenerateParamCtx ctx{mod, diag};
+  ValidateValueParamsInGenerate(item, WithEveryDeclaredConstant(scope, mod, {}),
+                                {}, ctx);
 }
 
 void Elaborator::ValidatePackageValueParams() {
@@ -630,7 +676,7 @@ void Elaborator::ValidatePackageValueParams() {
       BindPackageImportConstants(pkg, item, cu_param_scope_, scope);
       BindEnumConstantsOfItem(item, scope, arena_);
       if (item->kind != ModuleItemKind::kParamDecl) continue;
-      ValidateOneValueParam(item, scope, unit_, diag_, true);
+      ValidateOneValueParam(item, scope, diag_, true);
       scope[item->name] = 0;
     }
   }

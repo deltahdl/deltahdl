@@ -82,7 +82,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
     default:
       break;
   }
-  ValidateGenerateValueParams(pg.item, pg.mod, scope, unit_, diag_);
+  ValidateGenerateValueParams(pg.item, pg.mod, scope, diag_);
   for (const auto& [name, dtype] : typedefs_)
     saved_typedefs.insert_or_assign(name, dtype);
   typedefs_ = std::move(saved_typedefs);
