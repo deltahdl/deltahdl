@@ -359,8 +359,10 @@ class Elaborator : public ElaboratorClassRules {
 
   void ReportUnresolvedDefparamSite(RtlirModule* mod, const DefparamSite& site,
                                     const ScopeMap& mod_scope);
-  const RtlirParamDecl* ParamWithStepsAfterIt(RtlirModule* mod,
-                                              const HierPath& path);
+  const RtlirParamDecl* ParamAtPathFromAnyRoot(RtlirModule* mod,
+                                               const HierPath& path);
+  const RtlirParamDecl* ParamOfWhichPathNamesAPart(RtlirModule* mod,
+                                                   const HierPath& path);
   bool ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
                                    const HierPath& path);
 

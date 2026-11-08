@@ -411,7 +411,8 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     if (applied_defparams_.count(key)) continue;
     const auto& [path_expr, val_expr] = site.item->defparam_assigns[idx];
     HierPath path;
-    if (!CollectPathSteps(path_expr, scope, path)) continue;
+    if (!CollectPathSteps(path_expr, scope, path) || path.back().has_index)
+      continue;
     DefparamTopRooted rooted{mod, path, mod};
     auto* param =
         ResolveDefparamSteps(mod, path, site.path, &rooted.target_mod);
@@ -573,31 +574,56 @@ static bool DefparamTargetsSpecparam(RtlirModule* mod, const HierPath& path,
   return false;
 }
 
-static const RtlirParamDecl* OwnParamNamed(const RtlirModule& mod,
-                                           std::string_view name) {
-  for (const auto& p : mod.params) {
-    if (p.gen_block_prefix.empty() && p.name == name) return &p;
+static const RtlirParamDecl* ParamAtPath(RtlirModule* root,
+                                         const HierPath& path) {
+  std::vector<PathDescent> descents;
+  DefparamPathEnd reach = WalkDefparamPath(root, path, {}, descents);
+  std::string block_prefix;
+  for (const HierStep& block : reach.blocks) {
+    block_prefix += std::format("{}_", block.name);
+    if (block.has_index) block_prefix += std::format("{}_", block.index);
+  }
+  for (const auto& p : reach.mod->params) {
+    if (p.gen_block_prefix == block_prefix && p.name == path.back().name)
+      return &p;
   }
   return nullptr;
 }
 
-const RtlirParamDecl* Elaborator::ParamWithStepsAfterIt(RtlirModule* mod,
-                                                        const HierPath& path) {
-  for (size_t len = 1; len < path.size(); ++len) {
-    HierPath prefix(path.begin(),
-                    path.begin() + static_cast<std::ptrdiff_t>(len));
-    const RtlirParamDecl* p = len == 1
-                                  ? OwnParamNamed(*mod, prefix.front().name)
-                                  : ResolveDefparamSteps(mod, prefix, {});
-    DefparamTopRooted any{nullptr, prefix, mod};
-    if (p == nullptr) p = ResolveDefparamFromTop(prefix, any);
-    if (p != nullptr) return p;
+const RtlirParamDecl* Elaborator::ParamAtPathFromAnyRoot(RtlirModule* mod,
+                                                         const HierPath& path) {
+  if (const RtlirParamDecl* p = ParamAtPath(mod, path)) return p;
+  for (RtlirModule* top : defparam_top_roots_) {
+    if (path.size() < 2 || top->name != path.front().name) continue;
+    if (const RtlirParamDecl* p =
+            ParamAtPath(top, HierPath(path.begin() + 1, path.end())))
+      return p;
+  }
+  return nullptr;
+}
+
+const RtlirParamDecl* Elaborator::ParamOfWhichPathNamesAPart(
+    RtlirModule* mod, const HierPath& path) {
+  size_t last = path.back().has_index ? path.size() : path.size() - 1;
+  for (size_t len = 1; len <= last; ++len) {
+    HierPath whole(path.begin(),
+                   path.begin() + static_cast<std::ptrdiff_t>(len));
+    whole.back().has_index = false;
+    if (const RtlirParamDecl* p = ParamAtPathFromAnyRoot(mod, whole)) return p;
   }
   return nullptr;
 }
 
 bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
                                              const HierPath& path) {
+  if (const RtlirParamDecl* whole = ParamOfWhichPathNamesAPart(mod, path)) {
+    diag_.Error(loc,
+                std::format("defparam names a part of parameter '{}', which "
+                            "is overridden only as a whole",
+                            whole->name),
+                Subclause("6.20.2"));
+    return true;
+  }
   DefparamTopRooted any{nullptr, path, mod};
   if (ResolveDefparamSteps(mod, path, {}) != nullptr ||
       ResolveDefparamFromTop(path, any) != nullptr) {
@@ -615,14 +641,6 @@ bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
                 "defparam inside a generate block or an array of instances "
                 "reaches a parameter outside that hierarchy",
                 Subclause("23.10.1"));
-    return true;
-  }
-  if (const RtlirParamDecl* whole = ParamWithStepsAfterIt(mod, path)) {
-    diag_.Error(loc,
-                std::format("defparam names a part of parameter '{}', which "
-                            "is overridden only as a whole",
-                            whole->name),
-                Subclause("6.20.2"));
     return true;
   }
   if (!DefparamTargetsSpecparam(mod, path, defparam_top_roots_)) return false;
