@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -233,6 +235,56 @@ TEST(ConstConstantElaboration, ConstObjectMemberWriteSucceeds) {
       "  initial obj.x = 5;\n"
       "endmodule\n",
       f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+constexpr const char* kHandleClass =
+    "class C;\n"
+    "  int x;\n"
+    "  function new(int v);\n"
+    "    x = v;\n"
+    "  endfunction\n"
+    "endclass\n";
+
+TEST(ConstConstantElaboration, ConstClassHandleAsAnOutputOrRefActualIsError) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kHandleClass) +
+                   "module top;\n"
+                   "  const C obj = new(5);\n"
+                   "  task t1(output C o); endtask\n"
+                   "  task automatic t2(ref C o); endtask\n"
+                   "  initial begin\n"
+                   "    t1(obj);\n"
+                   "    t2(obj);\n"
+                   "  end\n"
+                   "endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant 'obj' cannot be the actual of output argument 'o' of 't1'", 12,
+      "6.20"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "constant 'obj' cannot be the actual of ref argument 'o' of 't2'", 13,
+      "6.20"));
+}
+
+TEST(ConstConstantElaboration,
+     ConstClassHandleAsAnInputOrConstRefActualIsAccepted) {
+  ElabFixture f;
+  auto* design =
+      ElaborateSrc(std::string(kHandleClass) +
+                       "module top;\n"
+                       "  const C obj = new(5);\n"
+                       "  task t3(input C o); endtask\n"
+                       "  task automatic t4(const ref C o); endtask\n"
+                       "  initial begin\n"
+                       "    t3(obj);\n"
+                       "    t4(obj);\n"
+                       "  end\n"
+                       "endmodule\n",
+                   f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }

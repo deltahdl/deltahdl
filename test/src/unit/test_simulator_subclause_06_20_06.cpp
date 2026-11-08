@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -343,6 +345,27 @@ TEST(ConstConstantSim, ExplicitlyAutomaticConstInStaticSubroutine) {
   EXPECT_FALSE(f.has_errors);
   LowerRunAndCheck(f, design,
                    {{"r1", 3u}, {"r2", 7u}, {"r3", 11u}, {"r4", 15u}});
+}
+
+TEST(ConstConstantSim, MemberWrittenThroughAConstHandleReadsBack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  int x;\n"
+      "  function new(int v);\n"
+      "    x = v;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  const C obj = new(5);\n"
+      "  initial begin\n"
+      "    obj.x = 7;\n"
+      "    $display(\"%0d\", obj.x);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(out, "7\n");
 }
 
 }  // namespace

@@ -583,11 +583,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateConstAssignments(const ModuleDecl* decl);
 
-  void WalkStmtsForConstAssign(const Stmt* s);
-
-  void ReportConstAssignTarget(const Expr* lhs, SourceLoc loc);
-
-  void ReportConstMutatingMethodCall(const Expr* call, SourceLoc loc);
+  void ValidateUnitConstAssignments();
 
   void CheckEnumAssignStmt(const Stmt* s);
 
