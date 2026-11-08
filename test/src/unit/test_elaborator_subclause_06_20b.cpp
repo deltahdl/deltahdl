@@ -477,7 +477,8 @@ TEST(ConstAssignElaboration,
       "    iu.t(P);\n    vi.t(P);\n    $root.m.u.t(P);\n"
       "    $unit::ut(P);\n    t(v);\n  end\nendmodule\n");
   ExpectNoError(
-      "module m;\n  task t(output int o); o = 1; endtask\n  class K;\n"
+      "module m;\n  function void t(output int o); o = 1; endfunction\n"
+      "  class K;\n"
       "    localparam int L = 1;\n"
       "    function void t(input int i); endfunction\n"
       "    function void f();\n      this.t(L);\n      t(L);\n"
