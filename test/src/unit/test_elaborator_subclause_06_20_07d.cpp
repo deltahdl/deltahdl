@@ -386,6 +386,38 @@ TEST(DollarClassParameterElaboration,
 }
 
 TEST(DollarClassParameterElaboration,
+     ClassBodyTypeParameterNamesTheClassItBinds) {
+  ElabFixture f;
+  Elaborate(
+      "class UL;\n"
+      "  localparam L = $;\n"
+      "  localparam LB = 4;\n"
+      "endclass\n"
+      "class W;\n"
+      "  parameter type T = UL;\n"
+      "  int wq[$];\n"
+      "  function int f(); return wq[T::L]; endfunction\n"
+      "  function int g(); return wq[T::LB]; endfunction\n"
+      "endclass\n"
+      "class WP #(int N = 1);\n"
+      "  parameter type T = UL;\n"
+      "  int wq[$];\n"
+      "  function int f(); return wq[T::L]; endfunction\n"
+      "  function int g(); return wq[T::LB]; endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  int q[$];\n"
+      "  int v;\n"
+      "  initial v = q[W::T::L];\n"
+      "  initial v = q[W::T::LB];\n"
+      "  initial v = q[WP#(2)::T::L];\n"
+      "  initial v = q[WP#(2)::T::LB];\n"
+      "endmodule\n",
+      f);
+  ExpectDollarParamReportedOnlyOn(f, {8, 14, 20, 22}, {9, 15, 21, 23});
+}
+
+TEST(DollarClassParameterElaboration,
      ClassParameterDefinedThroughItselfEndsTheSearch) {
   ElabFixture f;
   Elaborate(
