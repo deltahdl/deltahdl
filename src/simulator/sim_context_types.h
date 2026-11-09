@@ -82,6 +82,7 @@ struct StructFieldInfo {
   int64_t packed_right = 0;
   uint32_t packed_elem_width = 0;
   std::optional<PackedRange> decl_range = std::nullopt;
+  const std::vector<std::pair<Expr*, Expr*>>* inner_packed_dims = nullptr;
 };
 
 struct StructTypeInfo {

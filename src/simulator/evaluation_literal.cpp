@@ -133,7 +133,9 @@ static uint32_t RunningPackedDimProduct(const DataType& type, SimContext& ctx) {
   }
   if (names.empty()) return 0;
   for (const Expr* name : names) {
-    if (ctx.FindVariable(name->text) == nullptr) return 0;
+    if (ctx.FindVariable(name->text) == nullptr &&
+        ctx.FindArrayInfo(name->text) == nullptr)
+      return 0;
   }
   uint64_t product = 1;
   for (const auto& [left, right] : dims)
@@ -147,20 +149,24 @@ static uint32_t DeclaredPackedDimProduct(const DataType& type,
   return folded != 0 ? folded : RunningPackedDimProduct(type, ctx);
 }
 
+uint32_t NamedMemberWidth(const StructMember& m, SimContext& ctx) {
+  DataType own;
+  own.kind = m.type_kind;
+  own.type_name = m.type_name;
+  own.scope_name = m.scope_name;
+  own.packed_dim_left = m.packed_dim_left;
+  own.packed_dim_right = m.packed_dim_right;
+  own.extra_packed_dims = m.extra_packed_dims;
+  return DeclaredTypeWidth(own, ctx);
+}
+
 static uint32_t RunningMemberWidth(const StructMember& m, SimContext& ctx) {
   if (IsDynamicArrayMember(m)) return kDynamicMemberHandleWidth;
   uint32_t each = EvalStructMemberWidth(m);
   if (m.nested_type != nullptr) {
     each = DeclaredTypeWidth(*m.nested_type, ctx);
   } else if (m.resolved_width == 0 && m.type_kind == DataTypeKind::kNamed) {
-    DataType own;
-    own.kind = m.type_kind;
-    own.type_name = m.type_name;
-    own.scope_name = m.scope_name;
-    own.packed_dim_left = m.packed_dim_left;
-    own.packed_dim_right = m.packed_dim_right;
-    own.extra_packed_dims = m.extra_packed_dims;
-    each = DeclaredTypeWidth(own, ctx);
+    each = NamedMemberWidth(m, ctx);
   }
   return each * UnpackedMemberCount(m);
 }

@@ -26,6 +26,7 @@ struct Expr;
 struct ModuleItem;
 struct Stmt;
 struct StructFieldInfo;
+struct StructMember;
 struct StructTypeInfo;
 struct TimeFormatSpec;
 struct Net;
@@ -41,6 +42,8 @@ Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
 uint32_t LiteralWidth(std::string_view text, uint64_t val);
 
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
+
+uint32_t NamedMemberWidth(const StructMember& m, SimContext& ctx);
 
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 

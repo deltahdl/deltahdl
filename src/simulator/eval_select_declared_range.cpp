@@ -1,6 +1,9 @@
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
@@ -52,12 +55,78 @@ std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
   return DeclaredTypeRange(m->data_type, width, ctx, arena);
 }
 
+namespace {
+
+struct ClassNameDecl {
+  const DataType* type = nullptr;
+  size_t unpacked = 0;
+};
+
+}  // namespace
+
+static ClassNameDecl HeaderParamDeclOf(const ClassDecl& decl,
+                                       std::string_view name) {
+  for (size_t i = 0; i < decl.params.size(); ++i) {
+    if (decl.params[i].first != name) continue;
+    auto dims = decl.param_port_unpacked_dims.find(name);
+    return {&decl.param_types[i], dims == decl.param_port_unpacked_dims.end()
+                                      ? 0
+                                      : dims->second.size()};
+  }
+  return {};
+}
+
+static ClassNameDecl ClassNameDeclOf(const ClassTypeInfo* type,
+                                     std::string_view name) {
+  if (const ClassMember* m = DeclaringMember(type, name))
+    return {&m->data_type, m->unpacked_dims.size()};
+  return HeaderParamDeclOf(*type->decl, name);
+}
+
+const DataType* ClassNameType(const ClassTypeInfo* type,
+                              std::string_view name) {
+  return ClassNameDeclOf(type, name).type;
+}
+
+static std::vector<std::pair<Expr*, Expr*>> PackedDimsOf(const DataType& dt) {
+  std::vector<std::pair<Expr*, Expr*>> dims;
+  if (dt.packed_dim_left != nullptr)
+    dims.emplace_back(dt.packed_dim_left, dt.packed_dim_right);
+  dims.insert(dims.end(), dt.extra_packed_dims.begin(),
+              dt.extra_packed_dims.end());
+  return dims;
+}
+
+std::optional<PackedLevel> ClassNameLevel(const ClassTypeInfo* type,
+                                          std::string_view name, size_t depth,
+                                          uint32_t width, SimContext& ctx) {
+  ClassNameDecl named = ClassNameDeclOf(type, name);
+  if (named.type == nullptr || depth < named.unpacked) return std::nullopt;
+  std::vector<std::pair<Expr*, Expr*>> dims = PackedDimsOf(*named.type);
+  depth -= named.unpacked;
+  if (depth >= dims.size()) return std::nullopt;
+  Arena& arena = ctx.GetArena();
+  PackedRange range{SelectBoundValue(EvalExpr(dims[depth].first, ctx, arena)),
+                    SelectBoundValue(EvalExpr(dims[depth].second, ctx, arena))};
+  auto span = static_cast<uint32_t>(range.HighIndex() - range.LowIndex() + 1);
+  return PackedLevel{range, width / span};
+}
+
 std::optional<PackedRange> CalledFunctionRange(const Expr* base, uint32_t width,
                                                SimContext& ctx, Arena& arena) {
   if (base->kind != ExprKind::kCall) return std::nullopt;
   const ModuleItem* func = ctx.FindFunction(base->callee);
   if (func == nullptr) return std::nullopt;
   return DeclaredTypeRange(func->return_type, width, ctx, arena);
+}
+
+PackedLevel EvaluatedPackedLevel(const Expr* left, const Expr* right,
+                                 uint32_t width, SimContext& ctx,
+                                 Arena& arena) {
+  PackedRange range{SelectBoundValue(EvalExpr(left, ctx, arena)),
+                    SelectBoundValue(EvalExpr(right, ctx, arena))};
+  auto span = static_cast<uint32_t>(range.HighIndex() - range.LowIndex() + 1);
+  return PackedLevel{range, width / span};
 }
 
 std::optional<PackedLevel> CastTypeLevel(const Expr* base, uint32_t width,
@@ -68,11 +137,8 @@ std::optional<PackedLevel> CastTypeLevel(const Expr* base, uint32_t width,
                              ? ref->type_value
                              : ctx.FindTypeDeclaration(CastTypeKey(base, ctx));
   if (type == nullptr || type->packed_dim_left == nullptr) return std::nullopt;
-  PackedRange range{
-      SelectBoundValue(EvalExpr(type->packed_dim_left, ctx, arena)),
-      SelectBoundValue(EvalExpr(type->packed_dim_right, ctx, arena))};
-  auto span = static_cast<uint32_t>(range.HighIndex() - range.LowIndex() + 1);
-  return PackedLevel{range, width / span};
+  return EvaluatedPackedLevel(type->packed_dim_left, type->packed_dim_right,
+                              width, ctx, arena);
 }
 
 }  // namespace delta

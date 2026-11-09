@@ -21,6 +21,7 @@
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/statement_assign.h"
 #include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
@@ -185,14 +186,21 @@ bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+static const StructTypeInfo* StaticPropertyLayoutOf(
+    const StaticPropertyRef& ref, SimContext& ctx) {
+  const ClassTypeInfo::PropertyInfo* prop = ref.owner->FindProperty(ref.name);
+  if (prop != nullptr && !prop->type_name.empty())
+    return ctx.FindStructType(prop->type_name);
+  const DataType* declared = ClassNameType(ref.owner, ref.name);
+  return declared != nullptr ? DeclaredTypeLayout(*declared, ctx) : nullptr;
+}
+
 bool TryStaticStructMember(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
   StaticPropertyRef ref;
   std::string path;
   if (!ResolveStaticHandlePath(expr, ctx, arena, ref, path)) return false;
-  const ClassTypeInfo::PropertyInfo* prop = ref.owner->FindProperty(ref.name);
-  const StructTypeInfo* layout =
-      prop != nullptr ? ctx.FindStructType(prop->type_name) : nullptr;
+  const StructTypeInfo* layout = StaticPropertyLayoutOf(ref, ctx);
   if (layout == nullptr) return false;
   out = ExtractStructField(*ref.slot, layout, path, arena);
   return true;
@@ -292,32 +300,52 @@ static bool FindStructRoot(std::string_view name, std::string& path,
   return var == nullptr && PropertyRoot(ctx.CurrentThis(), name, ctx, root);
 }
 
-static const StructTypeInfo* SelectChainElementLayout(const Expr* base,
-                                                      SimContext& ctx) {
-  const Expr* root = base;
-  while (root != nullptr && root->kind == ExprKind::kSelect &&
-         root->index_end == nullptr) {
-    root = root->base;
+static const StructTypeInfo* StaticPropertyLayout(const Expr* base,
+                                                  SimContext& ctx) {
+  StaticPropertyRef ref;
+  if (!ResolveStaticPropertyBase(base, ctx, ctx.GetArena(), ref))
+    return nullptr;
+  return StaticPropertyLayoutOf(ref, ctx);
+}
+
+static const StructTypeInfo* MemberElementLayout(const Expr* access,
+                                                 SimContext& ctx) {
+  const StructFieldInfo* member = ResolveStructMember(access, ctx);
+  if (member == nullptr || member->packed_elem_width == 0) return nullptr;
+  return member->nested != nullptr ? member->nested
+                                   : ctx.FindStructType(member->type_name);
+}
+
+static const StructTypeInfo* IdentifierElementLayout(const Expr* base,
+                                                     SimContext& ctx) {
+  const ClassObject* self = ctx.CurrentThis();
+  if (self != nullptr && ctx.FindLocalVariable(base->text) == nullptr) {
+    if (const StructTypeInfo* info =
+            PropertyStructLayout(self, base->text, ctx))
+      return info;
   }
-  if (root == nullptr || root->kind != ExprKind::kIdentifier) return nullptr;
-  return StructLayoutOfName(root->text, ctx);
+  if (const StructTypeInfo* info = StructLayoutOfName(base->text, ctx))
+    return info;
+  return StaticPropertyLayout(base, ctx);
+}
+
+static const StructTypeInfo* ScopedElementLayout(const Expr* base,
+                                                 SimContext& ctx) {
+  if (const StructTypeInfo* info =
+          StructLayoutOfName(HierarchicalReferenceName(base), ctx))
+    return info;
+  return StaticPropertyLayout(base, ctx);
 }
 
 const StructTypeInfo* ContainerElementLayout(const Expr* base,
                                              SimContext& ctx) {
   if (base == nullptr) return nullptr;
-  if (base->kind == ExprKind::kSelect) {
-    return SelectChainElementLayout(base, ctx);
-  }
-  if (base->kind == ExprKind::kIdentifier) {
-    const ClassObject* self = ctx.CurrentThis();
-    if (self != nullptr && ctx.FindLocalVariable(base->text) == nullptr) {
-      if (const StructTypeInfo* info =
-              PropertyStructLayout(self, base->text, ctx))
-        return info;
-    }
-    return StructLayoutOfName(base->text, ctx);
-  }
+  if (base->kind == ExprKind::kSelect)
+    return ContainerElementLayout(base->base, ctx);
+  if (base->kind == ExprKind::kIdentifier)
+    return IdentifierElementLayout(base, ctx);
+  if (const StructTypeInfo* info = MemberElementLayout(base, ctx)) return info;
+  if (base->is_scope_resolution) return ScopedElementLayout(base, ctx);
   std::string_view name;
   std::string path;
   if (base->kind != ExprKind::kMemberAccess ||
@@ -395,15 +423,61 @@ QueueObject* ResolveStructDynMember(const Expr* access, SimContext& ctx,
   return copy;
 }
 
+static const StructFieldInfo* StaticStructMember(const Expr* access,
+                                                 SimContext& ctx) {
+  StaticPropertyRef ref;
+  std::string path;
+  if (!ResolveStaticHandlePath(access, ctx, ctx.GetArena(), ref, path))
+    return nullptr;
+  const StructTypeInfo* layout = StaticPropertyLayoutOf(ref, ctx);
+  if (layout == nullptr) return nullptr;
+  uint32_t offset = 0;
+  return ResolveStructField(layout, path, &offset);
+}
+
+namespace {
+
+struct ContainerMember {
+  const Expr* select = nullptr;
+  const StructTypeInfo* info = nullptr;
+  const StructFieldInfo* field = nullptr;
+  uint32_t offset = 0;
+};
+
+}  // namespace
+
+static const Expr* SelectUnderMembers(const Expr* expr, std::string& path) {
+  path = std::string(expr->rhs->text);
+  const Expr* at = expr->lhs;
+  for (; at->kind == ExprKind::kMemberAccess; at = at->lhs)
+    path.insert(0, std::string(at->rhs->text) + ".");
+  return at;
+}
+
+static bool FindContainerMember(const Expr* expr, SimContext& ctx,
+                                ContainerMember& out) {
+  std::string path;
+  out.select = SelectUnderMembers(expr, path);
+  if (out.select->kind != ExprKind::kSelect) return false;
+  out.info = ContainerElementLayout(out.select->base, ctx);
+  if (out.info == nullptr) return false;
+  out.field = ResolveStructField(out.info, path, &out.offset);
+  return out.field != nullptr;
+}
+
 const StructFieldInfo* ResolveStructMember(const Expr* access,
                                            SimContext& ctx) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess)
     return nullptr;
   std::string key;
   std::string path;
-  if (!MemberChainKey(access, key, path)) return nullptr;
+  if (!MemberChainKey(access, key, path)) {
+    ContainerMember member;
+    return FindContainerMember(access, ctx, member) ? member.field : nullptr;
+  }
   StructRoot root;
-  if (!FindStructRoot(key, path, ctx, root)) return nullptr;
+  if (!FindStructRoot(key, path, ctx, root))
+    return StaticStructMember(access, ctx);
   uint32_t offset = 0;
   return ResolveStructField(root.info, path, &offset);
 }
@@ -491,20 +565,11 @@ Logic4Vec NonexistentAggregateElement(const StructTypeInfo& layout,
 
 bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
-  const Expr* select = expr->lhs;
-  if (select == nullptr || select->kind != ExprKind::kSelect ||
-      select->index_end != nullptr || select->base == nullptr ||
-      expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier)
-    return false;
-  const StructTypeInfo* info = ContainerElementLayout(select->base, ctx);
-  if (info == nullptr) return false;
-  uint32_t offset = 0;
-  const StructFieldInfo* field =
-      ResolveStructField(info, expr->rhs->text, &offset);
-  if (field == nullptr) return false;
-  Logic4Vec element = EvalExpr(select, ctx, arena);
-  if (element.width < info->total_width) return false;
-  out = ExtractBitField(arena, element, offset, field->width);
+  ContainerMember member;
+  if (!FindContainerMember(expr, ctx, member)) return false;
+  const StructFieldInfo* field = member.field;
+  Logic4Vec element = EvalExpr(member.select, ctx, arena);
+  out = ExtractBitField(arena, element, member.offset, field->width);
   if (field->type_kind == DataTypeKind::kString) {
     out = StringMemberText(out, arena);
     return true;

@@ -11,13 +11,11 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
-#include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
-#include "elaborator/rtlir_scopes.h"
 #include "elaborator/system_function_types.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -74,18 +72,6 @@ const RtlirModule* RegisteredModule() { return g_param_range_module; }
 
 const std::vector<std::string_view>& RegisteredGenPrefixes() {
   return g_param_range_prefixes;
-}
-
-std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
-  if (!g_param_range_module) return std::nullopt;
-  for (const auto& pd : g_param_range_module->params) {
-    if (pd.name != name) continue;
-    if (!ParamVisibleFromScopes(pd.gen_block_prefix, RegisteredGenPrefixes()))
-      continue;
-    if (!pd.has_decl_range_bounds) return std::nullopt;
-    return PackedRange{pd.decl_range_left, pd.decl_range_right};
-  }
-  return std::nullopt;
 }
 
 std::optional<std::string> ScopedNameKey(const Expr* expr) {

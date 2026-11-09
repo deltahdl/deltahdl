@@ -194,6 +194,7 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   uint32_t width = shape.width;
   auto* var = ctx_.CreateVariable(full, width);
   BindParamLayout(p, full, width, ctx_, arena_);
+  RecordPackedRange(ParamValueType(p), var, ctx_, arena_);
   var->value =
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
   var->is_signed = shape.is_signed;

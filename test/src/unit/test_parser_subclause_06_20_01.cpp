@@ -554,4 +554,39 @@ TEST(ParameterDeclarations, InPlaceTypesParseInEveryOtherScope) {
   EXPECT_EQ(body->data_type.struct_members.size(), 2u);
 }
 
+TEST(DeclarationListParsing, ImplicitTypeTakesEveryPackedDimension) {
+  auto r = Parse(
+      "module m #(parameter [1:0][3:0] MP = 8'h12,\n"
+      "           localparam signed [2:0][1:0][3:0] ML = 0);\n"
+      "  parameter [1:0][3:0] P = 8'hA5;\n"
+      "  localparam unsigned [1:0][3:0] L = 8'hA5;\n"
+      "endmodule\n"
+      "class C #(parameter [1:0][3:0] CP = 8'h12);\n"
+      "  parameter signed [1:0][3:0] CQ = 8'hA5;\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->param_types.size(), 2u);
+  EXPECT_EQ(mod->param_types[0].extra_packed_dims.size(), 1u);
+  EXPECT_EQ(mod->param_types[1].extra_packed_dims.size(), 2u);
+  EXPECT_TRUE(mod->param_types[1].is_signed);
+  const std::vector<const ModuleItem*> kBody = ParamItems(mod->items);
+  ASSERT_EQ(kBody.size(), 2u);
+  EXPECT_EQ(kBody[0]->data_type.kind, DataTypeKind::kImplicit);
+  EXPECT_EQ(kBody[0]->data_type.extra_packed_dims.size(), 1u);
+  EXPECT_EQ(kBody[1]->data_type.extra_packed_dims.size(), 1u);
+  EXPECT_FALSE(kBody[1]->data_type.is_signed);
+  const auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->param_types.size(), 1u);
+  EXPECT_EQ(cls->param_types[0].extra_packed_dims.size(), 1u);
+  const ClassMember* body = nullptr;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param) body = m;
+  }
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->data_type.extra_packed_dims.size(), 1u);
+  EXPECT_TRUE(body->data_type.is_signed);
+}
+
 }  // namespace

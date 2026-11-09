@@ -203,7 +203,7 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
                                  Arena& arena) {
   for (auto& m : dt.struct_members) {
     const DataType* src = NestedAggregateSource(m, typedefs);
-    if (!src) {
+    if (!src || (m.nested_type == nullptr && m.packed_dim_left != nullptr)) {
       if (MemberNamedType(m, typedefs) != nullptr)
         m.resolved_width = EvalStructMemberWidth(m, typedefs);
       continue;

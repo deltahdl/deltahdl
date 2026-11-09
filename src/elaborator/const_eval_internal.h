@@ -190,6 +190,8 @@ ScopeMap RegisteredModuleScope();
 
 const DataType* RegisteredTypedef(std::string_view name);
 const std::unordered_map<std::string_view, DataType>* RegisteredTypedefMap();
+const std::unordered_map<std::string_view, DataType>&
+RegisteredTypedefsOrNone();
 uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope);
 
 std::optional<int64_t> RegisteredTypeRefCompare(const Expr* expr);
@@ -210,8 +212,6 @@ std::optional<ConstVal> RegisteredParamValue(std::string_view name,
 
 void RecordResolvedHighWords(RtlirParamDecl& pd, const Expr* expr,
                              const ScopeMap& scope);
-
-std::optional<PackedRange> RegisteredParamRange(std::string_view name);
 
 const std::vector<std::string_view>& RegisteredGenPrefixes();
 
@@ -259,7 +259,13 @@ std::optional<std::string> ConstEvalAggregatePartString(const Expr* expr,
 
 bool IsRealAggregatePart(const Expr* expr);
 
-std::optional<PackedRange> AggregatePartRange(const Expr* expr,
-                                              const ScopeMap& scope);
+struct PackedSelectBase {
+  PackedRange range;
+  uint32_t element_width = 1;
+  bool element_signed = false;
+};
+
+std::optional<PackedSelectBase> PackedSelectBaseOf(const Expr* expr,
+                                                   const ScopeMap& scope);
 
 }  // namespace delta

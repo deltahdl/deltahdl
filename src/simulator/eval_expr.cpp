@@ -582,6 +582,12 @@ static Variable* FindReferencedVariable(const Expr* expr,
   return var;
 }
 
+Variable* FindMemberAccessVariable(const Expr* expr, SimContext& ctx,
+                                   Arena& arena) {
+  return FindReferencedVariable(expr, HierarchicalReferenceName(expr), ctx,
+                                arena);
+}
+
 static bool TryCastMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   const Expr* base = expr->lhs;

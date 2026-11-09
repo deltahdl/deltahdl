@@ -425,11 +425,21 @@ static void InitPackageDataItem(const ModuleItem* item, std::string_view pkg,
   InitPackageCarrier(item->init_expr, key, found->second, ctx, arena);
 }
 
+static void RecordPackageDataRange(const ModuleItem* item, std::string_view pkg,
+                                   SimContext& ctx, Arena& arena) {
+  if (!DeclaresPackageData(item)) return;
+  RecordPackedRange(&WithPackageOwnType(item, pkg, ctx, arena)->data_type,
+                    ctx.FindVariable(PackageDataKey(item, pkg)), ctx, arena);
+}
+
 static void InitScopeDataItems(const std::vector<ModuleItem*>& items,
                                std::string_view pkg, SimContext& ctx,
                                Arena& arena) {
   ctx.PushScope(pkg);
-  for (auto* item : items) InitPackageDataItem(item, pkg, ctx, arena);
+  for (auto* item : items) {
+    RecordPackageDataRange(item, pkg, ctx, arena);
+    InitPackageDataItem(item, pkg, ctx, arena);
+  }
   ctx.PopScope();
 }
 

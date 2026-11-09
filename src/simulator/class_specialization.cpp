@@ -29,6 +29,7 @@
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -96,11 +97,14 @@ ClassTypeInfo* BaseUnderOwnParams(const ClassTypeInfo* info,
   const ClassDecl* decl = info->decl;
   if (!info->package.empty()) ctx.PushScope(info->package);
   ctx.PushScope();
-  for (const auto& [pname, pexpr] : decl->params) {
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
     if (decl->type_param_names.count(pname) != 0) continue;
     auto entry = info->static_properties.find(std::string(pname));
     if (entry == info->static_properties.end()) continue;
-    ctx.CreateLocalVariable(pname, entry->second.width)->value = entry->second;
+    Variable* local = ctx.CreateLocalVariable(pname, entry->second.width);
+    local->value = entry->second;
+    ShapeClassParamLocal(decl, i, local, ctx, arena);
   }
   ClassTypeInfo* spec = SpecializationOf(
       base, ActualsUnderSpecialization(info, decl->base_class_type_params, ctx),
@@ -487,8 +491,7 @@ static ClassTypeInfo* MakeSpecialization(ClassTypeInfo* generic,
   OwnVTableEntries(spec);
   ClassParamSizer body_sizer(generic->decl, generic->name);
   body_sizer.UseTypeActuals(spec->param_actuals);
-  FoldClassBodyParams(body_sizer, ClassStaticLookup(spec),
-                      ClassStaticStore(spec), ctx, arena);
+  FoldClassBodyParams(body_sizer, ClassStaticStorage(spec), ctx, arena);
   ctx.RegisterClassType(spec->name, spec);
   RegisterClassScopeTypedefAliases(spec, ctx, arena);
   InitSpecializationStaticProperties(spec, ctx, arena);

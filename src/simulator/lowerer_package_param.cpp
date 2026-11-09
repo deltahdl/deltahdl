@@ -25,10 +25,16 @@ static bool ParamDeclaresAWidth(const ModuleItem* item) {
          type.kind != DataTypeKind::kRealtime;
 }
 
+static bool PackedDimsGiveTheWidth(const DataType& type) {
+  return type.packed_dim_left != nullptr && type.kind != DataTypeKind::kNamed &&
+         type.kind != DataTypeKind::kStruct &&
+         type.kind != DataTypeKind::kUnion;
+}
+
 uint32_t DeclaredParamStorageWidth(const ModuleItem* item, SimContext& ctx) {
   if (!ParamDeclaresAWidth(item)) return 0;
   const DataType& type = item->data_type;
-  if (type.packed_dim_left != nullptr) return PackedDimProduct(type);
+  if (PackedDimsGiveTheWidth(type)) return PackedDimProduct(type);
   return DeclaredTypeWidth(type, ctx);
 }
 
@@ -37,8 +43,7 @@ static uint32_t DeclaredParamWidth(const ModuleItem* item, SimContext& ctx,
   if (!ParamDeclaresAWidth(item) || DeclaredTypeIsReal(item->data_type, ctx))
     return 0;
   const DataType& type = item->data_type;
-  if (type.packed_dim_left != nullptr)
-    return EvalFormalArgWidth(type, ctx, arena);
+  if (PackedDimsGiveTheWidth(type)) return EvalFormalArgWidth(type, ctx, arena);
   return DeclaredTypeWidth(type, ctx);
 }
 

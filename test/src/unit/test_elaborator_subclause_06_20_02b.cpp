@@ -693,4 +693,32 @@ TEST(AggregateParameters, DefparamOfAWholeAggregateParameterIsAccepted) {
   }
 }
 
+TEST(ValueParameters, ImplicitTypeWithTwoPackedDimensionsIsOneVector) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  parameter [1:0][3:0] P = 8'hA5;\n"
+      "  parameter signed [1:0][3:0] Q = 8'hA5;\n"
+      "  localparam int BP = $bits(P), BQ = $bits(Q);\n"
+      "  localparam int P1 = P[1], QV = Q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* p = FindParam(design, "m", "P");
+  ASSERT_NE(p, nullptr);
+  EXPECT_TRUE(p->has_decl_range);
+  EXPECT_FALSE(p->has_decl_type);
+  EXPECT_FALSE(p->decl_is_signed);
+  EXPECT_EQ(p->decl_width, 8u);
+  const auto* q = FindParam(design, "m", "Q");
+  ASSERT_NE(q, nullptr);
+  EXPECT_TRUE(q->decl_is_signed);
+  EXPECT_EQ(q->decl_width, 8u);
+  EXPECT_EQ(ParamValue(design, "BP"), 8);
+  EXPECT_EQ(ParamValue(design, "BQ"), 8);
+  EXPECT_EQ(ParamValue(design, "P1"), 0xA);
+  EXPECT_EQ(ParamValue(design, "QV"), -91);
+}
+
 }  // namespace

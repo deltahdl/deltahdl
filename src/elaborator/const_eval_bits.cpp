@@ -71,6 +71,12 @@ const std::unordered_map<std::string_view, DataType>* RegisteredTypedefMap() {
   return g_typedefs;
 }
 
+const std::unordered_map<std::string_view, DataType>&
+RegisteredTypedefsOrNone() {
+  static const std::unordered_map<std::string_view, DataType> kNone;
+  return g_typedefs != nullptr ? *g_typedefs : kNone;
+}
+
 uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope) {
   return g_typedefs == nullptr ? EvalTypeWidth(type)
                                : EvalTypeWidth(type, *g_typedefs, scope);
@@ -439,6 +445,8 @@ uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope) {
     if (RegisteredNamedType(type) == nullptr) return 0;
     return EvalTypeWidth(type, *g_typedefs, scope);
   }
+  if (type.kind == DataTypeKind::kStruct || type.kind == DataTypeKind::kUnion)
+    return EvalTypeWidth(type, RegisteredTypedefsOrNone(), scope);
   if (type.packed_dim_left != nullptr) return PackedDimProduct(type, scope);
   if (type.kind == DataTypeKind::kImplicit) return 0;
   return EvalTypeWidth(type);

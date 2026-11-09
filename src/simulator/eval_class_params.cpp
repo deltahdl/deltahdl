@@ -1,5 +1,6 @@
 #include "simulator/eval_class_params.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -16,12 +17,15 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_typedef_layout.h"
+#include "simulator/eval_function_args_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -55,6 +59,17 @@ static const DataType* ParamType(const ClassDecl* decl, size_t i) {
       decl->type_param_names.count(decl->params[i].first) != 0)
     return nullptr;
   return &decl->param_types[i];
+}
+
+static void ShapeParamLocal(const DataType* type, Variable* local,
+                            SimContext& ctx, Arena& arena) {
+  RecordPackedRange(type, local, ctx, arena);
+  if (type != nullptr) local->local_layout = DeclaredTypeLayout(*type, ctx);
+}
+
+void ShapeClassParamLocal(const ClassDecl* decl, size_t i, Variable* local,
+                          SimContext& ctx, Arena& arena) {
+  ShapeParamLocal(ParamType(decl, i), local, ctx, arena);
 }
 
 Logic4Vec ClassParamSizer::Value(size_t i, const Expr* expr, SimContext& ctx,
@@ -260,8 +275,7 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
   std::string_view cls = obj->type->name;
   ClassParamSizer body_sizer(obj->type->decl);
   body_sizer.UseTypeActuals(actuals);
-  FoldClassBodyParams(
-      body_sizer,
+  ClassParamStorage storage{
       [obj](std::string_view name) -> const Logic4Vec* {
         auto it = obj->properties.find(std::string(name));
         return it != obj->properties.end() ? &it->second : nullptr;
@@ -269,33 +283,143 @@ void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
       [obj, cls](std::string_view name, const Logic4Vec& value) {
         obj->properties[std::string(name)] = value;
         obj->properties[std::string(cls) + "::" + std::string(name)] = value;
-      },
-      ctx, arena);
+      }};
+  FoldClassBodyParams(body_sizer, storage, ctx, arena);
 }
 
-ParamValueLookup ClassStaticLookup(const ClassTypeInfo* info) {
-  return [info](std::string_view name) -> const Logic4Vec* {
-    auto it = info->static_properties.find(std::string(name));
-    return it != info->static_properties.end() ? &it->second : nullptr;
-  };
+ClassParamStorage ClassStaticStorage(ClassTypeInfo* info) {
+  return {[info](std::string_view name) -> const Logic4Vec* {
+            auto it = info->static_properties.find(std::string(name));
+            return it != info->static_properties.end() ? &it->second : nullptr;
+          },
+          [info](std::string_view name, const Logic4Vec& value) {
+            info->static_properties[std::string(name)] = value;
+          },
+          info};
 }
 
-ParamValueStore ClassStaticStore(ClassTypeInfo* info) {
-  return [info](std::string_view name, const Logic4Vec& value) {
-    info->static_properties[std::string(name)] = value;
-  };
+static bool SelectsOrNamesAMember(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess)
+    return true;
+  return SelectsOrNamesAMember(e->lhs) || SelectsOrNamesAMember(e->rhs);
 }
 
-void FoldClassBodyParams(ClassParamSizer sizer, const ParamValueLookup& header,
-                         const ParamValueStore& store, SimContext& ctx,
+static bool PackedDimsReadParamParts(const DataType& type) {
+  std::vector<const Expr*> bounds{type.packed_dim_left, type.packed_dim_right};
+  for (const auto& [left, right] : type.extra_packed_dims) {
+    bounds.push_back(left);
+    bounds.push_back(right);
+  }
+  return std::ranges::any_of(bounds, SelectsOrNamesAMember);
+}
+
+static uint32_t WidthReadingParamParts(const ClassMember& m, SimContext& ctx) {
+  if (m.kind != ClassMemberKind::kProperty || m.is_param ||
+      !m.unpacked_dims.empty() || !PackedDimsReadParamParts(m.data_type))
+    return 0;
+  return DeclaredTypeWidth(m.data_type, ctx);
+}
+
+static void ResizeProperty(ClassTypeInfo& info, std::string_view name,
+                           uint32_t width, Arena& arena) {
+  for (auto& prop : info.properties) {
+    if (prop.name != name) continue;
+    prop.width = width;
+    if (prop.is_static)
+      info.static_properties[std::string(prop.name)] =
+          prop.is_4state ? MakeAllX(arena, width)
+                         : MakeLogic4VecVal(arena, width, 0);
+  }
+}
+
+static void SizePropertiesReadingParamParts(ClassTypeInfo* info,
+                                            SimContext& ctx, Arena& arena) {
+  for (const auto* m : info->decl->members) {
+    uint32_t width = WidthReadingParamParts(*m, ctx);
+    if (width != 0) ResizeProperty(*info, m->name, width, arena);
+  }
+}
+
+static ArrayInfo ParamArrayShape(const ClassTypeInfo::PropertyInfo& prop) {
+  ArrayInfo shape;
+  shape.lo = static_cast<uint32_t>(prop.array_lo);
+  shape.size = prop.array_size;
+  shape.is_descending = prop.array_descending;
+  shape.elem_width = prop.width;
+  shape.is_4state = prop.is_4state;
+  shape.dim_los = prop.dim_los;
+  shape.dim_sizes = prop.dim_sizes;
+  shape.dim_descending = prop.dim_descending;
+  return shape;
+}
+
+static void FillParamArrayLocal(std::string_view name, const ArrayInfo& shape,
+                                const Expr* init, SimContext& ctx,
+                                Arena& arena) {
+  const ArrayInfo* source = init->kind == ExprKind::kIdentifier
+                                ? ctx.FindArrayInfo(init->text)
+                                : nullptr;
+  if (source != nullptr) {
+    CopyArrayElements(name, shape, init->text, *source, ctx);
+    return;
+  }
+  DistributePatternToArray(name, shape, UnwrapTypedPattern(init), ctx, arena);
+}
+
+static void BindParamArrayLocal(std::string_view name, const DataType* type,
+                                const ClassTypeInfo::PropertyInfo& prop,
+                                SimContext& ctx, Arena& arena) {
+  const ArrayInfo kShape = ParamArrayShape(prop);
+  ctx.RegisterLocalArray(name, kShape);
+  std::vector<Variable*> leaves;
+  for (uint32_t k = 0; k < ArrayElementCount(kShape); ++k) {
+    auto* key = arena.Create<std::string>(std::string(name) +
+                                          ArrayElementSuffixAt(kShape, k));
+    leaves.push_back(ctx.CreateLocalVariable(*key, kShape.elem_width));
+  }
+  FillParamArrayLocal(name, kShape, prop.init_expr, ctx, arena);
+  for (Variable* leaf : leaves) ShapeParamLocal(type, leaf, ctx, arena);
+}
+
+namespace {
+
+struct BoundParam {
+  std::string_view name;
+  const DataType* type = nullptr;
+  bool unpacked = false;
+};
+
+}  // namespace
+
+static void BindParamLocal(const BoundParam& param, const Logic4Vec& value,
+                           const ClassTypeInfo* sized, SimContext& ctx,
+                           Arena& arena) {
+  const ClassTypeInfo::PropertyInfo* prop =
+      param.unpacked && sized != nullptr ? sized->FindProperty(param.name)
+                                         : nullptr;
+  if (prop != nullptr) {
+    BindParamArrayLocal(param.name, param.type, *prop, ctx, arena);
+    return;
+  }
+  Variable* local = ctx.CreateLocalVariable(param.name, value.width);
+  local->value = value;
+  ShapeParamLocal(param.type, local, ctx, arena);
+}
+
+void FoldClassBodyParams(ClassParamSizer sizer,
+                         const ClassParamStorage& storage, SimContext& ctx,
                          Arena& arena) {
   const ClassDecl* decl = sizer.Decl();
   ctx.PushScope();
-  for (const auto& [pname, pexpr] : decl->params) {
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
     if (decl->type_param_names.count(pname) != 0) continue;
-    const Logic4Vec* value = header(pname);
+    const Logic4Vec* value = storage.header(pname);
     if (value == nullptr) continue;
-    ctx.CreateLocalVariable(pname, value->width)->value = *value;
+    BindParamLocal({pname, ParamType(decl, i),
+                    decl->param_port_unpacked_dims.count(pname) != 0},
+                   *value, storage.sized, ctx, arena);
   }
   for (const auto* m : decl->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param ||
@@ -303,9 +427,12 @@ void FoldClassBodyParams(ClassParamSizer sizer, const ParamValueLookup& header,
       continue;
     Logic4Vec value = OwnRhsWords(
         sizer.Value(m->name, &m->data_type, m->init_expr, ctx, arena), arena);
-    store(m->name, value);
-    ctx.CreateLocalVariable(m->name, value.width)->value = value;
+    storage.store(m->name, value);
+    BindParamLocal({m->name, &m->data_type, !m->unpacked_dims.empty()}, value,
+                   storage.sized, ctx, arena);
   }
+  if (storage.sized != nullptr)
+    SizePropertiesReadingParamParts(storage.sized, ctx, arena);
   ctx.PopScope();
 }
 

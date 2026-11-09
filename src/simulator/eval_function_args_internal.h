@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <string>
 #include <utility>
-#include <vector>
 
 #include "common/types.h"
 #include "simulator/eval_class_sync.h"
@@ -45,13 +44,10 @@ class CalleeOwnsClassScope {
 class CalleeScopeAside {
  public:
   explicit CalleeScopeAside(SimContext& ctx) : ctx_(ctx) {
-    std::vector<Scope> stack = ctx_.SwapScopeStack({});
-    if (!stack.empty()) {
-      callee_ = std::move(stack.back());
-      stack.pop_back();
+    if (ctx_.HasLocalScope()) {
+      callee_ = ctx_.DetachScope();
       set_aside_ = true;
     }
-    ctx_.SwapScopeStack(std::move(stack));
     if (CalleeOwnsClassFlag()) {
       method_class_ = ctx_.CurrentMethodClass();
       ctx_.PopMethodClass();
@@ -70,10 +66,7 @@ class CalleeScopeAside {
       ctx_.PushMethodClass(method_class_);
       ctx_.PushThis(self_);
     }
-    if (!set_aside_) return;
-    std::vector<Scope> stack = ctx_.SwapScopeStack({});
-    stack.push_back(std::move(callee_));
-    ctx_.SwapScopeStack(std::move(stack));
+    if (set_aside_) ctx_.RestoreScope(std::move(callee_));
   }
   CalleeScopeAside(const CalleeScopeAside&) = delete;
   CalleeScopeAside& operator=(const CalleeScopeAside&) = delete;

@@ -240,10 +240,12 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
     }
     auto* v = ctx.CreateLocalVariable(params[i].first, val.width);
     v->value = val;
+    ShapeClassParamLocal(cls->decl, i, v, ctx, arena);
     auto* qname = arena.Create<std::string>(std::string(cls->decl->name) + "." +
                                             std::string(params[i].first));
     auto* qv = ctx.CreateLocalVariable(*qname, val.width);
     qv->value = val;
+    ShapeClassParamLocal(cls->decl, i, qv, ctx, arena);
   }
 }
 

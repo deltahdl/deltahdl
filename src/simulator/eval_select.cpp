@@ -372,6 +372,13 @@ struct SelectBaseObject {
   size_t depth = 0;
 };
 
+static const Variable* CompoundSelectVariable(const Expr* select,
+                                              SimContext& ctx, Arena& arena) {
+  std::string name;
+  return BuildCompoundName(select, ctx, arena, name) ? ctx.FindVariable(name)
+                                                     : nullptr;
+}
+
 static SelectBaseObject FindSelectBaseObject(const Expr* base, SimContext& ctx,
                                              Arena& arena) {
   size_t depth = 0;
@@ -382,12 +389,67 @@ static SelectBaseObject FindSelectBaseObject(const Expr* base, SimContext& ctx,
                         ctx.FindAssocArray(p->text) != nullptr);
       return {holds_elements ? nullptr : ctx.FindVariable(p->text), depth};
     }
+    if (p->kind == ExprKind::kMemberAccess)
+      return {FindMemberAccessVariable(p, ctx, arena), depth};
     if (p->kind != ExprKind::kSelect) break;
-    std::string name;
-    if (!BuildCompoundName(p, ctx, arena, name)) continue;
-    if (const Variable* var = ctx.FindVariable(name)) return {var, depth};
+    if (const Variable* var = CompoundSelectVariable(p, ctx, arena))
+      return {var, depth};
   }
   return {};
+}
+
+struct SelectRoot {
+  const Expr* expr = nullptr;
+  size_t depth = 0;
+};
+
+static SelectRoot RootOfSelects(const Expr* base) {
+  SelectRoot root{base, 0};
+  for (; root.expr->kind == ExprKind::kSelect; root.expr = root.expr->base)
+    ++root.depth;
+  return root;
+}
+
+static std::optional<PackedLevel> SelectedClassNameLevel(SelectRoot root,
+                                                         uint32_t width,
+                                                         SimContext& ctx) {
+  FieldTarget target;
+  if (root.expr->kind == ExprKind::kMemberAccess) {
+    target = ResolveFieldTarget(root.expr, ctx);
+  } else if (root.expr->kind == ExprKind::kIdentifier) {
+    target = ResolveBarePropertyTarget(root.expr->text, ctx);
+  }
+  if (target.type == nullptr || (target.kind != FieldTarget::Kind::kProperty &&
+                                 target.kind != FieldTarget::Kind::kStatic))
+    return std::nullopt;
+  return ClassNameLevel(target.type, target.field, root.depth, width, ctx);
+}
+
+static std::optional<PackedLevel> InnerMemberLevel(
+    const StructFieldInfo& member, size_t depth, uint32_t width,
+    SimContext& ctx, Arena& arena) {
+  if (member.inner_packed_dims == nullptr ||
+      depth > member.inner_packed_dims->size())
+    return std::nullopt;
+  const auto& [left, right] = (*member.inner_packed_dims)[depth - 1];
+  return EvaluatedPackedLevel(left, right, width, ctx, arena);
+}
+
+static std::optional<PackedLevel> MemberPackedLevel(SelectRoot root,
+                                                    uint32_t width,
+                                                    SimContext& ctx,
+                                                    Arena& arena) {
+  const StructFieldInfo* member = ResolveStructMember(root.expr, ctx);
+  if (member == nullptr || member->packed_elem_width == 0) return std::nullopt;
+  size_t unpacked =
+      member->unpacked_dims != nullptr ? member->unpacked_dims->size() : 0;
+  if (root.depth < unpacked) return std::nullopt;
+  size_t depth = root.depth - unpacked;
+  if (depth == 0) {
+    return PackedLevel{{member->packed_left, member->packed_right},
+                       member->packed_elem_width};
+  }
+  return InnerMemberLevel(*member, depth, width, ctx, arena);
 }
 
 static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
@@ -395,26 +457,17 @@ static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
                                                   SimContext& ctx,
                                                   Arena& arena) {
   SelectBaseObject obj = FindSelectBaseObject(base, ctx, arena);
-  if (obj.var == nullptr) return CastTypeLevel(base, width, ctx, arena);
-  return obj.var->PackedLevelWithin(obj.depth, width);
-}
-
-static std::optional<PackedRange> SelectedPropertyRange(const Expr* base,
-                                                        uint32_t width,
-                                                        SimContext& ctx,
-                                                        Arena& arena) {
-  FieldTarget target = SelectedPropertyTarget(base, ctx);
-  if (target.kind != FieldTarget::Kind::kProperty) return std::nullopt;
-  return PropertyDeclaredRange(target.type ? target.type : target.obj->type,
-                               target.field, width, ctx, arena);
+  if (obj.var != nullptr) return obj.var->PackedLevelWithin(obj.depth, width);
+  if (auto level = CastTypeLevel(base, width, ctx, arena)) return level;
+  SelectRoot root = RootOfSelects(base);
+  if (auto level = SelectedClassNameLevel(root, width, ctx)) return level;
+  return MemberPackedLevel(root, width, ctx, arena);
 }
 
 static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
                                    SimContext& ctx, Arena& arena) {
   auto level = SelectBaseLevel(base, width, ctx, arena);
   if (!level) {
-    if (auto range = SelectedPropertyRange(base, width, ctx, arena))
-      return *range;
     if (auto range = CalledFunctionRange(base, width, ctx, arena))
       return *range;
     return PackedRange::Implicit(width);
@@ -502,14 +555,6 @@ static std::optional<Logic4Vec> TryPackedElementSelect(
     Arena& arena) {
   if (expr->index_end) return std::nullopt;
   auto level = SelectBaseLevel(expr->base, base_val.width, ctx, arena);
-  if (!level) {
-    const StructFieldInfo* member = ResolveStructMember(expr->base, ctx);
-    if (member != nullptr && member->packed_elem_width > 0 &&
-        member->width == base_val.width) {
-      level = PackedLevel{{member->packed_left, member->packed_right},
-                          member->packed_elem_width};
-    }
-  }
   if (!level || level->elem_width <= 1) return std::nullopt;
   uint32_t w = level->elem_width;
   auto range = level->range;

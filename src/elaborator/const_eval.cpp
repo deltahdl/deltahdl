@@ -618,39 +618,26 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   return NormalizeConstVal(*result, w, s);
 }
 
-static std::optional<PackedRange> SelectBaseRange(const Expr* base,
-                                                  const ScopeMap& scope) {
-  if (base->kind != ExprKind::kIdentifier)
-    return AggregatePartRange(base, scope);
-  return RegisteredParamRange(base->text);
-}
-
-static int64_t SelectOffset(const std::optional<PackedRange>& range,
-                            int64_t index) {
-  return range ? range->OffsetOf(index) : index;
-}
-
 static bool InsideValue(const ConstVal& value, int64_t offset) {
   return offset >= 0 && offset < static_cast<int64_t>(value.width);
 }
 
-static std::optional<ConstVal> SelectOneBit(const ConstVal& value,
-                                            int64_t offset) {
-  if (!InsideValue(value, offset)) return std::nullopt;
-  return ConstVal{ConstValBit(value, offset) ? 1 : 0, 1, false};
-}
-
-static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
-                                              int64_t off_a, int64_t off_b) {
-  const int64_t kHi = std::max(off_a, off_b);
-  const int64_t kLo = std::min(off_a, off_b);
+static std::optional<ConstVal> SelectElements(const ConstVal& value,
+                                              const PackedSelectBase& base,
+                                              int64_t index_a, int64_t index_b,
+                                              bool is_signed) {
+  const int64_t kStride = base.element_width;
+  const int64_t kA = base.range.OffsetOf(index_a);
+  const int64_t kB = base.range.OffsetOf(index_b);
+  const int64_t kLo = std::min(kA, kB) * kStride;
+  const int64_t kHi = (std::max(kA, kB) + 1) * kStride - 1;
   if (!InsideValue(value, kLo) || !InsideValue(value, kHi)) return std::nullopt;
   const auto kWidth = static_cast<uint32_t>(kHi - kLo + 1);
   std::vector<uint64_t> words((kWidth + 63) / 64, 0);
   for (uint32_t i = 0; i < kWidth; ++i) {
     if (ConstValBit(value, kLo + i)) words[i / 64] |= uint64_t{1} << (i % 64);
   }
-  return ConstValOfWords(words, kWidth, false);
+  return ConstValOfWords(words, kWidth, is_signed);
 }
 
 std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
@@ -660,17 +647,19 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
   if (!base_val) return std::nullopt;
   auto idx = ConstEvalFull(expr->index, scope);
   if (!idx) return std::nullopt;
-  auto range = SelectBaseRange(expr->base, scope);
+  const PackedSelectBase kBase =
+      PackedSelectBaseOf(expr->base, scope)
+          .value_or(PackedSelectBase{PackedRange::Implicit(base_val->width)});
   if (expr->index_end) {
     auto end = ConstEvalFull(expr->index_end, scope);
     if (!end) return std::nullopt;
     int64_t last = end->value;
     if (expr->is_part_select_plus) last = idx->value + end->value - 1;
     if (expr->is_part_select_minus) last = idx->value - end->value + 1;
-    return SelectBitRange(*base_val, SelectOffset(range, idx->value),
-                          SelectOffset(range, last));
+    return SelectElements(*base_val, kBase, idx->value, last, false);
   }
-  return SelectOneBit(*base_val, SelectOffset(range, idx->value));
+  return SelectElements(*base_val, kBase, idx->value, idx->value,
+                        kBase.element_signed);
 }
 
 }  // namespace delta

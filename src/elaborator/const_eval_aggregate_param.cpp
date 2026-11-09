@@ -39,14 +39,8 @@ class LocateDepth {
   LocateDepth& operator=(LocateDepth&&) = delete;
 };
 
-const TypedefMap& Typedefs() {
-  static const TypedefMap kNone;
-  const TypedefMap* map = RegisteredTypedefMap();
-  return map != nullptr ? *map : kNone;
-}
-
 const DataType& ResolvedType(const DataType& type) {
-  return LastTypeInChain(type, Typedefs());
+  return LastTypeInChain(type, RegisteredTypedefsOrNone());
 }
 
 bool HoldsAggregate(const DataType& type) {
@@ -285,7 +279,8 @@ bool IsDefaultKey(const Expr* key) {
 }
 
 bool IsTypeNameKey(const Expr* key) {
-  return key->kind == ExprKind::kIdentifier && IsTypeKey(key->text, Typedefs());
+  return key->kind == ExprKind::kIdentifier &&
+         IsTypeKey(key->text, RegisteredTypedefsOrNone());
 }
 
 bool IsKeyed(const Expr* pattern) { return !pattern->pattern_keys.empty(); }
@@ -311,8 +306,16 @@ std::optional<PackedLevel> PackedOuter(const DataType& type) {
     element.packed_dim_left = element.extra_packed_dims.front().first;
     element.packed_dim_right = element.extra_packed_dims.front().second;
     element.extra_packed_dims.erase(element.extra_packed_dims.begin());
+  } else if (element.kind == DataTypeKind::kImplicit ||
+             element.kind == DataTypeKind::kEnum) {
+    element.kind = DataTypeKind::kLogic;
   }
   return level;
+}
+
+PackedRange LevelRange(const PackedLevel& level, const ScopeMap& bounds) {
+  return PackedRange{ConstEvalInt(level.left, bounds).value_or(0),
+                     ConstEvalInt(level.right, bounds).value_or(0)};
 }
 
 bool Opens(const PartShape& shape) {
@@ -326,7 +329,7 @@ bool Opens(const PartShape& shape) {
 
 bool TypeKeyMatches(const Expr* key, const PartShape& target) {
   return !target.HasDims() && IsTypeNameKey(key) &&
-         TypeKeyMatchesType(key->text, target.type, Typedefs());
+         TypeKeyMatchesType(key->text, target.type, RegisteredTypedefsOrNone());
 }
 
 std::optional<LocatedPart> LocatePart(const Expr* expr, const ScopeMap& scope);
@@ -403,8 +406,21 @@ uint32_t PartWidth(const DataType& type, const ScopeMap& scope) {
   return width == 0 ? 32 : width;
 }
 
-bool SliceStep(LocatedPart& part, const Expr* step) {
-  if (step->kind != ExprKind::kMemberAccess) return false;
+bool SliceElement(LocatedPart& part, const Expr* step, const ScopeMap& scope) {
+  std::optional<PackedLevel> level = PackedOuter(part.reader.type);
+  if (!level) return false;
+  const ScopeMap& bounds = *part.reader.scope;
+  const PackedRange kRange = LevelRange(*level, bounds);
+  std::optional<int64_t> index = ConstEvalInt(step->index, scope);
+  if (!index || !kRange.Contains(*index)) return false;
+  part.offset += static_cast<uint32_t>(kRange.OffsetOf(*index)) *
+                 PartWidth(level->element, bounds);
+  part.reader.type = std::move(level->element);
+  return true;
+}
+
+bool SliceStep(LocatedPart& part, const Expr* step, const ScopeMap& scope) {
+  if (step->kind == ExprKind::kSelect) return SliceElement(part, step, scope);
   size_t index = 0;
   const StructMember* member =
       MemberNamed(part.reader.type, step->rhs->text, index);
@@ -434,7 +450,7 @@ bool Normalize(PartState& state) {
 }
 
 bool TakeStep(LocatedPart& part, const Expr* step, const ScopeMap& scope) {
-  if (IsPackedLevel(part.reader)) return SliceStep(part, step);
+  if (IsPackedLevel(part.reader)) return SliceStep(part, step, scope);
   const PartShape kOwner = part.reader;
   std::optional<Slot> slot = ReaderStep(step, kOwner, part.reader, scope);
   return slot && Normalize(part.state) && Advance(part.state, *slot);
@@ -527,7 +543,7 @@ std::optional<ConstVal> FoldPacked(const PartState& state) {
   if (!folded) folded = FoldDeclaredParamValue(state.value, type, scope);
   if (!folded) return std::nullopt;
   return NormalizeConstVal(*folded, PartWidth(type, *state.shape.scope),
-                           IsSignedType(type, Typedefs()));
+                           IsSignedType(type, RegisteredTypedefsOrNone()));
 }
 
 ConstVal SlicedBits(const ConstVal& whole, uint32_t offset, uint32_t width,
@@ -554,7 +570,7 @@ std::optional<ConstVal> FoldIntegral(const LocatedPart& part) {
   const DataType& type = part.reader.type;
   if (!whole || TakesItsTypeFromItsValue(type)) return whole;
   return SlicedBits(*whole, part.offset, PartWidth(type, *part.reader.scope),
-                    IsSignedType(type, Typedefs()));
+                    IsSignedType(type, RegisteredTypedefsOrNone()));
 }
 
 std::optional<ConstVal> FoldLeaf(const LocatedPart& part) {
@@ -574,6 +590,43 @@ const UnitParamValue* ScalarUnitRoot(const Expr* expr) {
   if (param == nullptr) return nullptr;
   LeafKind kind = KindOfLeaf(UnitParamState(*param).shape);
   return kind == LeafKind::kReal || kind == LeafKind::kString ? param : nullptr;
+}
+
+std::optional<PartShape> RootShape(const Expr* root, const ScopeMap& scope) {
+  if (root->kind == ExprKind::kIdentifier && root->scope_prefix.empty()) {
+    if (const RtlirParamDecl* pd = RegisteredParamNamed(root->text))
+      return PartShape{*ParamValueType(*pd), DimsOf(pd->unpacked_dims), 0,
+                       &scope};
+  }
+  const UnitParamValue* param = UnitRoot(root);
+  if (param == nullptr) return std::nullopt;
+  return UnitParamState(*param).shape;
+}
+
+std::optional<PackedLevel> PackedLevelOf(const PartShape& shape) {
+  if (shape.HasDims()) return std::nullopt;
+  return PackedOuter(shape.type);
+}
+
+std::optional<PartShape> StepShape(PartShape shape, const Expr* step,
+                                   const ScopeMap& scope) {
+  if (step->kind == ExprKind::kSelect) {
+    if (std::optional<PackedLevel> level = PackedLevelOf(shape)) {
+      shape.type = std::move(level->element);
+      return shape;
+    }
+  }
+  const PartShape kOwner = shape;
+  return ReaderStep(step, kOwner, shape, scope)
+      .transform([&shape](const Slot&) { return shape; });
+}
+
+std::optional<PartShape> ShapeOfRead(const Expr* expr, const ScopeMap& scope) {
+  if (!IsPartStep(expr)) return RootShape(expr, scope);
+  return ShapeOfRead(StepBase(expr), scope)
+      .and_then([expr, &scope](PartShape shape) {
+        return StepShape(std::move(shape), expr, scope);
+      });
 }
 
 std::optional<LocatedPart> LocateRead(const Expr* expr, const ScopeMap& scope) {
@@ -641,16 +694,17 @@ std::optional<std::string> ConstEvalAggregatePartString(const Expr* expr,
   return ConstEvalString(part->state.value, *part->state.frame.scope);
 }
 
-std::optional<PackedRange> AggregatePartRange(const Expr* expr,
-                                              const ScopeMap& scope) {
-  LocateDepth depth;
-  std::optional<LocatedPart> part = LocateRead(expr, scope);
-  if (!part) return std::nullopt;
-  std::optional<PackedLevel> level = PackedOuter(part->reader.type);
+std::optional<PackedSelectBase> PackedSelectBaseOf(const Expr* expr,
+                                                   const ScopeMap& scope) {
+  std::optional<PartShape> shape = ShapeOfRead(expr, scope);
+  if (!shape) return std::nullopt;
+  std::optional<PackedLevel> level = PackedLevelOf(*shape);
   if (!level) return std::nullopt;
-  const ScopeMap& bounds = *part->reader.scope;
-  return PackedRange{ConstEvalInt(level->left, bounds).value_or(0),
-                     ConstEvalInt(level->right, bounds).value_or(0)};
+  const ScopeMap& bounds = *shape->scope;
+  return PackedSelectBase{
+      LevelRange(*level, bounds),
+      DeclaredParamTypeWidth(level->element, bounds),
+      IsSignedType(level->element, RegisteredTypedefsOrNone())};
 }
 
 }  // namespace delta

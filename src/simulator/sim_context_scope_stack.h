@@ -21,7 +21,7 @@ class ScopeStack {
   void EnterSubroutineScope(std::string_view package);
   void PopScope();
   Scope DetachScope();
-  void RestoreScope(Scope frame);
+  void RestoreScope(Scope&& frame);
   std::vector<Scope> SwapScopeStack(std::vector<Scope> new_stack);
   bool HasLocalScope() const { return !scope_stack_.empty(); }
   std::vector<Scope>::const_reverse_iterator VisibleFramesEnd() const;

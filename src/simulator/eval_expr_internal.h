@@ -15,6 +15,7 @@ struct ClassObject;
 struct ClassTypeInfo;
 struct Expr;
 struct StructTypeInfo;
+struct Variable;
 
 Logic4Vec ResolveClassFieldChain(ClassObject* obj,
                                  const ClassTypeInfo* declared_type,
@@ -37,5 +38,8 @@ const StructTypeInfo* PropertyAggregateLayout(std::string_view name,
                                               std::string& key);
 
 std::string StripRootPrefix(const std::string& name);
+
+Variable* FindMemberAccessVariable(const Expr* expr, SimContext& ctx,
+                                   Arena& arena);
 
 }  // namespace delta

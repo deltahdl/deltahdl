@@ -165,8 +165,17 @@ std::optional<PackedRange> PropertyDeclaredRange(const ClassTypeInfo* type,
                                                  uint32_t width,
                                                  SimContext& ctx, Arena& arena);
 
+const DataType* ClassNameType(const ClassTypeInfo* type, std::string_view name);
+
+std::optional<PackedLevel> ClassNameLevel(const ClassTypeInfo* type,
+                                          std::string_view name, size_t depth,
+                                          uint32_t width, SimContext& ctx);
+
 std::optional<PackedRange> CalledFunctionRange(const Expr* base, uint32_t width,
                                                SimContext& ctx, Arena& arena);
+
+PackedLevel EvaluatedPackedLevel(const Expr* left, const Expr* right,
+                                 uint32_t width, SimContext& ctx, Arena& arena);
 
 std::optional<PackedLevel> CastTypeLevel(const Expr* base, uint32_t width,
                                          SimContext& ctx, Arena& arena);

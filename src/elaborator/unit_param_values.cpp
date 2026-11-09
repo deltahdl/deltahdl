@@ -46,7 +46,7 @@ static DataType RecordedType(const UnitParamSource& source) {
   return real;
 }
 
-static bool MayHoldMoreThanAnInteger(const DataType& type,
+static bool ReadsNeedTheDeclaredType(const DataType& type,
                                      const std::vector<Expr*>& dims) {
   switch (type.kind) {
     case DataTypeKind::kNamed:
@@ -58,13 +58,13 @@ static bool MayHoldMoreThanAnInteger(const DataType& type,
     case DataTypeKind::kString:
       return true;
     default:
-      return !dims.empty();
+      return !dims.empty() || type.packed_dim_left != nullptr;
   }
 }
 
 void RegisterUnitParamValue(const UnitParamSource& source) {
   DataType type = RecordedType(source);
-  if (!MayHoldMoreThanAnInteger(type, source.dims)) return;
+  if (!ReadsNeedTheDeclaredType(type, source.dims)) return;
   InstalledParams().declared[UnitKey(source.scope, source.name)] =
       UnitParamValue{source.value, std::move(type),
                      source.dims.empty() ? nullptr : &source.dims,

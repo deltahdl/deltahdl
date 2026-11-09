@@ -744,14 +744,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseImplicitParamRange(DataType& dtype) {
-  if (dtype.kind != DataTypeKind::kImplicit || !Check(TokenKind::kLBracket)) {
-    return;
-  }
-  Consume();
-  dtype.packed_dim_left = ParseExpr();
-  Expect(TokenKind::kColon, Subclause("6.20.2"));
-  dtype.packed_dim_right = ParseExpr();
-  Expect(TokenKind::kRBracket, Subclause("6.20.2"));
+  if (dtype.kind == DataTypeKind::kImplicit) ParsePackedDims(dtype);
 }
 
 bool ParserDataDeclHelpers::ReadTypeReference(Parser& p, DataType& dtype) {

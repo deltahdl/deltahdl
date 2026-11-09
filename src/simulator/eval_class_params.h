@@ -62,6 +62,9 @@ struct ClassParamBinding {
 };
 void MarkUnboundedClassParams(ClassObject* obj, const ClassDecl* decl);
 
+void ShapeClassParamLocal(const ClassDecl* decl, size_t i, Variable* local,
+                          SimContext& ctx, Arena& arena);
+
 std::vector<ClassParamBinding> CollectClassParamBindings(
     const ClassTypeInfo* cls, SimContext& ctx);
 void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,
@@ -70,12 +73,17 @@ void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,
 using ParamValueLookup = std::function<const Logic4Vec*(std::string_view)>;
 using ParamValueStore = std::function<void(std::string_view, const Logic4Vec&)>;
 
-void FoldClassBodyParams(ClassParamSizer sizer, const ParamValueLookup& header,
-                         const ParamValueStore& store, SimContext& ctx,
+struct ClassParamStorage {
+  ParamValueLookup header;
+  ParamValueStore store;
+  ClassTypeInfo* sized = nullptr;
+};
+
+void FoldClassBodyParams(ClassParamSizer sizer,
+                         const ClassParamStorage& storage, SimContext& ctx,
                          Arena& arena);
 
-ParamValueLookup ClassStaticLookup(const ClassTypeInfo* info);
-ParamValueStore ClassStaticStore(ClassTypeInfo* info);
+ClassParamStorage ClassStaticStorage(ClassTypeInfo* info);
 
 TypedefMap TypeParamTypes(const ClassDecl* decl,
                           const std::vector<DataType>& actuals,

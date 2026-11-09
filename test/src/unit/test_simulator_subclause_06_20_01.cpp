@@ -642,4 +642,80 @@ TEST(InPlaceTypeParameterSim, SubroutineAndBlockParametersReadBack) {
       "208 11 17 01 1x0z 0\n");
 }
 
+TEST(ParameterDeclarationSim,
+     ImplicitTypeWithTwoPackedDimensionsInAModuleAndItsPortList) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m #(parameter [1:0][3:0] MP = 8'h12,\n"
+                       "           localparam [1:0][3:0] ML = 8'h34);\n"
+                       "  parameter [1:0][3:0] P = 8'hA5;\n"
+                       "  parameter signed [1:0][3:0] Q = 8'hA5;\n"
+                       "  parameter unsigned [1:0][3:0] R = 8'hA5, S = 8'h5A;\n"
+                       "  localparam [1:0][3:0] L = 8'hA5;\n"
+                       "  initial begin\n"
+                       "    $display(\"%0d %h %h\", $bits(MP), MP[1], MP[0]);\n"
+                       "    $display(\"%0d %h\", $bits(ML), ML[1]);\n"
+                       "    $display(\"%0d %h %h\", $bits(P), P[1], P[0]);\n"
+                       "    $display(\"%0d %0d %h\", $bits(Q), Q, Q[1]);\n"
+                       "    $display(\"%0d %0d %h\", $bits(R), R, S[1]);\n"
+                       "    $display(\"%h\", L[0]);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  m #(.MP(8'hF0)) u ();\n"
+                       "endmodule\n",
+                       f),
+            "8 f 0\n8 3\n8 a 5\n8 -91 a\n8 165 5\n5\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ParameterDeclarationSim,
+     ImplicitTypeWithTwoPackedDimensionsInEveryOtherScope) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  parameter [1:0][3:0] PK = 8'hC3;\n"
+                 "endpackage\n"
+                 "localparam [1:0][3:0] U = 8'h96;\n"
+                 "interface ifc #(parameter [1:0][3:0] IP = 8'h21);\n"
+                 "  parameter [1:0][3:0] I = 8'h5A;\n"
+                 "endinterface\n"
+                 "program pg #(localparam [1:0][3:0] GP = 8'h43);\n"
+                 "  parameter [1:0][3:0] G = 8'h69;\n"
+                 "  initial #2 $display(\"%0d %h %0d %h\", $bits(G), G[1], "
+                 "$bits(GP), GP[0]);\n"
+                 "endprogram\n"
+                 "class C #(parameter [1:0][3:0] CP = 8'h3C);\n"
+                 "  parameter [1:0][3:0] CB = 8'hE1;\n"
+                 "  static function void show();\n"
+                 "    $display(\"%0d %h %0d %h\", $bits(CP), CP[1], $bits(CB), "
+                 "CB[0]);\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  ifc ii ();\n"
+                 "  pg pp ();\n"
+                 "  if (1) begin : g\n"
+                 "    parameter [1:0][3:0] GB = 8'h7E;\n"
+                 "  end\n"
+                 "  function automatic int fn();\n"
+                 "    parameter [1:0][3:0] FP = 8'hD2;\n"
+                 "    return $bits(FP) * 100 + FP[1];\n"
+                 "  endfunction\n"
+                 "  initial begin : b\n"
+                 "    parameter [1:0][3:0] BP = 8'hB4;\n"
+                 "    $display(\"%0d %h\", $bits(pk::PK), pk::PK[1]);\n"
+                 "    $display(\"%0d %h\", $bits(U), U[1]);\n"
+                 "    $display(\"%0d %h %0d %h\", $bits(ii.I), ii.I[1], "
+                 "$bits(ii.IP), ii.IP[1]);\n"
+                 "    C#()::show();\n"
+                 "    C#(8'h0F)::show();\n"
+                 "    $display(\"%0d %h\", $bits(g.GB), g.GB[1]);\n"
+                 "    $display(\"%0d %h %0d\", $bits(BP), BP[0], fn());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "8 c\n8 9\n8 5 8 2\n8 3 8 1\n8 0 8 1\n8 7\n8 4 813\n8 6 8 3\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

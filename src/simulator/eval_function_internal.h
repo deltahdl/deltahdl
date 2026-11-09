@@ -43,6 +43,8 @@ bool BindNamedLayout(std::string_view var_name, const DataType& type,
 
 const StructTypeInfo* NamedLayout(const DataType& type, SimContext& ctx);
 
+const StructTypeInfo* DeclaredTypeLayout(const DataType& type, SimContext& ctx);
+
 void ExecFuncBlockingAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryFuncClassPropertyWrite(const Expr* lhs, const Logic4Vec& val,
                                SimContext& ctx, Arena& arena);

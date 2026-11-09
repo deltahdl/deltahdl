@@ -17,6 +17,7 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
+#include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -63,6 +64,12 @@ bool BindNamedLayout(std::string_view var_name, const DataType& type,
 const StructTypeInfo* NamedLayout(const DataType& type, SimContext& ctx) {
   std::string_view type_name = NamedLayoutKey(type, ctx);
   return type_name.empty() ? nullptr : ctx.FindStructType(type_name);
+}
+
+const StructTypeInfo* DeclaredTypeLayout(const DataType& type,
+                                         SimContext& ctx) {
+  if (type.struct_members.empty()) return NamedLayout(type, ctx);
+  return InlineAggregateLayout(type, ctx);
 }
 
 static void BindLocalAggregateLayout(std::string_view name,

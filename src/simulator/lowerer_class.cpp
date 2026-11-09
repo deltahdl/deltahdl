@@ -167,14 +167,17 @@ static void InitStaticProperties(ClassTypeInfo* info, SimContext& ctx,
 
 static void BindStaticInitValueParams(const ClassTypeInfo* info,
                                       SimContext& ctx) {
-  for (const auto& [pname, pexpr] : info->decl->params) {
-    if (info->decl->type_param_names.count(pname) != 0 ||
-        info->decl->param_port_unpacked_dims.count(pname) != 0)
+  const ClassDecl* decl = info->decl;
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    std::string_view pname = decl->params[i].first;
+    if (decl->type_param_names.count(pname) != 0 ||
+        decl->param_port_unpacked_dims.count(pname) != 0)
       continue;
     auto entry = info->static_properties.find(std::string(pname));
     if (entry == info->static_properties.end()) continue;
     auto* v = ctx.CreateLocalVariable(pname, entry->second.width);
     v->value = entry->second;
+    ShapeClassParamLocal(decl, i, v, ctx, ctx.GetArena());
   }
 }
 
@@ -458,8 +461,8 @@ static void InitClassParams(ClassTypeInfo* info, const ClassDecl* cls,
                                       member->init_expr, ctx, arena)
                         : MakeLogic4VecVal(arena, w, 0));
   }
-  FoldClassBodyParams(ClassParamSizer(cls, info->name), ClassStaticLookup(info),
-                      ClassStaticStore(info), ctx, arena);
+  FoldClassBodyParams(ClassParamSizer(cls, info->name),
+                      ClassStaticStorage(info), ctx, arena);
 }
 
 static void InheritInterfaceStaticsAndEnums(ClassTypeInfo* info,

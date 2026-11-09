@@ -41,6 +41,9 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
 void RegisterAggregateLayout(std::string_view name, const DataType* dtype,
                              uint32_t width, SimContext& ctx, Arena& arena);
 
+const StructTypeInfo* InlineAggregateLayout(const DataType& written,
+                                            SimContext& ctx);
+
 bool HasFourStateMember(const StructTypeInfo& info);
 
 void MarkUnpackedStructStorage(std::string_view name, Variable* v,

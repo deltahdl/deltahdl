@@ -95,7 +95,7 @@ Scope ScopeStack::DetachScope() {
   return frame;
 }
 
-void ScopeStack::RestoreScope(Scope frame) {
+void ScopeStack::RestoreScope(Scope&& frame) {
   scope_stack_.push_back(std::move(frame));
 }
 
