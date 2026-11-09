@@ -18,4 +18,4 @@ write into it later, so the push that carries it goes red.
 **How to apply:** give an agent the file's name and its `add_unit_test`
 line to write, or write the file's first test yourself, and commit the file and
 the CMake line in the same commit as that test; see
-[[test-file-letter-suffixes]] and [[checking-for-the-letter-before-writing]].
+[test-file-letter-suffixes](test-file-letter-suffixes.md) and [checking-for-the-letter-before-writing](checking-for-the-letter-before-writing.md).

@@ -12,7 +12,7 @@ metadata:
 
 An issue holds one problem and no more.
 
-- **An issue of a standard** holds one rule the standard states that deltahdl breaks or leaves untested. It lists every case of that rule, meaning each allowed and forbidden form in each place it can be written ([[fixing-a-rule-in-full]]). Two rules are two issues, even when they share a clause, a failing file list or a first report. Two cases of one rule are one issue, even when they were found apart.
+- **An issue of a standard** holds one rule the standard states that deltahdl breaks or leaves untested. It lists every case of that rule, meaning each allowed and forbidden form in each place it can be written ([fixing-a-rule-in-full](fixing-a-rule-in-full.md)). Two rules are two issues, even when they share a clause, a failing file list or a first report. Two cases of one rule are one issue, even when they were found apart.
 - **An issue about deltahdl itself**, such as a coverage gap or a harness defect, holds one defect with one fix.
 
 This holds when filing and when reading:

@@ -14,4 +14,4 @@ metadata:
 
 **Why:** The byclause loop jumped from §4 to §5 while #3200 was still open under §4. With 1109 issues open, `--search '-label:"needs decision"' --limit 1000` reached down to #5392 and no further.
 
-**How to apply:** List open issues with `gh issue list --state open --limit 10000` and no `--search`. That form pages through GraphQL and returns them all. Leave a label out inside the `--jq` program with `map(select(all(.labels[]; .name != "<label>")))`. When a listing's length comes back as exactly its limit, the listing was cut short. The autopilot skill's loop commands follow this; see [[autopilot-skill]].
+**How to apply:** List open issues with `gh issue list --state open --limit 10000` and no `--search`. That form pages through GraphQL and returns them all. Leave a label out inside the `--jq` program with `map(select(all(.labels[]; .name != "<label>")))`. When a listing's length comes back as exactly its limit, the listing was cut short. The autopilot skill's loop commands follow this; see [the autopilot skill](../skills/autopilot/SKILL.md).

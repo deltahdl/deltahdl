@@ -14,4 +14,4 @@ When the `Publish to GitHub Pages` step of `assert-coverage` in `.github/workflo
 
 **Why:** The step fails when the repository is not set up to take a deployment from a workflow, and nothing in the workflow can change that. Marking the step `continue-on-error` would hide the failure and leave the coverage report unpublished with a green run.
 
-**How to apply:** Tell the user which setting to change, since it is outside the tree. Leave the step as it is, per [[never-weakening-a-gate]].
+**How to apply:** Tell the user which setting to change, since it is outside the tree. Leave the step as it is, per [never-weakening-a-gate](never-weakening-a-gate.md).

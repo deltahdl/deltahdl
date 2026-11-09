@@ -26,5 +26,5 @@ for the user's words quoted, such as a feedback draft's field for what the user
 said, gets a paraphrase marked as one. A user's message that names a term,
 file, label or command keeps that one name, which is not a quotation of the
 sentence around it. The same holds for the standard's sentences, per
-[[lrm-text-is-copyrighted]], and for what [[recording-what-a-session-learns]]
+[lrm-text-is-copyrighted](lrm-text-is-copyrighted.md), and for what [recording-what-a-session-learns](recording-what-a-session-learns.md)
 says a memory holds.

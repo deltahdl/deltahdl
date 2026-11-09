@@ -16,8 +16,8 @@ Before a push, the change is built and checked locally over what it touches: the
 
 **How to apply:**
 
-- **Red, then green.** Build and run each new test before writing its fix, and read why it fails: it must fail for the reason its issue names ([[test-driven-development]]). Then write the fix and run the test again.
+- **Red, then green.** Build and run each new test before writing its fix, and read why it fails: it must fail for the reason its issue names ([test-driven-development](test-driven-development.md)). Then write the fix and run the test again.
 - **Before every push,** run the `pre-push-checks` skill over the committed change, naming any other test targets that reach the changed code, and fix what it reports.
-- **Scope.** Keep the local work to what the change touches. The full unit suite of over three thousand binaries, the sanitizer and gcc builds, the e2e, integration and sv-tests runs and the copy-paste detectors stay CI's, and so does the verdict: read the run, per [[reading-a-ci-run]], and fix a red one per [[fixing-a-red-run]].
+- **Scope.** Keep the local work to what the change touches. The full unit suite of over three thousand binaries, the sanitizer and gcc builds, the e2e, integration and sv-tests runs and the copy-paste detectors stay CI's, and so does the verdict: read the run, per [reading-a-ci-run](reading-a-ci-run.md), and fix a red one per [fixing-a-red-run](fixing-a-red-run.md).
 - **Probes are allowed.** A defect may be probed by running a small design through `build-check/src/deltahdl`, built with `cmake --build build-check --target deltahdl`, but what shows the defect is still a test that states it, pushed with its fix.
-- **Long commands.** A build, a test run or a clang-tidy pass over many files runs in the background, per [[long-running-commands-in-the-background]], and while it runs only the issues in hand are worked on, per [[staying-on-the-issues-in-hand-while-waiting]].
+- **Long commands.** A build, a test run or a clang-tidy pass over many files runs in the background, per [long-running-commands-in-the-background](long-running-commands-in-the-background.md), and while it runs only the issues in hand are worked on, per [staying-on-the-issues-in-hand-while-waiting](staying-on-the-issues-in-hand-while-waiting.md).

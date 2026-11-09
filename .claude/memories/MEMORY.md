@@ -135,4 +135,4 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## The notes themselves
 
 - [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory.
-- [Recording what a session learns](recording-what-a-session-learns.md) — one indivisible fact per file, front matter, a line here, and no history: the reason, never when or after what.
+- [Recording what a session learns](recording-what-a-session-learns.md) — one indivisible fact per file, front matter, a line here, Markdown links `[name](name.md)` between files and never `[[name]]`, and no history: the reason, never when or after what.

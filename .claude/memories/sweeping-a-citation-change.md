@@ -11,4 +11,4 @@ When a diagnostic's `Subclause("…")` moves to another clause, find every asser
 
 **Why:** A sweep by file name misses the rest of that set: an assertion it misses still expects the old citation and turns a coverage shard red after the push, and a comment it misses goes on citing the wrong clause with nothing to say so.
 
-**How to apply:** before committing, run the sweep once more on the message text alone and confirm every hit carries the new clause. See [[test-file-letter-suffixes]] and [[naming-the-report-in-a-rejection-test]].
+**How to apply:** before committing, run the sweep once more on the message text alone and confirm every hit carries the new clause. See [test-file-letter-suffixes](test-file-letter-suffixes.md) and [naming-the-report-in-a-rejection-test](naming-the-report-in-a-rejection-test.md).

@@ -7,7 +7,7 @@ metadata:
 
 # Describing a change in the module's own terms
 
-Describe a change to a module in that module's own terms: an error message or commit message about module M should make sense to a reader who has never heard of anything that calls M. Docstrings and comments are not among the places, since no file carries one; see [[no-comments-in-any-file]].
+Describe a change to a module in that module's own terms: an error message or commit message about module M should make sense to a reader who has never heard of anything that calls M. Docstrings and comments are not among the places, since no file carries one; see [no-comments-in-any-file](no-comments-in-any-file.md).
 
 **Why:** Nothing enforces this, and naming the caller reads as helpful context at the time of writing. It stops being true as soon as a second caller exists, and it makes the module's own documentation unreadable to anyone arriving from a third direction.
 

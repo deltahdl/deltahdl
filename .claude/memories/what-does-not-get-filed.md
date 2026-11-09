@@ -12,7 +12,7 @@ metadata:
 
 Two findings do not become issues of their own.
 
-A case of a rule the commit in hand fixes. The fix reaches it, its test joins the commit, and the commit message states it ([[fixing-a-rule-in-full]]).
+A case of a rule the commit in hand fixes. The fix reaches it, its test joins the commit, and the commit message states it ([fixing-a-rule-in-full](fixing-a-rule-in-full.md)).
 
 A case of a rule an open issue already documents. It is added to that issue's list of cases instead.
 

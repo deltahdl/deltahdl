@@ -17,4 +17,4 @@ kept beside the answer, they are noise a reader has to get through to find
 it.
 
 **How to apply:** after adding a finding, re-read the whole issue and cut
-every sentence the finding makes moot. See [[issues-define-their-terms]].
+every sentence the finding makes moot. See [issues-define-their-terms](issues-define-their-terms.md).

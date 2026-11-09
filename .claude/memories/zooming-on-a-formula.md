@@ -19,4 +19,4 @@ misread glyph goes straight into the model and every test built on it.
 
 **How to apply:** whenever a modelling decision turns on one glyph, zoom
 before writing the test; a crop of a few hundred pixels is a small image.
-See [[reading-the-lrm-one-page-per-call]] and [[locating-a-clause]].
+See [reading-the-lrm-one-page-per-call](reading-the-lrm-one-page-per-call.md) and [locating-a-clause](locating-a-clause.md).

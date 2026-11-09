@@ -16,4 +16,4 @@ The warning does not fire for every such element. Clang suppresses it when most 
 
 **Why:** a missing pair of parentheses costs a full CI round. The build failure hides every test in the file, so whatever those tests would have shown comes a round later still.
 
-**How to apply:** after writing or extending a source array in a test, parenthesize each element made of more than one literal before pushing. clang-format keeps the parentheses and only re-indents the continuation lines. See [[verifying-through-ci]].
+**How to apply:** after writing or extending a source array in a test, parenthesize each element made of more than one literal before pushing. clang-format keeps the parentheses and only re-indents the continuation lines. See [verifying-through-ci](verifying-through-ci.md).

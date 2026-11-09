@@ -24,7 +24,7 @@ the original one depends on answers them.
 reminder and against the blocked-by links. For a question of what the language
 allows, read the rule in both standards, `~/IEEE 1800-2023.pdf` and
 `~/IEEE 1800.2-2020.pdf`, and write what each says into the issue, pages
-included; the 2017 edition is no source of truth ([[the-2017-edition]]).
+included; the 2017 edition is no source of truth ([the-2017-edition](the-2017-edition.md)).
 Read beyond the clause itself too: the clause that states the parallel rule
 for a sibling construct, and every clause that cites this one, often settle
 a reading the clause alone leaves open, as §16.3's grant for immediate
@@ -117,4 +117,4 @@ is in fact §23.3.3.7's permission. §23.3.3.6 confirms that not merging is
 allowed, so §32.4.4's interconnect delay on an inout load requires
 splitting the port.
 Once the answer stands,
-state it per [[issues-state-conclusions-not-the-trail]] and remove the label.
+state it per [issues-state-conclusions-not-the-trail](issues-state-conclusions-not-the-trail.md) and remove the label.

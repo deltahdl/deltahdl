@@ -20,4 +20,4 @@ metadata:
 - `src.yml` disables `bugprone-command-processor`, because §20.17.1 of IEEE 1800-2023 has `$system` pass its argument to the C `system()` command processor, the one call the check forbids. The test tier keeps the check on.
 - `HeaderFilterRegex` adds `lib/cpp` for tests. `lib/cpp` is test-tier code, and no `src/` file includes one of its headers.
 
-**How to apply:** When a check, option or naming rule changes in either file, make the same change in the other in the same commit, unless it is one of the differences above. Neither file is ever weakened to get a run through, per [[never-weakening-a-gate]].
+**How to apply:** When a check, option or naming rule changes in either file, make the same change in the other in the same commit, unless it is one of the differences above. Neither file is ever weakened to get a run through, per [never-weakening-a-gate](never-weakening-a-gate.md).

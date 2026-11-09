@@ -29,5 +29,5 @@ govern. If letting the general rule govern would leave the specific shall
 nothing to apply to, the specific one governs. §33.3.1.1 requires a warning
 for same-named modules mapped into one library in one invocation. Every
 file lands in some library, so a §3.13(a) error there would leave that
-warning nothing to apply to. See [[a-question-the-rules-answer-is-not-a-decision]] and
-[[lrm-source-of-truth]].
+warning nothing to apply to. See [a-question-the-rules-answer-is-not-a-decision](a-question-the-rules-answer-is-not-a-decision.md) and
+[lrm-source-of-truth](lrm-source-of-truth.md).

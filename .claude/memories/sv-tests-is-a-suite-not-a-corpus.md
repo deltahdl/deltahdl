@@ -21,5 +21,5 @@ editing its body, commenting on it, or only labelling it — grep its title and
 body for these words first and rewrite them, even in sentences the touch does
 not otherwise change, since an older issue may still carry them. A quoted log
 line from a run that printed the old wording (`tool rejected the file under …, but the
-corpus tags it …`) stays as quoted. See [[single-edition-1800-2023]] and
-[[reading-the-sv-tests-log-first]].
+corpus tags it …`) stays as quoted. See [single-edition-1800-2023](single-edition-1800-2023.md) and
+[reading-the-sv-tests-log-first](reading-the-sv-tests-log-first.md).

@@ -22,5 +22,5 @@ going.
 
 **How to apply:** In a watcher, loop over every run id the commit lists
 rather than taking the first. The SHA it names is a full one, as
-[[gh-run-list-commit-takes-a-full-sha]] has it, and the watcher runs in the
-background, as [[watching-a-run-in-the-background]] has it.
+[gh-run-list-commit-takes-a-full-sha](gh-run-list-commit-takes-a-full-sha.md) has it, and the watcher runs in the
+background, as [watching-a-run-in-the-background](watching-a-run-in-the-background.md) has it.

@@ -19,6 +19,6 @@ When a gate reports a breach, the code changes and the gate stays as it is.
 - lowering a threshold: the 100% line coverage that `assert-coverage` in `.github/workflows/deltahdl.yml` enforces, the pass bar the sv-tests run holds deltahdl to, `pytest --cov-fail-under=100`, or a size, complexity or naming limit in `etc/clang_tidy/` (a raised limit, a removed prefix, a changed `Case`)
 - disabling a clang-tidy check, or a job, such as `assert-no-inline-directives` or `assert-no-linter-config-files`
 - adding a name to an `IgnoredRegexp` to get past a naming rule, where renaming the code is the fix
-- adding `continue-on-error` to a step, as in [[a-failing-pages-deployment]]
+- adding `continue-on-error` to a step, as in [a-failing-pages-deployment](a-failing-pages-deployment.md)
 
-A check is disabled, or a name exempted, only where a standard mandates exactly what the check forbids. The C++ standard's own names and the names IEEE 1800-2023 prints are examples, listed per [[standard-names-listed-explicitly]], and the commit that does it names the clause. When a rule looks wrong, read the Google C++ Style Guide before touching the configuration. Related: [[gate-limits-live-in-tracked-files]], [[fixing-a-red-run]].
+A check is disabled, or a name exempted, only where a standard mandates exactly what the check forbids. The C++ standard's own names and the names IEEE 1800-2023 prints are examples, listed per [standard-names-listed-explicitly](standard-names-listed-explicitly.md), and the commit that does it names the clause. When a rule looks wrong, read the Google C++ Style Guide before touching the configuration. Related: [gate-limits-live-in-tracked-files](gate-limits-live-in-tracked-files.md), [fixing-a-red-run](fixing-a-red-run.md).

@@ -24,4 +24,4 @@ A plain string test, such as `grep -q` on a value already in the log, hides noth
 
 **Why:** the user wants to read a step's log without guessing what was left out. A step that printed nothing, or printed only when it failed, read to them as hidden output, whichever step it was.
 
-**How to apply:** when writing or reviewing any CI step or runner script, show what it runs, and stream it rather than reporting at the end. Complements [[failing-loudly-in-orchestrators]] and [[composite-actions]].
+**How to apply:** when writing or reviewing any CI step or runner script, show what it runs, and stream it rather than reporting at the end. Complements [failing-loudly-in-orchestrators](failing-loudly-in-orchestrators.md) and [composite-actions](composite-actions.md).

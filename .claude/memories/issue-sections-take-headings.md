@@ -22,4 +22,4 @@ only emphasis run into the paragraph.
 **How to apply:** use `##` for sections, since the issue title stands above
 them; a short noun phrase for the heading, no trailing period. When editing an
 issue written with bolded leads, convert them to headings. This is the one
-formatting rule for issues; otherwise [[issues-have-no-fixed-form]] holds.
+formatting rule for issues; otherwise [issues-have-no-fixed-form](issues-have-no-fixed-form.md) holds.

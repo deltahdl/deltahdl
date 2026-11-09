@@ -27,5 +27,5 @@ already had a table of expected rejections.
 a library relies on, read the rule in `~/IEEE 1800-2023.pdf` and whether
 `~/IEEE 1800.2-2020.pdf` says anything about the construct; write both into
 the issue. Those two are the only sources of truth: the 2017 edition has no
-say ([[single-edition-1800-2023]]). See
-[[a-question-the-rules-answer-is-not-a-decision]] and [[lrm-source-of-truth]].
+say ([single-edition-1800-2023](single-edition-1800-2023.md)). See
+[a-question-the-rules-answer-is-not-a-decision](a-question-the-rules-answer-is-not-a-decision.md) and [lrm-source-of-truth](lrm-source-of-truth.md).

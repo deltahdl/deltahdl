@@ -19,4 +19,4 @@ Each scanning job and step in the workflows reports its own result, whatever any
 - No scanning job lists another scanning job, or a job that decides from the changed paths, in its `needs:`.
 - In a job that runs several scans in a row, every step that reports findings of its own carries `if: ${{ !cancelled() }}`, as the markdownlint and yamllint jobs do. The job still fails when any one of them fails, and one run names every breach.
 
-Related: [[ci-shows-all-output]], [[failing-loudly-in-orchestrators]].
+Related: [ci-shows-all-output](ci-shows-all-output.md), [failing-loudly-in-orchestrators](failing-loudly-in-orchestrators.md).

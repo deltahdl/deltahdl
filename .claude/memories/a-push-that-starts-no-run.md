@@ -28,6 +28,6 @@ several minutes, check the commit's check suites; at 0, run
 `gh workflow run deltahdl.yml --ref main`, confirm with
 `gh run list --workflow deltahdl.yml --limit 1` that the queued run names
 the pushed SHA, and watch that run id in the background as
-[[watching-a-run-in-the-background]] has it. The dispatched run's event is
+[watching-a-run-in-the-background](watching-a-run-in-the-background.md) has it. The dispatched run's event is
 `workflow_dispatch`, so a watcher keyed on
-[[gh-run-list-commit-takes-a-full-sha]] still finds it by its SHA.
+[gh-run-list-commit-takes-a-full-sha](gh-run-list-commit-takes-a-full-sha.md) still finds it by its SHA.

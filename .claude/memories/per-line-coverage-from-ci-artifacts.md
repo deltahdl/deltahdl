@@ -33,11 +33,11 @@ Use the Homebrew LLVM of the major CI ran, `/opt/homebrew/opt/llvm@<major>/bin`
 A newer major refuses the raw profiles of an older one, since each major
 writes its own raw format version, and the merge then ends "no profile can
 be merged"; the default `llvm` formula floats ahead of CI's
-[[unpinned-ci-toolchain]]. If the export reports mismatched data, take both
+[unpinned-ci-toolchain](unpinned-ci-toolchain.md). If the export reports mismatched data, take both
 binaries from the `build-coverage-lib` artifact's `build.tar` instead
 (`./src/deltahdl` and `./src/libdeltahdl_lib.so`). Before a push, the
 `pre-push-checks` skill reads the coverage of the changed lines locally
-([[verifying-through-ci]]); this procedure is for a red run after one.
+([verifying-through-ci](verifying-through-ci.md)); this procedure is for a red run after one.
 
 **Why:** a guess at the missed line cost a whole CI round more than once; the
 report gives a count, and two plausible branches can share a file.

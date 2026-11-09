@@ -25,6 +25,6 @@ meaning and tie to the defect are left out.
 **How to apply:** before filing or editing an issue, read its title and body
 as someone who has opened it from the issue list with nothing else, and for
 each name, term and clause ask what it is and why it is there; add the
-sentence that answers. See [[issues-have-no-fixed-form]] (form is free, the
-context is not) and [[sv-tests-is-a-suite-not-a-corpus]] (the suite's own
+sentence that answers. See [issues-have-no-fixed-form](issues-have-no-fixed-form.md) (form is free, the
+context is not) and [sv-tests-is-a-suite-not-a-corpus](sv-tests-is-a-suite-not-a-corpus.md) (the suite's own
 words: suite, tag, test, revision, deltahdl, evaluate).
