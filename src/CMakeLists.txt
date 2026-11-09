@@ -292,6 +292,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/const_eval_bits.cpp
     elaborator/const_eval_func.cpp
     elaborator/const_eval_func_case.cpp
+    elaborator/local_name_frames.cpp
     elaborator/const_eval_real.cpp
     elaborator/const_eval_is_constant.cpp
     elaborator/const_eval_builtin_method.cpp

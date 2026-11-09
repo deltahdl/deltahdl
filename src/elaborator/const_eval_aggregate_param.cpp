@@ -73,6 +73,7 @@ class FrameGuard {
   ParamRangeRegistryGuard module_;
   RegisteredGenScopeGuard gen_;
   UnitNamePrefixGuard prefix_;
+  LocalNameFrame names_;
 };
 
 struct PartShape {
@@ -560,7 +561,7 @@ std::optional<ConstVal> FoldLeaf(const LocatedPart& part) {
   if (kind == LeafKind::kIntegral) return FoldIntegral(part);
   if (kind != LeafKind::kString) return std::nullopt;
   FrameGuard guard(part.state.frame);
-  return ConstEvalStringLiteral(part.state.value);
+  return ConstEvalStringLiteral(part.state.value, *part.state.frame.scope);
 }
 
 double AsReal(const ConstVal& value) {
@@ -636,7 +637,7 @@ std::optional<std::string> ConstEvalAggregatePartString(const Expr* expr,
   if (!part || KindOfLeaf(part->reader) != LeafKind::kString)
     return std::nullopt;
   FrameGuard guard(part->state.frame);
-  return ConstEvalString(part->state.value);
+  return ConstEvalString(part->state.value, *part->state.frame.scope);
 }
 
 std::optional<PackedRange> AggregatePartRange(const Expr* expr,

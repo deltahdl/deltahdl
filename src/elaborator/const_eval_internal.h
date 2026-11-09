@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "common/packed_range.h"
@@ -46,22 +47,35 @@ std::optional<ConstVal> ConstEvalLiteral(const Expr* expr);
 std::optional<const Stmt*> ConstFuncCaseArm(const Stmt* s,
                                             const ScopeMap& locals);
 
-class ConstFuncRealFrame {
+struct LocalNames {
+  std::unordered_set<std::string_view> declared;
+  std::unordered_map<std::string_view, double> reals;
+  std::unordered_map<std::string_view, std::string> strings;
+};
+
+class LocalNameFrame {
  public:
-  ConstFuncRealFrame();
-  ~ConstFuncRealFrame();
-  ConstFuncRealFrame(const ConstFuncRealFrame&) = delete;
-  ConstFuncRealFrame& operator=(const ConstFuncRealFrame&) = delete;
-  ConstFuncRealFrame(ConstFuncRealFrame&&) = delete;
-  ConstFuncRealFrame& operator=(ConstFuncRealFrame&&) = delete;
+  LocalNameFrame();
+  explicit LocalNameFrame(std::string_view genvar);
+  ~LocalNameFrame();
+  LocalNameFrame(const LocalNameFrame&) = delete;
+  LocalNameFrame& operator=(const LocalNameFrame&) = delete;
+  LocalNameFrame(LocalNameFrame&&) = delete;
+  LocalNameFrame& operator=(LocalNameFrame&&) = delete;
 
  private:
-  std::unordered_map<std::string_view, double> values_;
-  std::unordered_map<std::string_view, double>* prev_;
+  LocalNames locals_;
+  LocalNames* prev_;
 };
+void DeclareLocalName(std::string_view name);
+bool DeclaresLocalName(std::string_view name);
 std::optional<double> ConstFuncRealLocal(std::string_view name);
 void SetConstFuncRealLocal(std::string_view name, double value);
 void ClearConstFuncRealLocal(std::string_view name);
+const std::string* ConstFuncStringLocal(std::string_view name);
+void SetConstFuncStringLocal(std::string_view name, std::string chars);
+std::optional<std::string> NamedStringChars(const Expr* expr,
+                                            const ScopeMap& scope);
 void ReportConstFuncSeverity(const Expr* call, const ScopeMap& locals,
                              DiagEngine& diag, Arena& arena);
 bool IsConstFuncRealType(const DataType& type);
@@ -75,7 +89,8 @@ std::optional<double> ConstEvalUserCallReal(const Expr* call,
                                             const ScopeMap& scope);
 std::optional<ConstVal> ConstEvalUnbasedUnsized(const Expr* expr,
                                                 FoldContext ctx);
-std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr);
+std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr,
+                                               const ScopeMap& scope);
 
 std::optional<std::string> ConstTypenameChars(const Expr* expr);
 

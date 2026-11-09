@@ -23,6 +23,9 @@ constexpr std::string_view kPackage =
     "  parameter U = 2.5;\n"
     "  parameter real RI = 2;\n"
     "  parameter string S = \"hey\";\n"
+    "  parameter int N = 2;\n"
+    "  parameter string S2 = {S, \"!\"};\n"
+    "  parameter string S3 = {N{\"ab\"}};\n"
     "  parameter string SA [2] = '{\"ab\", \"cde\"};\n"
     "  parameter real RA [2] = '{1.25, 3.5};\n"
     "  parameter real R2 = R * 2;\n"
@@ -96,6 +99,10 @@ TEST(UnitParamValueRead, PackageParameterByItsScopedName) {
                                   "  localparam int L2 = pk::SA[1].len();\n"
                                   "  localparam int G1 = pk::S.getc(1);\n"
                                   "  localparam int E1 = pk::S == \"hey\";\n"
+                                  "  localparam string T3 = pk::S2;\n"
+                                  "  localparam string T4 = pk::S3;\n"
+                                  "  localparam int L3 = pk::S3.len();\n"
+                                  "  localparam int E2 = pk::S3 == \"abab\";\n"
                                   "  logic [$rtoi(pk::R * 4)-1:0] v1;\n"
                                   "  logic [pk::S.len()-1:0] v2;\n"
                                   "  if ($rtoi(pk::R * 4) == 10) begin : g1\n"
@@ -116,10 +123,17 @@ TEST(UnitParamValueRead, PackageParameterByItsScopedName) {
                {"X5", 5.0},
                {"X6", 2.5},
                {"X7", 0.5}});
-  ExpectStrings(design, "m", {{"T1", "hey"}, {"T2", "cde"}});
-  ExpectInts(
-      design, "m",
-      {{"I1", 10}, {"I2", 5}, {"L1", 3}, {"L2", 3}, {"G1", 'e'}, {"E1", 1}});
+  ExpectStrings(design, "m",
+                {{"T1", "hey"}, {"T2", "cde"}, {"T3", "hey!"}, {"T4", "abab"}});
+  ExpectInts(design, "m",
+             {{"I1", 10},
+              {"I2", 5},
+              {"L1", 3},
+              {"L2", 3},
+              {"L3", 4},
+              {"G1", 'e'},
+              {"E1", 1},
+              {"E2", 1}});
   ExpectWidth(design, "v1", 10);
   ExpectWidth(design, "v2", 3);
   EXPECT_EQ(CountVarsEndingIn(design, "m", "taken_real"), 1u);
@@ -130,7 +144,7 @@ TEST(UnitParamValueRead, PackageParameterImportedIntoAModuleBody) {
   for (const char* imports :
        {"  import pk::*;\n",
         "  import pk::R;\n  import pk::S;\n  import pk::SR;\n"
-        "  import pk::SA;\n  import pk::RI;\n"}) {
+        "  import pk::SA;\n  import pk::RI;\n  import pk::S3;\n"}) {
     ElabFixture f;
     auto* design =
         ElaborateSrc(std::string(kPackage) + "module m;\n" + imports +
@@ -142,6 +156,7 @@ TEST(UnitParamValueRead, PackageParameterImportedIntoAModuleBody) {
                          "  localparam int I3 = RI * 3;\n"
                          "  localparam string T1 = S;\n"
                          "  localparam string T2 = SA[1];\n"
+                         "  localparam string T3 = S3;\n"
                          "  localparam int L1 = S.len();\n"
                          "  logic [$rtoi(R * 4)-1:0] v1;\n"
                          "  logic [S.len()-1:0] v2;\n"
@@ -154,7 +169,7 @@ TEST(UnitParamValueRead, PackageParameterImportedIntoAModuleBody) {
     EXPECT_FALSE(f.has_errors) << imports;
     ExpectReals(design, "m",
                 {{"X1", 5.0}, {"X2", kShortrealTenthLess}, {"X3", 0.5}});
-    ExpectStrings(design, "m", {{"T1", "hey"}, {"T2", "cde"}});
+    ExpectStrings(design, "m", {{"T1", "hey"}, {"T2", "cde"}, {"T3", "abab"}});
     ExpectInts(design, "m", {{"I1", 10}, {"I2", 5}, {"I3", 6}, {"L1", 3}});
     ExpectWidth(design, "v1", 10);
     ExpectWidth(design, "v2", 3);
@@ -179,22 +194,93 @@ TEST(UnitParamValueRead, PackageParameterImportedInAModuleHeader) {
   ExpectInts(design, "m", {{"L1", 3}});
 }
 
-TEST(UnitParamValueRead, FunctionArgumentHidesAnImportedRealParameter) {
+TEST(UnitParamValueRead, LocalNameHidesAnImportedRealParameter) {
   ElabFixture f;
-  auto* design = ElaborateSrc(std::string(kPackage) +
-                                  "module m;\n"
-                                  "  import pk::*;\n"
-                                  "  function automatic int twice(int R);\n"
-                                  "    return R * 2;\n"
-                                  "  endfunction\n"
-                                  "  localparam int F = twice(4);\n"
-                                  "  localparam real X = R * 2;\n"
-                                  "endmodule\n",
-                              f);
+  auto* design = ElaborateSrc(
+      std::string(kPackage) +
+          "class E #(int R = 1);\n"
+          "  parameter int H = R / 2;\n"
+          "  parameter string S = \"zzz\";\n"
+          "  parameter string Q = pk::S2;\n"
+          "endclass\n"
+          "module c;\n"
+          "  import pk::*;\n"
+          "  localparam int W = R * 2;\n"
+          "endmodule\n"
+          "module g;\n"
+          "  import pk::*;\n"
+          "  for (genvar R = 0; R < 4; R++) begin : l\n"
+          "    localparam int Q = R / 2;\n"
+          "    localparam Q2 = R / 2;\n"
+          "    if ($rtoi(R * 4.0) == 12) begin : h\n"
+          "      logic taken;\n"
+          "    end\n"
+          "    if (Q == 1 && R == 3) begin : q\n"
+          "      logic taken_int;\n"
+          "    end\n"
+          "    if (Q2 == 1 && R == 3) begin : q2\n"
+          "      logic taken_untyped;\n"
+          "    end\n"
+          "    c ci();\n"
+          "  end\n"
+          "endmodule\n"
+          "module m;\n"
+          "  import pk::*;\n"
+          "  g u();\n"
+          "  function automatic int twice(int R);\n"
+          "    return R * 2;\n"
+          "  endfunction\n"
+          "  function automatic int halve(int R);\n"
+          "    return R / 2;\n"
+          "  endfunction\n"
+          "  function automatic int halve_local(int x);\n"
+          "    int R;\n"
+          "    R = x;\n"
+          "    return R / 2;\n"
+          "  endfunction\n"
+          "  function automatic int halve_loop(int x);\n"
+          "    halve_loop = 0;\n"
+          "    for (int R = x; R == x; R = R + 1) halve_loop = R / 2;\n"
+          "  endfunction\n"
+          "  function automatic int RT(int x);\n"
+          "    RT = x;\n"
+          "    RT = RT / 2;\n"
+          "  endfunction\n"
+          "  function automatic real half(int R);\n"
+          "    return R / 2.0;\n"
+          "  endfunction\n"
+          "  function automatic real package_twice(real R);\n"
+          "    return pk::R2;\n"
+          "  endfunction\n"
+          "  localparam int F1 = twice(4);\n"
+          "  localparam int F2 = twice(3);\n"
+          "  localparam int F3 = halve(3);\n"
+          "  localparam int F4 = halve_local(3);\n"
+          "  localparam int F5 = halve_loop(3);\n"
+          "  localparam int F6 = RT(3);\n"
+          "  localparam int F7 = E#(3)::H;\n"
+          "  localparam real H1 = half(3);\n"
+          "  localparam real H2 = package_twice(7.0);\n"
+          "  localparam string T = E#(3)::Q;\n"
+          "  localparam real X = R * 2;\n"
+          "endmodule\n",
+      f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  ExpectInts(design, "m", {{"F", 8}});
-  ExpectReals(design, "m", {{"X", 5.0}});
+  ExpectInts(design, "m",
+             {{"F1", 8},
+              {"F2", 6},
+              {"F3", 1},
+              {"F4", 1},
+              {"F5", 1},
+              {"F6", 1},
+              {"F7", 1}});
+  ExpectReals(design, "m", {{"H1", 1.5}, {"H2", 5.0}, {"X", 5.0}});
+  ExpectStrings(design, "m", {{"T", "hey!"}});
+  ExpectInts(design, "c", {{"W", 5}});
+  EXPECT_EQ(CountVarsEndingIn(design, "g", "taken"), 1u);
+  EXPECT_EQ(CountVarsEndingIn(design, "g", "taken_int"), 1u);
+  EXPECT_EQ(CountVarsEndingIn(design, "g", "taken_untyped"), 1u);
 }
 
 TEST(UnitParamValueRead, PackageParameterReadFromAnotherPackage) {
@@ -238,6 +324,8 @@ TEST(UnitParamValueRead, CompilationUnitParameter) {
                                   "parameter real W = pk::R * 2;\n"
                                   "parameter real W2 = PR * 4;\n"
                                   "parameter V = 1.25;\n"
+                                  "parameter int CN = 2;\n"
+                                  "parameter string CS = {CN{S}};\n"
                                   "module n;\n"
                                   "  localparam int R = 9;\n"
                                   "  localparam real X = $unit::R * 2;\n"
@@ -253,6 +341,7 @@ TEST(UnitParamValueRead, CompilationUnitParameter) {
                                   "  localparam string T1 = $unit::S;\n"
                                   "  localparam string T2 = S;\n"
                                   "  localparam string T3 = PS;\n"
+                                  "  localparam string T4 = CS;\n"
                                   "  localparam int L1 = S.len();\n"
                                   "  localparam int L2 = $unit::S.len();\n"
                                   "  logic [$rtoi($unit::R * 4)-1:0] v1;\n"
@@ -271,7 +360,8 @@ TEST(UnitParamValueRead, CompilationUnitParameter) {
                {"X5", 3.0},
                {"X6", 1.5}});
   ExpectReals(design, "n", {{"X", 5.0}});
-  ExpectStrings(design, "m", {{"T1", "hey"}, {"T2", "hey"}, {"T3", "yo"}});
+  ExpectStrings(design, "m",
+                {{"T1", "hey"}, {"T2", "hey"}, {"T3", "yo"}, {"T4", "heyhey"}});
   ExpectInts(design, "m", {{"L1", 3}, {"L2", 3}});
   ExpectWidth(design, "v1", 10);
   EXPECT_EQ(CountVarsEndingIn(design, "m", "taken_real"), 1u);
@@ -284,8 +374,11 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
       "  parameter real R = 2.5;\n"
       "  parameter string S = \"hey\";\n"
       "  parameter real R2 = R * 2;\n"
+      "  parameter int N = 2;\n"
+      "  parameter string S2 = {S, \"!\"};\n"
+      "  parameter string S3 = {N{\"ab\"}};\n"
       "endclass\n"
-      "class D #(int N = 1);\n"
+      "class D #(int N = 1, string T = \"a\");\n"
       "  parameter real RZ = 1.0 / (N - 2);\n"
       "  parameter real R = N * 1.25;\n"
       "  parameter real R2 = R * 2;\n"
@@ -293,6 +386,11 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
       "  parameter K = N + 1;\n"
       "  parameter shortreal SR = N * 0.05;\n"
       "  parameter string S = \"hey\";\n"
+      "  parameter string S2 = {S, \"!\"};\n"
+      "  parameter string S3 = {N{\"ab\"}};\n"
+      "  parameter string TT = {T, \"x\"};\n"
+      "  parameter int L = S3.len();\n"
+      "  parameter int K2 = R * 2;\n"
       "endclass\n"
       "module m;\n"
       "  localparam real X1 = C::R * 2;\n"
@@ -308,6 +406,15 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
       "  localparam string T2 = D#(2)::S;\n"
       "  localparam int L1 = C::S.len();\n"
       "  localparam int L2 = D#(2)::S.len();\n"
+      "  localparam string T3 = C::S2;\n"
+      "  localparam string T4 = C::S3;\n"
+      "  localparam string T5 = D#(2)::S2;\n"
+      "  localparam string T6 = D#(2)::S3;\n"
+      "  localparam string T7 = D#(2, \"b\")::TT;\n"
+      "  localparam string T8 = D#(2)::TT;\n"
+      "  localparam int L3 = D#(3)::L;\n"
+      "  localparam int K1 = D#(2)::K2;\n"
+      "  localparam int I1 = D#(2)::R;\n"
       "  logic [$rtoi(C::R * 4)-1:0] v1;\n"
       "  logic [$rtoi(D#(2)::R * 4)-1:0] v2;\n"
       "  if ($rtoi(C::R * 4) == 10) begin : g\n"
@@ -327,8 +434,17 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
                {"X7", 1.5},
                {"X8", 3.0},
                {"X9", kShortrealTenthLess}});
-  ExpectStrings(design, "m", {{"T1", "hey"}, {"T2", "hey"}});
-  ExpectInts(design, "m", {{"L1", 3}, {"L2", 3}});
+  ExpectStrings(design, "m",
+                {{"T1", "hey"},
+                 {"T2", "hey"},
+                 {"T3", "hey!"},
+                 {"T4", "abab"},
+                 {"T5", "hey!"},
+                 {"T6", "abab"},
+                 {"T7", "bx"},
+                 {"T8", "ax"}});
+  ExpectInts(design, "m",
+             {{"L1", 3}, {"L2", 3}, {"L3", 6}, {"K1", 5}, {"I1", 3}});
   ExpectWidth(design, "v1", 10);
   ExpectWidth(design, "v2", 10);
   EXPECT_EQ(CountVarsEndingIn(design, "m", "taken_real"), 1u);

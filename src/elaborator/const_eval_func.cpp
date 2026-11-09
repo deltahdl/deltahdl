@@ -35,7 +35,7 @@ static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
     if (!arg) return std::nullopt;
     return CastConstVal(*arg, arg->width, expr->callee == "$signed");
   }
-  if (expr->callee == "$typename") return ConstEvalStringLiteral(expr);
+  if (expr->callee == "$typename") return ConstEvalStringLiteral(expr, scope);
   auto val = EvalConstSysCall(expr, scope);
   if (!val) return std::nullopt;
   auto listed = std::ranges::find(kSystemFunctionTypes, expr->callee,
@@ -218,6 +218,7 @@ static ConstFuncFlow ExecConstFuncStmts(const std::vector<Stmt*>& stmts,
 
 static ConstFuncFlow ExecConstFuncVarDecl(const Stmt* s, ScopeMap& locals) {
   if (s->var_name.empty()) return ConstFuncFlow::kNormal;
+  DeclareLocalName(s->var_name);
   locals[s->var_name] = 0;
   if (IsConstFuncRealType(s->var_decl_type))
     SetConstFuncRealLocal(s->var_name, 0.0);
@@ -328,6 +329,7 @@ static ConstFuncFlow ExecConstFuncFor(const Stmt* s, ScopeMap& locals,
   for (size_t i = 0; i < s->for_init_types.size(); ++i) {
     if (s->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
     std::string_view name = s->for_inits[i]->lhs->text;
+    DeclareLocalName(name);
     auto outer = locals.find(name);
     if (outer != locals.end()) hidden.emplace_back(*outer);
     reals.emplace_back(name, ConstFuncRealLocal(name));
@@ -561,9 +563,11 @@ static std::optional<ConstCallResult> RunConstFuncCall(const Expr* expr,
   ScopeMap locals = scope;
   RealBindings reals;
   if (!BindConstFuncArgs(func, expr, scope, locals, reals)) return std::nullopt;
-  ConstFuncRealFrame frame;
+  LocalNameFrame frame;
+  for (const FunctionArg& fa : func->func_args) DeclareLocalName(fa.name);
   for (const auto& [name, value] : reals) SetConstFuncRealLocal(name, value);
   if (!func->name.empty()) {
+    DeclareLocalName(func->name);
     locals[func->name] = 0;
     if (IsConstFuncRealType(func->return_type))
       SetConstFuncRealLocal(func->name, 0.0);
@@ -628,7 +632,7 @@ static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
     case ExprKind::kUnbasedUnsizedLiteral:
       return ConstEvalUnbasedUnsized(expr, ctx);
     case ExprKind::kStringLiteral:
-      return ConstEvalStringLiteral(expr);
+      return ConstEvalStringLiteral(expr, scope);
     case ExprKind::kIdentifier:
       return ConstEvalIdentifierFull(expr, scope);
     case ExprKind::kUnary:

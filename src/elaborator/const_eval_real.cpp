@@ -15,33 +15,6 @@
 
 namespace delta {
 
-namespace {
-
-std::unordered_map<std::string_view, double>* g_real_frame = nullptr;
-
-}  // namespace
-
-ConstFuncRealFrame::ConstFuncRealFrame() : prev_(g_real_frame) {
-  g_real_frame = &values_;
-}
-
-ConstFuncRealFrame::~ConstFuncRealFrame() { g_real_frame = prev_; }
-
-std::optional<double> ConstFuncRealLocal(std::string_view name) {
-  if (g_real_frame == nullptr) return std::nullopt;
-  auto it = g_real_frame->find(name);
-  if (it == g_real_frame->end()) return std::nullopt;
-  return it->second;
-}
-
-void SetConstFuncRealLocal(std::string_view name, double value) {
-  (*g_real_frame)[name] = value;
-}
-
-void ClearConstFuncRealLocal(std::string_view name) {
-  g_real_frame->erase(name);
-}
-
 bool IsConstFuncRealType(const DataType& type) {
   return type.kind == DataTypeKind::kReal ||
          type.kind == DataTypeKind::kShortreal ||
@@ -200,17 +173,6 @@ static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
   return ConstEvalRealMathCall(expr, scope);
 }
 
-static std::optional<double> UnitParamReal(const Expr* expr,
-                                           const ScopeMap& scope) {
-  if (!NamesScalarUnitParam(expr)) return std::nullopt;
-  std::optional<double> unit = ConstEvalAggregatePartReal(expr, scope);
-  auto it = scope.find(expr->text);
-  if (it != scope.end() &&
-      unit.transform([](double v) { return std::llround(v); }) != it->second)
-    return std::nullopt;
-  return unit;
-}
-
 static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
                                                      const ScopeMap& scope) {
   if (expr->scope_prefix == "$unit")
@@ -221,9 +183,8 @@ static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
   if (pd != nullptr && pd->is_real_value &&
       (it == scope.end() || it->second == pd->resolved_value))
     return pd->resolved_real;
-  if (pd == nullptr) {
-    if (auto unit = UnitParamReal(expr, scope)) return unit;
-  }
+  if (pd == nullptr && it == scope.end() && NamesScalarUnitParam(expr))
+    return ConstEvalAggregatePartReal(expr, scope);
   if (it != scope.end()) return static_cast<double>(it->second);
   return std::nullopt;
 }

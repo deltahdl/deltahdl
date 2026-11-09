@@ -37,6 +37,7 @@ namespace delta {
 static bool IsRealIdentifier(const Expr* e) {
   if (e->scope_prefix.empty()) {
     if (ConstFuncRealLocal(e->text)) return true;
+    if (DeclaresLocalName(e->text)) return false;
     if (const RtlirParamDecl* pd = RegisteredParamNamed(e->text))
       return pd->is_real_value;
   }
@@ -89,6 +90,13 @@ std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
   auto rval = ConstEvalReal(expr, scope);
   if (!rval || !std::isfinite(*rval)) return std::nullopt;
   return std::llround(*rval);
+}
+
+std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
+                                                  const DataType& type,
+                                                  const ScopeMap& scope) {
+  if (auto rounded = FoldRealValueAsInteger(value, scope)) return rounded;
+  return FoldDeclaredParamValue(value, type, scope);
 }
 
 namespace {

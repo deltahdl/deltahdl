@@ -159,6 +159,8 @@ std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 
 std::optional<std::string> ConstEvalString(const Expr* expr);
+std::optional<std::string> ConstEvalString(const Expr* expr,
+                                           const ScopeMap& scope);
 
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);
 

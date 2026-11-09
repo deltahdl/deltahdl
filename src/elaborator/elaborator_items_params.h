@@ -26,6 +26,10 @@ namespace delta {
 std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
                                               const ScopeMap& scope);
 
+std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
+                                                  const DataType& type,
+                                                  const ScopeMap& scope);
+
 bool HasRealOperand(const Expr* expr);
 
 bool TakesItsTypeFromItsValue(const DataType& type);

@@ -404,13 +404,17 @@ static std::string StringLiteralChars(const Expr* expr) {
   return chars;
 }
 
-static std::optional<std::string> StringParamChars(const Expr* expr) {
-  const RtlirParamDecl* param =
-      expr->scope_prefix.empty() ? RegisteredParamNamed(expr->text) : nullptr;
-  if (param == nullptr)
-    return ConstEvalAggregatePartString(expr, RegisteredModuleScope());
-  if (!param->is_string_value) return std::nullopt;
-  return std::string(param->resolved_string);
+std::optional<std::string> NamedStringChars(const Expr* expr,
+                                            const ScopeMap& scope) {
+  if (expr->kind == ExprKind::kIdentifier && expr->scope_prefix.empty()) {
+    if (const std::string* local = ConstFuncStringLocal(expr->text))
+      return *local;
+    if (const RtlirParamDecl* param = RegisteredParamNamed(expr->text)) {
+      if (!param->is_string_value) return std::nullopt;
+      return std::string(param->resolved_string);
+    }
+  }
+  return ConstEvalAggregatePartString(expr, scope);
 }
 
 ScopeMap RegisteredModuleScope() {
@@ -425,51 +429,58 @@ ScopeMap RegisteredModuleScope() {
   return scope;
 }
 
-static std::optional<std::string> ConcatenatedStringChars(const Expr* expr) {
+static std::optional<std::string> ConcatenatedStringChars(
+    const Expr* expr, const ScopeMap& scope) {
   std::string chars;
   for (const Expr* element : expr->elements) {
-    auto part = ConstEvalString(element);
+    auto part = ConstEvalString(element, scope);
     if (!part) return std::nullopt;
     chars += *part;
   }
   return chars;
 }
 
-static std::optional<std::string> ReplicatedStringChars(const Expr* expr) {
-  auto count = ConstEvalInt(expr->repeat_count, RegisteredModuleScope());
+static std::optional<std::string> ReplicatedStringChars(const Expr* expr,
+                                                        const ScopeMap& scope) {
+  auto count = ConstEvalInt(expr->repeat_count, scope);
   if (!count || *count < 0) return std::nullopt;
-  auto inner = ConcatenatedStringChars(expr);
+  auto inner = ConcatenatedStringChars(expr, scope);
   if (!inner) return std::nullopt;
   std::string chars;
   for (int64_t i = 0; i < *count; ++i) chars += *inner;
   return chars;
 }
 
-std::optional<std::string> ConstEvalString(const Expr* expr) {
+std::optional<std::string> ConstEvalString(const Expr* expr,
+                                           const ScopeMap& scope) {
   if (expr == nullptr) return std::nullopt;
   switch (expr->kind) {
     case ExprKind::kStringLiteral:
       return StringLiteralChars(expr);
-    case ExprKind::kIdentifier:
-      return StringParamChars(expr);
     case ExprKind::kConcatenation:
-      return ConcatenatedStringChars(expr);
+      return ConcatenatedStringChars(expr, scope);
     case ExprKind::kReplicate:
-      return ReplicatedStringChars(expr);
+      return ReplicatedStringChars(expr, scope);
     case ExprKind::kSystemCall:
       return ConstTypenameChars(expr);
+    case ExprKind::kIdentifier:
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
-      return ConstEvalAggregatePartString(expr, RegisteredModuleScope());
+      return NamedStringChars(expr, scope);
     default:
       return std::nullopt;
   }
 }
 
-std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
+std::optional<std::string> ConstEvalString(const Expr* expr) {
+  return ConstEvalString(expr, RegisteredModuleScope());
+}
+
+std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr,
+                                               const ScopeMap& scope) {
   auto chars = expr->kind == ExprKind::kStringLiteral
                    ? std::optional<std::string>(StringLiteralBytes(expr))
-                   : ConstEvalString(expr);
+                   : ConstEvalString(expr, scope);
   if (!chars) return std::nullopt;
   uint32_t width =
       chars->empty() ? 8u : static_cast<uint32_t>(chars->size()) * 8u;

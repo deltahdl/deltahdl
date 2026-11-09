@@ -17,6 +17,7 @@
 #include "elaborator/checker_instance_binding.h"
 #include "elaborator/compilation_unit_set.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_bind_scope.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_scope_rules_names.h"
@@ -120,6 +121,7 @@ class ElaboratorData {
     HierPath path_;
     GenBlockConsts consts_;
     ScopeMap const_scope_;
+    LocalNameFrame genvar_names_;
   };
 
  protected:

@@ -40,13 +40,6 @@ struct ClassParamRegistration {
   const std::unordered_set<std::string_view>* specparams = nullptr;
 };
 
-static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
-                                                    const DataType& type,
-                                                    const ScopeMap& values) {
-  if (auto rounded = FoldRealValueAsInteger(pexpr, values)) return rounded;
-  return FoldDeclaredParamValue(pexpr, type, values);
-}
-
 static bool IsNullLiteral(const Expr* e) {
   return e->kind == ExprKind::kIdentifier && e->text == "null";
 }
@@ -87,7 +80,7 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
   bool is_real = !is_array && HoldsRealValue(type, pexpr);
   std::optional<int64_t> val;
   if (!is_real && !is_array)
-    val = FoldClassParamInteger(pexpr, type, reg.values);
+    val = FoldParamValueRoundingReal(pexpr, type, reg.values);
   bool constant = is_array  ? pexpr->kind != ExprKind::kAssignmentPattern ||
                                   PatternItemsConstant(pexpr, reg.values)
                   : is_real ? ConstEvalReal(pexpr, reg.values).has_value()

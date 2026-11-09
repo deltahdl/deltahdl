@@ -91,17 +91,6 @@ const std::vector<RtlirEnumMember>* EnumMembers(const Expr* operand) {
   return &it->second;
 }
 
-std::optional<std::string> StringParamValue(const Expr* operand,
-                                            const ScopeMap& scope) {
-  const RtlirParamDecl* param =
-      operand->kind == ExprKind::kIdentifier && operand->scope_prefix.empty()
-          ? RegisteredParamNamed(operand->text)
-          : nullptr;
-  if (param == nullptr) return ConstEvalAggregatePartString(operand, scope);
-  if (!param->is_string_value) return std::nullopt;
-  return std::string(param->resolved_string);
-}
-
 std::optional<ConstVal> StringParamChar(const Expr* call, std::string_view str,
                                         const ScopeMap& scope) {
   if (call->kind != ExprKind::kCall || call->args.size() != 1)
@@ -123,13 +112,13 @@ std::optional<ConstVal> ConstEvalBuiltinMethodFull(const Expr* expr,
   if (!member) return std::nullopt;
   const std::string_view kMethod = member->rhs->text;
   if (kMethod == "getc") {
-    auto str = StringParamValue(member->lhs, scope);
+    auto str = NamedStringChars(member->lhs, scope);
     if (!str) return std::nullopt;
     return StringParamChar(expr, *str, scope);
   }
   if (expr->kind == ExprKind::kCall && !expr->args.empty()) return std::nullopt;
   if (kMethod == "len") {
-    auto str = StringParamValue(member->lhs, scope);
+    auto str = NamedStringChars(member->lhs, scope);
     if (!str) return std::nullopt;
     return ConstVal{static_cast<int64_t>(str->size()), 32, true};
   }

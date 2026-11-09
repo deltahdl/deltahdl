@@ -75,11 +75,10 @@ static SpecializationArg OrderedParamOverride(const Expr& base, size_t pos,
 }
 
 static std::optional<ConstVal> FoldClassParamDefault(const Expr* pexpr,
-                                                     const DataType* type,
+                                                     const DataType& type,
                                                      const ScopeMap& values) {
   if (pexpr == nullptr) return std::nullopt;
-  auto v = type != nullptr ? FoldDeclaredParamValue(pexpr, *type, values)
-                           : ConstEvalInt(pexpr, values);
+  auto v = FoldParamValueRoundingReal(pexpr, type, values);
   if (!v) return std::nullopt;
   return ConstVal{*v, 32, true};
 }
@@ -116,9 +115,7 @@ static SpecializationArg HeaderParamArg(const Expr* expr, const ClassDecl* decl,
   SpecializationArg arg = NamedParamOverride(*expr->lhs, pname, scope);
   if (!arg.supplied) arg = OrderedParamOverride(*expr->lhs, i, scope);
   if (arg.supplied) return arg;
-  const DataType* type =
-      i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
-  return {false, FoldClassParamDefault(pexpr, type, values)};
+  return {false, FoldClassParamDefault(pexpr, decl->param_types[i], values)};
 }
 
 struct SpecializedTarget {
@@ -142,15 +139,18 @@ static void BindReal(std::string_view name, const BoundSource& from) {
   if (value) SetConstFuncRealLocal(name, *value);
 }
 
+static void BindString(std::string_view name, const BoundSource& from) {
+  if (from.type->kind != DataTypeKind::kString) return;
+  std::optional<std::string> chars =
+      ConstEvalString(from.source, from.source_scope);
+  if (chars) SetConstFuncStringLocal(name, std::move(*chars));
+}
+
 class SpecializationWalk {
  public:
   SpecializationWalk(const Expr* expr, const ClassDecl* decl,
-                     const ScopeMap& scope, bool binds_reals)
-      : expr_(expr),
-        decl_(decl),
-        scope_(scope),
-        values_(scope),
-        binds_reals_(binds_reals) {}
+                     const ScopeMap& scope)
+      : expr_(expr), decl_(decl), scope_(scope), values_(scope) {}
 
   std::optional<SpecializedTarget> Find() {
     std::string_view target = expr_->rhs->text;
@@ -172,7 +172,7 @@ class SpecializationWalk {
     for (const auto* m : decl_->members) {
       if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
       DataType type = InClassScope(m->data_type, *decl_);
-      auto v = FoldClassParamDefault(m->init_expr, &type, values_);
+      auto v = FoldClassParamDefault(m->init_expr, type, values_);
       if (m->name == target)
         return SpecializedTarget{Answer({false, v}), m->init_expr,
                                  std::move(type), values_};
@@ -184,7 +184,9 @@ class SpecializationWalk {
  private:
   void Take(std::string_view name, const std::optional<ConstVal>& v,
             const BoundSource& from) {
-    if (binds_reals_) BindReal(name, from);
+    DeclareLocalName(name);
+    BindReal(name, from);
+    BindString(name, from);
     Bind(values_, name, v, from);
   }
 
@@ -192,15 +194,15 @@ class SpecializationWalk {
   const ClassDecl* decl_;
   const ScopeMap& scope_;
   ScopeMap values_;
-  bool binds_reals_;
 };
 
 SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
                                                  const ScopeMap& scope) {
   const ClassDecl* decl = SpecializedParamClass(expr);
   if (!decl) return {};
+  LocalNameFrame frame;
   std::optional<SpecializedTarget> target =
-      SpecializationWalk(expr, decl, scope, false).Find();
+      SpecializationWalk(expr, decl, scope).Find();
   return target ? target->arg : SpecializationArg{};
 }
 
@@ -210,9 +212,9 @@ bool NamesSpecializedClassParam(const Expr* expr) {
 
 std::optional<double> ConstEvalSpecializedClassParamReal(
     const Expr* expr, const ScopeMap& scope) {
-  ConstFuncRealFrame frame;
+  LocalNameFrame frame;
   std::optional<SpecializedTarget> target =
-      SpecializationWalk(expr, SpecializedParamClass(expr), scope, true).Find();
+      SpecializationWalk(expr, SpecializedParamClass(expr), scope).Find();
   if (!target) return std::nullopt;
   if (!HoldsRealValue(target->type, target->source))
     return target->arg.value.transform(
@@ -222,11 +224,11 @@ std::optional<double> ConstEvalSpecializedClassParamReal(
 
 std::optional<std::string> ConstEvalSpecializedClassParamString(
     const Expr* expr, const ScopeMap& scope) {
+  LocalNameFrame frame;
   std::optional<SpecializedTarget> target =
-      SpecializationWalk(expr, SpecializedParamClass(expr), scope, false)
-          .Find();
+      SpecializationWalk(expr, SpecializedParamClass(expr), scope).Find();
   if (!target) return std::nullopt;
-  return ConstEvalString(target->source);
+  return ConstEvalString(target->source, target->scope);
 }
 
 }  // namespace delta

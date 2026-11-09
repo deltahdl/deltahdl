@@ -10,6 +10,7 @@
 
 #include "common/diagnostic.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/const_eval_internal.h"
 #include "elaborator/disable_iff_resolution.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -207,6 +208,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   BindDeclaredConstant(loop_scope, genvar_name, opening->init_value);
   std::string saved_prefix = gen_prefix_;
   active_loop_genvars_.insert(genvar_name);
+  LocalNameFrame genvar_names(genvar_name);
 
   size_t const_depth = gen_loop_consts_.size();
   gen_loop_consts_.emplace_back(genvar_name, opening->init_value);
