@@ -239,6 +239,18 @@ void RecordTypeParamActual(RtlirParamDecl& pd,
                              : tp->resolved_type;
 }
 
+void Elaborator::ResolveBodyTypeParam(const ModuleItem* item,
+                                      RtlirParamDecl& pd, RtlirModule* mod) {
+  ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
+                                 {mod->params, typedefs_, class_names_}, diag_);
+  auto assigned = AssignedTypeParamType(item, pd, mod, unit_, diag_);
+  if (!assigned) return;
+  ReportAssignedTypeOutsideRestriction(item, *assigned,
+                                       {typedefs_, unit_, class_names_}, diag_);
+  typedefs_[item->name] = assigned->type;
+  pd.resolved_type = arena_.Create<DataType>(assigned->type);
+}
+
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->data_type, item->loc, mod);
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
@@ -260,15 +272,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.default_value = item->init_expr;
   if (!item->unpacked_dims.empty()) pd.unpacked_dims = &item->unpacked_dims;
   if (is_type) {
-    ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
-                                   {mod->params, typedefs_, class_names_},
-                                   diag_);
-    if (auto assigned = AssignedTypeParamType(item, pd, mod, unit_, diag_)) {
-      ReportAssignedTypeOutsideRestriction(
-          item, *assigned, {typedefs_, unit_, class_names_}, diag_);
-      typedefs_[item->name] = assigned->type;
-      pd.resolved_type = arena_.Create<DataType>(assigned->type);
-    }
+    ResolveBodyTypeParam(item, pd, mod);
   } else {
     EmitBareEnumMembers(item, mod);
   }

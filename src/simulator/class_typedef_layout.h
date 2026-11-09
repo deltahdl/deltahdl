@@ -29,6 +29,11 @@ const ClassTypeInfo* ClassTypedefDeclarer(std::string_view name,
 std::string_view ClassTypedefLayoutKey(const ClassTypeInfo& cls,
                                        std::string_view name, SimContext& ctx);
 
+std::string_view InPlaceAggregateLayoutKey(std::string_view scope,
+                                           std::string_view name,
+                                           const DataType& type,
+                                           SimContext& ctx);
+
 const StructTypeInfo* MethodClassTypedefLayout(std::string_view name,
                                                SimContext& ctx,
                                                std::string_view* key);

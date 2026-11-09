@@ -463,9 +463,9 @@ TEST(InPlaceTypeParameterSim, PackageAndUnitParametersReadBack) {
   SimFixture f;
   EXPECT_EQ(
       RunCapture(
-          "parameter enum {UA, UB} UE = UB;\n"
+          "parameter enum {UA, UB, UC} UE = UC;\n"
           "localparam struct packed {logic [3:0] a;} US = 4'b1x0z;\n"
-          "parameter int UK = UA + 2;\n"
+          "parameter int UK = UB + 2;\n"
           "package pk;\n"
           "  parameter enum logic [2:0] {KA = 3, KB = 5} KE = KB;\n"
           "  localparam union packed {bit [3:0] a; bit [3:0] b;} "
@@ -476,10 +476,10 @@ TEST(InPlaceTypeParameterSim, PackageAndUnitParametersReadBack) {
           "endpackage\n"
           "module t;\n"
           "  initial $display(\"%0d %b %0d %0d %b %0d %b %0d %0d\", UE, US, "
-          "UK, pk::KE, pk::KU, pk::KR.a, pk::KR.b, pk::KI, UA);\n"
+          "UK, pk::KE, pk::KU, pk::KR.a, pk::KR.b, pk::KI, UB);\n"
           "endmodule\n",
           f),
-      "1 1x0z 2 5 1000 6 1z0x 3 0\n");
+      "2 1x0z 3 5 1000 6 1z0x 3 1\n");
 }
 
 TEST(InPlaceTypeParameterSim, ClassParametersOfInPlaceTypesReadBack) {
@@ -514,20 +514,26 @@ TEST(InPlaceTypeParameterSim, SubroutineAndBlockParametersReadBack) {
                  "    localparam struct packed {bit [3:0] a;} FS = 4'b1x0z;\n"
                  "    return FE * 100 + FS;\n"
                  "  endfunction\n"
+                 "  function int g();\n"
+                 "    parameter enum {GA, GB} GE = GB;\n"
+                 "    return GE + 10;\n"
+                 "  endfunction\n"
                  "  task automatic tk(output int o);\n"
                  "    parameter struct {int a; int b;} TR = '{a: 3, b: 4};\n"
-                 "    o = TR.a + TR.b;\n"
+                 "    parameter enum {TA, TB, TC} TE = TB;\n"
+                 "    o = TR.a + TR.b + TE * 10;\n"
                  "  endtask\n"
                  "  initial begin : b\n"
                  "    parameter enum logic [1:0] {BA, BB} BE = BB;\n"
                  "    localparam union packed {logic [3:0] a; logic [3:0] b;} "
                  "BU = 4'b1x0z;\n"
                  "    tk(r);\n"
-                 "    $display(\"%0d %0d %b %b %0d\", f(), r, BE, BU, BA);\n"
+                 "    $display(\"%0d %0d %0d %b %b %0d\", f(), g(), r, BE, BU, "
+                 "BA);\n"
                  "  end\n"
                  "endmodule\n",
                  f),
-      "208 7 01 1x0z 0\n");
+      "208 11 17 01 1x0z 0\n");
 }
 
 }  // namespace

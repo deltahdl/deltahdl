@@ -9,11 +9,13 @@
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/eval_class_params.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/unit_scope_items.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_dump_state.h"
 
@@ -29,23 +31,17 @@ std::optional<int64_t> FoldPackageParamValue(const ModuleItem& item,
                                SimParamTypeIsSigned(type, ctx));
 }
 
-static void RegisterPackageItemEnumConstants(const ModuleItem* item,
-                                             const PackageDecl& pkg,
-                                             ScopeMap& values, SimContext& ctx,
-                                             Arena& arena) {
-  std::string_view pkg_name = pkg.name;
-  if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-    if (auto v = FoldPackageParamValue(*item, pkg, values, ctx))
-      values[item->name] = *v;
-    return;
-  }
+static void RegisterItemEnumConstantVariables(const ModuleItem* item,
+                                              std::string_view scope_name,
+                                              ScopeMap& values, SimContext& ctx,
+                                              Arena& arena) {
   ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
     uint32_t width = EvalTypeWidth(EnumArrayElement(type), {});
     if (width == 0) width = 32;
     bool is_signed = IsSignedType(type, TypedefMap{});
     for (const auto& m : FoldEnumMembers(type.enum_members, values, arena)) {
       values[m.name] = m.value;
-      auto* qname = arena.Create<std::string>(std::string(pkg_name) + "." +
+      auto* qname = arena.Create<std::string>(std::string(scope_name) + "." +
                                               std::string(m.name));
       ctx.Vcd().MarkVcdEnumConstant(*qname);
       Variable* constant = ctx.CreateVariable(*qname, width);
@@ -56,6 +52,16 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
   });
 }
 
+static void RegisterPackageItemEnumConstants(const ModuleItem* item,
+                                             const PackageDecl& pkg,
+                                             ScopeMap& values, SimContext& ctx,
+                                             Arena& arena) {
+  RegisterItemEnumConstantVariables(item, pkg.name, values, ctx, arena);
+  if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
+  if (auto v = FoldPackageParamValue(*item, pkg, values, ctx))
+    values[item->name] = *v;
+}
+
 void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
                                   Arena& arena) {
   for (auto* pkg : design->packages) {
@@ -63,6 +69,12 @@ void RegisterPackageEnumConstants(const RtlirDesign* design, SimContext& ctx,
     for (auto* item : pkg->items)
       RegisterPackageItemEnumConstants(item, *pkg, values, ctx, arena);
   }
+  ForEachUnitScope(
+      design, arena, [&](const CompilationUnit& unit, std::string_view scope) {
+        ScopeMap values = design->unit_constants;
+        for (const auto* item : unit.cu_items)
+          RegisterItemEnumConstantVariables(item, scope, values, ctx, arena);
+      });
 }
 
 }  // namespace delta

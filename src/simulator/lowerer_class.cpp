@@ -330,9 +330,13 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
   for (auto* member : cls->members) {
     if (member->kind == ClassMemberKind::kProperty) {
       const DataType& type = *TypeOfThisNamed(&member->data_type, info, ctx);
+      std::string_view key =
+          member->is_param
+              ? InPlaceAggregateLayoutKey(cls->name, member->name, type, ctx)
+              : std::string_view{};
+      if (key.empty()) key = PropertyTypeKey(type, *info, *cls, params, ctx);
       info->properties.push_back(PropertyRecord(
-          member, ClassPropertyType(type, cls, type_params), params,
-          PropertyTypeKey(type, *info, *cls, params, ctx), ctx));
+          member, ClassPropertyType(type, cls, type_params), params, key, ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;

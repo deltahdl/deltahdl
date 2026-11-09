@@ -403,6 +403,14 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
   return ctx.InnermostScopeDeclares(stmt->var_name);
 }
 
+static bool DeclIs4State(const DataType& type, const SimContext& ctx) {
+  const bool kPackedInPlace = (type.kind == DataTypeKind::kStruct ||
+                               type.kind == DataTypeKind::kUnion) &&
+                              (type.is_packed || type.is_soft);
+  if (kPackedInPlace) return DeclaredTypeIs4State(type, ctx);
+  return Is4stateType(DeclaredTypeKind(type, ctx));
+}
+
 struct DeclaredObject {
   Variable* var;
   uint32_t declared_width;
@@ -413,7 +421,7 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
                                    std::string_view func_name, SimContext& ctx,
                                    Arena& arena) {
   Variable* var = obj.var;
-  var->is_4state = Is4stateType(DeclaredTypeKind(stmt->var_decl_type, ctx));
+  var->is_4state = DeclIs4State(stmt->var_decl_type, ctx);
   if (!var->is_4state) CoerceTo2State(var->value);
   if (var->is_4state && !var->is_virtual_interface && !stmt->var_init &&
       stmt->var_unpacked_dims.empty() && var->value.width > 0) {
@@ -459,8 +467,8 @@ StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-static const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
-                                       Arena& arena) {
+const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena) {
   if (stmt->var_decl_type.kind != DataTypeKind::kEnum) return stmt;
   ExecBlockItemDeclImpl(stmt, ctx, arena);
   const auto& shaped = ctx.ClassTypedefShapedDecls();

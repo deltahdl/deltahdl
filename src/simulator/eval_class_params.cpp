@@ -15,6 +15,7 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_typedef_layout.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -104,6 +105,18 @@ static Logic4Vec ParamValueOfType(const DataType& type, const Expr* expr,
   return ParamDefaultValue(expr, width, ctx, arena);
 }
 
+static DataType SizedParamType(std::string_view name, const DataType& type,
+                               const ClassDecl& decl, std::string_view scope,
+                               SimContext& ctx) {
+  std::string_view in_place =
+      InPlaceAggregateLayoutKey(decl.name, name, type, ctx);
+  if (in_place.empty()) return InClassScope(type, decl, scope);
+  DataType named;
+  named.kind = DataTypeKind::kNamed;
+  named.type_name = in_place;
+  return named;
+}
+
 Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
                                  const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
@@ -113,8 +126,9 @@ Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
     if (const DataType* bound = TypeParamType(type->type_name)) type = bound;
   }
   if (type != nullptr)
-    scoped = InClassScope(*type, *decl_,
-                          type_scope_.empty() ? decl_->name : type_scope_);
+    scoped =
+        SizedParamType(name, *type, *decl_,
+                       type_scope_.empty() ? decl_->name : type_scope_, ctx);
   bool is_real = type != nullptr && DeclaredTypeIsReal(scoped, ctx);
   uint32_t width =
       type != nullptr && !is_real ? SimParamTypeWidth(scoped, scope_, ctx) : 0;

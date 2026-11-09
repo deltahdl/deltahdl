@@ -167,6 +167,8 @@ class Elaborator : public ElaboratorClassRules {
   void CheckPropertyOperandInstances(const ModuleItem* item);
   void ElaborateAssertPropertyItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
+  void ResolveBodyTypeParam(const ModuleItem* item, RtlirParamDecl& pd,
+                            RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
 

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -171,6 +172,22 @@ std::string_view ClassTypedefLayoutKey(const ClassTypeInfo& cls,
   if (cls.param_actuals == nullptr) spelled += "#()";
   return RegisterSpecializationTypedefLayout(spelled, cls, name,
                                              ParamValuesOf(cls), ctx);
+}
+
+std::string_view InPlaceAggregateLayoutKey(std::string_view scope,
+                                           std::string_view name,
+                                           const DataType& type,
+                                           SimContext& ctx) {
+  const bool kUnpackedAggregate = (type.kind == DataTypeKind::kStruct ||
+                                   type.kind == DataTypeKind::kUnion) &&
+                                  !type.is_packed && !type.is_soft &&
+                                  !type.struct_members.empty();
+  if (!kUnpackedAggregate) return {};
+  auto* key = ctx.GetArena().Create<std::string>(
+      std::format("$param::{}::{}", scope, name));
+  if (ctx.FindStructType(*key) == nullptr)
+    RegisterTypeLayout(*key, &type, ctx, ctx.GetArena());
+  return *key;
 }
 
 const StructTypeInfo* MethodClassTypedefLayout(std::string_view name,

@@ -260,6 +260,7 @@ const Stmt* DeclParameterTypedByValue(const Stmt* stmt, SimContext& ctx,
 
 void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
                      Arena& arena) {
+  stmt = DeclareInlineEnumOf(stmt, ctx, arena);
   stmt = DeclOfThisTypeRef(stmt, ctx, arena);
   stmt = DeclOfTypeParam(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);

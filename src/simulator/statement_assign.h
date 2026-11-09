@@ -40,6 +40,8 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena);
+const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
+                                Arena& arena);
 StmtResult ExecForceOrAssignImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena);
 StmtResult ExecReleaseOrDeassignImpl(const Stmt* stmt, SimContext& ctx,
