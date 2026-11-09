@@ -78,13 +78,11 @@ class FrameGuard {
 
 struct PartShape {
   DataType type;
-  const std::vector<Expr*>* dims = nullptr;
+  std::vector<Expr*> dims;
   size_t dim_at = 0;
   const ScopeMap* scope = nullptr;
 
-  [[nodiscard]] bool HasDims() const {
-    return dims != nullptr && dim_at < dims->size();
-  }
+  [[nodiscard]] bool HasDims() const { return dim_at < dims.size(); }
 };
 
 struct PartState {
@@ -154,6 +152,10 @@ ValueFrame CurrentFrame(const ScopeMap& scope) {
 
 bool NamesDims(const std::vector<Expr*>* dims) { return dims != nullptr; }
 
+std::vector<Expr*> DimsOf(const std::vector<Expr*>* dims) {
+  return NamesDims(dims) ? *dims : std::vector<Expr*>{};
+}
+
 const DataType* ParamValueType(const RtlirParamDecl& pd) {
   return pd.type_param_actual != nullptr ? pd.type_param_actual : pd.decl_type;
 }
@@ -165,7 +167,7 @@ std::optional<PartState> ModuleParamState(const RtlirParamDecl& pd,
       (!NamesDims(pd.unpacked_dims) && !HoldsAggregate(*type)))
     return std::nullopt;
   PartState state{pd.default_value, CurrentFrame(scope),
-                  PartShape{*type, pd.unpacked_dims, 0, &scope}};
+                  PartShape{*type, DimsOf(pd.unpacked_dims), 0, &scope}};
   if (pd.defparam_value_expr != nullptr) {
     state.value = pd.defparam_value_expr;
     state.frame = ValueFrame{pd.defparam_module,
@@ -183,7 +185,7 @@ std::optional<PartState> ModuleParamState(const RtlirParamDecl& pd,
 PartState UnitParamState(const UnitParamValue& param) {
   return PartState{param.value,
                    ValueFrame{nullptr, &param.scope, {}, param.prefix},
-                   PartShape{param.type, param.dims, 0, &param.scope}};
+                   PartShape{param.type, DimsOf(param.dims), 0, &param.scope}};
 }
 
 const UnitParamValue* ImportedByModule(const RtlirModule& mod,
@@ -229,7 +231,7 @@ std::optional<PartState> RootState(const Expr* root, const ScopeMap& scope) {
 }
 
 std::optional<RtlirUnpackedDim> ShapeDim(const PartShape& shape) {
-  return FoldUnpackedDimBounds((*shape.dims)[shape.dim_at], *shape.scope);
+  return FoldUnpackedDimBounds(shape.dims[shape.dim_at], *shape.scope);
 }
 
 std::optional<int64_t> PositionOf(const PartShape& shape, const Expr* index,
@@ -257,14 +259,12 @@ const StructMember* MemberNamed(const DataType& type, std::string_view name,
 }
 
 PartShape MemberShape(const PartShape& owner, const StructMember& member) {
-  return PartShape{
-      MemberWrittenType(member),
-      member.unpacked_dims.empty() ? nullptr : &member.unpacked_dims, 0,
-      owner.scope};
+  return PartShape{MemberWrittenType(member), member.unpacked_dims, 0,
+                   owner.scope};
 }
 
-std::optional<Slot> ReaderStep(const Expr* step, PartShape& shape,
-                               const ScopeMap& scope) {
+std::optional<Slot> ReaderStep(const Expr* step, const PartShape& owner,
+                               PartShape& shape, const ScopeMap& scope) {
   if (step->kind == ExprKind::kSelect) {
     if (!shape.HasDims()) return std::nullopt;
     std::optional<int64_t> pos = PositionOf(shape, step->index, scope);
@@ -274,9 +274,9 @@ std::optional<Slot> ReaderStep(const Expr* step, PartShape& shape,
   }
   if (shape.HasDims()) return std::nullopt;
   Slot slot;
-  slot.member = MemberNamed(shape.type, step->rhs->text, slot.position);
+  slot.member = MemberNamed(owner.type, step->rhs->text, slot.position);
   if (slot.member == nullptr) return std::nullopt;
-  shape = MemberShape(shape, *slot.member);
+  shape = MemberShape(owner, *slot.member);
   return slot;
 }
 
@@ -435,7 +435,8 @@ bool Normalize(PartState& state) {
 
 bool TakeStep(LocatedPart& part, const Expr* step, const ScopeMap& scope) {
   if (IsPackedLevel(part.reader)) return SliceStep(part, step);
-  std::optional<Slot> slot = ReaderStep(step, part.reader, scope);
+  const PartShape kOwner = part.reader;
+  std::optional<Slot> slot = ReaderStep(step, kOwner, part.reader, scope);
   return slot && Normalize(part.state) && Advance(part.state, *slot);
 }
 
@@ -502,7 +503,7 @@ std::optional<ConstVal> ComposeElements(const PartState& state,
   int64_t left = ConstEvalInt(level.left, bounds).value_or(0);
   int64_t right = ConstEvalInt(level.right, bounds).value_or(0);
   int64_t count = (left >= right ? left - right : right - left) + 1;
-  PartShape element{level.element, nullptr, 0, state.shape.scope};
+  PartShape element{level.element, {}, 0, state.shape.scope};
   std::vector<PackedPart> parts;
   for (int64_t pos = 0; pos < count; ++pos) {
     Slot slot{static_cast<size_t>(pos), nullptr,

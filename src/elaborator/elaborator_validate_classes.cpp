@@ -14,6 +14,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -436,17 +437,11 @@ namespace {
 struct RestrictedScopePrefixes {
   std::unordered_set<std::string_view> incomplete_forward_types;
   std::unordered_set<std::string_view> interface_based_typedefs;
-  std::unordered_set<std::string_view> type_params;
 
   bool Empty() const {
-    return incomplete_forward_types.empty() &&
-           interface_based_typedefs.empty() && type_params.empty();
+    return incomplete_forward_types.empty() && interface_based_typedefs.empty();
   }
 };
-
-constexpr std::string_view kPermittedScopePrefixContexts =
-    "may prefix the class scope resolution operator only within a typedef "
-    "declaration, the type operator, or a type parameter assignment";
 
 }  // namespace
 
@@ -454,12 +449,7 @@ static void ReportRestrictedScopePrefix(std::string_view name, SourceLoc loc,
                                         const RestrictedScopePrefixes& r,
                                         DiagEngine& diag) {
   if (name.empty()) return;
-  if (r.type_params.count(name)) {
-    diag.Error(loc,
-               std::format("type parameter '{}' {}", name,
-                           kPermittedScopePrefixContexts),
-               Subclause("6.20.3"));
-  } else if (r.incomplete_forward_types.count(name)) {
+  if (r.incomplete_forward_types.count(name)) {
     diag.Error(loc,
                std::format("incomplete forward type '{}' {}", name,
                            kPermittedScopePrefixContexts),
@@ -532,13 +522,6 @@ static RestrictedScopePrefixes CollectModuleRestrictedPrefixes(
     const ModuleDecl* decl, const CompilationUnit* unit,
     const std::unordered_set<std::string_view>& class_names) {
   RestrictedScopePrefixes r;
-  r.type_params = decl->type_param_names;
-  for (const auto* item : decl->items) {
-    if (item->kind == ModuleItemKind::kParamDecl &&
-        item->data_type.kind == DataTypeKind::kVoid) {
-      r.type_params.insert(item->name);
-    }
-  }
   std::unordered_set<std::string_view> completed_forward_types;
   CollectScopePrefixTypedefs(decl->items, r, completed_forward_types);
   CollectScopePrefixTypedefs(unit->cu_items, r, completed_forward_types);
@@ -555,10 +538,7 @@ static void CheckClassPropertyScopePrefixes(const ClassDecl* cls,
                                   diag);
     }
     if (member->kind == ClassMemberKind::kClassDecl && member->nested_class) {
-      RestrictedScopePrefixes nested = r;
-      nested.type_params.insert(member->nested_class->type_param_names.begin(),
-                                member->nested_class->type_param_names.end());
-      CheckClassPropertyScopePrefixes(member->nested_class, nested, diag);
+      CheckClassPropertyScopePrefixes(member->nested_class, r, diag);
     }
   }
 }
@@ -571,10 +551,7 @@ static void CheckItemForRestrictedScopePrefix(const ModuleItem* item,
     return;
   }
   if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
-    RestrictedScopePrefixes in_class = r;
-    in_class.type_params.insert(item->class_decl->type_param_names.begin(),
-                                item->class_decl->type_param_names.end());
-    CheckClassPropertyScopePrefixes(item->class_decl, in_class, diag);
+    CheckClassPropertyScopePrefixes(item->class_decl, r, diag);
     return;
   }
   if (item->kind == ModuleItemKind::kContAssign) {
@@ -601,7 +578,6 @@ void ElaboratorClassRules::ValidateRestrictedScopePrefixUsage(
 void ElaboratorClassRules::ValidateRestrictedScopePrefixInClasses() {
   for (const auto* cls : unit_->classes) {
     RestrictedScopePrefixes restricted;
-    restricted.type_params = cls->type_param_names;
     std::unordered_set<std::string_view> completed_forward_types;
     CollectScopePrefixTypedefs(unit_->cu_items, restricted,
                                completed_forward_types);

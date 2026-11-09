@@ -656,6 +656,14 @@ DataTypeKind Parser::ParseTypeParamRestriction() {
   return kRestriction;
 }
 
+DataType Parser::ParseTypeAssignmentValue() {
+  if (!Check(TokenKind::kIdentifier) || !AtScopedTypeName())
+    return ParseDataType();
+  DataType named = ParseNamedType();
+  ParsePackedDims(named);
+  return named;
+}
+
 void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
                                 bool localparam) {
   const DataTypeKind kRestriction = ParseTypeParamRestriction();
@@ -672,7 +680,7 @@ void Parser::ParseTypeParamDecl(std::vector<ModuleItem*>& items, SourceLoc loc,
     bool has_default = false;
     if (Match(TokenKind::kEq)) {
       has_default = true;
-      auto dtype = ParseDataType();
+      auto dtype = ParseTypeAssignmentValue();
       if (dtype.kind != DataTypeKind::kImplicit) {
         item->typedef_type = dtype;
       } else {

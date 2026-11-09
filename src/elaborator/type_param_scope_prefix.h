@@ -9,16 +9,22 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_restriction.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 namespace delta {
 
+inline constexpr std::string_view kPermittedScopePrefixContexts =
+    "may prefix the class scope resolution operator only within a typedef "
+    "declaration, the type operator, or a type parameter assignment";
+
 struct TypeParamPrefixScope {
   const std::vector<RtlirParamDecl>& params;
   const TypedefMap& typedefs;
   const std::unordered_set<std::string_view>& class_names;
+  const CompilationUnit* unit;
 };
 
 void ReportTypeParamPrefixNotAClass(std::string_view prefix, SourceLoc loc,
@@ -38,6 +44,11 @@ void ReportSpecializationBindingErrors(const DataType& written, SourceLoc loc,
                                        DiagEngine& diag);
 
 void ReportItemTypeParamErrors(const ModuleItem& item,
+                               const TypeParamPrefixScope& scope,
+                               const TypeParamRestrictionScope& restriction,
+                               DiagEngine& diag);
+
+void ReportPortTypeParamErrors(const ModuleDecl& decl,
                                const TypeParamPrefixScope& scope,
                                const TypeParamRestrictionScope& restriction,
                                DiagEngine& diag);

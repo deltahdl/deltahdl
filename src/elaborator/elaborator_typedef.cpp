@@ -317,7 +317,8 @@ static void AdoptMemberTypedefDims(
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->typedef_type, item->loc, mod);
   ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
-                                 {mod->params, typedefs_, class_names_}, diag_);
+                                 {mod->params, typedefs_, class_names_, unit_},
+                                 diag_);
   ReportSpecializationErrors(item->typedef_type, item->loc, mod);
   ResolveTypeRefIndexDims(
       item->unpacked_dims,

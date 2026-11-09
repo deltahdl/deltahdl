@@ -439,4 +439,32 @@ TEST(PackageScopeReference,
   expect_two_elements(subroutines[1]->return_array_dims);
 }
 
+TEST(PackageImport, ABlockLocalTypeNameIsAScopeAndAValueNameIsNot) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class K; static int n = 1; endclass\n"
+      "module m;\n"
+      "  int b;\n"
+      "  initial begin\n"
+      "    localparam int LV = 1;\n"
+      "    let LL = 2;\n"
+      "    localparam type LT = K;\n"
+      "    typedef K LU;\n"
+      "    b = LV::n;\n"
+      "    b = LL::n;\n"
+      "    b = LT::n + LU::n;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved package or scope 'LV'", 9,
+                            "26.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved package or scope 'LL'", 10,
+                            "26.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved package or scope", 11,
+                             "26.3"));
+}
+
 }  // namespace

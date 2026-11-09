@@ -101,6 +101,18 @@ void Parser::ParseSysCallArgs(Expr* call) {
   }
 }
 
+Expr* Parser::ParseUnitScopedName(const Token& unit_tok) {
+  Expr* name = MakeSysScopePrefix(unit_tok);
+  bool cast_handled = false;
+  Expr* cast = TryParseIdentifierCast(
+      UnitScopedTypeName(arena_, unit_tok, name), &cast_handled);
+  if (cast_handled) return cast;
+  Expr* chain = ParseSysRootTail(ParseScopeSpecialization(name));
+  cast = TryParseIdentifierCast(chain, &cast_handled);
+  if (cast_handled) return cast;
+  return ParseNameTail(chain);
+}
+
 Expr* Parser::ParseSystemCall() {
   auto tok = Consume();
 
@@ -109,14 +121,8 @@ Expr* Parser::ParseSystemCall() {
                 Subclause("31.2"));
   }
 
-  if (tok.text == "$unit" && Check(TokenKind::kColonColon)) {
-    Consume();
-    Expr* name = MakeSysScopePrefix(tok);
-    bool cast_handled = false;
-    Expr* cast = TryParseIdentifierCast(UnitScopedTypeName(arena_, tok, name),
-                                        &cast_handled);
-    if (cast_handled) return cast;
-    return ParseNameTail(ParseSysRootTail(ParseScopeSpecialization(name)));
+  if (tok.text == "$unit" && Match(TokenKind::kColonColon)) {
+    return ParseUnitScopedName(tok);
   }
   if (tok.text == "$unit" && Check(TokenKind::kDot)) {
     Consume();

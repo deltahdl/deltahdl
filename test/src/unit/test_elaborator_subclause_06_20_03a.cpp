@@ -280,22 +280,16 @@ TEST(TypeParameterElab, TypeParamScopePrefixNotAClassIsError) {
                             3, "6.20.3"));
 }
 
-TEST(TypeParameterElab, TypeParamScopePrefixInExpressionIsError) {
-  ElabFixture f;
-  ElaborateSrc(
-      "class C;\n"
-      "  static int val = 7;\n"
-      "endclass\n"
-      "module m;\n"
-      "  parameter type T = C;\n"
-      "  int x;\n"
-      "  initial x = T::val;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "type parameter 'T' may prefix the class scope "
-                            "resolution operator only within",
-                            7, "6.20.3"));
+TEST(TypeParameterElab, ClassBoundTypeParamSelectingAStaticPropertyIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static int val = 7;\n"
+             "endclass\n"
+             "module m;\n"
+             "  parameter type T = C;\n"
+             "  int x;\n"
+             "  initial x = T::val;\n"
+             "endmodule\n"));
 }
 
 TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
@@ -313,7 +307,8 @@ TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
                             "23.10.1"));
 }
 
-TEST(TypeParameterElab, PortTypeParamScopePrefixInContAssignIsError) {
+TEST(TypeParameterElab,
+     IntBoundPortTypeParamSelectingAValueInContAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m #(parameter type T = int) ();\n"
@@ -322,8 +317,8 @@ TEST(TypeParameterElab, PortTypeParamScopePrefixInContAssignIsError) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "type parameter 'T' may prefix the class scope "
-                            "resolution operator only within",
+                            "type parameter 'T' used as a class scope "
+                            "resolution prefix does not resolve to a class",
                             3, "6.20.3"));
 }
 

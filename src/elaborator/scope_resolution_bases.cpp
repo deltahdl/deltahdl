@@ -1,10 +1,14 @@
 #include "elaborator/scope_resolution_bases.h"
 
+#include <algorithm>
+#include <string_view>
 #include <vector>
 
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -30,14 +34,36 @@ void CollectScopeBases(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) CollectScopeBases(el, out);
 }
 
-void CollectProcScopeBases(const Stmt* s, std::vector<const Expr*>& out) {
+static bool DeclaresBlockTypeName(const Stmt* s) {
+  const ModuleItem* item = s->decl_item;
+  if (item == nullptr) return false;
+  return item->kind == ModuleItemKind::kTypedef ||
+         (item->kind == ModuleItemKind::kParamDecl &&
+          item->data_type.kind == DataTypeKind::kVoid);
+}
+
+static void CollectBlockScopeBases(const Stmt* s,
+                                   std::vector<std::string_view> type_names,
+                                   std::vector<const Expr*>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
       s->kind == StmtKind::kNonblockingAssign) {
-    CollectScopeBases(s->rhs, out);
+    std::vector<const Expr*> refs;
+    CollectScopeBases(s->rhs, refs);
+    for (const Expr* ref : refs) {
+      if (std::ranges::find(type_names, ref->lhs->text) == type_names.end())
+        out.push_back(ref);
+    }
   }
-  ForEachChildStmt(s,
-                   [&](Stmt* const& sub) { CollectProcScopeBases(sub, out); });
+  ForEachChildStmt(s, [&](Stmt* const& sub) {
+    if (sub != nullptr && DeclaresBlockTypeName(sub))
+      type_names.push_back(sub->decl_item->name);
+    CollectBlockScopeBases(sub, type_names, out);
+  });
+}
+
+void CollectProcScopeBases(const Stmt* s, std::vector<const Expr*>& out) {
+  CollectBlockScopeBases(s, {}, out);
 }
 
 }  // namespace delta

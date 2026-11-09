@@ -649,6 +649,7 @@ class Parser {
   Expr* ParseWithClauseTail(Expr* result);
   Expr* ParseSelectExpr(Expr* base);
   Expr* ParseSystemCall();
+  Expr* ParseUnitScopedName(const Token& unit_tok);
   Expr* MakeSysScopePrefix(const Token& sys_tok);
   Expr* ParseSysRootTail(Expr* expr);
   void ParseSysClockingEventArg(Expr* call);
@@ -678,6 +679,7 @@ class Parser {
                           const std::vector<Attribute>& attrs);
 
   DataType ParseDataType();
+  DataType ParseTypeAssignmentValue();
   DataType ParseDeclaredDataType();
   bool AtDataTypeOrVoid();
   bool TryParseNetDataType(DataType& dtype, bool has_intervening);

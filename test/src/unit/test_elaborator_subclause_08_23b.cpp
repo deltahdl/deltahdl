@@ -417,4 +417,27 @@ TEST(ClassScopeResolutionElaboration,
                             6, "6.20.2"));
 }
 
+TEST(ClassScopeResolutionElaboration,
+     IncompleteForwardTypePrefixInAModuleClassPropertyIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef class F;\n"
+      "  class C;\n"
+      "    F::t p;\n"
+      "    class D;\n"
+      "      F::t q;\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "incomplete forward type 'F' may prefix the "
+                              "class scope resolution operator",
+                              line, "8.23"))
+        << line;
+  }
+}
+
 }  // namespace

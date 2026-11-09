@@ -35,7 +35,7 @@ struct ParserParamPortHelpers {
       if (p.Check(TokenKind::kKwType)) {
         p.ParseExpr();
       } else {
-        def_type = p.ParseDataType();
+        def_type = p.ParseTypeAssignmentValue();
       }
     }
 

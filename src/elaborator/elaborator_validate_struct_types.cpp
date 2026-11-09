@@ -223,8 +223,8 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   CheckTypeRefArgInner(ref, loc, mod);
   const ModuleDecl* decl = module_decl_path_.back();
   const TypeRefScope kScope{mod, typedefs_, unit_, loc, arena_, decl};
-  ReportTypeRefPrefixNotAClass(ref, loc, {mod->params, typedefs_, class_names_},
-                               diag_);
+  ReportTypeRefPrefixNotAClass(
+      ref, loc, {mod->params, typedefs_, class_names_, unit_}, diag_);
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
   if (std::optional<UnpackedArrayType> array = TypeRefValueArray(ref, mod)) {
     AdoptReferencedType(dt, array->element);

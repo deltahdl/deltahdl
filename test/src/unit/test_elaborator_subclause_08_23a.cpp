@@ -135,26 +135,21 @@ TEST(ClassScopeResolutionElaboration, NestedClassAsTypeOk) {
              "endmodule\n"));
 }
 
-TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
-  ElabFixture f;
-  ElaborateSrc(
-      "class C;\n"
-      "  static int val = 7;\n"
-      "endclass\n"
-      "module m;\n"
-      "  parameter type T = C;\n"
-      "  int x;\n"
-      "  initial x = T::val;\n"
-      "endmodule\n",
-      f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "type parameter 'T' may prefix the class scope resolution operator", 7,
-      "6.20.3"));
+TEST(ClassScopeResolutionElaboration,
+     ClassBoundTypeParamSelectingAStaticPropertyIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static int val = 7;\n"
+             "endclass\n"
+             "module m;\n"
+             "  parameter type T = C;\n"
+             "  int x;\n"
+             "  initial x = T::val;\n"
+             "endmodule\n"));
 }
 
 TEST(ClassScopeResolutionElaboration,
-     PortTypeParamScopePrefixInAlwaysBlockIsError) {
+     IntBoundPortTypeParamSelectingAValueInAlwaysBlockIsError) {
   ElabFixture f;
   ElaborateSrc(
       "module m #(parameter type T = int) ();\n"
@@ -163,10 +158,10 @@ TEST(ClassScopeResolutionElaboration,
       "  always @(posedge clk) q <= T::n;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "type parameter 'T' may prefix the class scope resolution operator", 4,
-      "6.20.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "type parameter 'T' used as a class scope "
+                            "resolution prefix does not resolve to a class",
+                            4, "6.20.3"));
 }
 
 TEST(ClassScopeResolutionElaboration, IncompleteForwardTypePrefixIsError) {

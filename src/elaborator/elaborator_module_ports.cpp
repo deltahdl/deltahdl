@@ -24,6 +24,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_io_decl.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/uwire_drivers.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -601,6 +602,9 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
   DeclarePortExprObjects(decl, mod, ctx);
   RecordPortExprDecls(decl, mod);
+  ReportPortTypeParamErrors(*decl,
+                            {mod->params, typedefs_, class_names_, unit_},
+                            {typedefs_, unit_, class_names_}, diag_);
   ResolvePortTypeRefs(
       decl, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
       arena_);

@@ -265,7 +265,8 @@ void RecordTypeParamActual(RtlirParamDecl& pd,
 void Elaborator::ResolveBodyTypeParam(const ModuleItem* item,
                                       RtlirParamDecl& pd, RtlirModule* mod) {
   ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
-                                 {mod->params, typedefs_, class_names_}, diag_);
+                                 {mod->params, typedefs_, class_names_, unit_},
+                                 diag_);
   auto assigned = AssignedTypeParamType(item, pd, mod, unit_, diag_);
   if (!assigned) return;
   ReportAssignedTypeOutsideRestriction(item, *assigned,

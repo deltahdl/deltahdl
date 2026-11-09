@@ -369,4 +369,25 @@ TEST(CastOperatorParsing, MethodTailOnAKeywordCastAndWithoutArguments) {
   EXPECT_EQ(stmt->rhs->lhs->lhs->kind, ExprKind::kCast);
 }
 
+TEST(CastOperatorParsing, UnitScopedClassTypeSelectionCast) {
+  auto r = Parse(
+      "class K; typedef byte inner; endclass\n"
+      "module t;\n"
+      "  int b;\n"
+      "  initial b = $unit::K::inner'(5);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  ASSERT_NE(stmt->rhs, nullptr);
+  ASSERT_EQ(stmt->rhs->kind, ExprKind::kCast);
+  const Expr* type = stmt->rhs->rhs;
+  ASSERT_NE(type, nullptr);
+  ASSERT_EQ(type->kind, ExprKind::kMemberAccess);
+  EXPECT_EQ(type->rhs->text, "inner");
+  EXPECT_EQ(type->lhs->text, "K");
+  EXPECT_EQ(type->lhs->scope_prefix, "$unit");
+}
+
 }  // namespace
