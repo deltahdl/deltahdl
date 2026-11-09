@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 86699205-8167-4d43-95d1-668dd7cf1a13
-  modified: 2026-10-28T14:38:01.125Z
+  modified: 2026-11-09T08:17:12.537Z
 ---
 
 # Fixing a rule in full
@@ -26,5 +26,6 @@ Write a test for each case and make deltahdl pass all of them in the same commit
 - For each forbidden form, write one test that it is reported, per [[naming-the-report-in-a-rejection-test]], and one that the nearest allowed form is accepted without a report.
 - Add a case found while fixing to the fix, never to a new issue.
 - Choose inputs that tell correct code from incorrect ([[discriminating-test-inputs]]).
-- Push the tests with the fix and let the run say which pass ([[verifying-through-ci]]).
+- Build and run the tests before writing the fix ([[verifying-through-ci]]). Each must fail because of the rule in hand. A test that fails for another reason has found a defect of another rule: fix it on the spot when that is quicker and safer, or else file it before designing the fix. Never bend the tests around it unrecorded.
+- Run the `pre-push-checks` skill before pushing the tests with the fix, then let the run give the verdict over all of deltahdl.
 - An issue about deltahdl itself, such as a coverage gap, has no rule behind it; fix the problem it names.

@@ -1,36 +1,23 @@
 ---
 name: verifying-through-ci
-description: "Keep local work to what CI has no way to perform; everything else, a build or a probe of a defect included, is pushed and read from the run."
+description: "Check locally what a change touches before pushing it, with the pre-push-checks skill; the CI run after the push still gives the verdict over all of deltahdl."
 metadata:
   node_type: memory
   type: feedback
   originSessionId: 80ac19af-0e3c-46db-9fa6-1642c305f31d
-  modified: 2026-11-07T22:09:40.739Z
+  modified: 2026-11-09T08:18:26.630Z
 ---
 
-# Verifying through CI, not locally
+# Checking locally, then verifying through CI
 
-Local work is confined to the steps CI has no way to perform. Whatever a CI job is able to do is pushed and read from the run instead.
+Before a push, the change is built and checked locally over what it touches: the test files it adds or edits are built and run, the changed src lines are read for coverage, and clang-tidy, clang-format and the file-size cap run over the touched files. `.claude/skills/pre-push-checks/check.sh` does all of it in one command, and the push waits until it passes. After the push, the CI run is read as before and gives the verdict over everything.
 
-**Why:** CI runs on GitHub's compute for free, while running locally costs tokens and session time. The run's own jobs already cover a great deal, all in `.github/workflows/deltahdl.yml` and `.github/workflows/scripts.yml`:
+**Why:** Pushing unchecked work and reading the run cost a full CI cycle, about an hour, for each mistake a local check finds in minutes. A function one statement over the limit, a branch no test took or a subject too long each sent a push back red and needed a push of its own to fix. A local build also shows a new test's first failure, so a test that fails for a reason outside the rule in hand is seen before the fix is designed around it.
 
-- the build and the unit, e2e and sv-tests runs
-- `clang-tidy`, the formatting check and the file-size cap
-- the assertions about suppressions and configuration files, and the unit test registration checks
-- the copy-paste detectors
-- the whole Python side: pytest, the coverage gates, pylint, `mypy --strict` and `assert-one-assert-per-pytest`
+**How to apply:**
 
-What a run does not do yet can still be made to run there: a test written for it, or a step added to a workflow.
-
-**How to apply:** Make the edits, format, commit explicit paths, push, and read the run, per [reading-a-ci-run](reading-a-ci-run.md). Do not build `deltahdl` or a test binary locally, do not run a probe design through a local binary, and do not keep a local coverage or regression build. A defect is shown by a test that states it, pushed with its fix, and the run says whether the fix holds. Each of these justifications for a local run is wrong:
-
-- "It is only an investigation, not a gate." CI can run the investigation, so it is not an exception.
-- "Protect a CI cycle." CI runs in parallel, and there is no scarce resource to protect.
-- "It reproduces the gate in 1.3 seconds." The seconds are not the cost; the tokens spent reading its output are.
-- "Local caught a regression, so it was worth it." CI would have surfaced the same diff for nothing.
-- "Build every target once the fixes are in, to see the push compiles." That is the build job's check.
-- "Run the new test to see it pass, or to see it fail first." That is the unit test job.
-- "A pre-push regression script." Rebuilding the unit tests, running every binary, collecting coverage and replaying the e2e sources are the CI jobs under another name.
-- "A review workflow before the push, to catch a compile error or a gate failure." Rounds of review agents reading the diff for what the build, clang-tidy, the copy-paste detectors and the coverage gate report spend more tokens and time than the red run they would spare, and a red run costs nothing; push and read the run instead, and see [[working-without-subagents]].
-
-One step CI has no way to perform is [clang-format-style-flag](clang-format-style-flag.md), which rewrites the files and so is how the committed bytes come to exist. Another is reading the LRM, which is copyrighted and kept only on this machine, as in [zooming-on-a-formula](zooming-on-a-formula.md).
+- **Red, then green.** Build and run each new test before writing its fix, and read why it fails: it must fail for the reason its issue names ([[test-driven-development]]). Then write the fix and run the test again.
+- **Before every push,** run the `pre-push-checks` skill over the committed change, naming any other test targets that reach the changed code, and fix what it reports.
+- **Scope.** Keep the local work to what the change touches. The full unit suite of over three thousand binaries, the sanitizer and gcc builds, the e2e, integration and sv-tests runs and the copy-paste detectors stay CI's, and so does the verdict: read the run, per [[reading-a-ci-run]], and fix a red one per [[fixing-a-red-run]].
+- **Probes are allowed.** A defect may be probed by running a small design through `build-check/src/deltahdl`, built with `cmake --build build-check --target deltahdl`, but what shows the defect is still a test that states it, pushed with its fix.
+- **Long commands.** A build, a test run or a clang-tidy pass over many files runs in the background, per [[long-running-commands-in-the-background]].

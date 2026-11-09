@@ -7,7 +7,7 @@ description: Start, restart or stop the standing reminders, with or without the 
 
 Every form's work, reading, searching and filing as well as code, is done in the session itself: no Agent or Workflow call takes any part of it, per `.claude/memories/working-without-subagents.md`.
 
-## The four standing reminders
+## The five standing reminders
 
 Every `start` form creates these.
 
@@ -16,6 +16,7 @@ Every `start` form creates these.
 | `2,17,32,47 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth. sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests. The UVM standard is ~/IEEE 1800.2-2020.pdf.` |
 | `7,22,37,52 * * * *` | `REMINDER: While any CI run for a pushed commit is in progress, only wait: no diagnosis, edits or commits.` |
 | `8,23,38,53 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue. Fix anything else you find on the spot when that is quicker and safer than filing it, and file the rest as issues: one per rule of a standard that deltahdl breaks or leaves untested, listing every case of it and labelled with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; or one per problem with deltahdl itself, such as a coverage gap, with neither label.` |
+| `9,24,39,54 * * * *` | `REMINDER: Build and run each new test before writing its fix, and read why it fails: it fails for the reason its issue names, or it has found another defect, which is fixed on the spot or filed before the fix is designed. Before every push, commit, then run .claude/skills/pre-push-checks/check.sh in the background, naming any other unit test targets that reach the changed code, and push once it prints that every check passed.` |
 | `12,27,42,57 * * * *` | `REMINDER: Fix the rule, not the example. Before fixing an issue of a standard, list every case of the rule it documents: each form the rule allows and each form it forbids, written in every place the standard lets that form appear (a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies) and with every kind of operand or type the rule names. Write a test for each case, one showing a forbidden form reported beside one showing the nearest allowed form accepted without a report, and make deltahdl pass every one of them in the same commit.` |
 
 ## The four loop reminders
@@ -62,7 +63,7 @@ And these:
 
 Any form but `reminders-only` may be followed by `--skip-label <label>`, once per label, quoted when it holds a space. Each puts `map(select(all(.labels[]; .name != "<label>"))) |` and a space at the very start of the loop command's `--jq` program, adding `labels` to its `--json` fields where they are missing (the `bysubclause` form), and appends to that reminder, after a space, `An issue labelled '<label>' is left to a person, whatever else it carries.` Two labels give `map(select(all(.labels[]; .name != "needs decision"))) | map(select(all(.labels[]; .name != "blocked"))) |` and a space before the program. The label is never left out through a `--search` term: GitHub's search returns at most 1000 issues, so a search listing drops every open issue older than the newest 1000, where `--limit 10000` without one pages through them all.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the four standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, create the five standing reminders only.
 
 Call `CronList`. A job on one of the form's cron slots whose prompt differs from that slot's reminder is a stale version of it: `CronDelete` it. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not already scheduled, substituting the number for `{X}` or the label for `{L}`. Then begin solving the command's first issue.
 
@@ -70,7 +71,7 @@ Call `CronList`. A job on one of the form's cron slots whose prompt differs from
 
 `restart` takes the forms `start` takes, with the same shorthands and the same `--skip-label` flags, and leaves scheduled exactly the reminders of the form it names, whatever was scheduled before.
 
-For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the four standing reminders only.
+For any form but `reminders-only`, run the loop's `gh issue list` command once; if it names no issue, the form's reminders are the five standing reminders only.
 
 Call `CronList`. `CronDelete` every job that is not one of the form's reminders: a job on a slot the form does not use, a job whose prompt differs from its slot's reminder, and every job but one on a slot that holds more than one. Then `CronCreate` with `recurring: true` each reminder of the form whose prompt is not scheduled after those deletions, substituting the number for `{X}` or the label for `{L}`. Then, for any form but `reminders-only`, begin solving the command's first issue.
 
@@ -90,7 +91,7 @@ Then the clause's other issues are taken, as below.
 
 ## Other issues
 
-A Reconcile issue is never solved alongside other issues. Each other issue is fixed for every case of its rule, per `.claude/memories/fixing-a-rule-in-full.md`, not only for the example it gives, and test first: each case's test is written before the code that makes it pass. Before any of them is taken, every issue the loop lists is read, by title and, where it shares a subclause or names the same code as another, by body, and the list is sorted into groups of issues whose fixes go through the same code; the first group is taken whole, designed and tested together. Each commit is pushed once it closes at least one issue, and it closes as many as it finishes, every case of each one's rule passing, with one `Closes #N` line per issue, per `.claude/memories/a-commit-closes-an-issue.md`. An issue whose open cases cannot all land in one commit is split by rule before any of its code is written, each case of a rule it already documents staying in it.
+A Reconcile issue is never solved alongside other issues. Each other issue is fixed for every case of its rule, per `.claude/memories/fixing-a-rule-in-full.md`, not only for the example it gives, and test first: each case's test is written, built and run before the code that makes it pass, and seen to fail for the reason its issue names, per `.claude/memories/verifying-through-ci.md`; a test failing for another reason has found a defect that is fixed on the spot or filed before the fix is designed. Before any of them is taken, every issue the loop lists is read, by title and, where it shares a subclause or names the same code as another, by body, and the list is sorted into groups of issues whose fixes go through the same code; the first group is taken whole, designed and tested together. Each commit is pushed once it closes at least one issue, and it closes as many as it finishes, every case of each one's rule passing, with one `Closes #N` line per issue, per `.claude/memories/a-commit-closes-an-issue.md`, and only once the `pre-push-checks` skill, run over the committed change, prints that every check passed. An issue whose open cases cannot all land in one commit is split by rule before any of its code is written, each case of a rule it already documents staying in it.
 
 ## Stop
 

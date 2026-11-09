@@ -11,4 +11,4 @@ Keep the subject short, about 72 characters, naming what the change does, and pu
 
 **Why:** GitHub, `git log --oneline` and most other views cut a subject at about that width, so a paragraph-long subject is truncated exactly where it is read most, while the body has room for the whole change. A body hard-wrapped at a column re-wraps badly wherever it is read ([prose-length-over-column-fitting](prose-length-over-column-fitting.md)).
 
-**How to apply:** Write a subject naming the change, then a blank line and a body saying what changed and why. Put the closing keywords on their own lines below, per [one-closing-keyword-per-issue](one-closing-keyword-per-issue.md).
+**How to apply:** Write a subject naming the change, then a blank line and a body saying what changed and why. Put the closing keywords on their own lines below, per [one-closing-keyword-per-issue](one-closing-keyword-per-issue.md). The `pre-push-checks` skill reports a subject over 72 characters before the push; reword it with `git commit --amend` then, since a pushed subject stays as it is.

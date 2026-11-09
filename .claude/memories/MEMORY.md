@@ -55,7 +55,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Tests
 
-- [Test-driven development](test-driven-development.md) — tests first, in the same commit; `pytest --cov-fail-under=100` enforces it.
+- [Test-driven development](test-driven-development.md) — tests first, in the same commit, each run and seen to fail for its issue's reason before the fix.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
@@ -76,7 +76,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — do locally only what CI cannot; push and read the run instead of building, testing or probing locally.
+- [Checking locally, then verifying through CI](verifying-through-ci.md) — see each new test fail first, run the `pre-push-checks` skill before every push, then read the run for the verdict.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — only a test asserting the standard's outcome shows a case conforms; an untested case is filed.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — read missed lines from the run's coverage artifacts with the local `llvm@<major>` CI ran.

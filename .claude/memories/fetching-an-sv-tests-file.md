@@ -14,4 +14,4 @@ gh api repos/chipsalliance/sv-tests/contents/tests/chapter-N/<path>.sv \
   --jq .content | base64 -d
 ```
 
-Related: [reading-the-sv-tests-log-first](reading-the-sv-tests-log-first.md) for when fetching it is unnecessary. The file is read, not run locally; per [verifying-through-ci](verifying-through-ci.md), running it is CI's.
+Related: [reading-the-sv-tests-log-first](reading-the-sv-tests-log-first.md) for when fetching it is unnecessary. The file may also be run through a local build to probe a failure ([verifying-through-ci](verifying-through-ci.md)); the sv-tests run in CI still gives the verdict.
