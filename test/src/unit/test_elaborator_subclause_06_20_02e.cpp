@@ -266,10 +266,10 @@ TEST(ParamValueAssignability, EnumConstantIsJudgedAsItsReadersScopeSeesIt) {
        "endmodule\n",
        "E", 7},
       {"a constant another module also declares",
-       "module m1;\n  typedef enum {X, Y} e_t;\n  typedef enum {P, Q} f_t;\n"
-       "  parameter f_t F = Y;\nendmodule\nmodule m2;\n"
-       "  typedef enum {Y, Z} g_t;\nendmodule\n",
-       "F", 4},
+       "module m2;\n  typedef enum {Y, Z} g_t;\nendmodule\nmodule m1;\n"
+       "  typedef enum {X, Y} e_t;\n  typedef enum {P, Q} f_t;\n"
+       "  parameter f_t F = Y;\n  m2 u();\nendmodule\n",
+       "F", 7},
       {"a class constant hiding a compilation-unit one",
        "typedef enum {X, Y} e_t;\nclass C;\n  enum {P, Y} w;\n"
        "  parameter e_t E = Y;\nendclass\nmodule m;\nendmodule\n",
@@ -329,10 +329,10 @@ TEST(ParamValueAssignability,
       "package p;\n  typedef enum {X, Y} e_t;\nendpackage\nmodule m;\n"
       "  initial begin : b\n    import p::*;\n    parameter e_t E = Y;\n"
       "    parameter int I = X;\n  end\nendmodule\n",
-      "module c #(parameter int I = 0);\n  parameter int J = 0;\nendmodule\n"
-      "class C #(int I = 0);\nendclass\nmodule t;\n  enum {X, Y} v;\n"
-      "  c #(.I(Y)) u();\n  c w();\n  defparam w.J = Y;\n  C #(.I(Y)) h;\n"
-      "endmodule\n",
+      "module c #(parameter int I = 0);\nendmodule\nmodule d;\n"
+      "  parameter int J = 0;\nendmodule\nclass C #(int I = 0);\nendclass\n"
+      "module t;\n  enum {X, Y} v;\n  c #(.I(Y)) u();\n  d w();\n"
+      "  defparam w.J = Y;\n  C #(.I(Y)) h;\nendmodule\n",
   };
   ExpectEachAccepted(kSources);
 }
@@ -343,7 +343,7 @@ TEST(ParamValueAssignability, EnumConstantIsAcceptedAsItsReadersScopeSeesIt) {
       "  parameter f_t F = Y;\nendmodule\n",
       "module m1;\n  typedef enum {X, Y} e_t;\n  parameter e_t E = Y;\n"
       "endmodule\nmodule m2;\n  typedef enum {Y, Z} g_t;\n"
-      "  parameter g_t G = Y;\nendmodule\n",
+      "  parameter g_t G = Y;\n  m1 u();\nendmodule\n",
       "enum {X, Y} v;\nclass C;\n  typedef enum {P, Y} f_t;\n"
       "  parameter f_t F = Y;\nendclass\nmodule m;\nendmodule\n",
       "module m;\n  parameter int Y = 1;\n  if (1) begin : g\n"

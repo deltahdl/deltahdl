@@ -345,4 +345,76 @@ TEST(ClassScopeResolutionElaboration, PackageClassTypedefTakesItsType) {
   EXPECT_EQ(w->width, 5u);
 }
 
+TEST(ClassScopeResolutionElaboration,
+     EnumConstantsOfAClassFoldThroughItsScope) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class D;\n"
+      "  enum {T, U = 7} v;\n"
+      "  typedef enum {R, S = 11} f_t;\n"
+      "  struct {enum {P, Q = 13} f;} s;\n"
+      "  enum {V[2] = 17} r;\n"
+      "  parameter enum {G, H = 19} L = H;\n"
+      "  class N;\n"
+      "    enum {A, B = 23} w;\n"
+      "  endclass\n"
+      "endclass\n"
+      "class E;\n"
+      "  localparam int K = D::U + 1;\n"
+      "endclass\n"
+      "module m;\n"
+      "  class C;\n"
+      "    enum {X, Y = 5} v;\n"
+      "  endclass\n"
+      "  logic [C::Y-1:0] z;\n"
+      "  localparam int K1 = D::U;\n"
+      "  localparam int K2 = D::S;\n"
+      "  localparam int K3 = D::Q;\n"
+      "  localparam int K4 = D::V1;\n"
+      "  localparam int K5 = D::H;\n"
+      "  localparam int K6 = D::N::B;\n"
+      "  localparam int K7 = E::K;\n"
+      "  if (1) begin : g\n"
+      "    localparam int K8 = D::U;\n"
+      "  end\n"
+      "  function automatic int f();\n"
+      "    localparam int K9 = D::U;\n"
+      "    return K9;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (auto [name, value] :
+       std::initializer_list<std::pair<const char*, int64_t>>{{"K1", 7},
+                                                              {"K2", 11},
+                                                              {"K3", 13},
+                                                              {"K4", 18},
+                                                              {"K5", 19},
+                                                              {"K6", 23},
+                                                              {"K7", 8}}) {
+    EXPECT_EQ(ParamValue(design, name), value) << name;
+  }
+  const auto* z = FindVar(design, "m", "z");
+  ASSERT_NE(z, nullptr);
+  EXPECT_EQ(z->width, 5u);
+}
+
+TEST(ClassScopeResolutionElaboration,
+     StaticPropertyThroughItsScopeIsNoConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class D;\n"
+      "  enum {T, U} v;\n"
+      "  static int s = 7;\n"
+      "endclass\n"
+      "module m;\n"
+      "  parameter int K = D::s;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'K' value is not a constant expression",
+                            6, "6.20.2"));
+}
+
 }  // namespace

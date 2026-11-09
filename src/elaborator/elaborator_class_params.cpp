@@ -143,8 +143,14 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
 static void BindClassEnumConstants(ClassParamRegistration& reg) {
   const EnumTypeVisitor kBind = [&reg](std::string_view, const DataType& type) {
     for (const auto& m :
-         FoldEnumMembers(type.enum_members, reg.values, reg.arena))
+         FoldEnumMembers(type.enum_members, reg.values, reg.arena)) {
       BindDeclaredConstant(reg.values, m.name, m.value);
+      BindDeclaredConstant(
+          reg.cu_param_scope,
+          *reg.arena.Create<std::string>(std::string(reg.key_prefix) + "." +
+                                         std::string(m.name)),
+          m.value);
+    }
   };
   ForEachEnumTypeOfClass(*reg.cls, kBind);
 }
