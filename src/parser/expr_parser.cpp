@@ -639,15 +639,7 @@ Expr* Parser::ParseIdentifierExpr() {
 
   if (auto* cast = TryParseUserTypeCast(tok)) return cast;
 
-  Expr* result = ParseMemberAccessChain(tok);
-
-  if (Check(TokenKind::kHash)) {
-    auto saved = lexer_.SavePos();
-    Consume();
-    bool is_param_value = Check(TokenKind::kLParen);
-    lexer_.RestorePos(saved);
-    if (is_param_value) result = ParseParameterizedScope(result);
-  }
+  Expr* result = ParseScopeSpecialization(ParseMemberAccessChain(tok));
 
   bool cast_handled = false;
   Expr* cast = TryParseIdentifierCast(result, &cast_handled);

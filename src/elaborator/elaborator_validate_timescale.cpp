@@ -43,6 +43,17 @@ void CheckInnerDeclaredTypes(
   });
 }
 
+InstanceParams InstanceParamsOf(const RtlirModule& mod) {
+  InstanceParams instance_params;
+  for (const auto& param : mod.params) {
+    if (param.is_unbounded) instance_params.unbounded.insert(param.name);
+    if (param.from_override) instance_params.overridden.insert(param.name);
+    if (param.resolved_type != nullptr)
+      instance_params.types.emplace(param.name, param.resolved_type);
+  }
+  return instance_params;
+}
+
 }  // namespace
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
@@ -149,13 +160,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   }
   CheckIsunboundedArgs(decl, mod, diag_);
   CheckTimeformatArgs(decl, diag_);
-  InstanceParams instance_params;
-  for (const auto& param : mod->params) {
-    if (!param.gen_block_prefix.empty()) continue;
-    if (param.is_unbounded) instance_params.unbounded.insert(param.name);
-    if (param.from_override) instance_params.overridden.insert(param.name);
-  }
-  CheckDollarOperands(decl, *unit_, instance_params, diag_);
+  CheckDollarOperands(decl, *unit_, InstanceParamsOf(*mod), diag_);
   CheckVariableReadsInUnpackedDims(decl, var_types_, diag_);
   CheckUntypedDefaultPatternValues(decl, diag_);
   CheckContinuousPropertyWrites(decl, class_var_types_, unit_, diag_);

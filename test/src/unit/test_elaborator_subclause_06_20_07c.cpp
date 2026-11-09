@@ -1,33 +1,12 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-#include <initializer_list>
-#include <string_view>
-
 #include "fixture_elaborator.h"
+#include "helpers_dollar_param_reports.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
-
-constexpr std::string_view kDollarParam =
-    "holds '$', so it may stand only where '$' itself may";
-
-void ExpectDollarParamReportedOnlyOn(const ElabFixture& f,
-                                     std::initializer_list<uint32_t> reported,
-                                     std::initializer_list<uint32_t> accepted) {
-  for (uint32_t line : reported) {
-    EXPECT_TRUE(
-        ReportedError(f.diag.Diagnostics(), kDollarParam, line, "6.20.7"))
-        << line;
-  }
-  for (uint32_t line : accepted) {
-    EXPECT_FALSE(
-        ReportedError(f.diag.Diagnostics(), kDollarParam, line, "6.20.7"))
-        << line;
-  }
-}
 
 TEST(DollarConstantElaboration, DollarParameterIsAnErrorAsAnOrdinaryOperand) {
   ElabFixture f;
@@ -575,6 +554,253 @@ TEST(DollarConstantElaboration,
                             "6.20.7"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'$' may bind the formal 'n' of 'cint' only", 89,
+                            "6.20.7"));
+}
+
+TEST(DollarConstantElaboration,
+     DollarParameterDefaultLeftInPlaceBindsOnlyAFormalThatDollarMayBind) {
+  ElabFixture f;
+  Elaborate(
+      "parameter U = $;\n"
+      "package pk;\n"
+      "  parameter K = $;\n"
+      "  parameter KB = 4;\n"
+      "  sequence pks(x, m = K);\n"
+      "    x ##1 (x == m);\n"
+      "  endsequence\n"
+      "  sequence pkb(x, m = KB);\n"
+      "    x ##1 (x == m);\n"
+      "  endsequence\n"
+      "  checker pkc(x, n = K, event clk);\n"
+      "    a1: assert property (@clk x == n);\n"
+      "  endchecker\n"
+      "  checker pkcb(x, n = KB, event clk);\n"
+      "    a1: assert property (@clk x == n);\n"
+      "  endchecker\n"
+      "endpackage\n"
+      "sequence usop(x, m = U);\n"
+      "  x ##1 (x == m);\n"
+      "endsequence\n"
+      "sequence usub(x, m = $unit::U);\n"
+      "  x ##[1:m] x;\n"
+      "endsequence\n"
+      "sequence upk(x, m = pk::K);\n"
+      "  x ##1 (x == m);\n"
+      "endsequence\n"
+      "checker cop(x, n = U, event clk);\n"
+      "  a1: assert property (@clk x == n);\n"
+      "endchecker\n"
+      "checker cub(x, n = U, event clk);\n"
+      "  a1: assert property (@clk x ##[1:n] x);\n"
+      "endchecker\n"
+      "checker cint(x, int n = U, event clk);\n"
+      "  a1: assert property (@clk x ##[1:n] x);\n"
+      "endchecker\n"
+      "checker cpass(x, event clk);\n"
+      "  sequence cs(y, m = U);\n"
+      "    y ##1 (y == m);\n"
+      "  endsequence\n"
+      "  a1: assert property (@clk cs(x));\n"
+      "  a2: assert property (@clk cs(x, 1));\n"
+      "  cop inner1(x, , clk);\n"
+      "  cop inner2(x, 1, clk);\n"
+      "endchecker\n"
+      "interface ifc(input logic clk);\n"
+      "  parameter P = $;\n"
+      "  bit a;\n"
+      "  sequence isop(x, m = P);\n"
+      "    x ##1 (a == m);\n"
+      "  endsequence\n"
+      "  i1: assert property (@(posedge clk) isop(a));\n"
+      "  i2: assert property (@(posedge clk) isop(a, 1));\n"
+      "endinterface\n"
+      "program prg(input logic clk);\n"
+      "  parameter P = $;\n"
+      "  bit a;\n"
+      "  property rop(x, m = P);\n"
+      "    x |-> a == m;\n"
+      "  endproperty\n"
+      "  r1: assert property (@(posedge clk) rop(a));\n"
+      "  r2: assert property (@(posedge clk) rop(a, 1));\n"
+      "endprogram\n"
+      "module ovr #(parameter P = 4) (input logic clk);\n"
+      "  bit a;\n"
+      "  sequence osop(x, m = P);\n"
+      "    x ##1 (a == m);\n"
+      "  endsequence\n"
+      "  o1: assert property (@(posedge clk) osop(a));\n"
+      "endmodule\n"
+      "module bnd #(parameter P = $) (input logic clk);\n"
+      "  bit a;\n"
+      "  sequence bsop(x, m = P);\n"
+      "    x ##1 (a == m);\n"
+      "  endsequence\n"
+      "  b1: assert property (@(posedge clk) bsop(a));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  import pk::*;\n"
+      "  parameter P = $;\n"
+      "  parameter Q = 4;\n"
+      "  localparam U = 4;\n"
+      "  parameter K = 4;\n"
+      "  bit clk, a, b;\n"
+      "  sequence sop(x, m = P);\n"
+      "    x ##1 (b == m);\n"
+      "  endsequence\n"
+      "  sequence sub(x, m = P);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  sequence sint(x, int m = P);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  sequence sunt(x, untyped m = P);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  sequence sq(x, m = Q);\n"
+      "    x ##1 (b == m);\n"
+      "  endsequence\n"
+      "  property pop(x, m = P);\n"
+      "    x |-> b == m;\n"
+      "  endproperty\n"
+      "  property pub(x, m = P);\n"
+      "    x |-> ##[1:m] b;\n"
+      "  endproperty\n"
+      "  sequence sbody1(x);\n"
+      "    sop(x);\n"
+      "  endsequence\n"
+      "  sequence sbody2(x);\n"
+      "    sub(x);\n"
+      "  endsequence\n"
+      "  property pbody1(x, P);\n"
+      "    pop(x);\n"
+      "  endproperty\n"
+      "  property pbody2(x);\n"
+      "    pub(x);\n"
+      "  endproperty\n"
+      "  a1: assert property (@(posedge clk) sop(a));\n"
+      "  a2: assert property (@(posedge clk) sop(a, 1));\n"
+      "  a3: assert property (@(posedge clk) sub(a));\n"
+      "  a4: assert property (@(posedge clk) sint(a));\n"
+      "  a5: assert property (@(posedge clk) sint(a, 3));\n"
+      "  a6: assert property (@(posedge clk) sunt(a));\n"
+      "  a7: assert property (@(posedge clk) sq(a));\n"
+      "  a8: assert property (@(posedge clk) pop(a));\n"
+      "  a9: assert property (@(posedge clk) pub(a));\n"
+      "  a10: assert property (@(posedge clk) sop(.x(a)));\n"
+      "  a11: assert property (@(posedge clk) sop(.x(a), .m()));\n"
+      "  a12: assert property (@(posedge clk) sop(a, ));\n"
+      "  a13: assert property (@(posedge clk) sop(.m(1), .x(a)));\n"
+      "  a14: assert property (@(posedge clk) usop(a));\n"
+      "  a15: assert property (@(posedge clk) usub(a));\n"
+      "  a16: assert property (@(posedge clk) upk(a));\n"
+      "  a17: assert property (@(posedge clk) pks(a));\n"
+      "  a18: assert property (@(posedge clk) pkb(a));\n"
+      "  c1: cover property (@(posedge clk) sop(a));\n"
+      "  cop k1(a, , posedge clk);\n"
+      "  cop k2(a, 1, posedge clk);\n"
+      "  cub k3(a, , posedge clk);\n"
+      "  cint k4(.x(a), .clk(posedge clk));\n"
+      "  cop k5(.x(a), .clk(posedge clk));\n"
+      "  cop k6(.x(a), .n(), .clk(posedge clk));\n"
+      "  cop k7(.x(a), .n(1), .clk(posedge clk));\n"
+      "  cpass k8(a, posedge clk);\n"
+      "  ifc i(clk);\n"
+      "  prg p(clk);\n"
+      "  ovr #(.P($)) uo(clk);\n"
+      "  bnd #(.P(4)) ub(clk);\n"
+      "  always @(posedge clk) begin\n"
+      "    cop k9(a, , posedge clk);\n"
+      "    cub k10(a, , posedge clk);\n"
+      "    assert property (sop(a));\n"
+      "    assert property (sub(a));\n"
+      "  end\n"
+      "  generate if (1) begin : g\n"
+      "    localparam P = 4;\n"
+      "    localparam G = $;\n"
+      "    sequence gs(x, m = P);\n"
+      "      x ##1 (b == m);\n"
+      "    endsequence\n"
+      "    sequence gg(x, m = G);\n"
+      "      x ##1 (b == m);\n"
+      "    endsequence\n"
+      "    g1: assert property (@(posedge clk) sop(a));\n"
+      "    g2: assert property (@(posedge clk) gs(a));\n"
+      "    g3: assert property (@(posedge clk) gg(a));\n"
+      "    cop k11(a, , posedge clk);\n"
+      "  end endgenerate\n"
+      "  sequence s2(x, m = P, k = P);\n"
+      "    x ##1 (b == m) ##1 (b == k);\n"
+      "  endsequence\n"
+      "  a19: assert property (@(posedge clk) s2(a));\n"
+      "  checker mc(x, n = P, event clk);\n"
+      "    a1: assert property (@clk x == n);\n"
+      "  endchecker\n"
+      "  mc k12(a, , posedge clk);\n"
+      "  mc k13(a, 1, posedge clk);\n"
+      "  pkc k14(a, , posedge clk);\n"
+      "  pkcb k15(a, , posedge clk);\n"
+      "  if (1) begin : h\n"
+      "    localparam P = 4;\n"
+      "    bit x, n;\n"
+      "    mc k16(a, , posedge clk);\n"
+      "    cop k17(.*);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectDollarParamReportedOnlyOn(
+      f, {40,  42,  51,  60,  68,  106, 112, 117, 120, 124,
+          126, 127, 128, 130, 132, 133, 135, 136, 139, 140,
+          141, 149, 151, 163, 165, 166, 171, 175, 177, 182},
+      {41,  43,  52,  61,  75,  109, 115, 118, 119, 121, 122, 123, 125,
+       129, 131, 134, 137, 138, 142, 150, 152, 164, 176, 178, 183});
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "leaves it as the default of the formal 'm' of "
+                            "'sop', which '$' may bind only when",
+                            117, "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "leaves it as the default of the formal 'n' of "
+                            "'cint', which '$' may bind only when",
+                            139, "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "leaves it as the default of the formal 'm' of "
+                            "'s2'",
+                            171, "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "leaves it as the default of the formal 'k' of "
+                            "'s2'",
+                            171, "6.20.7"));
+}
+
+TEST(DollarConstantElaboration,
+     DollarParameterActualBeforeNamedActualsBindsByPosition) {
+  ElabFixture f;
+  Elaborate(
+      "module top;\n"
+      "  parameter P = $;\n"
+      "  bit clk, a, b;\n"
+      "  sequence sxm(x, m);\n"
+      "    x ##[1:m] b;\n"
+      "  endsequence\n"
+      "  property pxm(x, m);\n"
+      "    x |-> ##[1:m] b;\n"
+      "  endproperty\n"
+      "  sequence sxym(x, y, m);\n"
+      "    x ##[1:m] (b == y);\n"
+      "  endsequence\n"
+      "  a1: assert property (@(posedge clk) sxm(P, .m(3)));\n"
+      "  a2: assert property (@(posedge clk) sxm(a, .m(P)));\n"
+      "  a3: assert property (@(posedge clk) pxm(P, .m(3)));\n"
+      "  a4: assert property (@(posedge clk) pxm(a, .m(P)));\n"
+      "  a5: assert property (@(posedge clk) sxym(a, P, .m(3)));\n"
+      "  a6: assert property (@(posedge clk) sxym(a, 1, .m(P)));\n"
+      "endmodule\n",
+      f);
+  ExpectDollarParamReportedOnlyOn(f, {13, 15, 17}, {14, 16, 18});
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'x' of 'sxm' only", 13,
+                            "6.20.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$' may bind the formal 'y' of 'sxym' only", 17,
                             "6.20.7"));
 }
 

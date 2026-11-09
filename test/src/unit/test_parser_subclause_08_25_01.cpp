@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <map>
 #include <string_view>
+#include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -105,6 +108,78 @@ TEST(ParameterizedScopeResolutionParsing, ExplicitSpecAccessesClassParam) {
               "  int result;\n"
               "  initial result = C#(5)::p;\n"
               "endmodule\n"));
+}
+
+TEST(ParameterizedScopeResolutionParsing,
+     UnitScopedSpecializationNamesAClassParam) {
+  auto r = Parse(
+      "class C #(parameter int p = 1, parameter int k = 2);\n"
+      "  localparam int q = p;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int a;\n"
+      "  initial a = $unit::C#(.k(4), .p(5))::q;\n"
+      "  initial a = $unit::C#()::p;\n"
+      "  initial a = C#(5)::q;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const std::vector<ModuleItem*>& items = r.cu->modules[0]->items;
+  const std::string_view kScopes[] = {"$unit", "$unit", ""};
+  const size_t kValues[] = {2, 0, 1};
+  const std::string_view kMembers[] = {"q", "p", "q"};
+  size_t k = 0;
+  for (const ModuleItem* item : items) {
+    if (item->kind != ModuleItemKind::kInitialBlock) continue;
+    ASSERT_LT(k, 3u);
+    const Expr* access = item->body->rhs;
+    ASSERT_EQ(access->kind, ExprKind::kMemberAccess) << k;
+    EXPECT_TRUE(access->is_scope_resolution) << k;
+    EXPECT_EQ(access->rhs->text, kMembers[k]) << k;
+    EXPECT_EQ(access->lhs->kind, ExprKind::kIdentifier) << k;
+    EXPECT_EQ(access->lhs->text, "C") << k;
+    EXPECT_EQ(access->lhs->scope_prefix, kScopes[k]) << k;
+    EXPECT_TRUE(access->lhs->has_param_spec) << k;
+    EXPECT_EQ(access->lhs->elements.size(), kValues[k]) << k;
+    ++k;
+  }
+  EXPECT_EQ(k, 3u);
+  const Expr* named = items[1]->body->rhs->lhs;
+  ASSERT_EQ(named->arg_names.size(), 2u);
+  EXPECT_EQ(named->arg_names[0], "k");
+  EXPECT_EQ(named->arg_names[1], "p");
+}
+
+TEST(ParameterizedScopeResolutionParsing,
+     HashOpeningNoParameterListLeavesTheNameAlone) {
+  auto r = Parse(
+      "module m;\n"
+      "  event f;\n"
+      "  int x;\n"
+      "  initial @f #5 x = 1;\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const Stmt* wait = FirstInitialStmt(r);
+  ASSERT_NE(wait, nullptr);
+  ASSERT_EQ(wait->kind, StmtKind::kEventControl);
+  ASSERT_EQ(wait->events.size(), 1u);
+  const Expr* event = wait->events[0].signal;
+  ASSERT_EQ(event->kind, ExprKind::kIdentifier);
+  EXPECT_EQ(event->text, "f");
+  EXPECT_FALSE(event->has_param_spec);
+  ASSERT_NE(wait->body, nullptr);
+  EXPECT_EQ(wait->body->kind, StmtKind::kDelay);
+}
+
+TEST(ParameterizedScopeResolutionParsing,
+     HashOpeningNoParameterListAfterAnOperandIsLeftForWhatFollows) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x, y;\n"
+      "  initial x = y #5;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '#'", 3, "12.3"));
 }
 
 TEST(ParameterizedScopeResolutionParsing,

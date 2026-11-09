@@ -382,6 +382,45 @@ TEST(DollarConstantElaboration, DollarIsJudgedInAPackageAndTheCompilationUnit) {
 }
 
 TEST(DollarConstantElaboration,
+     VariableDeclaredWithAQueuesTypeIsSelectedLikeAQueue) {
+  ElabFixture f;
+  Elaborate(
+      "package p;\n"
+      "  int pa [4];\n"
+      "  int pq [$];\n"
+      "  var type(pq) pw;\n"
+      "  function automatic int pf();\n"
+      "    return pa[$];\n"
+      "  endfunction\n"
+      "  function automatic int pg();\n"
+      "    return pw[$];\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "int ua [4];\n"
+      "int uq [$];\n"
+      "var type(uq) uw;\n"
+      "function automatic int uf();\n"
+      "  return ua[$];\n"
+      "endfunction\n"
+      "function automatic int ug();\n"
+      "  return uw[$];\n"
+      "endfunction\n"
+      "module top;\n"
+      "  int a [4];\n"
+      "  int q [$];\n"
+      "  var type(a) mf;\n"
+      "  var type(q) mw;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = mf[$];\n"
+      "    x = mw[$];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ExpectDollarReportedOnlyOn(f, {6, 16, 28}, {9, 19, 29});
+}
+
+TEST(DollarConstantElaboration,
      DollarIsJudgedInAClassItsConstraintsAndAnInlineConstraint) {
   ElabFixture f;
   Elaborate(

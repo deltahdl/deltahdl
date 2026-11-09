@@ -637,6 +637,7 @@ class Parser {
   Expr* MakeMemberAccess(Expr* base);
   void ParseParamValueAssignment(Expr* base);
   Expr* ParseParameterizedScope(Expr* base);
+  Expr* ParseScopeSpecialization(Expr* base);
   Expr* TryParseUserTypeCast(const Token& tok);
   Expr* ParseIdentifierExpr();
   Expr* ParseLocalScopeExpr();

@@ -271,6 +271,15 @@ void Parser::ParseParamValueAssignment(Expr* base) {
   base->elements.push_back(ParseTypeOr(&Parser::ParseMinTypMaxExpr));
 }
 
+Expr* Parser::ParseScopeSpecialization(Expr* base) {
+  if (!Check(TokenKind::kHash)) return base;
+  auto saved = lexer_.SavePos();
+  Consume();
+  const bool kParamValue = Check(TokenKind::kLParen);
+  lexer_.RestorePos(saved);
+  return kParamValue ? ParseParameterizedScope(base) : base;
+}
+
 Expr* Parser::ParseParameterizedScope(Expr* base) {
   Consume();
   if (!Check(TokenKind::kLParen)) return base;

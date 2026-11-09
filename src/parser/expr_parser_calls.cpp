@@ -116,7 +116,7 @@ Expr* Parser::ParseSystemCall() {
     Expr* cast = TryParseIdentifierCast(UnitScopedTypeName(arena_, tok, name),
                                         &cast_handled);
     if (cast_handled) return cast;
-    return ParseNameTail(ParseSysRootTail(name));
+    return ParseNameTail(ParseSysRootTail(ParseScopeSpecialization(name)));
   }
   if (tok.text == "$unit" && Check(TokenKind::kDot)) {
     Consume();
