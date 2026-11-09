@@ -13,7 +13,7 @@ struct RtlirEnumMember {
   int64_t value = 0;
   const Expr* xz_value = nullptr;
   const DataType* enumeration = nullptr;
-  std::string_view gen_block_prefix;
+  std::string_view gen_block_prefix = {};
 };
 
 }  // namespace delta

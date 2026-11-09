@@ -151,7 +151,7 @@ struct EnumMemberDeclCtx {
   std::unordered_set<std::string_view>& enum_member_names;
   const std::unordered_set<std::string_view>* explicitly_imported = nullptr;
   bool is_signed = false;
-  std::string_view gen_prefix;
+  std::string_view gen_prefix = {};
 };
 
 std::vector<RtlirEnumMember> BuildEnumMembers(const DataType& enumeration,
