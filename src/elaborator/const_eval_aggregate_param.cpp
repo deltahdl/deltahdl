@@ -196,9 +196,9 @@ const UnitParamValue* ImportedByModule(const RtlirModule& mod,
 }
 
 const UnitParamValue* NamedUnitRoot(std::string_view name) {
-  const RtlirModule* mod = RegisteredModule();
-  if (mod == nullptr) return FindUnitParamValueNamed(name);
   if (const UnitParamValue* own = FindUnitParamValueOwn(name)) return own;
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return FindUnitParamValueInTheCompilationUnit(name);
   if (const UnitParamValue* imported = ImportedByModule(*mod, name))
     return imported;
   return FindUnitParamValue(name);
@@ -567,13 +567,7 @@ double AsReal(const ConstVal& value) {
   return static_cast<double>(value.value);
 }
 
-bool IsModuleParamName(const Expr* expr) {
-  return expr->kind == ExprKind::kIdentifier && expr->scope_prefix.empty() &&
-         RegisteredParamNamed(expr->text) != nullptr;
-}
-
 const UnitParamValue* ScalarUnitRoot(const Expr* expr) {
-  if (IsModuleParamName(expr)) return nullptr;
   const UnitParamValue* param = UnitRoot(expr);
   if (param == nullptr) return nullptr;
   LeafKind kind = KindOfLeaf(UnitParamState(*param).shape);

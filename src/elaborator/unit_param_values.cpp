@@ -119,8 +119,8 @@ const UnitParamValue* FindUnitParamValueOwn(std::string_view name) {
   return FindUnitParamValueVisibleIn(g_unit_name_prefix, name);
 }
 
-const UnitParamValue* FindUnitParamValueNamed(std::string_view name) {
-  if (const UnitParamValue* own = FindUnitParamValueOwn(name)) return own;
+const UnitParamValue* FindUnitParamValueInTheCompilationUnit(
+    std::string_view name) {
   return FindUnitParamValueVisibleIn({}, name);
 }
 

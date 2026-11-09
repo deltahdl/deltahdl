@@ -82,6 +82,7 @@ const UnitParamValue* FindUnitParamValueImported(const UnitParamImport& imp,
 
 const UnitParamValue* FindUnitParamValueOwn(std::string_view name);
 
-const UnitParamValue* FindUnitParamValueNamed(std::string_view name);
+const UnitParamValue* FindUnitParamValueInTheCompilationUnit(
+    std::string_view name);
 
 }  // namespace delta
