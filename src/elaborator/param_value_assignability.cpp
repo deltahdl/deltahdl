@@ -93,10 +93,34 @@ ParamValueShape StructureShape(const DataType& resolved) {
   return shape;
 }
 
-ParamValueShape ResolvedShape(const DataType& resolved) {
+std::size_t WrittenPackedDims(const DataType& type) {
+  if (type.kind != DataTypeKind::kNamed) return 0;
+  return (type.packed_dim_left != nullptr ? 1 : 0) +
+         type.extra_packed_dims.size();
+}
+
+std::size_t PackedDimsOver(const DataType& type,
+                           const std::vector<std::string_view>& names,
+                           const TypedefMap& typedefs) {
+  std::size_t dims = WrittenPackedDims(type);
+  for (std::string_view name : names)
+    dims += WrittenPackedDims(typedefs.at(name));
+  return dims;
+}
+
+ParamValueShape EnumShape(const DataType& resolved, std::size_t packed_dims) {
+  const std::size_t kDims = packed_dims + resolved.enum_array_dims.size();
+  ParamValueShape shape =
+      OfIdentity(kDims == 0 ? Kind::kEnum : Kind::kNumber, resolved);
+  shape.enum_array_dims = kDims;
+  return shape;
+}
+
+ParamValueShape ResolvedShape(const DataType& resolved,
+                              std::size_t packed_dims) {
   switch (resolved.kind) {
     case DataTypeKind::kEnum:
-      return OfIdentity(Kind::kEnum, resolved);
+      return EnumShape(resolved, packed_dims);
     case DataTypeKind::kString:
       return OfKind(Kind::kString);
     case DataTypeKind::kStruct:
@@ -129,7 +153,9 @@ ParamValueShape DeclaredShape(const DataType& type, std::vector<uint64_t> dims,
   const DataType* resolved =
       FollowTypedefs(keyed, scope.tables.typedefs, names);
   if (auto array = TypedefArrayShape(names, scope)) return *std::move(array);
-  if (resolved != nullptr) return ResolvedShape(*resolved);
+  if (resolved != nullptr)
+    return ResolvedShape(*resolved,
+                         PackedDimsOver(type, names, scope.tables.typedefs));
   if (scope.tables.class_names.count(names.back()) == 0) return {};
   ParamValueShape shape = OfKind(Kind::kClass);
   shape.class_name = names.back();
@@ -274,15 +300,24 @@ ParamValueShape ArrayPartShape(ParamValueShape array, const Expr& select,
   return DeclaredShape(array.element, {}, scope);
 }
 
+ParamValueShape IntegralSelectShape(ParamValueShape base, const Expr& select) {
+  if (base.enum_array_dims == 0) return OfKind(Kind::kNumber);
+  if (select.index_end != nullptr) return base;
+  --base.enum_array_dims;
+  if (base.enum_array_dims == 0) base.kind = Kind::kEnum;
+  return base;
+}
+
 ParamValueShape SelectShape(const Expr* select, const ParamValueScope& scope) {
   ParamValueShape base = ValueShapeOf(select->base, scope);
   switch (base.kind) {
     case Kind::kArray:
       return ArrayPartShape(std::move(base), *select, scope);
     case Kind::kNumber:
+    case Kind::kEnum:
     case Kind::kStringLiteral:
     case Kind::kString:
-      return OfKind(Kind::kNumber);
+      return IntegralSelectShape(std::move(base), *select);
     default:
       return {};
   }

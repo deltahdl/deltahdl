@@ -43,6 +43,7 @@ struct ParamValueShape {
   std::vector<uint64_t> dims;
   DataType element;
   DataType structure;
+  std::size_t enum_array_dims = 0;
 };
 
 using ParamShapeLookup =

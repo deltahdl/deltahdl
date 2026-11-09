@@ -33,6 +33,9 @@ constexpr std::string_view kPartTypes[] = {
     "typedef struct { int a; } in_t;",
     "typedef struct { int a; } other_t;",
     "typedef struct { int arr [2]; in_t in; int a; string s; } o_t;",
+    "typedef enum {EX, EY} e_t;",
+    "typedef enum {FX, FY} f_t;",
+    "typedef e_t [1:0] ea_t;",
 };
 
 constexpr std::string_view kAggregateParams[] = {
@@ -42,6 +45,10 @@ constexpr std::string_view kAggregateParams[] = {
     "K KA [2] = '{null, null}",
     "int A [4] = '{1, 2, 3, 4}",
     "struct { int arr [2]; } S = '{arr: '{1, 2}}",
+    "enum {GX, GY} E = GY",
+    "e_t [1:0] PE = {EX, EY}",
+    "ea_t [1:0] PA = {EX, EY, EY, EX}",
+    "enum {HX, HY} [1:0] PH = {HX, HY}",
 };
 
 std::string Lines(std::span<const std::string_view> lines,
@@ -89,66 +96,66 @@ constexpr PartPlace kPartPlaces[] = {
        return AtUnit("module m;\n" + Aggregates("  ", ";\n") +
                      Param("  ", decl, ";\n") + "endmodule\n");
      },
-     15},
+     22},
     {"a module port list parameter",
      [](std::string_view decl) {
        return AtUnit("module m #(\n" + Aggregates("    ", ",\n") +
                      Param("    ", decl, ");\n") + "endmodule\n");
      },
-     15},
+     22},
     {"a generate block parameter",
      [](std::string_view decl) {
        return AtUnit("module m;\n  if (1) begin : g\n" +
                      Aggregates("    ", ";\n") + Param("    ", decl, ";\n") +
                      "  end\nendmodule\n");
      },
-     16},
+     23},
     {"a function parameter",
      [](std::string_view decl) {
        return AtUnit("module m;\n  function int f();\n" +
                      Aggregates("    ", ";\n") + Param("    ", decl, ";\n") +
                      "    return 0;\n  endfunction\nendmodule\n");
      },
-     16},
+     23},
     {"a package parameter",
      [](std::string_view decl) {
        return std::string(kPartClasses) + "package p;\n" +
               Lines(kPartTypes, "  ", "\n") + Aggregates("  ", ";\n") +
               Param("  ", decl, ";\n") + "endpackage\nmodule m;\nendmodule\n";
      },
-     15},
+     22},
     {"a compilation-unit parameter",
      [](std::string_view decl) {
        return AtUnit(Aggregates("", ";\n") + Param("", decl, ";\n") +
                      "module m;\nendmodule\n");
      },
-     14},
+     21},
     {"a class body parameter",
      [](std::string_view decl) {
        return AtUnit("class C;\n" + Aggregates("  ", ";\n") +
                      Param("  ", decl, ";\n") +
                      "endclass\nmodule m;\nendmodule\n");
      },
-     15},
+     22},
     {"a class port list parameter",
      [](std::string_view decl) {
        return AtUnit("class C #(\n" + Aggregates("    ", ",\n") +
                      Param("    ", decl, ");\n") +
                      "endclass\nmodule m;\nendmodule\n");
      },
-     15},
+     22},
     {"an instance override",
      [](std::string_view decl) {
        return AtUnit(ChildAndParent(decl) + "  c #(.B(" + PartValue(decl) +
                      ")) u();\nendmodule\n");
      },
-     24},
+     35},
     {"a defparam",
      [](std::string_view decl) {
        return AtUnit(ChildAndParent(decl) + "  c u();\n  defparam u.B = " +
                      PartValue(decl) + ";\nendmodule\n");
      },
-     25},
+     36},
 };
 
 struct PartReading {
@@ -186,6 +193,24 @@ constexpr PartReading kPartReadings[] = {
      "int B [3] = A[2-:2]", "int B [2] = A[2-:2]"},
     {"a member of a structure written in place, for another size",
      "int B [3] = S.arr", "int B [2] = S.arr"},
+    {"a bit of an enumeration, for a string", "string B = E[0]",
+     "int B = E[0]"},
+    {"a part-select of an enumeration, for a string", "string B = E[1:0]",
+     "int B = E[1:0]"},
+    {"an element of a packed array of an enumeration, for another one",
+     "f_t B = PE[0]", "e_t B = PE[0]"},
+    {"a packed array of an enumeration, for that enumeration", "e_t B = PE",
+     "e_t [1:0] B = PE"},
+    {"a slice of a packed array of an enumeration, for that enumeration",
+     "e_t B = PE[1:1]", "e_t B = PE[1]"},
+    {"a bit of an element of a packed array of an enumeration, for a string",
+     "string B = PE[1][0]", "int B = PE[1][0]"},
+    {"an element of a typedef's packed array of an enumeration, for another",
+     "f_t B = PA[1][0]", "e_t B = PA[1][0]"},
+    {"a row of a typedef's packed array of an enumeration, for the enumeration",
+     "e_t B = PA[1]", "ea_t B = PA[1]"},
+    {"a choice of an enumeration or a packed array of it, for the enumeration",
+     "e_t B = 1 ? EX : PE", "e_t B = 1 ? EX : PE[0]"},
 };
 
 TEST(ParamValueAssignability, NamedParameterIsFoundInEveryScope) {
