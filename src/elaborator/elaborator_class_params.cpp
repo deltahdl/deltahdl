@@ -13,6 +13,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/dollar_contexts.h"
+#include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
@@ -139,7 +140,24 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
   }
 }
 
+static void BindClassEnumConstants(ClassParamRegistration& reg) {
+  const EnumTypeVisitor kBind = [&reg](std::string_view, const DataType& type) {
+    for (const auto& m :
+         FoldEnumMembers(type.enum_members, reg.values, reg.arena))
+      BindDeclaredConstant(reg.values, m.name, m.value);
+  };
+  for (const DataType& type : reg.cls->param_types)
+    ForEachEnumTypeIn(type, kBind);
+  for (const auto* m : reg.cls->members) {
+    if (m->kind == ClassMemberKind::kProperty)
+      ForEachEnumTypeIn(m->data_type, kBind);
+    if (m->typedef_item != nullptr)
+      ForEachEnumTypeIn(m->typedef_item->typedef_type, kBind);
+  }
+}
+
 static void RegisterClassTreeParams(ClassParamRegistration& reg) {
+  BindClassEnumConstants(reg);
   RegisterOneClassParams(reg);
   for (const auto* m : reg.cls->members) {
     if (m->kind != ClassMemberKind::kClassDecl) continue;

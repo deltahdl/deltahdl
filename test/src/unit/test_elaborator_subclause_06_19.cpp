@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -589,6 +591,64 @@ TEST(EnumerationElaboration, AnEnumArrayOfA64BitBaseTakesItsWholeRange) {
   const auto* b = FindVar(design, "m", "B");
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(b->width, 64u);
+}
+
+struct ClassEnumPlace {
+  const char* where;
+  const char* classes;
+  const char* reader;
+};
+
+TEST(EnumerationElaboration, ConstantsOfAnEnumWrittenInAClassFoldInItsParams) {
+  const ClassEnumPlace kPlaces[] = {
+      {"in place on a port parameter",
+       "class C #(parameter enum {A, B, D} E = D,\n"
+       "          parameter int P = E * 10 + B);\nendclass\n",
+       "C::P"},
+      {"in place on a body parameter",
+       "class C;\n  parameter enum {A, B, D} E = D;\n"
+       "  parameter int P = E * 10 + B;\nendclass\n",
+       "C::P"},
+      {"in place on a property",
+       "class C;\n  enum {A, B, D} v;\n  parameter int P = D * 10 + B;\n"
+       "endclass\n",
+       "C::P"},
+      {"in a class typedef",
+       "class C;\n  typedef enum {A, B, D} t;\n  parameter t E = D;\n"
+       "  parameter int P = E * 10 + B;\nendclass\n",
+       "C::P"},
+      {"in place on a property of the enclosing class",
+       "class O;\n  enum {A, B, D} v;\n  class C;\n"
+       "    parameter int P = D * 10 + B;\n  endclass\nendclass\n",
+       "O::C::P"},
+  };
+  for (const ClassEnumPlace& place : kPlaces) {
+    SCOPED_TRACE(place.where);
+    ElabFixture f;
+    auto* design =
+        ElaborateSrc(std::string(place.classes) +
+                         "module m;\n  localparam int L = " + place.reader +
+                         ";\nendmodule\n",
+                     f);
+    ASSERT_NE(design, nullptr);
+    EXPECT_FALSE(f.has_errors);
+    const auto* param = FindParam(design, "m", "L");
+    ASSERT_NE(param, nullptr);
+    EXPECT_EQ(param->resolved_value, 21);
+  }
+}
+
+TEST(EnumerationElaboration, ConstantOfAnEnumInAnotherClassIsNoParamValue) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class D;\n  enum {A, B, Q} v;\nendclass\n"
+      "class C;\n  parameter int P = Q;\nendclass\n"
+      "module m;\nendmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class parameter 'P' value is not a constant "
+                            "expression",
+                            5, "6.20.2"));
 }
 
 }  // namespace

@@ -32,15 +32,27 @@ constexpr std::array<std::string_view, 12> kAssocIndexKeywords = {
 
 }  // namespace
 
+static TypedefMap::const_iterator FindTypedefEntry(const DataType& type,
+                                                   const TypedefMap& typedefs) {
+  if (!type.scope_name.empty()) {
+    auto scoped = typedefs.find(NamedTypeKey(type));
+    if (scoped != typedefs.end()) return scoped;
+  }
+  return typedefs.find(type.type_name);
+}
+
 const DataType* FollowTypedefs(const DataType& dtype,
                                const TypedefMap& typedefs,
                                std::vector<std::string_view>& names) {
   const DataType* type = &dtype;
   for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
     if (type->kind != DataTypeKind::kNamed) return type;
-    names.push_back(type->type_name);
-    auto it = typedefs.find(type->type_name);
-    if (it == typedefs.end()) return nullptr;
+    auto it = FindTypedefEntry(*type, typedefs);
+    if (it == typedefs.end()) {
+      names.push_back(type->type_name);
+      return nullptr;
+    }
+    names.push_back(it->first);
     type = &it->second;
   }
   return nullptr;
