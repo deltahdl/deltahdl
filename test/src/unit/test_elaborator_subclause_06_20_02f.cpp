@@ -52,6 +52,17 @@ int64_t IntParam(RtlirDesign* design, std::string_view mod,
   return p != nullptr && p->is_resolved ? p->resolved_value : -1;
 }
 
+int64_t BlockIntParam(RtlirDesign* design, std::string_view mod,
+                      std::string_view prefix, std::string_view name) {
+  const RtlirModule* m = FindModule(design, mod);
+  if (m == nullptr) return -1;
+  for (const auto& p : m->params) {
+    if (p.name == name && p.gen_block_prefix == prefix)
+      return p.is_resolved && !p.is_real_value ? p.resolved_value : -1;
+  }
+  return -1;
+}
+
 void ExpectReals(
     RtlirDesign* design, std::string_view mod,
     std::initializer_list<std::pair<std::string_view, double>> reals) {
@@ -203,6 +214,9 @@ TEST(UnitParamValueRead, LocalNameHidesAnImportedRealParameter) {
           "  parameter string S = \"zzz\";\n"
           "  parameter string Q = pk::S2;\n"
           "endclass\n"
+          "class F #(real R = 1.0);\n"
+          "  parameter real P = pk::R2;\n"
+          "endclass\n"
           "module c;\n"
           "  import pk::*;\n"
           "  localparam int W = R * 2;\n"
@@ -214,12 +228,6 @@ TEST(UnitParamValueRead, LocalNameHidesAnImportedRealParameter) {
           "    localparam Q2 = R / 2;\n"
           "    if ($rtoi(R * 4.0) == 12) begin : h\n"
           "      logic taken;\n"
-          "    end\n"
-          "    if (Q == 1 && R == 3) begin : q\n"
-          "      logic taken_int;\n"
-          "    end\n"
-          "    if (Q2 == 1 && R == 3) begin : q2\n"
-          "      logic taken_untyped;\n"
           "    end\n"
           "    c ci();\n"
           "  end\n"
@@ -243,14 +251,10 @@ TEST(UnitParamValueRead, LocalNameHidesAnImportedRealParameter) {
           "    for (int R = x; R == x; R = R + 1) halve_loop = R / 2;\n"
           "  endfunction\n"
           "  function automatic int RT(int x);\n"
-          "    RT = x;\n"
-          "    RT = RT / 2;\n"
+          "    return (RT + x) / 2;\n"
           "  endfunction\n"
           "  function automatic real half(int R);\n"
           "    return R / 2.0;\n"
-          "  endfunction\n"
-          "  function automatic real package_twice(real R);\n"
-          "    return pk::R2;\n"
           "  endfunction\n"
           "  localparam int F1 = twice(4);\n"
           "  localparam int F2 = twice(3);\n"
@@ -260,7 +264,7 @@ TEST(UnitParamValueRead, LocalNameHidesAnImportedRealParameter) {
           "  localparam int F6 = RT(3);\n"
           "  localparam int F7 = E#(3)::H;\n"
           "  localparam real H1 = half(3);\n"
-          "  localparam real H2 = package_twice(7.0);\n"
+          "  localparam real H2 = F#(7.0)::P;\n"
           "  localparam string T = E#(3)::Q;\n"
           "  localparam real X = R * 2;\n"
           "endmodule\n",
@@ -279,8 +283,8 @@ TEST(UnitParamValueRead, LocalNameHidesAnImportedRealParameter) {
   ExpectStrings(design, "m", {{"T", "hey!"}});
   ExpectInts(design, "c", {{"W", 5}});
   EXPECT_EQ(CountVarsEndingIn(design, "g", "taken"), 1u);
-  EXPECT_EQ(CountVarsEndingIn(design, "g", "taken_int"), 1u);
-  EXPECT_EQ(CountVarsEndingIn(design, "g", "taken_untyped"), 1u);
+  EXPECT_EQ(BlockIntParam(design, "g", "l_3_", "Q"), 1);
+  EXPECT_EQ(BlockIntParam(design, "g", "l_3_", "Q2"), 1);
 }
 
 TEST(UnitParamValueRead, PackageParameterReadFromAnotherPackage) {

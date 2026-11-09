@@ -198,6 +198,29 @@ std::optional<Elaborator::GenerateForOpening> Elaborator::OpenGenerateForLoop(
   return GenerateForOpening{genvar_name, *init_val};
 }
 
+namespace {
+
+class ActiveLoopGenvar {
+ public:
+  ActiveLoopGenvar(std::unordered_set<std::string_view>& active,
+                   std::string_view genvar)
+      : active_(active), genvar_(genvar), names_(genvar) {
+    active_.insert(genvar_);
+  }
+  ~ActiveLoopGenvar() { active_.erase(genvar_); }
+  ActiveLoopGenvar(const ActiveLoopGenvar&) = delete;
+  ActiveLoopGenvar& operator=(const ActiveLoopGenvar&) = delete;
+  ActiveLoopGenvar(ActiveLoopGenvar&&) = delete;
+  ActiveLoopGenvar& operator=(ActiveLoopGenvar&&) = delete;
+
+ private:
+  std::unordered_set<std::string_view>& active_;
+  std::string_view genvar_;
+  LocalNameFrame names_;
+};
+
+}  // namespace
+
 void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
                                       const ScopeMap& scope) {
   auto opening = OpenGenerateForLoop(item, mod, scope);
@@ -207,8 +230,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
   ScopeMap loop_scope = scope;
   BindDeclaredConstant(loop_scope, genvar_name, opening->init_value);
   std::string saved_prefix = gen_prefix_;
-  active_loop_genvars_.insert(genvar_name);
-  LocalNameFrame genvar_names(genvar_name);
+  ActiveLoopGenvar active_genvar(active_loop_genvars_, genvar_name);
 
   size_t const_depth = gen_loop_consts_.size();
   gen_loop_consts_.emplace_back(genvar_name, opening->init_value);
@@ -222,7 +244,6 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
 
   auto close_loop = [&] {
     gen_prefix_ = saved_prefix;
-    active_loop_genvars_.erase(genvar_name);
     gen_loop_consts_.resize(const_depth);
     gen_block_path_.pop_back();
     gen_prefix_scopes_.pop_back();
