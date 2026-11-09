@@ -14,6 +14,4 @@ While any CI run for a pushed commit is in progress -- any workflow under .githu
 
 **Why:** A run's findings decide the next step, and work done before they land is done on a guess about them.
 
-A comment-only edit does not depend on what a run finds, so it may be prepared in the working tree while a run is in progress. It is still committed and pushed only after the run lands.
-
-**How to apply:** After a push, arm the monitor and stop. Read the run when it completes, then act. The same goes for a run that a later push will cancel: wait for the new run rather than working under it. A local build, test run or pre-push check holds the session to the issues in hand in the same way, per [staying-on-the-issues-in-hand-while-waiting](staying-on-the-issues-in-hand-while-waiting.md). See [verifying-through-ci](verifying-through-ci.md) and [watching-a-run-in-the-background](watching-a-run-in-the-background.md).
+**How to apply:** After a push, arm the monitor and stop. Read the run when it completes, then act. The same goes for a run that a later push will cancel: wait for the new run rather than working under it. The same holds for every other command running in the background, per [waiting-while-anything-runs-in-the-background](waiting-while-anything-runs-in-the-background.md). See [verifying-through-ci](verifying-through-ci.md) and [watching-a-run-in-the-background](watching-a-run-in-the-background.md).
