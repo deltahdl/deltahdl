@@ -218,6 +218,24 @@ TEST(TypedParameterSign, ClassParameterOfAnUnsignedTypeReadsUnsigned) {
   EXPECT_EQ(ParamValue(design, "Q"), 8);
 }
 
+TEST(TypedParameterSign, ClassParameterSignedOrRangedRoundsARealValue) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  parameter signed P = -2.5;\n"
+      "  parameter [7:0] Q = 2.5;\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int X = C::P;\n"
+      "  localparam int Y = C::Q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "X"), -3);
+  EXPECT_EQ(ParamValue(design, "Y"), 3);
+}
+
 TEST(TypedefParameterType, PackageParameterIsCutToTheTypedefWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(

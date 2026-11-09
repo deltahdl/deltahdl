@@ -123,15 +123,14 @@ static const std::vector<Expr*>& PortParamDims(const ClassDecl& cls,
 }
 
 static void RegisterOneClassParams(ClassParamRegistration& reg) {
-  static const DataType kUntyped;
   UnitNamePrefixGuard prefix_guard(reg.key_prefix);
   const auto& params = reg.cls->params;
   const auto& types = reg.cls->param_types;
   for (size_t i = 0; i < params.size(); ++i) {
     const auto& [pname, pexpr] = params[i];
     if (reg.cls->type_param_names.count(pname)) continue;
-    RecordClassParam(pname, pexpr, i < types.size() ? types[i] : kUntyped,
-                     PortParamDims(*reg.cls, pname), reg);
+    RecordClassParam(pname, pexpr, types.at(i), PortParamDims(*reg.cls, pname),
+                     reg);
   }
   for (const auto* m : reg.cls->members) {
     if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
