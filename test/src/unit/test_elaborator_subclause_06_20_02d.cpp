@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -24,6 +25,168 @@ void ExpectReportedOnlyWithTheWrongValue(const std::string& reported_src,
   ElaborateSrc(accepted_src, accepted);
   EXPECT_FALSE(accepted.has_errors);
 }
+
+constexpr std::string_view kPartClasses =
+    "class K;\nendclass\nclass J;\nendclass\n";
+
+constexpr std::string_view kPartTypes[] = {
+    "typedef struct { int a; } in_t;",
+    "typedef struct { int a; } other_t;",
+    "typedef struct { int arr [2]; in_t in; int a; string s; } o_t;",
+};
+
+constexpr std::string_view kAggregateParams[] = {
+    "int M [2][2] = '{'{1, 2}, '{3, 4}}",
+    "o_t P = '{arr: '{1, 2}, in: '{a: 1}, a: 3, s: \"s\"}",
+    "in_t IA [2] = '{'{a: 1}, '{a: 2}}",
+    "K KA [2] = '{null, null}",
+    "int A [4] = '{1, 2, 3, 4}",
+    "struct { int arr [2]; } S = '{arr: '{1, 2}}",
+};
+
+std::string Lines(std::span<const std::string_view> lines,
+                  const std::string& open, std::string_view close) {
+  std::string text;
+  for (std::string_view line : lines) {
+    text += open;
+    text += line;
+    text += close;
+  }
+  return text;
+}
+
+std::string Aggregates(const std::string& indent, std::string_view end) {
+  return Lines(kAggregateParams, indent + "parameter ", end);
+}
+
+std::string AtUnit(const std::string& body) {
+  return std::string(kPartClasses) + Lines(kPartTypes, "", "\n") + body;
+}
+
+std::string Param(const std::string& indent, std::string_view decl,
+                  std::string_view end) {
+  return indent + "parameter " + std::string(decl) + std::string(end);
+}
+
+std::string ChildAndParent(std::string_view decl) {
+  return "module c;\n" + Aggregates("  ", ";\n") + Param("  ", decl, ";\n") +
+         "endmodule\nmodule t;\n" + Aggregates("  ", ";\n");
+}
+
+std::string PartValue(std::string_view decl) {
+  return std::string(decl.substr(decl.find(" = ") + 3));
+}
+
+struct PartPlace {
+  const char* where;
+  std::string (*source)(std::string_view decl);
+  uint32_t line;
+};
+
+const PartPlace kPartPlaces[] = {
+    {"a module body parameter",
+     [](std::string_view decl) {
+       return AtUnit("module m;\n" + Aggregates("  ", ";\n") +
+                     Param("  ", decl, ";\n") + "endmodule\n");
+     },
+     15},
+    {"a module port list parameter",
+     [](std::string_view decl) {
+       return AtUnit("module m #(\n" + Aggregates("    ", ",\n") +
+                     Param("    ", decl, ");\n") + "endmodule\n");
+     },
+     15},
+    {"a generate block parameter",
+     [](std::string_view decl) {
+       return AtUnit("module m;\n  if (1) begin : g\n" +
+                     Aggregates("    ", ";\n") + Param("    ", decl, ";\n") +
+                     "  end\nendmodule\n");
+     },
+     16},
+    {"a function parameter",
+     [](std::string_view decl) {
+       return AtUnit("module m;\n  function int f();\n" +
+                     Aggregates("    ", ";\n") + Param("    ", decl, ";\n") +
+                     "    return 0;\n  endfunction\nendmodule\n");
+     },
+     16},
+    {"a package parameter",
+     [](std::string_view decl) {
+       return std::string(kPartClasses) + "package p;\n" +
+              Lines(kPartTypes, "  ", "\n") + Aggregates("  ", ";\n") +
+              Param("  ", decl, ";\n") + "endpackage\nmodule m;\nendmodule\n";
+     },
+     15},
+    {"a compilation-unit parameter",
+     [](std::string_view decl) {
+       return AtUnit(Aggregates("", ";\n") + Param("", decl, ";\n") +
+                     "module m;\nendmodule\n");
+     },
+     14},
+    {"a class body parameter",
+     [](std::string_view decl) {
+       return AtUnit("class C;\n" + Aggregates("  ", ";\n") +
+                     Param("  ", decl, ";\n") +
+                     "endclass\nmodule m;\nendmodule\n");
+     },
+     15},
+    {"a class port list parameter",
+     [](std::string_view decl) {
+       return AtUnit("class C #(\n" + Aggregates("    ", ",\n") +
+                     Param("    ", decl, ");\n") +
+                     "endclass\nmodule m;\nendmodule\n");
+     },
+     15},
+    {"an instance override",
+     [](std::string_view decl) {
+       return AtUnit(ChildAndParent(decl) + "  c #(.B(" + PartValue(decl) +
+                     ")) u();\nendmodule\n");
+     },
+     24},
+    {"a defparam",
+     [](std::string_view decl) {
+       return AtUnit(ChildAndParent(decl) + "  c u();\n  defparam u.B = " +
+                     PartValue(decl) + ";\nendmodule\n");
+     },
+     25},
+};
+
+struct PartReading {
+  const char* where;
+  const char* reported;
+  const char* accepted;
+};
+
+const PartReading kPartReadings[] = {
+    {"a row of a two-dimensional array, for an array of another size",
+     "int B [3] = M[1]", "int B [2] = M[1]"},
+    {"a row, for an array of another element type", "byte B [2] = M[1]",
+     "int B [2] = M[1]"},
+    {"a row, for an int", "int B = M[1]", "int B = M[1][0]"},
+    {"a bit of an element, for a string", "string B = M[1][0][3]",
+     "int B = M[1][0][3]"},
+    {"an array member, for an array of another size", "int B [3] = P.arr",
+     "int B [2] = P.arr"},
+    {"an array member, for an int", "int B = P.arr", "int B = P.arr[1]"},
+    {"a structure member, for another structure", "other_t B = P.in",
+     "in_t B = P.in"},
+    {"a structure member, for an int", "int B = P.in", "int B = P.in.a"},
+    {"an int member, for a string", "string B = P.a", "string B = P.s"},
+    {"a string member, for an int", "int B = P.s", "int B = P.a"},
+    {"a character of a string member, for a string", "string B = P.s[0]",
+     "int B = P.s[0]"},
+    {"a structure element, for another structure", "other_t B = IA[0]",
+     "in_t B = IA[0]"},
+    {"a handle element, for an unrelated class", "J B = KA[0]", "K B = KA[0]"},
+    {"a slice, for an array of another size", "int B [3] = A[1:2]",
+     "int B [2] = A[1:2]"},
+    {"an ascending indexed slice, for another element type",
+     "byte B [2] = A[1+:2]", "int B [2] = A[1+:2]"},
+    {"a descending indexed slice, for an array of another size",
+     "int B [3] = A[2-:2]", "int B [2] = A[2-:2]"},
+    {"a member of a structure written in place, for another size",
+     "int B [3] = S.arr", "int B [2] = S.arr"},
+};
 
 TEST(ParamValueAssignability, NamedParameterIsFoundInEveryScope) {
   const IncompatibleValue kCases[] = {
@@ -405,6 +568,27 @@ TEST(ParamValueAssignability, UntypedParameterValueIsNamedFromItsOwnScope) {
       "  c u();\n  defparam u.X = B;\nendmodule\n",
   };
   ExpectEachAccepted(kSources);
+}
+
+TEST(ParamValueAssignability, PartOfAnAggregateParameterTakesItsDeclaredType) {
+  for (const PartPlace& place : kPartPlaces) {
+    for (const PartReading& form : kPartReadings) {
+      SCOPED_TRACE(std::string(place.where) + ", " + form.where);
+      ExpectReportedOnlyWithTheWrongValue(place.source(form.reported),
+                                          place.source(form.accepted), "B",
+                                          place.line);
+    }
+  }
+}
+
+TEST(ParamValueAssignability, BitOfAStringLiteralParameterIsIntegral) {
+  ExpectReportedOnlyWithTheWrongValue(
+      "module m;\n  parameter U = \"ab\";\n  parameter string B = U[0];\n"
+      "endmodule\n",
+      "module m;\n  parameter U = \"ab\";\n  parameter int B = U[0];\n"
+      "  parameter enum {X, Y} E = Y;\n  parameter int C = E[0];\n"
+      "endmodule\n",
+      "B", 3);
 }
 
 }  // namespace

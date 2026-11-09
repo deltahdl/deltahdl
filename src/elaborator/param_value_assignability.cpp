@@ -4,6 +4,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <format>
 #include <optional>
 #include <span>
@@ -15,6 +16,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator_helpers.h"
@@ -85,6 +87,12 @@ ParamValueShape ArrayShape(std::vector<uint64_t> dims,
   return shape;
 }
 
+ParamValueShape StructureShape(const DataType& resolved) {
+  ParamValueShape shape = OfIdentity(Kind::kStructure, resolved);
+  shape.structure = resolved;
+  return shape;
+}
+
 ParamValueShape ResolvedShape(const DataType& resolved) {
   switch (resolved.kind) {
     case DataTypeKind::kEnum:
@@ -93,9 +101,8 @@ ParamValueShape ResolvedShape(const DataType& resolved) {
       return OfKind(Kind::kString);
     case DataTypeKind::kStruct:
     case DataTypeKind::kUnion:
-      return IsUnpackedAggregateType(resolved)
-                 ? OfIdentity(Kind::kStructure, resolved)
-                 : OfKind(Kind::kNumber);
+      return IsUnpackedAggregateType(resolved) ? StructureShape(resolved)
+                                               : OfKind(Kind::kNumber);
     default:
       return OfKind(Kind::kNumber);
   }
@@ -243,6 +250,56 @@ ParamValueShape ConcatShape(const Expr* concat, const ParamValueScope& scope) {
   return OfKind(any_string ? Kind::kString : Kind::kStringLiteral);
 }
 
+int64_t SliceSize(const Expr& select, const ScopeMap& constants) {
+  const std::optional<int64_t> kEnd = ConstEvalInt(select.index_end, constants);
+  if (select.is_part_select_plus || select.is_part_select_minus)
+    return kEnd.value_or(0);
+  return ConstEvalInt(select.index, constants)
+      .and_then([&kEnd](int64_t start) {
+        return kEnd.transform(
+            [start](int64_t end) { return std::abs(start - end) + 1; });
+      })
+      .value_or(0);
+}
+
+ParamValueShape ArrayPartShape(ParamValueShape array, const Expr& select,
+                               const ParamValueScope& scope) {
+  if (select.index_end != nullptr) {
+    array.dims.front() =
+        static_cast<uint64_t>(SliceSize(select, scope.constants));
+    return array;
+  }
+  array.dims.erase(array.dims.begin());
+  if (!array.dims.empty()) return array;
+  return DeclaredShape(array.element, {}, scope);
+}
+
+ParamValueShape SelectShape(const Expr* select, const ParamValueScope& scope) {
+  ParamValueShape base = ValueShapeOf(select->base, scope);
+  switch (base.kind) {
+    case Kind::kArray:
+      return ArrayPartShape(std::move(base), *select, scope);
+    case Kind::kNumber:
+    case Kind::kStringLiteral:
+    case Kind::kString:
+      return OfKind(Kind::kNumber);
+    default:
+      return {};
+  }
+}
+
+ParamValueShape MemberShape(const Expr* access, const ParamValueScope& scope) {
+  const ParamValueShape kBase = ValueShapeOf(access->lhs, scope);
+  ParamValueShape shape;
+  if (kBase.kind != Kind::kStructure) return shape;
+  for (const StructMember& member : kBase.structure.struct_members) {
+    if (member.name == access->rhs->text)
+      shape =
+          TargetShape(MemberWrittenType(member), member.unpacked_dims, scope);
+  }
+  return shape;
+}
+
 ParamValueShape ValueShapeOf(const Expr* value, const ParamValueScope& scope) {
   switch (value->kind) {
     case ExprKind::kIntegerLiteral:
@@ -256,9 +313,11 @@ ParamValueShape ValueShapeOf(const Expr* value, const ParamValueScope& scope) {
       return OfKind(Kind::kStringLiteral);
     case ExprKind::kIdentifier:
       return NamedShape(value, scope);
+    case ExprKind::kSelect:
+      return SelectShape(value, scope);
     case ExprKind::kMemberAccess:
       return value->is_scope_resolution ? QualifiedShape(value, scope)
-                                        : ParamValueShape{};
+                                        : MemberShape(value, scope);
     case ExprKind::kAssignmentPattern:
       return OfKind(Kind::kPattern);
     case ExprKind::kCast:

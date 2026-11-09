@@ -42,6 +42,7 @@ struct ParamValueShape {
   std::string class_name;
   std::vector<uint64_t> dims;
   DataType element;
+  DataType structure;
 };
 
 using ParamShapeLookup =
