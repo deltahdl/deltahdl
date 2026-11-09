@@ -166,9 +166,6 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
   const Expr* expr = param.override_expr != nullptr ? param.override_expr
                                                     : param.default_value;
   if (expr == nullptr) return;
-  std::string own = ctx.ActiveInstancePrefix();
-  if (param.override_expr != nullptr)
-    ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
   bool folded = width <= 64 && param.is_resolved && !HoldsXZLiteral(expr) &&
                 !NamesAnUnknownValue(expr, ctx);
   if (!folded && EveryNameHasStorage(expr, ctx)) {
@@ -178,7 +175,6 @@ void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
     if (type != nullptr && !DeclaredTypeIs4State(*type, ctx))
       CoerceTo2State(var->value);
   }
-  ctx.SetLoweringInstancePrefix(own);
 }
 
 bool UnfoldedParamEvaluable(const RtlirParamDecl& param, SimContext& ctx) {

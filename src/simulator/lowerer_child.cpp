@@ -525,6 +525,7 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
       RegisterChildInstancePath(saved_prefix, child_prefix, child, ctx_);
   inst_prefix_ = child_prefix;
   EnterInstanceUnit(design_, child.resolved, inst_prefix_, ctx_, arena_);
+  instance_prefixes_.try_emplace(child.resolved, inst_prefix_);
   if (child.resolved->is_interface) {
     interface_instance_prefixes_.push_back(child_prefix);
   }

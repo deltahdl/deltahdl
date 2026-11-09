@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -80,6 +81,9 @@ class Lowerer {
   void LowerParams(const RtlirModule* mod);
   void LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
                   std::string_view full);
+  void FillParamValue(const RtlirParamDecl& p, std::function<void()> fill);
+  void FillInValueScope(const RtlirParamDecl& p,
+                        const std::function<void()>& fill);
   void RegisterGenBlockMembers(const RtlirModule* mod);
   void LowerAliases(const RtlirModule* mod);
   void LowerModuleProcesses(const RtlirModule* mod);
@@ -241,6 +245,8 @@ class Lowerer {
                               const std::string& scope_prefix);
   void EnrollArrayElements(const std::string& name);
   std::unordered_set<std::string> path_delayed_ports_;
+  std::unordered_map<const RtlirModule*, std::string> instance_prefixes_;
+  std::vector<std::function<void()>> deferred_param_fills_;
 };
 
 }  // namespace delta

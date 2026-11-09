@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "fixture_simulator.h"
@@ -280,6 +281,106 @@ TEST(ParameterArraySim, OverrideByANameOrATypedPatternGivesEveryElement) {
   EXPECT_EQ(ValueOf(f, "y.e1"), 4u);
   EXPECT_EQ(ValueOf(f, "z.e0"), 9u);
   EXPECT_EQ(ValueOf(f, "z.e1"), 10u);
+}
+
+constexpr std::string_view kWholeDefparamTarget =
+    "typedef struct { int a; logic [7:0] b; } s_t;\n"
+    "module m;\n"
+    "  parameter int W = 100;\n"
+    "  parameter s_t Q = '{a: 200, b: 8'h20};\n"
+    "  parameter int C[2] = '{300, 400};\n"
+    "  parameter s_t P = '{a: 1, b: 8'h2};\n"
+    "  parameter s_t R = '{a: 1, b: 8'h2};\n"
+    "  parameter int A[2] = '{1, 2};\n"
+    "  parameter int B[2] = '{1, 2};\n"
+    "  int pa, pb, ra, rb, a0, a1, b0, b1;\n"
+    "  initial begin\n"
+    "    pa = P.a;\n"
+    "    pb = P.b;\n"
+    "    ra = R.a;\n"
+    "    rb = R.b;\n"
+    "    a0 = A[0];\n"
+    "    a1 = A[1];\n"
+    "    b0 = B[0];\n"
+    "    b1 = B[1];\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(StructureParameterSim, WholeDefparamFromAFartherModuleNamesTheWriters) {
+  SimFixture f;
+  std::string src(kWholeDefparamTarget);
+  src +=
+      "module mid;\n"
+      "  parameter int W = 50;\n"
+      "  parameter s_t Q = '{a: 60, b: 8'h6};\n"
+      "  parameter int C[2] = '{70, 80};\n"
+      "  m u();\n"
+      "  m v();\n"
+      "endmodule\n"
+      "module w;\n"
+      "  parameter int W = 30;\n"
+      "  parameter s_t Q = '{a: 31, b: 8'h32};\n"
+      "  parameter int C[2] = '{33, 34};\n"
+      "  defparam top.t.v.P = '{a: W, b: 8'h3};\n"
+      "  defparam top.t.v.A = '{W, 4};\n"
+      "  defparam top.t.v.R = Q;\n"
+      "  defparam top.t.v.B = C;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  parameter int W = 7;\n"
+      "  parameter s_t Q = '{a: 8, b: 8'h9};\n"
+      "  parameter int C[2] = '{11, 12};\n"
+      "  mid t();\n"
+      "  w x();\n"
+      "  defparam t.u.P = '{a: W, b: 8'h1};\n"
+      "  defparam t.u.A = '{W, 2};\n"
+      "  defparam t.u.R = Q;\n"
+      "  defparam t.u.B = C;\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", t.u.pa, t.u.pb, "
+      "t.u.ra, t.u.rb, t.u.a0, t.u.a1, t.u.b0, t.u.b1);\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", t.v.pa, t.v.pb, "
+      "t.v.ra, t.v.rb, t.v.a0, t.v.a1, t.v.b0, t.v.b1);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunCapture(src, f), "7 1 8 9 7 2 11 12\n30 3 31 50 30 4 33 34\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(StructureParameterSim, WholeDefparamInAGenerateBlockNamesTheBlocks) {
+  SimFixture f;
+  std::string src(kWholeDefparamTarget);
+  src +=
+      "module top;\n"
+      "  parameter int W = 7;\n"
+      "  parameter s_t Q = '{a: 8, b: 8'h9};\n"
+      "  if (1) begin : g\n"
+      "    localparam int W = 40;\n"
+      "    localparam s_t Q = '{a: 41, b: 8'h2a};\n"
+      "    m k();\n"
+      "    defparam k.P = '{a: W, b: 8'h1};\n"
+      "    defparam k.A = '{W, 2};\n"
+      "    defparam k.R = Q;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : l\n"
+      "    m k();\n"
+      "    defparam k.P = '{a: i + 20, b: 8'h1};\n"
+      "    defparam k.A = '{W, i};\n"
+      "    defparam k.R = Q;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1;\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", g.k.pa, g.k.a0, g.k.a1, "
+      "g.k.ra, g.k.rb);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", l[0].k.pa, l[0].k.a0, "
+      "l[0].k.a1, l[0].k.ra, l[0].k.rb);\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", l[1].k.pa, l[1].k.a0, "
+      "l[1].k.a1, l[1].k.ra, l[1].k.rb);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunCapture(src, f), "40 40 2 41 42\n20 7 0 8 9\n21 7 1 8 9\n");
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(StructureParameterSim, MemberOfAnElementOfAStructureArrayIsRead) {

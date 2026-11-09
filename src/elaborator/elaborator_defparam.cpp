@@ -474,6 +474,7 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     param->defparam_value_expr = val_expr;
     param->defparam_value_scope = scope;
     param->defparam_value_scopes = site.scopes;
+    param->defparam_value_consts = site.consts;
     param->defparam_module = mod;
     mod->defparams.push_back(
         {target_mod,

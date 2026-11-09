@@ -207,6 +207,7 @@ void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
 
 void Lowerer::LowerModule(const RtlirModule* mod) {
   EnterInstanceUnit(design_, mod, inst_prefix_, ctx_, arena_);
+  instance_prefixes_.try_emplace(mod, inst_prefix_);
   RegisterInstanceKeyBinding(inst_prefix_, mod, ctx_);
   RegisterTypeRefCompares(inst_prefix_, mod, ctx_);
   LowerParams(mod);
@@ -587,6 +588,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
       LowerParallelTop(mod);
     }
   }
+  for (const auto& fill : deferred_param_fills_) fill();
   RegisterClassTypeAliases(design, ctx_, arena_);
   MakeNamedSpecializations();
   InitializeStaticLocals();

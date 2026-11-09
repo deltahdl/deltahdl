@@ -1,6 +1,8 @@
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -8,12 +10,14 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
+#include "simulator/deferred_caller.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
+#include "simulator/process.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
@@ -61,8 +65,9 @@ static void FillParamArray(std::string_view full, RtlirVariable& var,
   InitArrayElements(full, var, ctx, arena);
 }
 
-static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
-                             SimContext& ctx, Arena& arena) {
+static RtlirVariable CreateParamArray(const RtlirParamDecl& p,
+                                      std::string_view full, SimContext& ctx,
+                                      Arena& arena) {
   ParamStorageShape shape = ParamStorageShapeOf(p);
   BindParamLayout(p, full, shape.width, ctx, arena);
   const DataType& type = *p.decl_type;
@@ -85,13 +90,11 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.is_descending = outer.left > outer.right;
   var.num_unpacked_dims = static_cast<uint32_t>(p.unpacked_bounds.size());
   CreateArrayElements(full, var, ctx, arena);
-  const Expr* value =
-      p.override_expr != nullptr ? p.override_expr : p.default_value;
-  std::string own = ctx.ActiveInstancePrefix();
-  if (p.override_expr != nullptr)
-    ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
-  FillParamArray(full, var, value, ctx, arena);
-  ctx.SetLoweringInstancePrefix(own);
+  return var;
+}
+
+static const Expr* ParamValueExpr(const RtlirParamDecl& p) {
+  return p.override_expr != nullptr ? p.override_expr : p.default_value;
 }
 
 static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
@@ -110,22 +113,48 @@ static bool HoldStructParamValue(const RtlirParamDecl& p, std::string_view full,
   const StructTypeInfo* layout = ctx.GetVariableStructType(full);
   if (layout == nullptr || (p.from_override && p.override_expr == nullptr))
     return false;
-  const Expr* value =
-      p.override_expr != nullptr ? p.override_expr : p.default_value;
+  const Expr* value = ParamValueExpr(p);
   const Expr* pattern = UnwrapTypedPattern(value);
   bool is_pattern = pattern->kind == ExprKind::kAssignmentPattern;
   if (!is_pattern && layout->is_packed) return false;
-  std::string own = ctx.ActiveInstancePrefix();
-  if (p.override_expr != nullptr)
-    ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
   uint32_t width = var->value.width;
   var->value =
       is_pattern ? EvalStructPatternValue(pattern, layout, ctx, arena)
                  : OwnRhsWords(ResizeToWidth(EvalExpr(value, ctx, arena, width),
                                              width, arena),
                                arena);
-  ctx.SetLoweringInstancePrefix(own);
   return true;
+}
+
+void Lowerer::FillInValueScope(const RtlirParamDecl& p,
+                               const std::function<void()>& fill) {
+  if (p.defparam_module != nullptr) {
+    Process writer;
+    writer.stand_in = true;
+    writer.inst_prefix = instance_prefixes_[p.defparam_module];
+    writer.gen_prefixes.assign(p.defparam_value_scopes.begin(),
+                               p.defparam_value_scopes.end());
+    InstallGenBlockConsts(p.defparam_value_consts, &writer);
+    CallerStandIn in_writer(&writer, ctx_);
+    fill();
+    return;
+  }
+  std::string own = ctx_.ActiveInstancePrefix();
+  if (p.override_expr != nullptr)
+    ctx_.SetLoweringInstancePrefix(ctx_.InstantiatingPrefix(own));
+  fill();
+  ctx_.SetLoweringInstancePrefix(own);
+}
+
+void Lowerer::FillParamValue(const RtlirParamDecl& p,
+                             std::function<void()> fill) {
+  if (p.defparam_module != nullptr &&
+      !instance_prefixes_.contains(p.defparam_module)) {
+    deferred_param_fills_.emplace_back(
+        [this, &p, fill = std::move(fill)] { FillInValueScope(p, fill); });
+    return;
+  }
+  FillInValueScope(p, fill);
 }
 
 void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
@@ -136,7 +165,10 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
     return;
   }
   if (!p.unpacked_bounds.empty()) {
-    CreateParamArray(p, full, ctx_, arena_);
+    RtlirVariable var = CreateParamArray(p, full, ctx_, arena_);
+    FillParamValue(p, [this, &p, full, var]() mutable {
+      FillParamArray(full, var, ParamValueExpr(p), ctx_, arena_);
+    });
     return;
   }
   if (!p.is_resolved && !UnfoldedParamEvaluable(p, ctx_)) return;
@@ -164,12 +196,14 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   BindParamLayout(p, full, width, ctx_, arena_);
   var->value =
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
-  if (!HoldStructParamValue(p, full, var, ctx_, arena_) &&
-      (p.override_expr != nullptr ||
-       !NamesOwnEnumConstant(p.default_value, mod)))
-    ReevaluateParamValue(p, var, ctx_, arena_);
   var->is_signed = shape.is_signed;
-  var->value.is_signed = shape.is_signed;
+  FillParamValue(p, [this, &mod, &p, full, var, shape] {
+    if (!HoldStructParamValue(p, full, var, ctx_, arena_) &&
+        (p.override_expr != nullptr ||
+         !NamesOwnEnumConstant(p.default_value, mod)))
+      ReevaluateParamValue(p, var, ctx_, arena_);
+    var->value.is_signed = shape.is_signed;
+  });
 }
 
 }  // namespace delta
