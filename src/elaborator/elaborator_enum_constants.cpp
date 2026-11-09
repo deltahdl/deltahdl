@@ -159,14 +159,6 @@ void ForEachEnumTypeOfClass(const ClassDecl& cls, const EnumTypeVisitor& fn) {
   }
 }
 
-const DataType* EnumDeclaringConstant(const DataType& type,
-                                      std::string_view name,
-                                      const ScopeMap& scope) {
-  const DataType* found = nullptr;
-  ForEachEnumTypeIn(type, EnumDeclaring(name, scope, found));
-  return found;
-}
-
 const DataType* EnumDeclaringConstantOfItems(std::span<ModuleItem* const> items,
                                              std::string_view name,
                                              const ScopeMap& scope) {

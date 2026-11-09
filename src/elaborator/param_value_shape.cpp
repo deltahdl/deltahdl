@@ -265,10 +265,6 @@ ParamValueShape MemberShape(const Expr* access, const ParamValueScope& scope) {
   return shape;
 }
 
-bool SameIdentity(const ParamValueShape& target, const ParamValueShape& value) {
-  return value.identity == 0 || value.identity == target.identity;
-}
-
 const DataType* Resolved(const DataType* type, const TypedefMap& typedefs) {
   std::vector<std::string_view> names;
   const DataType* resolved = FollowTypedefs(*type, typedefs, names);
@@ -369,14 +365,15 @@ bool ParamShapeAssignable(const ParamValueShape& target,
     case Kind::kString:
       return value.kind == Kind::kString || value.kind == Kind::kStringLiteral;
     case Kind::kEnum:
-      return value.kind == Kind::kEnum && SameIdentity(target, value);
+      return value.kind == Kind::kEnum && value.identity == target.identity;
     case Kind::kArray:
       return value.kind == Kind::kPattern ||
              (value.kind == Kind::kArray &&
               ArraysAssignable(target, value, scope.tables.typedefs));
     case Kind::kStructure:
       return value.kind == Kind::kPattern ||
-             (value.kind == Kind::kStructure && SameIdentity(target, value));
+             (value.kind == Kind::kStructure &&
+              value.identity == target.identity);
     default:
       return value.kind == Kind::kNull ||
              (value.kind == Kind::kClass &&

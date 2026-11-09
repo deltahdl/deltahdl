@@ -25,10 +25,6 @@ void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn);
 
 void ForEachEnumTypeOfClass(const ClassDecl& cls, const EnumTypeVisitor& fn);
 
-const DataType* EnumDeclaringConstant(const DataType& type,
-                                      std::string_view name,
-                                      const ScopeMap& scope);
-
 const DataType* EnumDeclaringConstantOfItems(std::span<ModuleItem* const> items,
                                              std::string_view name,
                                              const ScopeMap& scope);
