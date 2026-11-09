@@ -180,8 +180,7 @@ std::string_view InPlaceAggregateLayoutKey(std::string_view scope,
                                            SimContext& ctx) {
   const bool kUnpackedAggregate = (type.kind == DataTypeKind::kStruct ||
                                    type.kind == DataTypeKind::kUnion) &&
-                                  !type.is_packed && !type.is_soft &&
-                                  !type.struct_members.empty();
+                                  !type.is_packed && !type.is_soft;
   if (!kUnpackedAggregate) return {};
   auto* key = ctx.GetArena().Create<std::string>(
       std::format("$param::{}::{}", scope, name));

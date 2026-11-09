@@ -488,20 +488,25 @@ TEST(InPlaceTypeParameterSim, ClassParametersOfInPlaceTypesReadBack) {
       RunCapture(
           "class C #(struct packed {bit [3:0] a;} P = 4'b1x0z,\n"
           "          parameter union packed {logic [3:0] x; logic [3:0] y;} "
-          "Q = 4'b1x0z);\n"
+          "Q = 4'b1x0z,\n"
+          "          parameter union soft {logic [3:0] m; logic [3:0] n;} "
+          "W = 4'bz10x);\n"
           "  localparam struct packed {logic [3:0] a;} S = 4'bz01x;\n"
           "endclass\n"
           "class D;\n"
           "  parameter struct {int a; int b;} R = '{a: 4, b: 9};\n"
           "  localparam union packed {bit [3:0] u; bit [3:0] w;} "
           "U = 4'b1x0z;\n"
+          "  localparam union soft {logic [3:0] s; logic [3:0] t;} "
+          "V = 4'b01xz;\n"
           "endclass\n"
           "module t;\n"
-          "  initial $display(\"%b %b %b %b %0d %0d %b\", C#()::P, C#()::Q, "
-          "C#()::S, C#(4'h6)::P, D::R.a, D::R.b, D::U);\n"
+          "  initial $display(\"%b %b %b %b %0d %0d %b %b %b\", C#()::P, "
+          "C#()::Q, C#()::S, C#(4'h6)::P, D::R.a, D::R.b, D::U, C#()::W, "
+          "D::V);\n"
           "endmodule\n",
           f),
-      "1000 1x0z z01x 0110 4 9 1000\n");
+      "1000 1x0z z01x 0110 4 9 1000 z10x 01xz\n");
 }
 
 TEST(InPlaceTypeParameterSim, SubroutineAndBlockParametersReadBack) {
