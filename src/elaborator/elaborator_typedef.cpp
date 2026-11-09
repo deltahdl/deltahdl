@@ -315,7 +315,11 @@ static void AdoptMemberTypedefDims(
 }
 
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
+  std::vector<Expr*> taken_dims =
+      TypeRefUnpackedDims(item->typedef_type.type_ref_expr, mod);
   ResolveTypeRef(item->typedef_type, item->loc, mod);
+  item->unpacked_dims.insert(item->unpacked_dims.end(), taken_dims.begin(),
+                             taken_dims.end());
   ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
                                  {mod->params, typedefs_, class_names_, unit_},
                                  diag_);
@@ -336,10 +340,15 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                 Subclause("6.18"));
   }
   if (!item->typedef_ifc_port.empty()) {
-    const DataType* taken = InterfacePortTypedefType(
+    const ModuleItem* taken = InterfacePortTypedef(
         item, module_decl_path_.back(),
         [this](std::string_view name) { return FindModuleInScope(name); });
-    if (taken != nullptr) item->typedef_type = *taken;
+    if (taken != nullptr) {
+      item->typedef_type = taken->typedef_type;
+      item->unpacked_dims.insert(item->unpacked_dims.end(),
+                                 taken->unpacked_dims.begin(),
+                                 taken->unpacked_dims.end());
+    }
   }
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
   SizeClassHandleMembers(item->typedef_type, typedefs_, class_names_);

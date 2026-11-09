@@ -351,7 +351,7 @@ TEST(TypeDeclParsing, TypedefInterfacePortBitSelect) {
   EXPECT_EQ(item->typedef_ifc_port, "port0");
   EXPECT_EQ(item->typedef_type.type_name, "my_type");
   EXPECT_EQ(item->name, "local_t");
-  EXPECT_EQ(item->unpacked_dims.size(), 1u);
+  EXPECT_TRUE(item->unpacked_dims.empty());
 }
 
 TEST(TypeDeclParsing, TypedefInterfacePortNoBitSelect) {

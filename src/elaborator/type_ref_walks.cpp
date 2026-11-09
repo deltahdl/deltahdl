@@ -192,6 +192,15 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
       arena);
 }
 
+static void ResolveTypedefTypeRef(ModuleItem& item,
+                                  const TypeRefResolver& resolve,
+                                  Arena& arena) {
+  const std::vector<Expr*> kTaken = resolve(item.typedef_type, item.loc, {});
+  item.unpacked_dims.insert(item.unpacked_dims.end(), kTaken.begin(),
+                            kTaken.end());
+  ResolveItemIndexTypeRefs(item, resolve, arena);
+}
+
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve,
                               const CompilationUnit* unit, Arena& arena,
@@ -199,8 +208,7 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
   for (ModuleItem* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kTypedef:
-        resolve(item->typedef_type, item->loc, {});
-        ResolveItemIndexTypeRefs(*item, resolve, arena);
+        ResolveTypedefTypeRef(*item, resolve, arena);
         break;
       case ModuleItemKind::kNettypeDecl:
         resolve(item->typedef_type, item->loc, {});
@@ -331,8 +339,7 @@ void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
       [&](DataType& dt, SourceLoc loc,
           std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
     if (dt.type_ref_expr != nullptr) record(dt.type_ref_expr, loc, locals);
-    ResolveScopeTypeRef(dt, *items, arena);
-    return {};
+    return ResolveScopeTypeRef(dt, *items, arena);
   };
   const ProceduralStmtVisitor kVisit =
       [&](Stmt* s, std::span<const ProceduralLocal> locals) {

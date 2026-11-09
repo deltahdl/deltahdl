@@ -462,12 +462,19 @@ static void TakeWrittenFields(
   var.gen_block_consts = gen_loop_consts;
 }
 
-static void ResolveOrReportClassScopedDeclType(DataType& type, SourceLoc loc,
+static void ResolveOrReportClassScopedDeclType(ModuleItem* item,
                                                const TypedefMap& typedefs,
                                                const CompilationUnit* unit,
                                                DiagEngine& diag) {
-  ResolveClassScopedDeclType(type, typedefs, unit);
-  ReportUnresolvedClassScopedType(type, loc, typedefs, unit, diag);
+  const ModuleItem* td =
+      ResolveClassScopedDeclType(item->data_type, typedefs, unit);
+  if (td != nullptr) {
+    item->unpacked_dims.insert(item->unpacked_dims.end(),
+                               td->unpacked_dims.begin(),
+                               td->unpacked_dims.end());
+  }
+  ReportUnresolvedClassScopedType(item->data_type, item->loc, typedefs, unit,
+                                  diag);
 }
 
 std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
@@ -511,8 +518,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_, diag_);
 
-  ResolveOrReportClassScopedDeclType(item->data_type, item->loc, typedefs_,
-                                     unit_, diag_);
+  ResolveOrReportClassScopedDeclType(item, typedefs_, unit_, diag_);
 
   if (ElaborateUserNettypeNet(item, mod)) return;
 

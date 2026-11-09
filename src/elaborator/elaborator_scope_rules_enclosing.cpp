@@ -211,7 +211,9 @@ void ElaboratorClassRules::ValidateForwardTypedefsInScope(
       ValidateForwardTypedefsInScope(arm.body);
     }
     if (item->kind != ModuleItemKind::kTypedef) continue;
-    if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
+    if (item->typedef_type.kind != DataTypeKind::kImplicit ||
+        item->typedef_type.type_ref_expr != nullptr)
+      continue;
     bool resolved = ForwardTypedefHasDefinition(items, item);
     if (!resolved && class_names_.count(item->name) > 0) {
       resolved = true;

@@ -685,6 +685,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/simple_bit_vector.cpp
     elaborator/dollar_contexts.cpp
     elaborator/dollar_scope.cpp
+    elaborator/dollar_value.cpp
     elaborator/dollar_parameter_values.cpp
     elaborator/unpacked_dim_reads.cpp
     elaborator/default_pattern_values.cpp

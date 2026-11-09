@@ -163,8 +163,9 @@ std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
 
 void AdoptReferencedType(DataType& dt, const DataType& type);
 
-void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
-                         Arena& arena);
+std::vector<Expr*> ResolveScopeTypeRef(DataType& dt,
+                                       const std::vector<ModuleItem*>& items,
+                                       Arena& arena);
 
 void AdoptExpressionType(DataType& dt, const std::optional<DataType>& type,
                          Arena& arena);
@@ -187,8 +188,9 @@ const ModuleItem* FindClassScopedTypedefItem(std::string_view cls_name,
                                              std::string_view type_name,
                                              const CompilationUnit* unit);
 
-bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
-                                const CompilationUnit* unit);
+const ModuleItem* ResolveClassScopedDeclType(DataType& dtype,
+                                             const TypedefMap& typedefs,
+                                             const CompilationUnit* unit);
 
 struct ClassTypedefTables {
   const CompilationUnit* unit;

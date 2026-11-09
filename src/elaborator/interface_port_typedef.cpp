@@ -8,7 +8,7 @@
 
 namespace delta {
 
-const DataType* InterfacePortTypedefType(
+const ModuleItem* InterfacePortTypedef(
     const ModuleItem* item, const ModuleDecl* decl,
     const std::function<const ModuleDecl*(std::string_view)>& find_module) {
   for (const PortDecl& port : decl->ports) {
@@ -18,7 +18,7 @@ const DataType* InterfacePortTypedefType(
     for (const ModuleItem* it : iface->items) {
       if (it->kind == ModuleItemKind::kTypedef &&
           it->name == item->typedef_type.type_name) {
-        return &it->typedef_type;
+        return it;
       }
     }
     return nullptr;

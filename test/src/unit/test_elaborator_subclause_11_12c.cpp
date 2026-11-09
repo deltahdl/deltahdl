@@ -424,7 +424,7 @@ TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-TEST(LetActualScopeElaboration, TypesOfAnInterfacePortAreNotFollowed) {
+TEST(LetActualScopeElaboration, ATypeTakenThroughAnInterfacePortIsFollowed) {
   ElabFixture f;
   ElaborateSrc(
       "interface ifc;\n"
@@ -433,7 +433,9 @@ TEST(LetActualScopeElaboration, TypesOfAnInterfacePortAreNotFollowed) {
       "module m (ifc p);\n"
       "  typedef p.t lt;\n"
       "  let f(lt x) = x[0];\n"
+      "  int a2 [2];\n"
       "  int a3 [3];\n"
+      "  initial $display(\"%0d\", f(a2));\n"
       "  initial $display(\"%0d\", f(a3));\n"
       "endmodule\n"
       "module top;\n"
@@ -442,7 +444,9 @@ TEST(LetActualScopeElaboration, TypesOfAnInterfacePortAreNotFollowed) {
       "endmodule\n",
       f);
   EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 10, "11.12"));
 }
 
 TEST(LetActualScopeElaboration, ATypeAClassDeclaresIsFollowed) {

@@ -28,3 +28,22 @@ inline void ExpectDollarParamReportedOnlyOn(
         << line;
   }
 }
+
+constexpr std::string_view kDollarContext =
+    "'$' may stand only in a queue's dimension or select, a value range's "
+    "bound";
+
+inline void ExpectDollarReportedOnlyOn(
+    const ElabFixture& f, std::initializer_list<uint32_t> reported,
+    std::initializer_list<uint32_t> accepted) {
+  for (uint32_t line : reported) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kDollarContext, line, "6.20.7"))
+        << line;
+  }
+  for (uint32_t line : accepted) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kDollarContext, line, "6.20.7"))
+        << line;
+  }
+}

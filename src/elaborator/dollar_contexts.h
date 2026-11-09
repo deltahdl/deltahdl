@@ -21,6 +21,7 @@ struct InstanceParams {
   std::unordered_set<std::string_view> unbounded;
   std::unordered_set<std::string_view> overridden;
   std::unordered_map<std::string_view, const DataType*> types;
+  bool values_unknown = false;
 };
 
 void CheckDollarOperands(const ModuleDecl* decl, const CompilationUnit& unit,

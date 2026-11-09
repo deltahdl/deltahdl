@@ -262,19 +262,21 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   return {};
 }
 
-void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
-                         Arena& arena) {
+std::vector<Expr*> ResolveScopeTypeRef(DataType& dt,
+                                       const std::vector<ModuleItem*>& items,
+                                       Arena& arena) {
   const Expr* ref = dt.type_ref_expr;
-  if (ref == nullptr || ref->kind != ExprKind::kIdentifier) return;
+  if (ref == nullptr || ref->kind != ExprKind::kIdentifier) return {};
   DataType spelled = TypeNameToDataType(ref->text);
   const ModuleItem* item = ItemNamed(items, ref->text);
   if (spelled.kind != DataTypeKind::kNamed ||
       (item != nullptr && item->kind == ModuleItemKind::kTypedef)) {
     AdoptReferencedType(dt, spelled);
-    return;
+    return {};
   }
-  if (item == nullptr) return;
+  if (item == nullptr) return {};
   AdoptReferencedType(dt, ScopeValueType(*item, items, arena));
+  return item->unpacked_dims;
 }
 
 static const ClassDecl* FindClassAmong(std::string_view name,
@@ -450,16 +452,17 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   return &td->typedef_type;
 }
 
-bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
-                                const CompilationUnit* unit) {
+const ModuleItem* ResolveClassScopedDeclType(DataType& dtype,
+                                             const TypedefMap& typedefs,
+                                             const CompilationUnit* unit) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) {
-    return false;
+    return nullptr;
   }
-  if (typedefs.count(TypeChainKey(dtype)) > 0) return false;
+  if (typedefs.count(TypeChainKey(dtype)) > 0) return nullptr;
   const ClassDecl* cls = ClassOfChainedScope(dtype, unit);
-  if (cls == nullptr) return false;
+  if (cls == nullptr) return nullptr;
   const ModuleItem* td = FindClassTypedef(cls, dtype.type_name);
-  if (td == nullptr) return false;
+  if (td == nullptr) return nullptr;
   const DataType& resolved = td->typedef_type;
   dtype.kind = resolved.kind;
   dtype.is_signed = resolved.is_signed;
@@ -467,7 +470,7 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
   dtype.packed_dim_left = resolved.packed_dim_left;
   dtype.packed_dim_right = resolved.packed_dim_right;
   dtype.extra_packed_dims = resolved.extra_packed_dims;
-  return true;
+  return td;
 }
 
 static bool ClassDeclaresMember(const ClassDecl* cls, std::string_view name) {

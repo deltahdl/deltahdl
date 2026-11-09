@@ -195,7 +195,7 @@ bool Parser::TryInterfacePortTypedef(ModuleItem* item) {
   item->typedef_ifc_port = Consume().text;
   while (Check(TokenKind::kLBracket)) {
     Consume();
-    item->unpacked_dims.push_back(ParseExpr());
+    ParseExpr();
     Expect(TokenKind::kRBracket, Subclause("6.18"));
   }
   Expect(TokenKind::kDot, Subclause("6.18"));

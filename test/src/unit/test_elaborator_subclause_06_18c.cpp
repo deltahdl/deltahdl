@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <format>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -49,6 +53,50 @@ TEST(UserDefinedTypeElaboration, ClassTypedefArrayIsAnArrayOfHandles) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "class 'C' has no member named 'baz'", 7, "8.6"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(UserDefinedTypeElaboration,
+     TypeOperatorTypedefInAGenerateBlockIsNoForwardTypedef) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int v;\n"
+      "  typedef type(v) mt;\n"
+      "  if (1) begin : g\n"
+      "    typedef type(v) gt;\n"
+      "    typedef gf;\n"
+      "  end else begin : e\n"
+      "    typedef type(v) et;\n"
+      "    typedef ef;\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : c\n"
+      "      typedef type(v) ct;\n"
+      "      typedef cf;\n"
+      "    end\n"
+      "  endcase\n"
+      "  for (genvar i = 0; i < 1; i++) begin : l\n"
+      "    typedef type(v) lt;\n"
+      "    typedef lf;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  auto forward_reported = [&](std::string_view name, uint32_t line) {
+    return ReportedError(f.diag.Diagnostics(),
+                         std::format("forward typedef '{}' is never resolved "
+                                     "by a definition in the same scope",
+                                     name),
+                         line, "6.18");
+  };
+  EXPECT_FALSE(forward_reported("mt", 3));
+  EXPECT_FALSE(forward_reported("gt", 5));
+  EXPECT_TRUE(forward_reported("gf", 6));
+  EXPECT_FALSE(forward_reported("et", 8));
+  EXPECT_TRUE(forward_reported("ef", 9));
+  EXPECT_FALSE(forward_reported("ct", 13));
+  EXPECT_TRUE(forward_reported("cf", 14));
+  EXPECT_FALSE(forward_reported("lt", 18));
+  EXPECT_TRUE(forward_reported("lf", 19));
 }
 
 }  // namespace
