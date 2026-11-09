@@ -221,6 +221,7 @@ void CheckGateInstNameDiagnostics(const ModuleItem* item, DiagEngine& diag) {
 }
 
 void RecordImportDecl(const ModuleItem* item, RtlirModule* mod) {
+  if (item->import_item.is_header) return;
   RtlirImport imp;
   imp.package_name = item->import_item.package_name;
   imp.item_name = item->import_item.item_name;

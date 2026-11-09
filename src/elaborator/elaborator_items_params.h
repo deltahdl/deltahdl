@@ -28,6 +28,10 @@ std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
 
 bool HasRealOperand(const Expr* expr);
 
+bool TakesItsTypeFromItsValue(const DataType& type);
+
+bool HoldsRealValue(const DataType& type, const Expr* value);
+
 struct InstanceParamAssignments {
   const Elaborator::ParamList& params;
   ScopeMap scope;

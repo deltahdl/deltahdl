@@ -215,12 +215,22 @@ struct SpecializationArg {
 SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
                                                  const ScopeMap& scope);
 
+bool NamesSpecializedClassParam(const Expr* expr);
+
+std::optional<double> ConstEvalSpecializedClassParamReal(const Expr* expr,
+                                                         const ScopeMap& scope);
+
+std::optional<std::string> ConstEvalSpecializedClassParamString(
+    const Expr* expr, const ScopeMap& scope);
+
 std::optional<bool> BuiltinMethodCallIsConstant(const Expr* expr,
                                                 const ScopeMap& scope);
 
 std::optional<std::string> ScopedNameKey(const Expr* expr);
 
 bool NamesAggregateParam(const Expr* expr);
+
+bool NamesScalarUnitParam(const Expr* expr);
 
 std::optional<ConstVal> ConstEvalAggregatePart(const Expr* expr,
                                                const ScopeMap& scope);

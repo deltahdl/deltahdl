@@ -19,7 +19,7 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
-#include "elaborator/unit_aggregate_params.h"
+#include "elaborator/unit_param_values.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -39,13 +39,6 @@ struct ClassParamRegistration {
   DiagEngine& diag;
   const std::unordered_set<std::string_view>* specparams = nullptr;
 };
-
-static bool TakesRealClassParamValue(const Expr* pexpr, const DataType& type) {
-  if (IsRealType(type.kind)) return true;
-  bool untyped = type.kind == DataTypeKind::kImplicit && !type.is_signed &&
-                 type.packed_dim_left == nullptr;
-  return untyped && HasRealOperand(pexpr);
-}
 
 static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
                                                     const DataType& type,
@@ -91,7 +84,7 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              ClassParamRegistration& reg) {
   if (!pexpr || ContainsDollar(pexpr)) return;
   bool is_array = !dims.empty() || pexpr->kind == ExprKind::kAssignmentPattern;
-  bool is_real = !is_array && TakesRealClassParamValue(pexpr, type);
+  bool is_real = !is_array && HoldsRealValue(type, pexpr);
   std::optional<int64_t> val;
   if (!is_real && !is_array)
     val = FoldClassParamInteger(pexpr, type, reg.values);
@@ -103,7 +96,7 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
     ReportNonConstantClassParam(pname, pexpr, reg);
     return;
   }
-  RegisterUnitAggregateParam(
+  RegisterUnitParamValue(
       {reg.key_prefix, pname, pexpr, type, dims, reg.values});
   if (is_array || is_real || !val) return;
   auto* qname = reg.arena.Create<std::string>(std::string(reg.key_prefix) +

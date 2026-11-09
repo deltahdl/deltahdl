@@ -470,7 +470,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       std::exchange(current_library_, std::string(decl->library));
 
   ApplyCompilationUnitImports(decl, mod);
-  ApplyHeaderImports(decl);
+  ApplyHeaderImports(decl, mod);
   ImportedEnumCtx enum_ctx{unit_, arena_, typedefs_, enum_member_names_};
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);
   RegisterCuEnumLiterals(decl, mod, enum_ctx);

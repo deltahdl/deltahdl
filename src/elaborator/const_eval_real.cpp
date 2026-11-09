@@ -200,14 +200,30 @@ static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
   return ConstEvalRealMathCall(expr, scope);
 }
 
+static std::optional<double> UnitParamReal(const Expr* expr,
+                                           const ScopeMap& scope) {
+  if (!NamesScalarUnitParam(expr)) return std::nullopt;
+  std::optional<double> unit = ConstEvalAggregatePartReal(expr, scope);
+  auto it = scope.find(expr->text);
+  if (it != scope.end() &&
+      unit.transform([](double v) { return std::llround(v); }) != it->second)
+    return std::nullopt;
+  return unit;
+}
+
 static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
                                                      const ScopeMap& scope) {
+  if (expr->scope_prefix == "$unit")
+    return ConstEvalAggregatePartReal(expr, scope);
   if (auto local = ConstFuncRealLocal(expr->text)) return local;
   auto it = scope.find(expr->text);
   const RtlirParamDecl* pd = RegisteredParamNamed(expr->text);
   if (pd != nullptr && pd->is_real_value &&
       (it == scope.end() || it->second == pd->resolved_value))
     return pd->resolved_real;
+  if (pd == nullptr) {
+    if (auto unit = UnitParamReal(expr, scope)) return unit;
+  }
   if (it != scope.end()) return static_cast<double>(it->second);
   return std::nullopt;
 }

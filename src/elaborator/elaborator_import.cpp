@@ -133,11 +133,12 @@ void Elaborator::ApplyCompilationUnitImports(const ModuleDecl* decl,
   }
 }
 
-void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
+void Elaborator::ApplyHeaderImports(const ModuleDecl* decl, RtlirModule* mod) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
-    if (!item->import_item.is_header) continue;
-    ApplyImport(item->import_item, unit_,
+    const ImportItem& imp = item->import_item;
+    if (!imp.is_header) continue;
+    ApplyImport(imp, unit_,
                 {typedefs_,
                  aggregate_typedef_names_,
                  cu_param_scope_,
@@ -146,6 +147,8 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
                  func_decls_,
                  {nettype_names_, nettype_resolve_funcs_, nettype_canonical_},
                  arena_});
+    mod->imports.push_back(RtlirImport{imp.package_name, imp.item_name,
+                                       imp.is_wildcard, std::string_view()});
   }
 }
 

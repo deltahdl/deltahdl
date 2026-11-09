@@ -15,9 +15,10 @@
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_key_match.h"
-#include "elaborator/unit_aggregate_params.h"
+#include "elaborator/unit_param_values.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
@@ -156,11 +157,6 @@ const DataType* ParamValueType(const RtlirParamDecl& pd) {
   return pd.type_param_actual != nullptr ? pd.type_param_actual : pd.decl_type;
 }
 
-bool IsImplicitType(const DataType& type) {
-  return type.kind == DataTypeKind::kImplicit && !type.is_signed &&
-         type.packed_dim_left == nullptr;
-}
-
 std::optional<PartState> ModuleParamState(const RtlirParamDecl& pd,
                                           const ScopeMap& scope) {
   const DataType* type = ParamValueType(pd);
@@ -183,21 +179,40 @@ std::optional<PartState> ModuleParamState(const RtlirParamDecl& pd,
   return state;
 }
 
-PartState UnitParamState(const UnitAggregateParam& param) {
+PartState UnitParamState(const UnitParamValue& param) {
   return PartState{param.value,
                    ValueFrame{nullptr, &param.scope, {}, param.prefix},
                    PartShape{param.type, param.dims, 0, &param.scope}};
 }
 
-const UnitAggregateParam* UnitRoot(const Expr* root) {
+const UnitParamValue* ImportedByModule(const RtlirModule& mod,
+                                       std::string_view name) {
+  for (const RtlirImport& imp : mod.imports) {
+    if (const UnitParamValue* found = FindUnitParamValueImported(
+            {imp.package_name, imp.item_name, imp.is_wildcard}, name))
+      return found;
+  }
+  return nullptr;
+}
+
+const UnitParamValue* NamedUnitRoot(std::string_view name) {
+  const RtlirModule* mod = RegisteredModule();
+  if (mod == nullptr) return FindUnitParamValueNamed(name);
+  if (const UnitParamValue* own = FindUnitParamValueOwn(name)) return own;
+  if (const UnitParamValue* imported = ImportedByModule(*mod, name))
+    return imported;
+  return FindUnitParamValue(name);
+}
+
+const UnitParamValue* UnitRoot(const Expr* root) {
   if (root->kind == ExprKind::kMemberAccess) {
     if (!root->is_scope_resolution) return nullptr;
-    return FindUnitAggregateParam(ScopedNameKey(root).value_or(""));
+    return FindUnitParamValue(ScopedNameKey(root).value_or(""));
   }
   if (root->kind != ExprKind::kIdentifier) return nullptr;
-  if (root->scope_prefix == "$unit") return FindUnitAggregateParam(root->text);
+  if (root->scope_prefix == "$unit") return FindUnitParamValue(root->text);
   if (!root->scope_prefix.empty()) return nullptr;
-  return FindUnitAggregateParamNamed(root->text);
+  return NamedUnitRoot(root->text);
 }
 
 std::optional<PartState> RootState(const Expr* root, const ScopeMap& scope) {
@@ -205,7 +220,7 @@ std::optional<PartState> RootState(const Expr* root, const ScopeMap& scope) {
     if (const RtlirParamDecl* pd = RegisteredParamNamed(root->text))
       return ModuleParamState(*pd, scope);
   }
-  const UnitAggregateParam* param = UnitRoot(root);
+  const UnitParamValue* param = UnitRoot(root);
   if (param == nullptr ||
       (!NamesDims(param->dims) && !HoldsAggregate(param->type)))
     return std::nullopt;
@@ -505,7 +520,7 @@ std::optional<ConstVal> FoldPacked(const PartState& state) {
   FrameGuard guard(state.frame);
   const ScopeMap& scope = *state.frame.scope;
   const DataType& type = state.shape.type;
-  if (IsImplicitType(type)) return ConstEvalFull(state.value, scope);
+  if (TakesItsTypeFromItsValue(type)) return ConstEvalFull(state.value, scope);
   std::optional<int64_t> folded = FoldRealValueAsInteger(state.value, scope);
   if (!folded) folded = FoldDeclaredParamValue(state.value, type, scope);
   if (!folded) return std::nullopt;
@@ -535,7 +550,7 @@ LeafKind KindOfLeaf(const PartShape& reader) {
 std::optional<ConstVal> FoldIntegral(const LocatedPart& part) {
   std::optional<ConstVal> whole = FoldPacked(part.state);
   const DataType& type = part.reader.type;
-  if (!whole || IsImplicitType(type)) return whole;
+  if (!whole || TakesItsTypeFromItsValue(type)) return whole;
   return SlicedBits(*whole, part.offset, PartWidth(type, *part.reader.scope),
                     IsSignedType(type, Typedefs()));
 }
@@ -552,9 +567,26 @@ double AsReal(const ConstVal& value) {
   return static_cast<double>(value.value);
 }
 
+bool IsModuleParamName(const Expr* expr) {
+  return expr->kind == ExprKind::kIdentifier && expr->scope_prefix.empty() &&
+         RegisteredParamNamed(expr->text) != nullptr;
+}
+
+const UnitParamValue* ScalarUnitRoot(const Expr* expr) {
+  if (IsModuleParamName(expr)) return nullptr;
+  const UnitParamValue* param = UnitRoot(expr);
+  if (param == nullptr) return nullptr;
+  LeafKind kind = KindOfLeaf(UnitParamState(*param).shape);
+  return kind == LeafKind::kReal || kind == LeafKind::kString ? param : nullptr;
+}
+
 std::optional<LocatedPart> LocateRead(const Expr* expr, const ScopeMap& scope) {
-  if (!IsPartStep(expr)) return std::nullopt;
-  return LocatePart(expr, scope);
+  if (IsPartStep(expr)) return LocatePart(expr, scope);
+  const UnitParamValue* param = ScalarUnitRoot(expr);
+  if (param == nullptr || g_locate_depth > kMaxLocateDepth) return std::nullopt;
+  PartState state = UnitParamState(*param);
+  PartShape reader = state.shape;
+  return LocatedPart{std::move(state), std::move(reader)};
 }
 
 }  // namespace
@@ -562,6 +594,10 @@ std::optional<LocatedPart> LocateRead(const Expr* expr, const ScopeMap& scope) {
 bool NamesAggregateParam(const Expr* expr) {
   static const ScopeMap kNoScope;
   return RootState(expr, kNoScope).has_value();
+}
+
+bool NamesScalarUnitParam(const Expr* expr) {
+  return ScalarUnitRoot(expr) != nullptr;
 }
 
 std::optional<ConstVal> ConstEvalAggregatePart(const Expr* expr,
@@ -574,6 +610,8 @@ std::optional<ConstVal> ConstEvalAggregatePart(const Expr* expr,
 
 std::optional<double> ConstEvalAggregatePartReal(const Expr* expr,
                                                  const ScopeMap& scope) {
+  if (NamesSpecializedClassParam(expr))
+    return ConstEvalSpecializedClassParamReal(expr, scope);
   LocateDepth depth;
   std::optional<LocatedPart> part = LocateRead(expr, scope);
   if (!part) return ConstEvalFull(expr, scope).transform(AsReal);
@@ -597,6 +635,8 @@ bool IsRealAggregatePart(const Expr* expr) {
 
 std::optional<std::string> ConstEvalAggregatePartString(const Expr* expr,
                                                         const ScopeMap& scope) {
+  if (NamesSpecializedClassParam(expr))
+    return ConstEvalSpecializedClassParamString(expr, scope);
   LocateDepth depth;
   std::optional<LocatedPart> part = LocateRead(expr, scope);
   if (!part || KindOfLeaf(part->reader) != LeafKind::kString)

@@ -11,7 +11,6 @@
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
-#include "elaborator/rtlir_scopes.h"
 #include "parser/ast_expr.h"
 
 namespace delta {
@@ -94,19 +93,13 @@ const std::vector<RtlirEnumMember>* EnumMembers(const Expr* operand) {
 
 std::optional<std::string> StringParamValue(const Expr* operand,
                                             const ScopeMap& scope) {
-  if (operand->kind != ExprKind::kIdentifier)
-    return ConstEvalAggregatePartString(operand, scope);
-  const RtlirModule* mod = RegisteredModule();
-  if (!mod) return std::nullopt;
-  for (const auto& param : mod->params) {
-    if (param.name != operand->text) continue;
-    if (!ParamVisibleFromScopes(param.gen_block_prefix,
-                                RegisteredGenPrefixes()))
-      continue;
-    if (!param.is_string_value) return std::nullopt;
-    return std::string(param.resolved_string);
-  }
-  return std::nullopt;
+  const RtlirParamDecl* param =
+      operand->kind == ExprKind::kIdentifier && operand->scope_prefix.empty()
+          ? RegisteredParamNamed(operand->text)
+          : nullptr;
+  if (param == nullptr) return ConstEvalAggregatePartString(operand, scope);
+  if (!param->is_string_value) return std::nullopt;
+  return std::string(param->resolved_string);
 }
 
 std::optional<ConstVal> StringParamChar(const Expr* call, std::string_view str,

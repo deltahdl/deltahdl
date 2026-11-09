@@ -405,8 +405,11 @@ static std::string StringLiteralChars(const Expr* expr) {
 }
 
 static std::optional<std::string> StringParamChars(const Expr* expr) {
-  const RtlirParamDecl* param = RegisteredParamNamed(expr->text);
-  if (param == nullptr || !param->is_string_value) return std::nullopt;
+  const RtlirParamDecl* param =
+      expr->scope_prefix.empty() ? RegisteredParamNamed(expr->text) : nullptr;
+  if (param == nullptr)
+    return ConstEvalAggregatePartString(expr, RegisteredModuleScope());
+  if (!param->is_string_value) return std::nullopt;
   return std::string(param->resolved_string);
 }
 

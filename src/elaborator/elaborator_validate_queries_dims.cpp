@@ -20,6 +20,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unit_param_values.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -770,6 +771,12 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
   }
 }
 
+void BindImportedUnitParamNames(const ModuleItem* item, ScopeMap& scope) {
+  if (item->kind != ModuleItemKind::kImportDecl) return;
+  for (std::string_view name : UnitParamNamesImported(item->import_item))
+    scope.try_emplace(name, 0);
+}
+
 }  // namespace
 
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
@@ -805,6 +812,7 @@ void Elaborator::ValidatePackageValueParams() {
     ScopeMap scope = cu_param_scope_;
     for (const auto* item : pkg->items) {
       BindPackageImportConstants(pkg, item, cu_param_scope_, scope);
+      BindImportedUnitParamNames(item, scope);
       BindEnumConstantsOfItem(item, scope, arena_);
       if (item->kind != ModuleItemKind::kParamDecl) continue;
       ValidateOneValueParam(item, scope, diag_, true);

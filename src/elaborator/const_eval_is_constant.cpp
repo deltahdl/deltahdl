@@ -120,12 +120,14 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
       IsConstantExpr(expr->lhs, scope))
     return true;
   std::optional<std::string> key = ScopedNameKey(expr);
-  return (key && scope.count(*key) > 0) || NamesAggregateParam(expr);
+  return (key && scope.count(*key) > 0) || NamesAggregateParam(expr) ||
+         NamesScalarUnitParam(expr);
 }
 
 static bool IsConstantIdentifierExpr(const Expr* expr, const ScopeMap& scope) {
   if (expr->text == "$" || expr->text == "null") return true;
-  return scope.count(expr->text) > 0 || NamesAggregateParam(expr);
+  return scope.count(expr->text) > 0 || NamesAggregateParam(expr) ||
+         NamesScalarUnitParam(expr);
 }
 
 static bool IsConstantMinTypMaxExpr(const Expr* expr, const ScopeMap& scope) {

@@ -1,11 +1,14 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/elaborator_items_params.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -118,38 +121,112 @@ static SpecializationArg HeaderParamArg(const Expr* expr, const ClassDecl* decl,
   return {false, FoldClassParamDefault(pexpr, type, values)};
 }
 
-static SpecializationArg FoldUnderSpecialization(const Expr* expr,
-                                                 const ClassDecl* decl,
-                                                 const ScopeMap& scope) {
-  std::string_view target = expr->rhs->text;
-  ScopeMap values = scope;
-  for (size_t i = 0; i < decl->params.size(); ++i) {
-    std::string_view pname = decl->params[i].first;
-    if (decl->type_param_names.count(pname) != 0) continue;
-    SpecializationArg arg = HeaderParamArg(expr, decl, i, scope, values);
-    if (pname == target) return Answer(arg);
-    const Expr* actual = WrittenParamActual(*expr->lhs, pname, i);
-    const DataType* type =
-        i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
-    Bind(values, pname, arg.value,
-         actual != nullptr ? BoundSource{actual, type, scope}
-                           : BoundSource{decl->params[i].second, type, values});
-  }
-  for (const auto* m : decl->members) {
-    if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
-    DataType type = InClassScope(m->data_type, *decl);
-    auto v = FoldClassParamDefault(m->init_expr, &type, values);
-    if (m->name == target) return Answer({false, v});
-    Bind(values, m->name, v, {m->init_expr, &type, values});
-  }
-  return {};
+struct SpecializedTarget {
+  SpecializationArg arg;
+  const Expr* source = nullptr;
+  DataType type;
+  ScopeMap scope;
+};
+
+static std::optional<double> HeldAs(const DataType& type,
+                                    std::optional<double> value) {
+  if (type.kind != DataTypeKind::kShortreal) return value;
+  return value.transform(
+      [](double v) { return static_cast<double>(static_cast<float>(v)); });
 }
+
+static void BindReal(std::string_view name, const BoundSource& from) {
+  if (!HoldsRealValue(*from.type, from.source)) return;
+  std::optional<double> value =
+      HeldAs(*from.type, ConstEvalReal(from.source, from.source_scope));
+  if (value) SetConstFuncRealLocal(name, *value);
+}
+
+class SpecializationWalk {
+ public:
+  SpecializationWalk(const Expr* expr, const ClassDecl* decl,
+                     const ScopeMap& scope, bool binds_reals)
+      : expr_(expr),
+        decl_(decl),
+        scope_(scope),
+        values_(scope),
+        binds_reals_(binds_reals) {}
+
+  std::optional<SpecializedTarget> Find() {
+    std::string_view target = expr_->rhs->text;
+    for (size_t i = 0; i < decl_->params.size(); ++i) {
+      std::string_view pname = decl_->params[i].first;
+      if (decl_->type_param_names.count(pname) != 0) continue;
+      SpecializationArg arg = HeaderParamArg(expr_, decl_, i, scope_, values_);
+      const Expr* actual = WrittenParamActual(*expr_->lhs, pname, i);
+      const DataType& type = decl_->param_types[i];
+      BoundSource from =
+          actual != nullptr
+              ? BoundSource{actual, &type, scope_}
+              : BoundSource{decl_->params[i].second, &type, values_};
+      if (pname == target)
+        return SpecializedTarget{Answer(arg), from.source, type,
+                                 from.source_scope};
+      Take(pname, arg.value, from);
+    }
+    for (const auto* m : decl_->members) {
+      if (m->kind != ClassMemberKind::kProperty || !m->is_param) continue;
+      DataType type = InClassScope(m->data_type, *decl_);
+      auto v = FoldClassParamDefault(m->init_expr, &type, values_);
+      if (m->name == target)
+        return SpecializedTarget{Answer({false, v}), m->init_expr,
+                                 std::move(type), values_};
+      Take(m->name, v, {m->init_expr, &type, values_});
+    }
+    return std::nullopt;
+  }
+
+ private:
+  void Take(std::string_view name, const std::optional<ConstVal>& v,
+            const BoundSource& from) {
+    if (binds_reals_) BindReal(name, from);
+    Bind(values_, name, v, from);
+  }
+
+  const Expr* expr_;
+  const ClassDecl* decl_;
+  const ScopeMap& scope_;
+  ScopeMap values_;
+  bool binds_reals_;
+};
 
 SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
                                                  const ScopeMap& scope) {
   const ClassDecl* decl = SpecializedParamClass(expr);
   if (!decl) return {};
-  return FoldUnderSpecialization(expr, decl, scope);
+  std::optional<SpecializedTarget> target =
+      SpecializationWalk(expr, decl, scope, false).Find();
+  return target ? target->arg : SpecializationArg{};
+}
+
+bool NamesSpecializedClassParam(const Expr* expr) {
+  return SpecializedParamClass(expr) != nullptr;
+}
+
+std::optional<double> ConstEvalSpecializedClassParamReal(
+    const Expr* expr, const ScopeMap& scope) {
+  ConstFuncRealFrame frame;
+  std::optional<SpecializedTarget> target =
+      SpecializationWalk(expr, SpecializedParamClass(expr), scope, true).Find();
+  if (!target) return std::nullopt;
+  if (!HoldsRealValue(target->type, target->source))
+    return target->arg.value.transform(
+        [](const ConstVal& v) { return static_cast<double>(v.value); });
+  return HeldAs(target->type, ConstEvalReal(target->source, target->scope));
+}
+
+std::optional<std::string> ConstEvalSpecializedClassParamString(
+    const Expr* expr, const ScopeMap& scope) {
+  std::optional<SpecializedTarget> target =
+      SpecializationWalk(expr, SpecializedParamClass(expr), scope, false)
+          .Find();
+  if (!target) return std::nullopt;
+  return ConstEvalString(target->source);
 }
 
 }  // namespace delta

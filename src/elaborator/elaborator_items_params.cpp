@@ -34,14 +34,19 @@
 
 namespace delta {
 
+static bool IsRealIdentifier(const Expr* e) {
+  if (e->scope_prefix.empty()) {
+    if (ConstFuncRealLocal(e->text)) return true;
+    if (const RtlirParamDecl* pd = RegisteredParamNamed(e->text))
+      return pd->is_real_value;
+  }
+  return IsRealAggregatePart(e);
+}
+
 static bool IsRealOperand(const Expr* e) {
   if (e->kind == ExprKind::kRealLiteral || e->kind == ExprKind::kTimeLiteral)
     return true;
-  if (e->kind == ExprKind::kIdentifier) {
-    if (ConstFuncRealLocal(e->text)) return true;
-    const RtlirParamDecl* pd = RegisteredParamNamed(e->text);
-    return pd != nullptr && pd->is_real_value;
-  }
+  if (e->kind == ExprKind::kIdentifier) return IsRealIdentifier(e);
   if (e->kind == ExprKind::kCall) {
     const ModuleItem* fn = RegisteredConstFunc(e);
     if (fn != nullptr) return IsConstFuncRealType(fn->return_type);
@@ -66,6 +71,16 @@ bool HasRealOperand(const Expr* e) {
     if (HasRealOperand(a)) return true;
   }
   return false;
+}
+
+bool TakesItsTypeFromItsValue(const DataType& type) {
+  return type.kind == DataTypeKind::kImplicit && !type.is_signed &&
+         type.packed_dim_left == nullptr;
+}
+
+bool HoldsRealValue(const DataType& type, const Expr* value) {
+  if (TakesItsTypeFromItsValue(type)) return HasRealOperand(value);
+  return IsRealType(type.kind);
 }
 
 std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
