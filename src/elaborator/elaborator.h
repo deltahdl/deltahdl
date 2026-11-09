@@ -587,6 +587,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void TrackEnumVariable(const ModuleItem* item);
   void EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod);
+  void EmitInPlaceEnumMembers(const DataType& type, std::string_view key,
+                              SourceLoc loc, RtlirModule* mod);
 
   void ValidateEnumAssignments(const ModuleDecl* decl);
 

@@ -269,6 +269,8 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
       typedefs_[item->name] = assigned->type;
       pd.resolved_type = arena_.Create<DataType>(assigned->type);
     }
+  } else {
+    EmitBareEnumMembers(item, mod);
   }
   const ScopeMap kScope = BuildParamScope(mod);
   FoldParamUnpackedBounds(pd, kScope);

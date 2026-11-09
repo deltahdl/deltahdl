@@ -13,6 +13,7 @@
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/assoc_index_type.h"
 #include "elaborator/const_eval.h"
@@ -368,21 +369,25 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
 }
 
 void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
-  DataTypeKind kind = item->data_type.kind;
-  if (kind != DataTypeKind::kEnum && kind != DataTypeKind::kStruct &&
-      kind != DataTypeKind::kUnion)
-    return;
   if (!item->first_in_decl_list) return;
+  EmitInPlaceEnumMembers(item->data_type, item->name, item->loc, mod);
+}
+
+void Elaborator::EmitInPlaceEnumMembers(const DataType& type,
+                                        std::string_view key, SourceLoc loc,
+                                        RtlirModule* mod) {
+  if (type.kind != DataTypeKind::kEnum && type.kind != DataTypeKind::kStruct &&
+      type.kind != DataTypeKind::kUnion)
+    return;
   ScopeMap scope = BuildParamScope(mod);
-  ForEachEnumTypeIn(
-      item->data_type, [&](std::string_view path, const DataType& type) {
-        if (type.enum_members.empty()) return;
-        if (!path.empty()) ValidateEnumDecl(type, item->loc, true);
-        DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
-                        EvalTypeWidth(EnumArrayElement(type), typedefs_), scope,
-                        {scope, arena_, mod, enum_member_names_, nullptr,
-                         IsSignedType(type, typedefs_)});
-      });
+  ForEachEnumTypeIn(type, [&](std::string_view path, const DataType& found) {
+    if (found.enum_members.empty()) return;
+    if (!path.empty()) ValidateEnumDecl(found, loc, true);
+    DeclareEnumType(found, EnumTypeKey(key, path, arena_),
+                    EvalTypeWidth(EnumArrayElement(found), typedefs_), scope,
+                    {scope, arena_, mod, enum_member_names_, nullptr,
+                     IsSignedType(found, typedefs_)});
+  });
 }
 
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {

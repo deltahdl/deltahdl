@@ -753,4 +753,36 @@ TEST(AggregateParameterConstantReads, ElementMembersSizeProceduralRanges) {
   ExpectValues(f, {{"n", 603}});
 }
 
+TEST(AggregateParameterConstantReads,
+     ParametersOfAnInPlaceTypeFoldOutsideModules) {
+  SimFixture f;
+  RunAndFindVar(
+      "parameter union packed { logic [7:0] a; logic [7:0] b; } U = 8'h9;\n"
+      "parameter struct { int a; logic [7:0] b; } V = '{a: 4, b: 8'h3};\n"
+      "package pk;\n"
+      "  parameter struct { int a; logic [7:0] b; } K = '{a: 5, b: 8'h6};\n"
+      "endpackage\n"
+      "class C;\n"
+      "  localparam struct { int a; } CK = '{a: 2};\n"
+      "endclass\n"
+      "module t;\n"
+      "  logic [U.b-1:0] v1;\n"
+      "  logic [V.a-1:0] v2;\n"
+      "  logic [pk::K.a-1:0] v3;\n"
+      "  logic [pk::K.b-1:0] v4;\n"
+      "  logic [C::CK.a-1:0] v5;\n"
+      "  int n1, n2, n3, n4, n5;\n"
+      "  initial begin\n"
+      "    n1 = $bits(v1);\n"
+      "    n2 = $bits(v2);\n"
+      "    n3 = $bits(v3);\n"
+      "    n4 = $bits(v4);\n"
+      "    n5 = $bits(v5);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "n1");
+  EXPECT_FALSE(f.has_errors);
+  ExpectValues(f, {{"n1", 9}, {"n2", 4}, {"n3", 5}, {"n4", 6}, {"n5", 2}});
+}
+
 }  // namespace

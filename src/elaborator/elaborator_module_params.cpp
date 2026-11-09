@@ -444,12 +444,13 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
       InnermostScope(RegisteredGenPrefixes())};
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [pname, pval] = decl->params[i];
-    auto scope = BuildParamScope(mod);
     bool has_param_type = i < decl->param_types.size() &&
                           decl->type_param_names.count(pname) == 0;
     ResolveParamPortTypeRef(decl, i, has_param_type, [&](DataType& dt) {
       ResolveTypeRef(dt, decl->range.start, mod);
+      EmitInPlaceEnumMembers(dt, pname, decl->param_port_locs[i], mod);
     });
+    auto scope = BuildParamScope(mod);
     RtlirParamDecl pd = BuildParamDeclShell(
         decl, i, {typedefs_, scope, real_param_names_, kWrittenTypes, arena_},
         has_param_type);

@@ -623,4 +623,98 @@ TEST(ParamValueAssignability, ConfigurationOverrideOfItsTypeIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ParamValueAssignability, InPlaceTypeGivenAnotherTypeIsReportedEverywhere) {
+  const IncompatibleValue kCases[] = {
+      {"an integer for a module body parameter",
+       "module m;\n  parameter enum {A, B} E = 1;\nendmodule\n", "E", 2},
+      {"an integer for a localparam with a base type",
+       "module m;\n  localparam enum logic [1:0] {A, B} E = 2'd1;\n"
+       "endmodule\n",
+       "E", 2},
+      {"a constant of an enumeration a typedef declares",
+       "module m;\n  typedef enum {X, Y} f_t;\n  parameter enum {A, B} E = Y;\n"
+       "endmodule\n",
+       "E", 3},
+      {"an int parameter",
+       "module m;\n  parameter int I = 1;\n  parameter enum {A, B} E = I;\n"
+       "endmodule\n",
+       "E", 3},
+      {"a parameter of another enumeration written in place",
+       "module m;\n  parameter enum {X, Y} F = Y;\n"
+       "  parameter enum {A, B} E = F;\nendmodule\n",
+       "E", 3},
+      {"an integer for the second name of a list",
+       "module m;\n  parameter enum {A, B} E = A, F = 1;\nendmodule\n", "F", 2},
+      {"an integer for a port list parameter",
+       "module m #(parameter enum {A, B} E = 1);\nendmodule\n", "E", 1},
+      {"an integer for a port list parameter written without the keyword",
+       "module m #(enum {A, B} E = 1);\nendmodule\n", "E", 1},
+      {"an integer for an interface body parameter",
+       "interface i;\n  parameter enum {A, B} E = 1;\nendinterface\n"
+       "module m;\n  i u();\nendmodule\n",
+       "E", 2},
+      {"an integer for a program body parameter",
+       "program p;\n  parameter enum {A, B} E = 1;\nendprogram\nmodule m;\n"
+       "  p u();\nendmodule\n",
+       "E", 2},
+      {"an integer for a generate block parameter",
+       "module m;\n  if (1) begin : g\n    parameter enum {A, B} E = 1;\n"
+       "  end\nendmodule\n",
+       "E", 3},
+      {"an integer for a package parameter",
+       "package p;\n  parameter enum {A, B} E = 1;\nendpackage\nmodule m;\n"
+       "endmodule\n",
+       "E", 2},
+      {"an integer for a compilation-unit parameter",
+       "parameter enum {A, B} E = 1;\nmodule m;\nendmodule\n", "E", 1},
+      {"an integer for a class body parameter",
+       "class C;\n  parameter enum {A, B} E = 1;\nendclass\nmodule m;\n"
+       "endmodule\n",
+       "E", 2},
+      {"an integer for a class port list parameter",
+       "class C #(enum {A, B} E = 1);\nendclass\nmodule m;\nendmodule\n", "E",
+       1},
+      {"an integer for a function parameter",
+       "module m;\n  function int f();\n    parameter enum {A, B} E = 1;\n"
+       "    return 0;\n  endfunction\nendmodule\n",
+       "E", 3},
+      {"an integer for a named block parameter",
+       "module m;\n  initial begin : b\n    parameter enum {A, B} E = 1;\n"
+       "  end\nendmodule\n",
+       "E", 3},
+      {"an integer for an unpacked structure",
+       "module m;\n  parameter struct {int a; int b;} S = 5;\nendmodule\n", "S",
+       2},
+      {"an integer for an unpacked structure port",
+       "module m #(struct {int a;} S = 5);\nendmodule\n", "S", 1},
+  };
+  ExpectEachReported(kCases);
+}
+
+TEST(ParamValueAssignability, InPlaceTypeGivenItsOwnValueIsAcceptedEverywhere) {
+  const char* const kSources[] = {
+      "module m #(parameter enum {A, B} E = B, enum bit {C, D} F = D,\n"
+      "           localparam struct packed {bit [3:0] a;} P = 4'h1);\n"
+      "  parameter enum logic [1:0] {G, H} J = H, K = G;\n"
+      "  parameter int I = A + J;\n"
+      "  localparam struct {int a; int b;} S = '{1, 2};\n"
+      "  parameter union packed {bit [3:0] u; bit [3:0] w;} U = 5;\n"
+      "  if (1) begin : g\n    parameter enum {X, Y} L = Y;\n  end\n"
+      "endmodule\n",
+      "interface i;\n  parameter enum {A, B} E = B;\nendinterface\n"
+      "program p;\n  localparam enum {C, D} F = C;\nendprogram\nmodule m;\n"
+      "  i u();\n  p v();\nendmodule\n",
+      "parameter enum {UA, UB} UE = UB;\npackage p;\n"
+      "  parameter enum {A, B} E = B;\n  parameter int I = A;\nendpackage\n"
+      "module m;\nendmodule\n",
+      "class C #(struct packed {bit [3:0] a;} P = 4'h2);\n"
+      "  parameter struct {int a;} S = '{a: 3};\nendclass\nmodule m;\n"
+      "endmodule\n",
+      "module m;\n  function int f();\n    parameter enum {A, B} E = B;\n"
+      "    return E;\n  endfunction\n  initial begin : b\n"
+      "    localparam enum {C, D} F = D;\n  end\nendmodule\n",
+  };
+  ExpectEachAccepted(kSources);
+}
+
 }  // namespace

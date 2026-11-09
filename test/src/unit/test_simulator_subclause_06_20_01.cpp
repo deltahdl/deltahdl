@@ -395,4 +395,139 @@ TEST(StructureParameterSim, MembersAreReadInAProgramAFunctionAndANamedBlock) {
   EXPECT_EQ(ValueOf(f, "nb"), 416u);
 }
 
+TEST(InPlaceTypeParameterSim, ModuleParametersOfInPlaceTypesReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module n #(enum bit {N0, N1} P = N1,\n"
+          "           struct packed {bit [3:0] a;} Q = 4'h1);\n"
+          "endmodule\n"
+          "module t #(parameter enum {A, B} P = B,\n"
+          "           struct packed {logic [3:0] a;} Q = 4'b1x0z,\n"
+          "           localparam union packed {bit [3:0] x; bit [3:0] y;} "
+          "L = 4'b1x0z);\n"
+          "  parameter enum logic [1:0] {C, D, E} G = E, H = C;\n"
+          "  localparam struct packed {bit [3:0] a;} S = 4'b1x0z;\n"
+          "  parameter struct {int a; logic [3:0] b;} R = '{1, 4'bz01x};\n"
+          "  localparam union packed {logic [3:0] u; logic [3:0] w;} "
+          "U = 4'bz01x;\n"
+          "  parameter int K = D + B;\n"
+          "  n #(.Q(4'h7)) u();\n"
+          "  initial $display(\"%0d %b %b %b %b %b %0d %b %b %0d %0d %b %b "
+          "%b\", P, Q, L, G, H, S, R.a, R.b, U, K, A, Q.a, u.P, u.Q);\n"
+          "endmodule\n",
+          f),
+      "1 1x0z 1000 10 00 1000 1 z01x z01x 2 0 1x0z 1 0111\n");
+}
+
+TEST(InPlaceTypeParameterSim, InterfaceAndGenerateParametersReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface ifc #(struct packed {logic [3:0] a;} IP = 4'b1x0z);\n"
+          "  parameter enum {I0, I1, I2} IE = I2;\n"
+          "  localparam union packed {bit [3:0] a; bit [3:0] b;} "
+          "IU = 4'b1x0z;\n"
+          "endinterface\n"
+          "module t;\n"
+          "  ifc i();\n"
+          "  if (1) begin : g\n"
+          "    parameter enum logic [1:0] {G0, G1, G2} GE = G2;\n"
+          "    localparam struct packed {bit [3:0] a;} GS = 4'b1x0z;\n"
+          "    parameter int GK = G1;\n"
+          "  end\n"
+          "  initial $display(\"%b %0d %b %b %b %0d\", i.IP, i.IE, i.IU, "
+          "g.GE, g.GS, g.GK);\n"
+          "endmodule\n",
+          f),
+      "1x0z 2 1000 10 1000 1\n");
+}
+
+TEST(InPlaceTypeParameterSim, ProgramParametersOfInPlaceTypesReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program prg #(parameter enum {P0, P1} PE = P1);\n"
+                 "  localparam struct packed {logic [3:0] a;} PS = 4'bz01x;\n"
+                 "  parameter union packed {bit [3:0] a; bit [3:0] b;} "
+                 "PU = 4'bz01x;\n"
+                 "  initial $display(\"%0d %b %b %0d\", PE, PS, PU, P0);\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  prg u();\n"
+                 "endmodule\n",
+                 f),
+      "1 z01x 0010 0\n");
+}
+
+TEST(InPlaceTypeParameterSim, PackageAndUnitParametersReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "parameter enum {UA, UB} UE = UB;\n"
+          "localparam struct packed {logic [3:0] a;} US = 4'b1x0z;\n"
+          "parameter int UK = UA + 2;\n"
+          "package pk;\n"
+          "  parameter enum logic [2:0] {KA = 3, KB = 5} KE = KB;\n"
+          "  localparam union packed {bit [3:0] a; bit [3:0] b;} "
+          "KU = 4'b1x0z;\n"
+          "  parameter struct {int a; logic [3:0] b;} KR = "
+          "'{a: 6, b: 4'b1z0x};\n"
+          "  parameter int KI = KA;\n"
+          "endpackage\n"
+          "module t;\n"
+          "  initial $display(\"%0d %b %0d %0d %b %0d %b %0d %0d\", UE, US, "
+          "UK, pk::KE, pk::KU, pk::KR.a, pk::KR.b, pk::KI, UA);\n"
+          "endmodule\n",
+          f),
+      "1 1x0z 2 5 1000 6 1z0x 3 0\n");
+}
+
+TEST(InPlaceTypeParameterSim, ClassParametersOfInPlaceTypesReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "class C #(struct packed {bit [3:0] a;} P = 4'b1x0z,\n"
+          "          parameter union packed {logic [3:0] x; logic [3:0] y;} "
+          "Q = 4'b1x0z);\n"
+          "  localparam struct packed {logic [3:0] a;} S = 4'bz01x;\n"
+          "endclass\n"
+          "class D;\n"
+          "  parameter struct {int a; int b;} R = '{a: 4, b: 9};\n"
+          "  localparam union packed {bit [3:0] u; bit [3:0] w;} "
+          "U = 4'b1x0z;\n"
+          "endclass\n"
+          "module t;\n"
+          "  initial $display(\"%b %b %b %b %0d %0d %b\", C#()::P, C#()::Q, "
+          "C#()::S, C#(4'h6)::P, D::R.a, D::R.b, D::U);\n"
+          "endmodule\n",
+          f),
+      "1000 1x0z z01x 0110 4 9 1000\n");
+}
+
+TEST(InPlaceTypeParameterSim, SubroutineAndBlockParametersReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int r;\n"
+                 "  function automatic int f();\n"
+                 "    parameter enum {FA, FB, FC} FE = FC;\n"
+                 "    localparam struct packed {bit [3:0] a;} FS = 4'b1x0z;\n"
+                 "    return FE * 100 + FS;\n"
+                 "  endfunction\n"
+                 "  task automatic tk(output int o);\n"
+                 "    parameter struct {int a; int b;} TR = '{a: 3, b: 4};\n"
+                 "    o = TR.a + TR.b;\n"
+                 "  endtask\n"
+                 "  initial begin : b\n"
+                 "    parameter enum logic [1:0] {BA, BB} BE = BB;\n"
+                 "    localparam union packed {logic [3:0] a; logic [3:0] b;} "
+                 "BU = 4'b1x0z;\n"
+                 "    tk(r);\n"
+                 "    $display(\"%0d %0d %b %b %0d\", f(), r, BE, BU, BA);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "208 7 01 1x0z 0\n");
+}
+
 }  // namespace

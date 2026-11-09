@@ -450,4 +450,108 @@ TEST(ParameterPortListParsing, LocalparamTypePortWithDefaultParses) {
   EXPECT_EQ(mod->localparam_port_names.count("T"), 1u);
 }
 
+std::vector<const ModuleItem*> ParamItems(
+    const std::vector<ModuleItem*>& items) {
+  std::vector<const ModuleItem*> params;
+  for (const auto* item : items) {
+    if (item->kind == ModuleItemKind::kParamDecl) params.push_back(item);
+  }
+  return params;
+}
+
+TEST(ParameterDeclarations, InPlaceEnumStructAndUnionTypesParseInAModule) {
+  auto r = Parse(
+      "module m #(parameter enum {A, B} P = B,\n"
+      "           struct packed {bit [3:0] a;} Q = 4'h1,\n"
+      "           localparam union packed {bit [1:0] x; bit [1:0] y;} L = 1);\n"
+      "  parameter enum logic [1:0] {C, D} E = D, F = C;\n"
+      "  localparam struct packed {bit [3:0] a;} S = 4'b1010;\n"
+      "  parameter struct {int a; int b;} R = '{1, 2};\n"
+      "  localparam union packed {bit [3:0] u; bit [3:0] w;} U = 4'h3;\n"
+      "  if (1) begin : g\n"
+      "    parameter enum {G0, G1} G = G1;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto* mod = r.cu->modules[0];
+  ASSERT_EQ(mod->params.size(), 3u);
+  ASSERT_EQ(mod->param_types.size(), 3u);
+  EXPECT_EQ(mod->param_types[0].kind, DataTypeKind::kEnum);
+  EXPECT_EQ(mod->param_types[0].enum_members.size(), 2u);
+  EXPECT_EQ(mod->param_types[1].kind, DataTypeKind::kStruct);
+  EXPECT_TRUE(mod->param_types[1].is_packed);
+  EXPECT_EQ(mod->param_types[2].kind, DataTypeKind::kUnion);
+  EXPECT_EQ(mod->localparam_port_names.count("L"), 1u);
+  const std::vector<const ModuleItem*> kBody = ParamItems(mod->items);
+  ASSERT_EQ(kBody.size(), 5u);
+  EXPECT_EQ(kBody[0]->name, "E");
+  EXPECT_EQ(kBody[0]->data_type.kind, DataTypeKind::kEnum);
+  EXPECT_TRUE(kBody[0]->first_in_decl_list);
+  EXPECT_EQ(kBody[1]->name, "F");
+  EXPECT_EQ(kBody[1]->data_type.kind, DataTypeKind::kEnum);
+  EXPECT_FALSE(kBody[1]->first_in_decl_list);
+  EXPECT_TRUE(kBody[2]->data_type.is_packed);
+  EXPECT_EQ(kBody[3]->data_type.kind, DataTypeKind::kStruct);
+  EXPECT_FALSE(kBody[3]->data_type.is_packed);
+  EXPECT_EQ(kBody[3]->data_type.struct_members.size(), 2u);
+  EXPECT_EQ(kBody[4]->data_type.kind, DataTypeKind::kUnion);
+  const ModuleItem* in_block = nullptr;
+  for (const auto* item : mod->items) {
+    if (item->kind == ModuleItemKind::kGenerateIf)
+      in_block = FindParamInGenerate(item);
+  }
+  ASSERT_NE(in_block, nullptr);
+  EXPECT_EQ(in_block->name, "G");
+  EXPECT_EQ(in_block->data_type.kind, DataTypeKind::kEnum);
+}
+
+TEST(ParameterDeclarations, InPlaceTypesParseInEveryOtherScope) {
+  auto r = Parse(
+      "parameter enum {UA, UB} UE = UB;\n"
+      "package pk;\n"
+      "  localparam struct packed {bit [3:0] a;} KS = 4'h2;\n"
+      "endpackage\n"
+      "interface ifc #(union packed {bit [1:0] a; bit [1:0] b;} IU = 1);\n"
+      "  parameter enum bit {I0, I1} IE = I1;\n"
+      "endinterface\n"
+      "program prg;\n"
+      "  parameter struct {int a;} PR = '{a: 1};\n"
+      "endprogram\n"
+      "class C #(parameter struct packed {bit [3:0] a;} P = 4'h5,\n"
+      "          union packed {bit [3:0] x; bit [3:0] y;} Q = 4'h6);\n"
+      "  parameter struct {int a; int b;} R = '{a: 4, b: 9};\n"
+      "endclass\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_GE(r.cu->cu_items.size(), 1u);
+  EXPECT_EQ(r.cu->cu_items[0]->data_type.kind, DataTypeKind::kEnum);
+  const std::vector<const ModuleItem*> kPkg =
+      ParamItems(r.cu->packages[0]->items);
+  ASSERT_EQ(kPkg.size(), 1u);
+  EXPECT_TRUE(kPkg[0]->data_type.is_packed);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  const auto* ifc = r.cu->interfaces[0];
+  ASSERT_EQ(ifc->param_types.size(), 1u);
+  EXPECT_EQ(ifc->param_types[0].kind, DataTypeKind::kUnion);
+  const std::vector<const ModuleItem*> kIfc = ParamItems(ifc->items);
+  ASSERT_EQ(kIfc.size(), 1u);
+  EXPECT_EQ(kIfc[0]->data_type.kind, DataTypeKind::kEnum);
+  const std::vector<const ModuleItem*> kPrg =
+      ParamItems(r.cu->programs[0]->items);
+  ASSERT_EQ(kPrg.size(), 1u);
+  EXPECT_EQ(kPrg[0]->data_type.kind, DataTypeKind::kStruct);
+  const auto* cls = r.cu->classes[0];
+  ASSERT_EQ(cls->param_types.size(), 2u);
+  EXPECT_EQ(cls->param_types[0].kind, DataTypeKind::kStruct);
+  EXPECT_EQ(cls->param_types[1].kind, DataTypeKind::kUnion);
+  const ClassMember* body = nullptr;
+  for (const auto* m : cls->members) {
+    if (m->kind == ClassMemberKind::kProperty && m->is_param) body = m;
+  }
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(body->data_type.struct_members.size(), 2u);
+}
+
 }  // namespace

@@ -4,6 +4,7 @@
 #include <format>
 #include <optional>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -705,12 +706,14 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     return;
   }
   DataType dtype;
-  if (!ParserDataDeclHelpers::ReadTypeReference(*this, dtype)) {
+  if (!ParserDataDeclHelpers::ReadTypeReference(*this, dtype) &&
+      !TryParseInlineAggregateType(dtype)) {
     dtype = ParseDeclaredDataType();
     ParseImplicitParamRange(dtype);
   }
   const std::string_view kFsmEnum = lexer_.ClaimFsmEnumPragma(CurrentLoc());
 
+  bool first = true;
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kParamDecl;
@@ -718,6 +721,7 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     item->fsm_enum = kFsmEnum;
     item->loc = loc;
     item->data_type = dtype;
+    item->first_in_decl_list = std::exchange(first, false);
     item->name = Expect(TokenKind::kIdentifier, Subclause("6.20.1")).text;
     ParseUnpackedDims(item->unpacked_dims);
     if (Match(TokenKind::kEq)) {

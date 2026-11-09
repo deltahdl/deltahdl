@@ -92,7 +92,8 @@ struct ParserParamPortHelpers {
   static void ParseValueParamPortDecl(Parser& p, ParamPortList& out,
                                       bool is_localparam_group) {
     DataType dtype;
-    if (!ParserDataDeclHelpers::ReadTypeReference(p, dtype)) {
+    if (!ParserDataDeclHelpers::ReadTypeReference(p, dtype) &&
+        !p.TryParseInlineAggregateType(dtype)) {
       dtype = p.ParseDeclaredDataType();
       p.ParseImplicitParamRange(dtype);
     }
