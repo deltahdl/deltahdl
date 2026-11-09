@@ -604,7 +604,7 @@ TEST(EnumerationElaboration, ConstantsOfAnEnumWrittenInAClassFoldInItsParams) {
       {"in place on a port parameter",
        "class C #(parameter enum {A, B, D} E = D,\n"
        "          parameter int P = E * 10 + B);\nendclass\n",
-       "C::P"},
+       "C#()::P"},
       {"in place on a body parameter",
        "class C;\n  parameter enum {A, B, D} E = D;\n"
        "  parameter int P = E * 10 + B;\nendclass\n",
