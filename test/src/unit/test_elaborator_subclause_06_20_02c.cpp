@@ -218,6 +218,11 @@ TEST(ParamValueAssignability, ArrayParameterGivenAnUnequalArrayIsReported) {
        "B", 3},
       {"an integer", "module m;\n  parameter int B[2] = 5;\nendmodule\n", "B",
        2},
+      {"a structure parameter read back by element",
+       "module m;\n  typedef struct { int a; int b; } s_t;\n"
+       "  parameter s_t S = '{1, 2};\n  parameter int B[2] = S;\n"
+       "  localparam int L = B[0];\nendmodule\n",
+       "B", 4},
       {"an array for an int",
        "module m;\n  parameter int A[2] = '{1, 2};\n"
        "  parameter int I = A;\nendmodule\n",
@@ -265,6 +270,11 @@ TEST(ParamValueAssignability, StructureParameterGivenAnotherTypeIsReported) {
        "module m;\n  typedef struct { int a; int b; } s_t;\n"
        "  parameter s_t S = 5;\nendmodule\n",
        "S", 3},
+      {"an array parameter read back by member",
+       "module m;\n  typedef struct { int a; int b; } s_t;\n"
+       "  parameter int A[2] = '{1, 2};\n  parameter s_t S = A;\n"
+       "  localparam int L = S.a;\nendmodule\n",
+       "S", 4},
       {"an integer for an unpacked union",
        "module m;\n  typedef union { int a; byte b; } u_t;\n"
        "  parameter u_t U = 5;\nendmodule\n",
