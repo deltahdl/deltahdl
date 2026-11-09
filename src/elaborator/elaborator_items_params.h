@@ -77,7 +77,7 @@ const InstanceParamAssignments* BodyParamAssignments();
 
 std::vector<std::string_view> OverridableParamNames(const ModuleDecl* decl);
 
-void PushInstParamAssignment(const ModuleDecl* child_decl,
+bool PushInstParamAssignment(const ModuleDecl* child_decl,
                              std::string_view pname, const Expr* pexpr,
                              const ScopeMap& parent_scope,
                              Elaborator::ParamList& child_params);

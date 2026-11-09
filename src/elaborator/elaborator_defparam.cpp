@@ -301,6 +301,10 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   RefoldChildOverrides(mod, BuildParamScope(mod, {}));
 }
 
+static bool VisibleAtDefparam(const RtlirParamDecl& p) {
+  return ParamVisibleFromScopes(p.gen_block_prefix, RegisteredGenPrefixes());
+}
+
 struct DefparamOverride {
   const RtlirParamDecl* param;
   const Expr* val_expr;
@@ -327,7 +331,9 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
     return false;
   }
   ParamNames writer_params;
-  for (const auto& p : ovr.writer->params) writer_params.insert(p.name);
+  for (const auto& p : ovr.writer->params) {
+    if (VisibleAtDefparam(p)) writer_params.insert(p.name);
+  }
   if (RhsContainsHierarchicalRef(ovr.val_expr, writer_params)) {
     diag.Error(ovr.loc,
                "defparam right-hand side may only reference parameters "
@@ -352,6 +358,14 @@ static void ReportNonConstantDefparam(DiagEngine& diag, SourceLoc loc) {
              Subclause("23.10.1"));
 }
 
+static ScopeMap WriterNames(const DefparamOverride& ovr) {
+  ScopeMap names = ovr.scope;
+  for (const auto& p : ovr.writer->params) {
+    if (VisibleAtDefparam(p)) names.try_emplace(p.name, 0);
+  }
+  return names;
+}
+
 static std::optional<int64_t> EvalDefparamOverride(
     DiagEngine& diag, const DefparamOverride& ovr,
     const DefparamAppliedRecord& rec) {
@@ -360,7 +374,7 @@ static std::optional<int64_t> EvalDefparamOverride(
   }
   auto val = FoldParamValue(*ovr.param, ovr.val_expr, ovr.scope);
   if (!val) {
-    if (!IsConstantExpr(ovr.val_expr, ovr.scope)) {
+    if (!IsConstantExpr(ovr.val_expr, WriterNames(ovr))) {
       ReportNonConstantDefparam(diag, ovr.loc);
     } else {
       diag.Warning(ovr.loc, "defparam value is not constant",
@@ -409,9 +423,7 @@ static bool IsConstantWholeValue(const Expr* value, const ScopeMap& names) {
 
 static bool WholeValueIsConstant(DiagEngine& diag,
                                  const DefparamOverride& ovr) {
-  ScopeMap names = ovr.scope;
-  for (const auto& p : ovr.writer->params) names.try_emplace(p.name, 0);
-  if (IsConstantWholeValue(ovr.val_expr, names)) return true;
+  if (IsConstantWholeValue(ovr.val_expr, WriterNames(ovr))) return true;
   ReportNonConstantDefparam(diag, ovr.loc);
   return false;
 }

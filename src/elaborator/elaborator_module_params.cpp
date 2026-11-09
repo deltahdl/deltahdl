@@ -559,7 +559,7 @@ static void PushUnfoldedValue(std::string_view pname, const Expr* pexpr,
   child_params.push_back(ovr);
 }
 
-void PushInstParamAssignment(const ModuleDecl* child_decl,
+bool PushInstParamAssignment(const ModuleDecl* child_decl,
                              std::string_view pname, const Expr* pexpr,
                              const ScopeMap& parent_scope,
                              Elaborator::ParamList& child_params) {
@@ -567,25 +567,27 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
       ContainsDollar(pexpr) && child_decl->type_param_names.count(pname) == 0;
   if (dollar || IsBodyTypeParam(child_decl, pname)) {
     child_params.push_back({pname, 0, pexpr});
-    return;
+    return true;
   }
   bool aggregate = MayHoldAggregate(child_decl, pname);
   if (aggregate &&
       UntypedPattern(pexpr)->kind == ExprKind::kAssignmentPattern) {
     PushUnfoldedValue(pname, pexpr, child_params);
-    return;
+    return true;
   }
   if (auto real = RealOverrideValue(pexpr, parent_scope)) {
     Elaborator::ParamOverride ovr{pname, RoundRealToInteger(*real), pexpr};
     ovr.real = real;
     child_params.push_back(ovr);
-    return;
+    return true;
   }
   if (auto val = ConstEvalInt(pexpr, parent_scope)) {
     child_params.push_back({pname, *val, pexpr});
-  } else if (aggregate || child_decl->type_param_names.count(pname) == 0) {
-    PushUnfoldedValue(pname, pexpr, child_params);
+    return true;
   }
+  if (aggregate || child_decl->type_param_names.count(pname) == 0)
+    PushUnfoldedValue(pname, pexpr, child_params);
+  return aggregate;
 }
 
 static bool IsLocalParamOf(const ModuleDecl* decl, std::string_view pname) {

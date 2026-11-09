@@ -140,9 +140,8 @@ std::vector<std::string_view> ApplyConfigOverrideParams(
     if (pexpr == nullptr || child_decl->type_param_names.contains(pname)) {
       continue;
     }
-    const std::size_t kBefore = child_params.size();
-    PushInstParamAssignment(child_decl, pname, pexpr, scope, child_params);
-    if (child_params.size() == kBefore) unresolved.push_back(pname);
+    if (!PushInstParamAssignment(child_decl, pname, pexpr, scope, child_params))
+      unresolved.push_back(pname);
   }
   return unresolved;
 }

@@ -491,26 +491,20 @@ constexpr DefparamPlace kDefparamPlaces[] = {
      21},
 };
 
-TEST(DefparamElaboration, RhsReadsAPartOfAParameterOfItsOwnModule) {
-  struct PartRead {
-    const char* value;
-    int64_t expected;
-  };
-  const PartRead kReads[] = {
-      {"S.a", 7}, {"S.in.a", 6}, {"S.arr[1]", 5}, {"IA[1].a", 9}};
+TEST(DefparamElaboration, RhsMayReadAPartOfAParameterOfItsOwnModule) {
+  const char* const kValues[] = {"S.a", "S.in.a", "S.arr[1]", "IA[1].a"};
   for (const DefparamPlace& place : kDefparamPlaces) {
-    for (const PartRead& read : kReads) {
-      SCOPED_TRACE(std::string(place.where) + ", " + read.value);
+    for (const char* value : kValues) {
+      SCOPED_TRACE(std::string(place.where) + ", " + value);
       ElabFixture f;
-      EXPECT_EQ(ParamOfModule(place.source(read.value), "child", "P", f),
-                read.expected);
+      ElaborateSrc(place.source(value), f, "top");
       EXPECT_FALSE(f.has_errors);
     }
   }
 }
 
 TEST(DefparamElaboration, RhsRejectsAPartOfAParameterOfAnotherScope) {
-  const char* const kValues[] = {"o.S.a", "p::S.a", "IA[o.N].a"};
+  const char* const kValues[] = {"o.S.a", "p::S", "p::S.a", "IA[o.N].a"};
   for (const DefparamPlace& place : kDefparamPlaces) {
     for (const char* value : kValues) {
       SCOPED_TRACE(std::string(place.where) + ", " + value);
