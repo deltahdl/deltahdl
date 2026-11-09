@@ -407,7 +407,8 @@ static std::string StringLiteralChars(const Expr* expr) {
 std::optional<std::string> NamedStringChars(const Expr* expr,
                                             const ScopeMap& scope) {
   if (expr->kind == ExprKind::kIdentifier && expr->scope_prefix.empty()) {
-    if (const std::string* local = ConstFuncStringLocal(expr->text))
+    if (const std::optional<std::string>* local =
+            ConstFuncStringLocal(expr->text))
       return *local;
     if (const RtlirParamDecl* param = RegisteredParamNamed(expr->text)) {
       if (!param->is_string_value) return std::nullopt;

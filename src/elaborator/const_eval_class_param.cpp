@@ -141,9 +141,8 @@ static void BindReal(std::string_view name, const BoundSource& from) {
 
 static void BindString(std::string_view name, const BoundSource& from) {
   if (from.type->kind != DataTypeKind::kString) return;
-  std::optional<std::string> chars =
-      ConstEvalString(from.source, from.source_scope);
-  if (chars) SetConstFuncStringLocal(name, std::move(*chars));
+  SetConstFuncStringLocal(name,
+                          ConstEvalString(from.source, from.source_scope));
 }
 
 class SpecializationWalk {

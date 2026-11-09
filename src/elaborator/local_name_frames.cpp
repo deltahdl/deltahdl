@@ -46,12 +46,13 @@ void ClearConstFuncRealLocal(std::string_view name) {
   g_locals->reals.erase(name);
 }
 
-const std::string* ConstFuncStringLocal(std::string_view name) {
+const std::optional<std::string>* ConstFuncStringLocal(std::string_view name) {
   auto it = g_locals->strings.find(name);
   return it == g_locals->strings.end() ? nullptr : &it->second;
 }
 
-void SetConstFuncStringLocal(std::string_view name, std::string chars) {
+void SetConstFuncStringLocal(std::string_view name,
+                             std::optional<std::string> chars) {
   g_locals->strings[name] = std::move(chars);
 }
 

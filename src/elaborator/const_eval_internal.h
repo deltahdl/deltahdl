@@ -50,7 +50,7 @@ std::optional<const Stmt*> ConstFuncCaseArm(const Stmt* s,
 struct LocalNames {
   std::unordered_set<std::string_view> declared;
   std::unordered_map<std::string_view, double> reals;
-  std::unordered_map<std::string_view, std::string> strings;
+  std::unordered_map<std::string_view, std::optional<std::string>> strings;
 };
 
 class LocalNameFrame {
@@ -72,8 +72,9 @@ bool DeclaresLocalName(std::string_view name);
 std::optional<double> ConstFuncRealLocal(std::string_view name);
 void SetConstFuncRealLocal(std::string_view name, double value);
 void ClearConstFuncRealLocal(std::string_view name);
-const std::string* ConstFuncStringLocal(std::string_view name);
-void SetConstFuncStringLocal(std::string_view name, std::string chars);
+const std::optional<std::string>* ConstFuncStringLocal(std::string_view name);
+void SetConstFuncStringLocal(std::string_view name,
+                             std::optional<std::string> chars);
 std::optional<std::string> NamedStringChars(const Expr* expr,
                                             const ScopeMap& scope);
 void ReportConstFuncSeverity(const Expr* call, const ScopeMap& locals,

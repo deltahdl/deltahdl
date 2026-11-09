@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <limits>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -395,6 +396,7 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
       "  parameter string TT = {T, \"x\"};\n"
       "  parameter int L = S3.len();\n"
       "  parameter int K2 = R * 2;\n"
+      "  parameter real BIG = 1.0e308 * N;\n"
       "endclass\n"
       "module m;\n"
       "  localparam real X1 = C::R * 2;\n"
@@ -406,6 +408,7 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
       "  localparam real X7 = D#(2)::K * 0.5;\n"
       "  localparam real X8 = D#(2)::N * 1.5;\n"
       "  localparam real X9 = D#(2)::SR - 0.1;\n"
+      "  localparam real X10 = D#(10)::BIG;\n"
       "  localparam string T1 = C::S;\n"
       "  localparam string T2 = D#(2)::S;\n"
       "  localparam int L1 = C::S.len();\n"
@@ -437,7 +440,8 @@ TEST(UnitParamValueRead, ClassParameterAndSpecialization) {
                {"X6", 1.0},
                {"X7", 1.5},
                {"X8", 3.0},
-               {"X9", kShortrealTenthLess}});
+               {"X9", kShortrealTenthLess},
+               {"X10", std::numeric_limits<double>::infinity()}});
   ExpectStrings(design, "m",
                 {{"T1", "hey"},
                  {"T2", "hey"},
