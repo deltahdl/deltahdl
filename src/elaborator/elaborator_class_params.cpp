@@ -146,14 +146,7 @@ static void BindClassEnumConstants(ClassParamRegistration& reg) {
          FoldEnumMembers(type.enum_members, reg.values, reg.arena))
       BindDeclaredConstant(reg.values, m.name, m.value);
   };
-  for (const DataType& type : reg.cls->param_types)
-    ForEachEnumTypeIn(type, kBind);
-  for (const auto* m : reg.cls->members) {
-    if (m->kind == ClassMemberKind::kProperty)
-      ForEachEnumTypeIn(m->data_type, kBind);
-    if (m->typedef_item != nullptr)
-      ForEachEnumTypeIn(m->typedef_item->typedef_type, kBind);
-  }
+  ForEachEnumTypeOfClass(*reg.cls, kBind);
 }
 
 static void RegisterClassTreeParams(ClassParamRegistration& reg) {

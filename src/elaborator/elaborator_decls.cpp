@@ -543,6 +543,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   ValidateNetDeclDataType(item, nettype_names_, kShapeTables, diag_);
   ValidateNetDeclaratorDims(item->unpacked_dims, kShapeTables, diag_,
                             item->loc);
+  EmitBareEnumMembers(item, mod);
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {

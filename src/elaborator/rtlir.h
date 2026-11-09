@@ -368,6 +368,7 @@ struct RtlirModule {
   std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> enum_types;
   const ModuleDecl* decl = nullptr;
   std::vector<TypeRefCompareResult> type_ref_compares;
+  std::vector<RtlirEnumMember> enum_constants;
 };
 
 struct RtlirDesign : RtlirTypedefFacts {

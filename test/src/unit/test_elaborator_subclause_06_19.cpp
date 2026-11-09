@@ -408,6 +408,24 @@ TEST(EnumerationElaboration, UnitScopeBareEnumLiteralFoldsIntoALocalparam) {
   EXPECT_EQ(param->resolved_value, 10);
 }
 
+TEST(EnumerationElaboration,
+     ConstantsOfAnEnumWrittenOnANetFoldIntoALocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  wire enum logic [1:0] {X, Y, Z} w;\n"
+      "  wire struct packed {enum logic {P, Q} f;} s;\n"
+      "  localparam int L = Z * 10 + Q;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* param = FindParam(design, "m", "L");
+  ASSERT_NE(param, nullptr);
+  EXPECT_TRUE(param->is_resolved);
+  EXPECT_EQ(param->resolved_value, 21);
+}
+
 TEST(EnumerationElaboration, MemberOfAnIntBaseEnumIsSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -151,6 +151,7 @@ struct EnumMemberDeclCtx {
   std::unordered_set<std::string_view>& enum_member_names;
   const std::unordered_set<std::string_view>* explicitly_imported = nullptr;
   bool is_signed = false;
+  std::string_view gen_prefix;
 };
 
 std::vector<RtlirEnumMember> BuildEnumMembers(const DataType& enumeration,
@@ -196,7 +197,11 @@ std::string_view EnumTypeKey(std::string_view decl_name,
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
                      ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
   auto members = BuildEnumMembers(type, width, ctx);
-  for (const auto& m : members) BindDeclaredConstant(scope, m.name, m.value);
+  for (RtlirEnumMember m : members) {
+    BindDeclaredConstant(scope, m.name, m.value);
+    m.gen_block_prefix = ctx.gen_prefix;
+    ctx.mod->enum_constants.push_back(m);
+  }
   ctx.mod->enum_types[key] = std::move(members);
 }
 
@@ -364,7 +369,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
         DeclareEnumType(type, EnumTypeKey(item->name, path, arena_),
                         EvalTypeWidth(EnumArrayElement(type), typedefs_), scope,
                         {scope, arena_, mod, enum_member_names_, nullptr,
-                         IsSignedType(type, typedefs_)});
+                         IsSignedType(type, typedefs_), InternedGenPrefix()});
       });
 }
 
@@ -386,7 +391,7 @@ void Elaborator::EmitInPlaceEnumMembers(const DataType& type,
     DeclareEnumType(found, EnumTypeKey(key, path, arena_),
                     EvalTypeWidth(EnumArrayElement(found), typedefs_), scope,
                     {scope, arena_, mod, enum_member_names_, nullptr,
-                     IsSignedType(found, typedefs_)});
+                     IsSignedType(found, typedefs_), InternedGenPrefix()});
   });
 }
 

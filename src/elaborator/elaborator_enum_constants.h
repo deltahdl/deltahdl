@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -14,11 +15,27 @@
 
 namespace delta {
 
+struct ClassDecl;
+
 using EnumTypeVisitor = std::function<void(std::string_view member_path,
                                            const DataType& enum_type)>;
 void ForEachEnumTypeIn(const DataType& type, const EnumTypeVisitor& fn);
 
 void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn);
+
+void ForEachEnumTypeOfClass(const ClassDecl& cls, const EnumTypeVisitor& fn);
+
+const DataType* EnumDeclaringConstant(const DataType& type,
+                                      std::string_view name,
+                                      const ScopeMap& scope);
+
+const DataType* EnumDeclaringConstantOfItems(std::span<ModuleItem* const> items,
+                                             std::string_view name,
+                                             const ScopeMap& scope);
+
+const DataType* EnumDeclaringConstantOfClass(const ClassDecl& cls,
+                                             std::string_view name,
+                                             const ScopeMap& scope);
 
 bool ExprContainsXZ(const Expr* e);
 

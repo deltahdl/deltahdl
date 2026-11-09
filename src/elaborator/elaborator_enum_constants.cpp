@@ -1,8 +1,10 @@
 #include "elaborator/elaborator_enum_constants.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -12,6 +14,7 @@
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir_enum_member.h"
+#include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -87,6 +90,24 @@ void AddEnumConstantNames(const DataType& type, const ScopeMap& scope,
   }
 }
 
+bool DeclaresConstant(const DataType& enumeration, std::string_view name,
+                      const ScopeMap& scope) {
+  return std::ranges::any_of(
+      enumeration.enum_members, [name, &scope](const EnumMember& member) {
+        return member.range_start == nullptr
+                   ? member.name == name
+                   : std::ranges::contains(
+                         EnumMemberDeclaredNames(member, scope), name);
+      });
+}
+
+EnumTypeVisitor EnumDeclaring(std::string_view name, const ScopeMap& scope,
+                              const DataType*& found) {
+  return [name, &scope, &found](std::string_view, const DataType& type) {
+    if (DeclaresConstant(type, name, scope)) found = &type;
+  };
+}
+
 std::unordered_set<std::string> NamesDeclaredBefore(const PackageDecl* pkg,
                                                     const ModuleItem* until,
                                                     const ScopeMap& scope) {
@@ -126,6 +147,41 @@ void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn) {
   ForEachEnumTypeIn(item->kind == ModuleItemKind::kTypedef ? item->typedef_type
                                                            : item->data_type,
                     fn);
+}
+
+void ForEachEnumTypeOfClass(const ClassDecl& cls, const EnumTypeVisitor& fn) {
+  for (const DataType& type : cls.param_types) ForEachEnumTypeIn(type, fn);
+  for (const ClassMember* member : cls.members) {
+    if (member->kind == ClassMemberKind::kProperty)
+      ForEachEnumTypeIn(member->data_type, fn);
+    if (member->typedef_item != nullptr)
+      ForEachEnumTypeIn(member->typedef_item->typedef_type, fn);
+  }
+}
+
+const DataType* EnumDeclaringConstant(const DataType& type,
+                                      std::string_view name,
+                                      const ScopeMap& scope) {
+  const DataType* found = nullptr;
+  ForEachEnumTypeIn(type, EnumDeclaring(name, scope, found));
+  return found;
+}
+
+const DataType* EnumDeclaringConstantOfItems(std::span<ModuleItem* const> items,
+                                             std::string_view name,
+                                             const ScopeMap& scope) {
+  const DataType* found = nullptr;
+  const EnumTypeVisitor kFind = EnumDeclaring(name, scope, found);
+  for (const ModuleItem* item : items) ForEachEnumTypeOfItem(item, kFind);
+  return found;
+}
+
+const DataType* EnumDeclaringConstantOfClass(const ClassDecl& cls,
+                                             std::string_view name,
+                                             const ScopeMap& scope) {
+  const DataType* found = nullptr;
+  ForEachEnumTypeOfClass(cls, EnumDeclaring(name, scope, found));
+  return found;
 }
 
 std::vector<RtlirEnumMember> FoldEnumMembers(
