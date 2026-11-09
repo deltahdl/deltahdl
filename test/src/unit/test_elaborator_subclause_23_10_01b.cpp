@@ -440,4 +440,88 @@ TEST(DefparamElaboration, ASelectOfOneIndexNamesNoElementOfATwoDimArray) {
                               4, "23.10.1"));
 }
 
+constexpr std::string_view kPartScopes =
+    "module child;\n  parameter int P = 0;\nendmodule\n"
+    "package p;\n  typedef struct { int a; } s_t;\n"
+    "  parameter s_t S = '{a: 1};\nendpackage\n"
+    "module other;\n  typedef struct { int a; } s_t;\n"
+    "  parameter s_t S = '{a: 2};\n  parameter int N = 1;\nendmodule\n";
+
+constexpr std::string_view kPartTypes =
+    "  typedef struct { int a; } in_t;\n"
+    "  typedef struct { int arr [2]; in_t in; int a; } s_t;\n";
+
+std::string PartParams(const std::string& indent) {
+  return indent + "parameter s_t S = '{arr: '{4, 5}, in: '{a: 6}, a: 7};\n" +
+         indent + "parameter in_t IA [2] = '{'{a: 8}, '{a: 9}};\n";
+}
+
+std::string TopWith(const std::string& body) {
+  return std::string(kPartScopes) + "module top;\n  other o();\n" +
+         std::string(kPartTypes) + body + "endmodule\n";
+}
+
+struct DefparamPlace {
+  const char* where;
+  std::string (*source)(const std::string& value);
+  uint32_t line;
+};
+
+constexpr DefparamPlace kDefparamPlaces[] = {
+    {"a module body defparam reading the module's parameter",
+     [](const std::string& value) {
+       return TopWith(PartParams("  ") +
+                      "  child u();\n  defparam u.P = " + value + ";\n");
+     },
+     20},
+    {"a generate block defparam reading the module's parameter",
+     [](const std::string& value) {
+       return TopWith(PartParams("  ") +
+                      "  if (1) begin : g\n    child u();\n"
+                      "    defparam u.P = " +
+                      value + ";\n  end\n");
+     },
+     21},
+    {"a generate block defparam reading the block's parameter",
+     [](const std::string& value) {
+       return TopWith("  if (1) begin : g\n" + PartParams("    ") +
+                      "    child u();\n    defparam u.P = " + value +
+                      ";\n  end\n");
+     },
+     21},
+};
+
+TEST(DefparamElaboration, RhsReadsAPartOfAParameterOfItsOwnModule) {
+  struct PartRead {
+    const char* value;
+    int64_t expected;
+  };
+  const PartRead kReads[] = {
+      {"S.a", 7}, {"S.in.a", 6}, {"S.arr[1]", 5}, {"IA[1].a", 9}};
+  for (const DefparamPlace& place : kDefparamPlaces) {
+    for (const PartRead& read : kReads) {
+      SCOPED_TRACE(std::string(place.where) + ", " + read.value);
+      ElabFixture f;
+      EXPECT_EQ(ParamOfModule(place.source(read.value), "child", "P", f),
+                read.expected);
+      EXPECT_FALSE(f.has_errors);
+    }
+  }
+}
+
+TEST(DefparamElaboration, RhsRejectsAPartOfAParameterOfAnotherScope) {
+  const char* const kValues[] = {"o.S.a", "p::S.a", "IA[o.N].a"};
+  for (const DefparamPlace& place : kDefparamPlaces) {
+    for (const char* value : kValues) {
+      SCOPED_TRACE(std::string(place.where) + ", " + value);
+      ElabFixture f;
+      ElaborateSrc(place.source(value), f, "top");
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "defparam right-hand side may only reference "
+                                "parameters declared in the same module",
+                                place.line, "23.10.1"));
+    }
+  }
+}
+
 }  // namespace

@@ -583,7 +583,7 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
   }
   if (auto val = ConstEvalInt(pexpr, parent_scope)) {
     child_params.push_back({pname, *val, pexpr});
-  } else if (aggregate) {
+  } else if (aggregate || child_decl->type_param_names.count(pname) == 0) {
     PushUnfoldedValue(pname, pexpr, child_params);
   }
 }

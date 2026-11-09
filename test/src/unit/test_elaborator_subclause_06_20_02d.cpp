@@ -83,7 +83,7 @@ struct PartPlace {
   uint32_t line;
 };
 
-const PartPlace kPartPlaces[] = {
+constexpr PartPlace kPartPlaces[] = {
     {"a module body parameter",
      [](std::string_view decl) {
        return AtUnit("module m;\n" + Aggregates("  ", ";\n") +
@@ -157,7 +157,7 @@ struct PartReading {
   const char* accepted;
 };
 
-const PartReading kPartReadings[] = {
+constexpr PartReading kPartReadings[] = {
     {"a row of a two-dimensional array, for an array of another size",
      "int B [3] = M[1]", "int B [2] = M[1]"},
     {"a row, for an array of another element type", "byte B [2] = M[1]",

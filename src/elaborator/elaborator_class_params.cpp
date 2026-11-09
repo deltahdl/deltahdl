@@ -53,9 +53,13 @@ static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
   return FoldDeclaredParamValue(pexpr, type, values);
 }
 
+static bool IsNullLiteral(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier && e->text == "null";
+}
+
 static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
   if (e->kind != ExprKind::kAssignmentPattern)
-    return ConstEvalInt(e, values).has_value() ||
+    return IsNullLiteral(e) || ConstEvalInt(e, values).has_value() ||
            ConstEvalReal(e, values).has_value();
   return std::ranges::all_of(e->elements, [&values](const Expr* item) {
     return PatternItemsConstant(item, values);
@@ -93,14 +97,14 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
   bool constant = is_array  ? pexpr->kind != ExprKind::kAssignmentPattern ||
                                   PatternItemsConstant(pexpr, reg.values)
                   : is_real ? ConstEvalReal(pexpr, reg.values).has_value()
-                            : val.has_value();
+                            : val.has_value() || IsNullLiteral(pexpr);
   if (!constant) {
     ReportNonConstantClassParam(pname, pexpr, reg);
     return;
   }
   RegisterUnitAggregateParam(
       {reg.key_prefix, pname, pexpr, type, dims, reg.values});
-  if (is_array || is_real) return;
+  if (is_array || is_real || !val) return;
   auto* qname = reg.arena.Create<std::string>(std::string(reg.key_prefix) +
                                               "." + std::string(pname));
   reg.cu_param_scope[*qname] = *val;

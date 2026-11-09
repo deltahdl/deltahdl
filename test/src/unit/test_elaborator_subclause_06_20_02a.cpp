@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -493,6 +495,50 @@ TEST(ValueParameters, NonConstantClassBodyParamDefaultIsRejected) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "class parameter 'P' value is not a constant expression", 5, "6.20.2"));
+}
+
+TEST(ValueParameters, ClassHandleClassParamTakesNullButNoVariable) {
+  const char* const kAccepted[] = {
+      "class K;\nendclass\nclass C;\n  parameter K H = null;\n"
+      "  parameter K A [2] = '{null, null};\nendclass\nmodule m;\nendmodule\n",
+      "class K;\nendclass\nclass C #(\n    parameter K H = null,\n"
+      "    parameter K A [2] = '{null, null});\nendclass\nmodule m;\n"
+      "endmodule\n",
+  };
+  for (const char* src : kAccepted) {
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(f.has_errors);
+  }
+  struct Rejected {
+    const char* src;
+    uint32_t line;
+  };
+  const Rejected kRejected[] = {
+      {"class K;\nendclass\nclass C;\n  K v;\n  parameter K D = v;\n"
+       "endclass\nmodule m;\nendmodule\n",
+       5},
+      {"class K;\nendclass\nclass C;\n  K v;\n"
+       "  parameter K D [2] = '{null, v};\nendclass\nmodule m;\nendmodule\n",
+       5},
+      {"class K;\nendclass\nK v;\nclass C #(parameter K D = v);\nendclass\n"
+       "module m;\nendmodule\n",
+       4},
+      {"class K;\nendclass\nK v;\n"
+       "class C #(parameter K D [2] = '{null, v});\nendclass\nmodule m;\n"
+       "endmodule\n",
+       4},
+  };
+  for (const Rejected& c : kRejected) {
+    SCOPED_TRACE(c.src);
+    ElabFixture f;
+    ElaborateSrc(c.src, f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "class parameter 'D' value is not a constant expression",
+                      c.line, "6.20.2"));
+  }
 }
 
 TEST(ValueParameters, ClassParamDefaultDependsOnEarlierClassParam) {

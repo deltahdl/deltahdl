@@ -53,36 +53,50 @@ static bool CollectPathSteps(const Expr* expr, const ScopeMap& scope,
   return false;
 }
 
-static bool RhsContainsHierarchicalRef(const Expr* e);
+using ParamNames = std::unordered_set<std::string_view>;
 
-static bool AnyScalarChildContainsHierarchicalRef(const Expr* e) {
-  return RhsContainsHierarchicalRef(e->lhs) ||
-         RhsContainsHierarchicalRef(e->rhs) ||
-         RhsContainsHierarchicalRef(e->base) ||
-         RhsContainsHierarchicalRef(e->index) ||
-         RhsContainsHierarchicalRef(e->index_end) ||
-         RhsContainsHierarchicalRef(e->condition) ||
-         RhsContainsHierarchicalRef(e->true_expr) ||
-         RhsContainsHierarchicalRef(e->false_expr) ||
-         RhsContainsHierarchicalRef(e->repeat_count);
+static bool RhsContainsHierarchicalRef(const Expr* e, const ParamNames& params);
+
+static bool AnyScalarChildContainsHierarchicalRef(const Expr* e,
+                                                  const ParamNames& params) {
+  return RhsContainsHierarchicalRef(e->lhs, params) ||
+         RhsContainsHierarchicalRef(e->rhs, params) ||
+         RhsContainsHierarchicalRef(e->base, params) ||
+         RhsContainsHierarchicalRef(e->index, params) ||
+         RhsContainsHierarchicalRef(e->index_end, params) ||
+         RhsContainsHierarchicalRef(e->condition, params) ||
+         RhsContainsHierarchicalRef(e->true_expr, params) ||
+         RhsContainsHierarchicalRef(e->false_expr, params) ||
+         RhsContainsHierarchicalRef(e->repeat_count, params);
 }
 
-static bool AnyListChildContainsHierarchicalRef(const Expr* e) {
+static bool AnyListChildContainsHierarchicalRef(const Expr* e,
+                                                const ParamNames& params) {
   for (const auto* a : e->args) {
-    if (RhsContainsHierarchicalRef(a)) return true;
+    if (RhsContainsHierarchicalRef(a, params)) return true;
   }
   for (const auto* elem : e->elements) {
-    if (RhsContainsHierarchicalRef(elem)) return true;
+    if (RhsContainsHierarchicalRef(elem, params)) return true;
   }
   return false;
 }
 
-static bool RhsContainsHierarchicalRef(const Expr* e) {
+static bool NamesPartOfParam(const Expr* e, const ParamNames& params) {
+  if (e->kind == ExprKind::kSelect) return NamesPartOfParam(e->base, params);
+  if (e->kind == ExprKind::kMemberAccess)
+    return !e->is_scope_resolution && NamesPartOfParam(e->lhs, params);
+  return params.count(e->text) > 0;
+}
+
+static bool RhsContainsHierarchicalRef(const Expr* e,
+                                       const ParamNames& params) {
   if (!e) return false;
-  if (e->kind == ExprKind::kMemberAccess) return true;
+  if (e->kind == ExprKind::kMemberAccess)
+    return !NamesPartOfParam(e, params) ||
+           RhsContainsHierarchicalRef(e->lhs, params);
   if (e->kind == ExprKind::kIdentifier && !e->scope_prefix.empty()) return true;
-  if (AnyScalarChildContainsHierarchicalRef(e)) return true;
-  return AnyListChildContainsHierarchicalRef(e);
+  if (AnyScalarChildContainsHierarchicalRef(e, params)) return true;
+  return AnyListChildContainsHierarchicalRef(e, params);
 }
 
 RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
@@ -287,32 +301,6 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   RefoldChildOverrides(mod, BuildParamScope(mod, {}));
 }
 
-static bool DefparamOverrideAllowed(DiagEngine& diag,
-                                    const RtlirParamDecl* param,
-                                    const Expr* val_expr, SourceLoc loc) {
-  if (param->is_type_param) {
-    diag.Error(loc, "defparam cannot override a type parameter",
-               Subclause("23.10.1"));
-    return false;
-  }
-  if (param->is_localparam) {
-    diag.Error(loc, "defparam cannot override a local parameter",
-               Subclause("23.10.1"));
-    return false;
-  }
-  if (param->config_locked) {
-    return false;
-  }
-  if (RhsContainsHierarchicalRef(val_expr)) {
-    diag.Error(loc,
-               "defparam right-hand side may only reference parameters "
-               "declared in the same module",
-               Subclause("23.10.1"));
-    return false;
-  }
-  return true;
-}
-
 struct DefparamOverride {
   const RtlirParamDecl* param;
   const Expr* val_expr;
@@ -320,7 +308,35 @@ struct DefparamOverride {
   SourceLoc loc;
   const RtlirModule* writer;
   bool whole;
+  std::string_view prefix;
 };
+
+static bool DefparamOverrideAllowed(DiagEngine& diag,
+                                    const DefparamOverride& ovr) {
+  if (ovr.param->is_type_param) {
+    diag.Error(ovr.loc, "defparam cannot override a type parameter",
+               Subclause("23.10.1"));
+    return false;
+  }
+  if (ovr.param->is_localparam) {
+    diag.Error(ovr.loc, "defparam cannot override a local parameter",
+               Subclause("23.10.1"));
+    return false;
+  }
+  if (ovr.param->config_locked) {
+    return false;
+  }
+  ParamNames writer_params;
+  for (const auto& p : ovr.writer->params) writer_params.insert(p.name);
+  if (RhsContainsHierarchicalRef(ovr.val_expr, writer_params)) {
+    diag.Error(ovr.loc,
+               "defparam right-hand side may only reference parameters "
+               "declared in the same module",
+               Subclause("23.10.1"));
+    return false;
+  }
+  return true;
+}
 
 using DefparamAppliedKey =
     std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>;
@@ -339,10 +355,6 @@ static void ReportNonConstantDefparam(DiagEngine& diag, SourceLoc loc) {
 static std::optional<int64_t> EvalDefparamOverride(
     DiagEngine& diag, const DefparamOverride& ovr,
     const DefparamAppliedRecord& rec) {
-  if (!DefparamOverrideAllowed(diag, ovr.param, ovr.val_expr, ovr.loc)) {
-    rec.applied.insert(rec.key);
-    return std::nullopt;
-  }
   if (auto real = RealOverrideValue(ovr.val_expr, ovr.scope)) {
     return ConvertOverrideValue(RoundRealToInteger(*real), *ovr.param);
   }
@@ -408,8 +420,7 @@ static bool SetWholeAggregateDefparamValue(DiagEngine& diag,
                                            RtlirParamDecl& param,
                                            const DefparamOverride& ovr,
                                            const DefparamAppliedRecord& rec) {
-  if (!DefparamOverrideAllowed(diag, &param, ovr.val_expr, ovr.loc) ||
-      !WholeValueIsConstant(diag, ovr)) {
+  if (!WholeValueIsConstant(diag, ovr)) {
     rec.applied.insert(rec.key);
     return false;
   }
@@ -432,6 +443,19 @@ static bool SetDefparamValue(DiagEngine& diag, RtlirParamDecl& param,
   param.is_resolved = true;
   param.from_override = true;
   return true;
+}
+
+static bool ApplyDefparamValue(DiagEngine& diag, RtlirParamDecl& param,
+                               const ParamValueScope& target,
+                               const DefparamOverride& ovr,
+                               const DefparamAppliedRecord& rec) {
+  if (!DefparamOverrideAllowed(diag, ovr)) {
+    rec.applied.insert(rec.key);
+    return false;
+  }
+  ReportOverrideNotAssignable(
+      param, target, {ovr.val_expr, ovr.writer, ovr.scope, ovr.prefix}, diag);
+  return SetDefparamValue(diag, param, ovr, rec);
 }
 
 void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
@@ -459,17 +483,18 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     const TypedefMap kTargetTypes =
         ModuleTypedefTable(typedefs_, FindModule(target_mod->name));
     DefparamOverride ovr{
-        param, val_expr,
-        scope, site.item->loc,
-        mod,   TakesValueWhole(*param, val_expr, kTargetTypes),
+        param,       val_expr,
+        scope,       site.item->loc,
+        mod,         TakesValueWhole(*param, val_expr, kTargetTypes),
+        site.prefix,
     };
     DefparamAppliedRecord rec{applied_defparams_, key};
-    if (!SetDefparamValue(diag_, *param, ovr, rec)) continue;
     const TypeShapeTables kTargetTables{kTargetTypes, td_array_dims_,
                                         class_names_};
-    ReportOverrideNotAssignable(
-        *param, {kTargetTables, BuildParamScope(target_mod), unit_},
-        {val_expr, mod, scope, site.prefix}, diag_);
+    if (!ApplyDefparamValue(diag_, *param,
+                            {kTargetTables, BuildParamScope(target_mod), unit_},
+                            ovr, rec))
+      continue;
     RecordResolvedHighWords(*param, val_expr, scope);
     param->defparam_value_expr = val_expr;
     param->defparam_value_scope = scope;
