@@ -88,6 +88,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Force-cancelling a hung run](force-cancelling-a-hung-run.md) — a hung job ignores a plain cancel; `gh run cancel --force`, then `gh run rerun --failed`.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute runs with `run_in_background: true`.
 - [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — only wait: no diagnosis, edits or commits, bar preparing comment-only edits.
+- [Staying on the issues in hand while waiting](staying-on-the-issues-in-hand-while-waiting.md) — during a local build, test or pre-push check, only the issues in hand's work its result cannot change and no tracked edit; never read ahead.
 - [Fixing a red run after a push](fixing-a-red-run.md) — fix your push's red run, caused or inherited, in a push of its own first; red only on `assert-coverage` holds nothing up.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read a gate's limit from its tracked config or workflow, not a tool default.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.

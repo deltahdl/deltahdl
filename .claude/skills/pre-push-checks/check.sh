@@ -28,6 +28,7 @@ require_committed() {
     echo "error: HEAD has no commit that ${PRE_PUSH_BASE:-origin/main} lacks"
     exit 1
   fi
+  head=$(git rev-parse HEAD) || exit 1
 }
 
 check_messages() {
@@ -175,6 +176,16 @@ check_tidy() {
   done < "$work/unit"
 }
 
+check_unchanged() {
+  section "working tree"
+  if [ "$(git rev-parse HEAD)" != "$head" ] ||
+    [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    report "HEAD or a tracked file changed while the checks ran, so they checked something other than the commit; leave the tree alone and run this again"
+    return 1
+  fi
+  echo "HEAD and the tracked files are as they were at the start"
+}
+
 require_committed
 list_files "$@"
 check_messages
@@ -182,6 +193,7 @@ check_format_and_size
 check_registration
 build_and_test && check_coverage
 check_tidy
+check_unchanged
 
 section "result"
 if [ -s "$errors" ]; then

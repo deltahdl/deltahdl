@@ -15,7 +15,7 @@ Commit first, then run, from anywhere in the checkout:
 .claude/skills/pre-push-checks/check.sh [extra_test_target ...]
 ```
 
-It refuses to start while a tracked file has uncommitted changes, since what it checks has to be exactly what will be pushed. `PRE_PUSH_BASE=<commit>` checks the commits after that one in place of those after `origin/main`. The first run configures `build-check/`, a Debug tree built by Homebrew's `llvm@22` clang with coverage instrumentation, and builds the whole library, which takes several minutes; later runs rebuild only what changed. Run it in the background, per `.claude/memories/long-running-commands-in-the-background.md`.
+It refuses to start while a tracked file has uncommitted changes, since what it checks has to be exactly what will be pushed. `PRE_PUSH_BASE=<commit>` checks the commits after that one in place of those after `origin/main`. The first run configures `build-check/`, a Debug tree built by Homebrew's `llvm@22` clang with coverage instrumentation, and builds the whole library, which takes several minutes; later runs rebuild only what changed. Run it in the background, per `.claude/memories/long-running-commands-in-the-background.md`. While it runs, edit, stage and commit nothing, and work only on the issues the commit is for, per `.claude/memories/staying-on-the-issues-in-hand-while-waiting.md`: it reads the working tree until it finishes, and it reports a commit or tracked edit made during its run.
 
 Every touched file under `test/src/unit/` is built and run as its own target. Name as arguments any other test targets that reach the changed src code, such as the file holding the existing tests of a function a refactor moved. Coverage is read only from the tests that ran, so a changed line that only some other file's tests reach is reported until that file is named. To find that file, grep `test/src/unit/` for the construct the line handles; when no test reaches the line, write one.
 
@@ -26,6 +26,7 @@ Every touched file under `test/src/unit/` is built and run as its own target. Na
 - **Registration:** every touched unit test file is listed by `add_unit_test` in `test/CMakeLists.txt` and declares a test, every touched src `.cpp` is listed in `src/CMakeLists.txt`, and no test name is declared twice anywhere under `test/src/unit/`.
 - **Build and tests:** the library and the test targets build with `-Werror`, and every test in them passes.
 - **Coverage:** every changed line under `src/` ran, and every branch outcome on a changed line was taken, with each condition of `&&` and `||` counted on its own, as `assert-coverage` counts them.
+- **An unchanged tree:** HEAD and every tracked file are as they were when it started, so that what it checked is the commit.
 - **clang-tidy:** every touched src `.cpp` passes `etc/clang_tidy/src.yml`, and every touched unit test file passes `etc/clang_tidy/test_src_unit.yml`, all warnings as errors. These configurations carry the limits on statements, nesting, parameters and cognitive complexity, the naming rules and `misc-include-cleaner`, and they also check the repository headers each file includes.
 
 ## What it leaves to CI
