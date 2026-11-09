@@ -77,6 +77,7 @@ class Lowerer {
  private:
   void LowerModule(const RtlirModule* mod);
   void LowerParallelTop(const RtlirModule* mod);
+  void LowerTopModules(const std::vector<RtlirModule*>& tops);
   void LowerTopNamedBy(const Expr* conn);
   void LowerParams(const RtlirModule* mod);
   void LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,

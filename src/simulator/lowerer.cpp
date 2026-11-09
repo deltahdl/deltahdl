@@ -559,6 +559,17 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   }
 }
 
+void Lowerer::LowerTopModules(const std::vector<RtlirModule*>& tops) {
+  for (auto* mod : tops) {
+    if (mod == tops.front()) {
+      LowerModule(mod);
+    } else if (!ctx_.IsParallelTop(mod->name)) {
+      LowerParallelTop(mod);
+    }
+  }
+  for (const auto& fill : deferred_param_fills_) fill();
+}
+
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
   if (design->simulation_blocked) return;
@@ -581,14 +592,7 @@ void Lowerer::Lower(const RtlirDesign* design) {
   const auto& tops = design->top_modules;
   if (!tops.empty()) ctx_.RegisterTopModule(tops.front()->name);
   ConstructDesignData();
-  for (auto* mod : tops) {
-    if (mod == tops.front()) {
-      LowerModule(mod);
-    } else if (!ctx_.IsParallelTop(mod->name)) {
-      LowerParallelTop(mod);
-    }
-  }
-  for (const auto& fill : deferred_param_fills_) fill();
+  LowerTopModules(tops);
   RegisterClassTypeAliases(design, ctx_, arena_);
   MakeNamedSpecializations();
   InitializeStaticLocals();
