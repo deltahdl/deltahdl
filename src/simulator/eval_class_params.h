@@ -65,6 +65,9 @@ void MarkUnboundedClassParams(ClassObject* obj, const ClassDecl* decl);
 void ShapeClassParamLocal(const ClassDecl* decl, size_t i, Variable* local,
                           SimContext& ctx, Arena& arena);
 
+uint32_t OuterParamPartsWidth(const DataType& type, const ClassDecl& decl,
+                              SimContext& ctx);
+
 std::vector<ClassParamBinding> CollectClassParamBindings(
     const ClassTypeInfo* cls, SimContext& ctx);
 void RebindClassParamBindings(const std::vector<ClassParamBinding>& bindings,

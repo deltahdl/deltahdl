@@ -149,6 +149,19 @@ static uint32_t DeclaredPackedDimProduct(const DataType& type,
   return folded != 0 ? folded : RunningPackedDimProduct(type, ctx);
 }
 
+uint32_t RunningDimsWidth(const DataType& type, SimContext& ctx) {
+  DataType element = type;
+  element.packed_dim_left = nullptr;
+  element.packed_dim_right = nullptr;
+  element.extra_packed_dims.clear();
+  uint64_t width =
+      DeclaredTypeWidth(element, ctx) *
+      RunningSpan(type.packed_dim_left, type.packed_dim_right, ctx);
+  for (const auto& [left, right] : type.extra_packed_dims)
+    width *= RunningSpan(left, right, ctx);
+  return static_cast<uint32_t>(width);
+}
+
 uint32_t NamedMemberWidth(const StructMember& m, SimContext& ctx) {
   DataType own;
   own.kind = m.type_kind;

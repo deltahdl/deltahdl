@@ -311,6 +311,19 @@ TEST_F(VariablesOfARun, AStructureMemberHasBits) {
   EXPECT_EQ(IntOf(vpi_handle_by_index(By("top.str1.vec"), 4)), 0);
 }
 
+TEST_F(VariablesOfARun, AMemberOfANamedElementTypeHasBits) {
+  Run("typedef bit b_t;\n"
+      "typedef logic [3:0] n_t;\n"
+      "module top;\n"
+      "  struct { b_t [7:0] bv; n_t [1:0] nv; } str1;\n"
+      "  initial str1.bv = 8'h20;\n"
+      "endmodule\n");
+  EXPECT_EQ(ObjectsOf(vpiBit, By("top.str1.bv")).size(), 8U);
+  EXPECT_EQ(ObjectsOf(vpiBit, By("top.str1.nv")).size(), 8U);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(By("top.str1.bv"), 5)), 1);
+  EXPECT_EQ(IntOf(vpi_handle_by_index(By("top.str1.bv"), 4)), 0);
+}
+
 TEST_F(VariablesOfARun, AnElementOfAnArrayOfStructuresHasMembers) {
   Run("typedef struct { logic [7:0] bvec; int n; } s_t;\n"
       "module top; s_t spa[2][3];\n"

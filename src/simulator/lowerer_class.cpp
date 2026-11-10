@@ -297,12 +297,18 @@ static bool LayoutHas4StateMember(const StructTypeInfo& layout) {
   return false;
 }
 
+struct PropertyScope {
+  const ClassDecl& cls;
+  const ScopeMap& params;
+};
+
 static ClassTypeInfo::PropertyInfo PropertyRecord(const ClassMember* member,
                                                   const DataType& type,
-                                                  const ScopeMap& params,
+                                                  const PropertyScope& scope,
                                                   std::string_view type_key,
                                                   SimContext& ctx) {
-  uint32_t w = EvalTypeWidth(type, {}, params);
+  uint32_t w = OuterParamPartsWidth(type, scope.cls, ctx);
+  if (w == 0) w = EvalTypeWidth(type, {}, scope.params);
   const StructTypeInfo* layout =
       w == 0 ? StructPropertyLayout(type, type_key, ctx) : nullptr;
   if (w == 0) w = layout ? layout->total_width : DeclaredTypeWidth(type, ctx);
@@ -338,8 +344,9 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
               ? InPlaceAggregateLayoutKey(cls->name, member->name, type, ctx)
               : std::string_view{};
       if (key.empty()) key = PropertyTypeKey(type, *info, *cls, params, ctx);
-      info->properties.push_back(PropertyRecord(
-          member, ClassPropertyType(type, cls, type_params), params, key, ctx));
+      info->properties.push_back(
+          PropertyRecord(member, ClassPropertyType(type, cls, type_params),
+                         {*cls, params}, key, ctx));
     } else if (member->kind == ClassMemberKind::kMethod && member->method) {
       std::string name(member->method->name);
       info->methods[name] = member->method;
@@ -427,7 +434,7 @@ static void MakeParamArraysStatic(ClassTypeInfo* info, const ClassDecl* cls,
     port->init_expr = pexpr;
     port->is_static = true;
     info->properties.push_back(PropertyRecord(
-        port, port->data_type, scope,
+        port, port->data_type, {*cls, scope},
         PropertyTypeKey(port->data_type, *info, *cls, scope, ctx), ctx));
     ShapeArrayProperty(&info->properties.back(), dims->second, scope, ctx,
                        arena);

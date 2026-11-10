@@ -45,6 +45,8 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 
 uint32_t NamedMemberWidth(const StructMember& m, SimContext& ctx);
 
+uint32_t RunningDimsWidth(const DataType& type, SimContext& ctx);
+
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 
 bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx);

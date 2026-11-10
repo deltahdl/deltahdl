@@ -132,6 +132,12 @@ static DataType SizedParamType(std::string_view name, const DataType& type,
   return named;
 }
 
+static uint32_t SizedParamWidth(const DataType& type, const ClassDecl& decl,
+                                const ScopeMap& scope, SimContext& ctx) {
+  uint32_t width = OuterParamPartsWidth(type, decl, ctx);
+  return width != 0 ? width : SimParamTypeWidth(type, scope, ctx);
+}
+
 Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
                                  const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
@@ -145,8 +151,9 @@ Logic4Vec ClassParamSizer::Value(std::string_view name, const DataType* type,
         SizedParamType(name, *type, *decl_,
                        type_scope_.empty() ? decl_->name : type_scope_, ctx);
   bool is_real = type != nullptr && DeclaredTypeIsReal(scoped, ctx);
-  uint32_t width =
-      type != nullptr && !is_real ? SimParamTypeWidth(scoped, scope_, ctx) : 0;
+  uint32_t width = type != nullptr && !is_real
+                       ? SizedParamWidth(scoped, *decl_, scope_, ctx)
+                       : 0;
   Logic4Vec val = ParamValueOfType(scoped, expr, width, ctx, arena);
   if (width != 0 && !DeclaredTypeIs4State(scoped, ctx)) CoerceTo2State(val);
   if (is_real) val = ToDeclaredReal(val, &scoped, ctx, arena);
@@ -298,25 +305,59 @@ ClassParamStorage ClassStaticStorage(ClassTypeInfo* info) {
           info};
 }
 
-static bool SelectsOrNamesAMember(const Expr* e) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess)
-    return true;
-  return SelectsOrNamesAMember(e->lhs) || SelectsOrNamesAMember(e->rhs);
+static bool IsPartRead(const Expr* e) {
+  return e->kind == ExprKind::kSelect ||
+         (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution);
 }
 
-static bool PackedDimsReadParamParts(const DataType& type) {
+static const Expr* PartReadRoot(const Expr* e) {
+  while (IsPartRead(e)) e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
+  return e;
+}
+
+static bool IsOwnParam(const ClassDecl& decl, std::string_view name) {
+  return std::ranges::any_of(
+             decl.params, [name](const auto& p) { return p.first == name; }) ||
+         std::ranges::any_of(decl.members, [name](const ClassMember* m) {
+           return m->is_param && m->name == name;
+         });
+}
+
+static bool ReadsParamPart(const Expr* e, const ClassDecl& decl, bool own) {
+  if (e == nullptr) return false;
+  if (IsPartRead(e)) {
+    const Expr* root = PartReadRoot(e);
+    bool is_own = root->kind == ExprKind::kIdentifier &&
+                  root->scope_prefix.empty() && IsOwnParam(decl, root->text);
+    return is_own == own;
+  }
+  return ReadsParamPart(e->lhs, decl, own) || ReadsParamPart(e->rhs, decl, own);
+}
+
+static bool PackedDimsReadParamParts(const DataType& type,
+                                     const ClassDecl& decl, bool own) {
   std::vector<const Expr*> bounds{type.packed_dim_left, type.packed_dim_right};
   for (const auto& [left, right] : type.extra_packed_dims) {
     bounds.push_back(left);
     bounds.push_back(right);
   }
-  return std::ranges::any_of(bounds, SelectsOrNamesAMember);
+  return std::ranges::any_of(bounds, [&decl, own](const Expr* bound) {
+    return ReadsParamPart(bound, decl, own);
+  });
 }
 
-static uint32_t WidthReadingParamParts(const ClassMember& m, SimContext& ctx) {
+uint32_t OuterParamPartsWidth(const DataType& type, const ClassDecl& decl,
+                              SimContext& ctx) {
+  return PackedDimsReadParamParts(type, decl, false)
+             ? RunningDimsWidth(type, ctx)
+             : 0;
+}
+
+static uint32_t WidthReadingParamParts(const ClassMember& m,
+                                       const ClassDecl& decl, SimContext& ctx) {
   if (m.kind != ClassMemberKind::kProperty || m.is_param ||
-      !m.unpacked_dims.empty() || !PackedDimsReadParamParts(m.data_type))
+      !m.unpacked_dims.empty() ||
+      !PackedDimsReadParamParts(m.data_type, decl, true))
     return 0;
   return DeclaredTypeWidth(m.data_type, ctx);
 }
@@ -336,7 +377,7 @@ static void ResizeProperty(ClassTypeInfo& info, std::string_view name,
 static void SizePropertiesReadingParamParts(ClassTypeInfo* info,
                                             SimContext& ctx, Arena& arena) {
   for (const auto* m : info->decl->members) {
-    uint32_t width = WidthReadingParamParts(*m, ctx);
+    uint32_t width = WidthReadingParamParts(*m, *info->decl, ctx);
     if (width != 0) ResizeProperty(*info, m->name, width, arena);
   }
 }

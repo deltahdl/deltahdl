@@ -481,4 +481,46 @@ TEST(PackedMemberSelectSim, SelectsUnderAVariableMemberReachTheSubarray) {
       "34 3c 34 3c\n");
 }
 
+TEST(PackedParameterSelectSim, SelectsOfOuterParametersSizeAClassProperty) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  parameter logic [1:0][3:0] Q = 8'h6C;\n"
+                       "  class P;\n"
+                       "    logic [Q[1]:0] a;\n"
+                       "  endclass\n"
+                       "endpackage\n"
+                       "localparam logic [1:0][3:0] U = 8'h3A;\n"
+                       "import pk::Q;\n"
+                       "class C;\n"
+                       "  logic [pk::Q[1]:0] a;\n"
+                       "  logic [U[0]:0] b;\n"
+                       "  logic [Q[0]-1:0] i;\n"
+                       "  logic [$unit::U[0]:0] q;\n"
+                       "  logic [0:pk::Q[1]] r;\n"
+                       "  logic [1:0][U[0]:0] v;\n"
+                       "  static logic [pk::Q[0]-1:0] s;\n"
+                       "  localparam logic [pk::Q[1]:0] L = '1;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  parameter logic [1:0][3:0] M = 8'h25;\n"
+                       "  class D;\n"
+                       "    logic [M[1]:0] m;\n"
+                       "  endclass\n"
+                       "  initial begin\n"
+                       "    static C c = new;\n"
+                       "    static D d = new;\n"
+                       "    static pk::P p = new;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", "
+                       "$bits(c.a), $bits(c.b),\n"
+                       "             $bits(c.i), $bits(C::s), $bits(C::L), "
+                       "$bits(d.m),\n"
+                       "             $bits(p.a));\n"
+                       "    $display(\"%0d %0d %0d\", $bits(c.q), $bits(c.r), "
+                       "$bits(c.v));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "7 11 12 12 7 3 7\n11 7 22\n");
+}
+
 }  // namespace

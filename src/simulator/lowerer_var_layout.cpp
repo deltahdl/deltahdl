@@ -51,7 +51,8 @@ static uint32_t StorageWidth(const StructMember& m, SimContext& ctx) {
 
 static void RecordOuterPackedDim(const StructMember& m, StructFieldInfo& fi,
                                  SimContext& ctx) {
-  bool has_element = !m.extra_packed_dims.empty() || !m.type_name.empty() ||
+  bool has_element = !m.extra_packed_dims.empty() ||
+                     m.type_kind == DataTypeKind::kNamed ||
                      m.nested_type != nullptr;
   if (!has_element || m.packed_dim_left == nullptr ||
       m.packed_dim_right == nullptr)

@@ -205,7 +205,7 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
       (!kVector && !kPacked)) {
     return std::nullopt;
   }
-  if (kVector && field.packed_elem_width != 0) {
+  if (kVector && field.packed_elem_width > 1) {
     return PackedDims{PackedRange{field.packed_left, field.packed_right},
                       PackedRange::Implicit(field.packed_elem_width)};
   }
