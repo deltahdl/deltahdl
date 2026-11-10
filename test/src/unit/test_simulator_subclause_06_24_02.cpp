@@ -416,4 +416,148 @@ TEST(DynamicCastSim, TaskFormValidInFunctionBodyRaisesNoError) {
   EXPECT_EQ(FindDiag(f, "$cast task could not assign"), nullptr);
 }
 
+TEST(DynamicCastSim, ClauseExampleCastsAnEnumAndChecksAnInvalidOne) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef enum {red, green, blue, yellow, white, black} Colors;\n"
+          "  Colors col;\n"
+          "  initial begin\n"
+          "    $cast(col, 2 + 3);\n"
+          "    $display(\"%0s\", col.name());\n"
+          "    if (! $cast(col, 2 + 8)) $display(\"Error in cast\");\n"
+          "    $display(\"%0d\", col);\n"
+          "    col = Colors'(2 + 8);\n"
+          "    $display(\"%0d\", col);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "black\nError in cast\n5\n10\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DynamicCastSim, FunctionFormInAFunctionReturnsItsVerdict) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef enum {A, B, C} e_t;\n"
+                       "  function automatic int g(int v);\n"
+                       "    e_t e;\n"
+                       "    return $cast(e, v);\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d %0d\", g(2), g(3));\n"
+                       "endmodule\n",
+                       f),
+            "1 0\n");
+}
+
+TEST(DynamicCastSim, DISABLED_ValidCastsConvertBetweenRealIntegralAndString) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int i; real r; string s; bit [3:0] n; int ok;\n"
+                 "  initial begin\n"
+                 "    ok = $cast(i, 2.6); $display(\"%0d %0d\", ok, i);\n"
+                 "    ok = $cast(r, 7); $display(\"%0d %0.1f\", ok, r);\n"
+                 "    ok = $cast(s, 8'h41); $display(\"%0d [%s]\", ok, s);\n"
+                 "    ok = $cast(n, -1); $display(\"%0d %0d\", ok, n);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 3\n1 7.0\n1 [A]\n1 15\n");
+}
+
+TEST(DynamicCastSim, DISABLED_FunctionFormRefusesAPairThatIsNotCastCompatible) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  chandle ch; int i; int ok;\n"
+                       "  initial begin\n"
+                       "    i = 5;\n"
+                       "    ok = $cast(i, ch);\n"
+                       "    $display(\"%0d %0d\", ok, i);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 5\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DynamicCastSim, DISABLED_TaskFormReportsAPairThatIsNotCastCompatible) {
+  SimFixture f;
+  std::string src =
+      "module t;\n"
+      "  chandle ch; int i;\n"
+      "  initial begin\n"
+      "    i = 5;\n"
+      "    $cast(i, ch);\n"
+      "    $display(\"%0d\", i);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunCapture(src, f), "5\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression",
+                            LineHolding(src, "$cast(i, ch)"), "6.24.2"));
+}
+
+TEST(DynamicCastSim,
+     DISABLED_FunctionFormJudgesUnpackedArraysByAssignmentCompatibility) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int a [4]; int b [4]; int c [3]; shortint d [4];\n"
+                 "  int dy []; int ok;\n"
+                 "  initial begin\n"
+                 "    foreach (b[k]) b[k] = k + 1;\n"
+                 "    a = '{9, 9, 9, 9};\n"
+                 "    ok = $cast(a, b); $display(\"%0d %0d\", ok, a[3]);\n"
+                 "    a = '{9, 9, 9, 9};\n"
+                 "    ok = $cast(a, c); $display(\"%0d %0d\", ok, a[0]);\n"
+                 "    ok = $cast(a, d); $display(\"%0d %0d\", ok, a[0]);\n"
+                 "    dy = new[3];\n"
+                 "    ok = $cast(a, dy); $display(\"%0d %0d\", ok, a[0]);\n"
+                 "    dy = new[4](b);\n"
+                 "    ok = $cast(a, dy); $display(\"%0d %0d\", ok, a[3]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 4\n0 9\n0 9\n0 9\n1 4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DynamicCastSim, DISABLED_TaskFormReportsAnUnpackedArrayOfAnotherSize) {
+  SimFixture f;
+  std::string src =
+      "module t;\n"
+      "  int a [4]; int dy [];\n"
+      "  initial begin\n"
+      "    a = '{9, 9, 9, 9};\n"
+      "    dy = new[3];\n"
+      "    $cast(a, dy);\n"
+      "    $display(\"%0d\", a[0]);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunCapture(src, f), "9\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression",
+                            LineHolding(src, "$cast(a, dy)"), "6.24.2"));
+}
+
+TEST(DynamicCastSim,
+     DISABLED_FunctionFormRefusesNonequivalentUnpackedStructures) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef struct {int x;} s1_t;\n"
+                 "  typedef struct {int x;} s2_t;\n"
+                 "  s1_t p; s1_t p2; s2_t q; int ok;\n"
+                 "  initial begin\n"
+                 "    p.x = 3; p2.x = 6; q.x = 8;\n"
+                 "    ok = $cast(p, q); $display(\"%0d %0d\", ok, p.x);\n"
+                 "    ok = $cast(p, p2); $display(\"%0d %0d\", ok, p.x);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 3\n1 6\n");
+}
+
 }  // namespace
