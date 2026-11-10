@@ -293,4 +293,77 @@ TEST(HierarchyInstances, CheckerInstanceInACheckersGenerateBlock) {
             "top.o.g.i1.a1 failed at 15\n$finish at time 40\n");
 }
 
+TEST(HierarchyInstances, CheckerInstanceInACheckersBody) {
+  EXPECT_EQ(RunUnderTop(std::string(kChecker) +
+                            "checker outer(input logic clk, input logic a);\n"
+                            "  chk i1(clk, a);\n"
+                            "endchecker\n",
+                        "  outer o(clk, a);\n"),
+            "top.o.i1.a1 failed at 15\n$finish at time 40\n");
+}
+
+TEST(ImplicitTopLevelInstances, TwoUninstantiatedModulesAreTwoTops) {
+  SimFixture f;
+  auto run = RunAllTops(
+      "module first; initial $display(\"%m\"); endmodule\n"
+      "module second; initial $display(\"%m\"); endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(run.design, nullptr);
+  ASSERT_EQ(run.design->top_modules.size(), 2u);
+  EXPECT_EQ(run.design->top_modules[0]->name, "first");
+  EXPECT_EQ(run.design->top_modules[1]->name, "second");
+  EXPECT_EQ(SortedLines(run.out),
+            (std::vector<std::string>{"first", "second"}));
+}
+
+TEST(ImplicitTopLevelInstances, UninstantiatedModuleAndProgramAreBothTops) {
+  SimFixture f;
+  auto run = RunAllTops(
+      "module design_top; initial $display(\"%m\"); endmodule\n"
+      "program bench_top; initial $display(\"%m\"); endprogram\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(run.design, nullptr);
+  ASSERT_EQ(run.design->top_modules.size(), 2u);
+  EXPECT_EQ(run.design->top_modules[0]->name, "design_top");
+  EXPECT_EQ(run.design->top_modules[1]->name, "bench_top");
+  EXPECT_EQ(SortedLines(run.out),
+            (std::vector<std::string>{"bench_top", "design_top"}));
+}
+
+TEST(ImplicitTopLevelInstances, InstantiatedModuleIsNoTop) {
+  SimFixture f;
+  auto run = RunAllTops(
+      "module leaf; initial $display(\"%m\"); endmodule\n"
+      "module root; leaf l(); endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_NE(run.design, nullptr);
+  ASSERT_EQ(run.design->top_modules.size(), 1u);
+  EXPECT_EQ(run.design->top_modules[0]->name, "root");
+  EXPECT_EQ(run.out, "root.l\n");
+}
+
+TEST(HierarchicalPathNames, EachLevelReachesTheOthersByPathName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n"
+                       "  int v = 7;\n"
+                       "  int seen;\n"
+                       "  initial #1 seen = top.x;\n"
+                       "endmodule\n"
+                       "module mid;\n"
+                       "  leaf c();\n"
+                       "  initial #2 $display(\"mid %0d\", c.v);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  int x = 3;\n"
+                       "  mid m();\n"
+                       "  initial #3 $display(\"top %0d %0d\", m.c.v, "
+                       "m.c.seen);\n"
+                       "endmodule\n",
+                       f),
+            "mid 7\ntop 7 3\n");
+}
+
 }  // namespace
