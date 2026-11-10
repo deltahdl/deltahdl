@@ -63,12 +63,22 @@ fi
 
 if [ -n "$cwd" ]; then
   cache="${TMPDIR:-/tmp}/claude-statusline-issues-$(printf '%s' "$cwd" | cksum | cut -d' ' -f1)"
+  trend_file="${cache}-trend"
   if stale "$cache"; then
     count=$(cd "$cwd" 2>/dev/null && GH_PROMPT_DISABLED=1 gh repo view --json issues -q .issues.totalCount 2>/dev/null)
-    [ -n "$count" ] && printf '%s' "$count" > "$cache"
+    if [ -n "$count" ]; then
+      previous=$(cat "$cache" 2>/dev/null)
+      if [ -n "$previous" ] && [ "$count" -gt "$previous" ]; then
+        printf '\342\226\262' > "$trend_file"
+      elif [ -n "$previous" ] && [ "$count" -lt "$previous" ]; then
+        printf '\342\226\274' > "$trend_file"
+      fi
+      printf '%s' "$count" > "$cache"
+    fi
   fi
   issues=$(cat "$cache" 2>/dev/null)
-  [ -n "$issues" ] && out="${out}${out:+  |  }Open issues: $issues"
+  trend=$(cat "$trend_file" 2>/dev/null)
+  [ -n "$issues" ] && out="${out}${out:+  |  }Open issues: ${issues}${trend:+ $trend}"
 fi
 
 modeleffort="$model"
