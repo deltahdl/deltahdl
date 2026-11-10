@@ -128,4 +128,30 @@ TEST(TypeRefCompareInstanceSim, EachLoopIterationComparesItsOwnWidth) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), (kNoneMatch << 16) | kAllMatch);
 }
 
+TEST(TypeRefOverrideSim, DISABLED_TypeReferenceOverridesATypeParameter) {
+  EXPECT_EQ(RunAndGet("module add_float #(type T = int) (input T a);\n"
+                      "  localparam int W = $bits(T);\n"
+                      "  localparam bit IsReal = type(T) == type(real);\n"
+                      "endmodule\n"
+                      "module sub #(type T = int);\n"
+                      "  localparam int W = $bits(T);\n"
+                      "endmodule\n"
+                      "interface ifc #(type T = int);\n"
+                      "  localparam int W = $bits(T);\n"
+                      "endinterface\n"
+                      "module top;\n"
+                      "  real R1;\n"
+                      "  bit [12:0] A_bus;\n"
+                      "  logic [4:0] n;\n"
+                      "  int r;\n"
+                      "  add_float #(type(R1)) u(R1);\n"
+                      "  sub #(.T(type(A_bus))) s();\n"
+                      "  ifc #(type(n + 3'b0)) i();\n"
+                      "  initial r = u.W * 100000 + u.IsReal * 10000 + s.W * "
+                      "100 + i.W;\n"
+                      "endmodule\n",
+                      "r"),
+            6411305u);
+}
+
 }  // namespace

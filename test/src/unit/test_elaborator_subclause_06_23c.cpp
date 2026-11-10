@@ -219,8 +219,8 @@ TEST(TypeOperatorMemberRoots, ADotOnAScopeIsAHierarchicalReference) {
 }
 
 constexpr std::array kLocalRoots = {
-    "  initial for (string i = \"a\"; i.len() < 2; i = {i, \"a\"}) begin "
-    "var type(i.len()) d; end",
+    ("  initial for (string i = \"a\"; i.len() < 2; i = {i, \"a\"}) begin "
+     "var type(i.len()) d; end"),
     "  initial begin st b; var type(b.f) d; end",
     "  initial begin localparam st BP = '{8'd2, 1'b0}; var type(BP.g) d; end",
     "  function automatic void ff(st a); var type(a.f) d; endfunction",
@@ -256,6 +256,37 @@ TEST(TypeOperatorMemberRoots, ADotOnAClassHandleIsNoHierarchicalReference) {
             std::string(kValuePreamble) + std::string(line) + "\nendmodule\n",
         f);
     EXPECT_FALSE(ReportsTheOperand(f.diag.Diagnostics()));
+  }
+}
+
+TEST(TypeOfThisElab, DISABLED_TypeOfThisOutsideAClassReported) {
+  std::string src =
+      "package p;\n"
+      "  function bit pf;\n"
+      "    return type(this) == type(int);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "function bit uf;\n"
+      "  return type(this) != type(int);\n"
+      "endfunction\n"
+      "interface ifc;\n"
+      "  initial $display(type(this) === type(int));\n"
+      "endinterface\n"
+      "module m;\n"
+      "  ifc i();\n"
+      "  function bit mf;\n"
+      "    return type(this) !== type(int);\n"
+      "  endfunction\n"
+      "  localparam bit L = type(this) == type(byte);\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  for (std::string_view at :
+       {"type(this) == type(int)", "type(this) != type", "type(this) === type",
+        "type(this) !== type", "type(this) == type(byte)"}) {
+    SCOPED_TRACE(at);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "type(this)",
+                              LineHolding(src, at), "6.23"));
   }
 }
 

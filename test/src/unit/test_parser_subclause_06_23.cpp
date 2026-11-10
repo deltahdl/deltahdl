@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "fixture_parser.h"
@@ -621,6 +624,112 @@ TEST(TypeOperatorParsing, BlockItemTypeRefWithoutVarReportsOnce) {
                             return d.severity == DiagSeverity::kError;
                           }),
             1);
+}
+
+constexpr std::string_view kVarKeywordReport =
+    "type_reference in a variable declaration must be preceded by the 'var' "
+    "keyword";
+
+size_t ErrorCount(const std::vector<Diagnostic>& diags) {
+  return static_cast<size_t>(std::count_if(
+      diags.begin(), diags.end(),
+      [](const Diagnostic& d) { return d.severity == DiagSeverity::kError; }));
+}
+
+TEST(TypeOperatorParsing, TypeRefWithoutVarReportedInEveryPlace) {
+  std::string src =
+      "package p;\n"
+      "  int a;\n"
+      "  type(a) pb;\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int a;\n"
+      "  type(a) cb;\n"
+      "endclass\n"
+      "interface ifc;\n"
+      "  logic a;\n"
+      "  type(a) ib;\n"
+      "endinterface\n"
+      "program prg;\n"
+      "  logic a;\n"
+      "  type(a) rb;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  logic a;\n"
+      "  if (1) begin : g\n"
+      "    type(a) gb;\n"
+      "  end\n"
+      "  task tk;\n"
+      "    type(a) tb;\n"
+      "  endtask\n"
+      "  function void fn;\n"
+      "    type(a) fb;\n"
+      "  endfunction\n"
+      "endmodule\n";
+  auto r = Parse(src);
+  for (std::string_view name :
+       {" pb;", " cb;", " ib;", " rb;", " gb;", " tb;", " fb;"}) {
+    SCOPED_TRACE(name);
+    EXPECT_TRUE(ReportedError(r.diags, kVarKeywordReport,
+                              LineHolding(src, name), "6.8"));
+  }
+  EXPECT_EQ(ErrorCount(r.diags), 7u);
+}
+
+TEST(TypeOperatorParsing,
+     DISABLED_TypeRefWithoutVarReportedInTheCompilationUnit) {
+  auto r = Parse(
+      "int g;\n"
+      "type(g) h;\n"
+      "module t;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVarKeywordReport, 2, "6.8"));
+  EXPECT_EQ(ErrorCount(r.diags), 1u);
+}
+
+TEST(TypeOperatorParsing, TypeRefWithAVarOrNetKeywordAcceptedInEveryPlace) {
+  auto r = Parse(
+      "int g;\n"
+      "var type(g) h;\n"
+      "package p;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "endclass\n"
+      "interface ifc;\n"
+      "  logic a;\n"
+      "  var type(a) b;\n"
+      "  wire type(a) w;\n"
+      "endinterface\n"
+      "program prg;\n"
+      "  logic a;\n"
+      "  var type(a) b;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  logic a;\n"
+      "  wire type(a) w1;\n"
+      "  tri type(a) w2;\n"
+      "  wand type(a) w3;\n"
+      "  uwire type(a) w4;\n"
+      "  tri0 type(a) w5;\n"
+      "  if (1) begin : g\n"
+      "    var type(a) b;\n"
+      "  end\n"
+      "  task tk;\n"
+      "    var type(a) c;\n"
+      "  endtask\n"
+      "  function void fn;\n"
+      "    var type(a) d;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    var type(a) e;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
