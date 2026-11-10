@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -163,6 +164,36 @@ TEST(DynamicArrayDeleteSimulation, DeleteEmptiesArrayOfArrays) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 0u);
+}
+
+TEST(DynamicArrayDeleteSimulation, DeleteWithoutParenthesesEmptiesTheArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int ab [] = new[4]; int m [2][];\n"
+                       "  initial begin\n"
+                       "    m[1] = new[3];\n"
+                       "    ab.delete; m[1].delete;\n"
+                       "    $display(\"%d\", ab.size);\n"
+                       "    $display(\"%0d\", m[1].size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "         0\n0\n");
+}
+
+TEST(DynamicArrayDeleteSimulation,
+     DISABLED_DeleteWithoutParenthesesOnAClassProperty) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class H; int d []; endclass\n"
+                       "  H h;\n"
+                       "  initial begin\n"
+                       "    h = new; h.d = new[2]; h.d.delete;\n"
+                       "    $display(\"%0d\", h.d.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n");
 }
 
 }  // namespace

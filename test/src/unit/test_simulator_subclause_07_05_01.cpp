@@ -541,4 +541,121 @@ TEST(DynamicArrayNewSimulation, UnsignedSizeWithTopBitSetIsNotNegative) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(DynamicArrayNewSimulation,
+     ClauseArr1AndArr2DeclarationsSizeTheOuterArray) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int arr1 [][2][3] = new [4]; int arr2 [][] = new [4];\n"
+                 "  initial $display(\"%0d %0d %0d %0d\", arr1.size(), "
+                 "arr1[3][1][2], arr2.size(), arr2[0].size());\n"
+                 "endmodule\n",
+                 f),
+      "4 0 4 0\n");
+}
+
+TEST(DynamicArrayNewSimulation,
+     DISABLED_NewThroughAnUncreatedElementCreatesNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int arr [2][][];\n"
+                       "  initial begin\n"
+                       "    arr[0] = new [4]; arr[0][0] = new [2];\n"
+                       "    arr[1][0] = new [2];\n"
+                       "    $display(\"%0d %0d %0d\", arr[1].size(), "
+                       "arr[0].size(), arr[0][0].size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 4 2\n");
+}
+
+TEST(DynamicArrayNewSimulation, SizeIsEvaluatedBeforeTheInitializer) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  string log; int n = 2; int src [3] = '{4, 5, 6};\n"
+                 "  function automatic int f(); log = {log, \"f\"}; return n; "
+                 "endfunction\n"
+                 "  typedef int a3_t [3];\n"
+                 "  function automatic a3_t g();\n"
+                 "    log = {log, \"g\"}; n = 3; return src;\n"
+                 "  endfunction\n"
+                 "  int d [];\n"
+                 "  initial begin\n"
+                 "    d = new[f()](g());\n"
+                 "    $display(\"%s %0d\", log, d.size());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "fg 2\n");
+}
+
+TEST(DynamicArrayNewSimulation, DISABLED_DeclarationSizeFromAFunctionCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string log; int src [3] = '{4, 5, 6};\n"
+                       "  function automatic int f(); log = {log, \"f\"}; "
+                       "return 2; endfunction\n"
+                       "  int d [] = new[f()](src);\n"
+                       "  initial #1 $display(\"%s %0d %0d\", log, d.size(), "
+                       "d[1]);\n"
+                       "endmodule\n",
+                       f),
+            "f 2 5\n");
+}
+
+TEST(DynamicArrayNewSimulation,
+     DISABLED_InitializerFromAFunctionCallOrADeclarationPattern) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int src [3] = '{4, 5, 6};\n"
+                 "  typedef int a3_t [3];\n"
+                 "  function automatic a3_t g(); return src; endfunction\n"
+                 "  int p [] = new[2]('{7, 8, 9});\n"
+                 "  int d [];\n"
+                 "  initial begin\n"
+                 "    d = new[2](g());\n"
+                 "    $display(\"%0d %0d %0d %0d\", d[1], d.size(), p[1], "
+                 "p.size());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "5 2 8 2\n");
+}
+
+TEST(DynamicArrayNewSimulation,
+     NewWithoutAnInitializerDiscardsEarlierElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int d []; logic [7:0] l [];\n"
+                       "  initial begin\n"
+                       "    d = new[3]; d[0] = 5; d[2] = 7; d = new[3];\n"
+                       "    $display(\"%0d %0d\", d[0], d[2]);\n"
+                       "    d[1] = 4; d = new[5];\n"
+                       "    $display(\"%0d %0d %0d\", d[1], d[4], d.size());\n"
+                       "    l = new[2]; l[1] = 1; l = new[4];\n"
+                       "    $display(\"%b %b %b\", l[0], l[1], l[3]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 0\n0 0 5\nxxxxxxxx xxxxxxxx xxxxxxxx\n");
+}
+
+TEST(DynamicArrayNewSimulation, RefToAnElementOutdatedByNewWritesNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int d [];\n"
+                       "  task automatic tk(ref int r); d = new[3]; r = 9; "
+                       "endtask\n"
+                       "  initial begin\n"
+                       "    d = new[3]; d[1] = 4; tk(d[1]);\n"
+                       "    $display(\"%0d %0d\", d[1], d.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 3\n");
+}
+
 }  // namespace

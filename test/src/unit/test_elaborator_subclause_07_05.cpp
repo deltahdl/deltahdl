@@ -73,4 +73,18 @@ TEST(DynamicArrayValidation, StringElementDynamicElaborates) {
              "endmodule\n"));
 }
 
+TEST(DynamicArrayValidation,
+     DISABLED_NewOnADynamicArrayOfEnumsOrChandlesIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {A, B, C} e_t;\n"
+      "  e_t ed [] = new[2]; chandle cd [] = new[2]; e_t ee []; chandle ch "
+      "[];\n"
+      "  initial begin ee = new[3](ed); ee = new[4]; ch = new[2]; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

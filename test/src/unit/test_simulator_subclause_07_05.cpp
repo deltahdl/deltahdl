@@ -239,4 +239,57 @@ TEST(DynamicArraySimulation, AnElementOfADynamicArrayFormalReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
+TEST(DynamicArraySim, ClauseExamplesAndElementsOfEveryKindOfType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef struct {int a; logic [1:0] b;} s_t;\n"
+          "  class K; int v = 3; endclass\n"
+          "  bit [3:0] nibble []; integer mem [2][]; s_t sd []; K kd [];\n"
+          "  int dq [][$];\n"
+          "  initial begin\n"
+          "    nibble = new[2]; nibble[1] = 4'ha; mem[1] = new[3]; "
+          "mem[1][2] = 6;\n"
+          "    sd = new[1]; sd[0] = '{4, 2'b1x}; kd = new[2]; kd[1] = new;\n"
+          "    dq = new[2]; dq[1].push_back(7);\n"
+          "    $display(\"%h %0d %0d %0d %0d %0d %b %0d %0d %0d\", nibble[1], "
+          "$bits(nibble[0]), mem[0].size(), mem[1][2], $isunknown(mem[1][0]), "
+          "sd[0].a, sd[0].b, kd[1].v, kd[0] == null, dq[1][0]);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "a 4 0 6 1 4 1x 3 1 7\n");
+}
+
+TEST(DynamicArraySim, DISABLED_EventElementIsTriggeredAndWaitedOn) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  event ev [];\n"
+                 "  initial begin\n"
+                 "    ev = new[1];\n"
+                 "    fork\n"
+                 "      begin @(ev[0]); $display(\"ev %0t\", $time); end\n"
+                 "      begin #1 ->ev[0]; end\n"
+                 "    join\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "ev 1\n");
+}
+
+TEST(DynamicArraySim, DISABLED_ElementThatIsAnAssociativeArrayKeepsItsEntries) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int da [][int];\n"
+                       "  initial begin\n"
+                       "    da = new[2]; da[1][9] = 5;\n"
+                       "    $display(\"%0d %0d\", da[1][9], da[1].num());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 1\n");
+}
+
 }  // namespace
