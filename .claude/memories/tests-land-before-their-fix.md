@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: b425c181-0dc9-4105-9628-ad8462acdd57
-  modified: 2026-11-10T05:42:32.135Z
+  modified: 2026-11-10T05:46:37.475Z
 ---
 
 # Tests land before their fix
@@ -22,4 +22,4 @@ A unit test under `test/src/unit/` is committed and pushed once it is written an
 - To run a test that carries the prefix, pass `--gtest_also_run_disabled_tests --gtest_filter=Suite.DISABLED_Name` to its binary.
 - A fix removes the prefix from every test of the rule it closes, and an issue of a rule closes only when no test of its cases still carries one ([fixing-a-rule-in-full](fixing-a-rule-in-full.md)).
 - A test that cannot compile against deltahdl as it stands, because it needs a declaration deltahdl lacks, waits for its fix, and its case says which declaration.
-- An issue labelled `tests first` asks for the tests of one section of a standard ahead of any fix. It changes nothing under `src/`, and the existing `bylabel` form of the autopilot skill works through such issues.
+- An issue labelled `lrm-tests` asks for the tests of one section of a standard ahead of any fix. It changes nothing under `src/`, and the existing `bylabel` form of the autopilot skill works through such issues.
