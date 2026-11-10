@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -194,10 +195,11 @@ TEST(TypeParameterParsing, ClassBodyLocalTypeParamIsATypedefOfItsType) {
 }
 
 TEST(TypeParameterParsing, HierarchicalNameAsAPortListTypeDefaultIsReported) {
+  auto r = Parse(
+      "interface ifc; typedef logic [5:0] w6_t; endinterface\n"
+      "module t #(parameter type T = i.w6_t) (); ifc i(); endmodule\n");
   EXPECT_TRUE(
-      Parse("interface ifc; typedef logic [5:0] w6_t; endinterface\n"
-            "module t #(parameter type T = i.w6_t) (); ifc i(); endmodule\n")
-          .has_errors);
+      ReportedError(r.diags, "expected ')', got identifier", 2, "23.2.3"));
   EXPECT_FALSE(Parse("typedef logic [5:0] w6_t;\n"
                      "module t #(parameter type T = w6_t) (); endmodule\n")
                    .has_errors);
