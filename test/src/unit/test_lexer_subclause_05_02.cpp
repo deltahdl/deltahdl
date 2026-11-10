@@ -372,4 +372,24 @@ TEST(LexicalConventionLexing, ByteInsideACommentOrStringDrawsNoReport) {
   }
 }
 
+TEST(LexicalConventionLexing, WhitespaceInsideAMultiCharOperatorSplitsIt) {
+  auto joined = Lex("a<=b==c&&d<<<e");
+  ASSERT_EQ(joined.size(), 10u);
+  EXPECT_EQ(joined[1].kind, TokenKind::kLtEq);
+  EXPECT_EQ(joined[3].kind, TokenKind::kEqEq);
+  EXPECT_EQ(joined[5].kind, TokenKind::kAmpAmp);
+  EXPECT_EQ(joined[7].kind, TokenKind::kLtLtLt);
+
+  auto split = Lex("a< =b= =c&\n&d<< <e");
+  ASSERT_EQ(split.size(), 14u);
+  EXPECT_EQ(split[1].kind, TokenKind::kLt);
+  EXPECT_EQ(split[2].kind, TokenKind::kEq);
+  EXPECT_EQ(split[4].kind, TokenKind::kEq);
+  EXPECT_EQ(split[5].kind, TokenKind::kEq);
+  EXPECT_EQ(split[7].kind, TokenKind::kAmp);
+  EXPECT_EQ(split[8].kind, TokenKind::kAmp);
+  EXPECT_EQ(split[10].kind, TokenKind::kLtLt);
+  EXPECT_EQ(split[11].kind, TokenKind::kLt);
+}
+
 }  // namespace
