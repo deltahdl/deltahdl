@@ -16,6 +16,30 @@ TEST(TimeLiteralSimulation, IntegerNs) {
   EXPECT_DOUBLE_EQ(v, 10.0);
 }
 
+TEST(TimeLiteralSimulation, LiteralIsARealtimeInArithmeticAndConversion) {
+  EXPECT_DOUBLE_EQ(RunAndGetReal("module t;\n"
+                                 "  timeunit 1ns;\n"
+                                 "  real r;\n"
+                                 "  initial r = 1ns / 2;\n"
+                                 "endmodule\n",
+                                 "r"),
+                   0.5);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  timeunit 1ns;\n"
+                      "  timeprecision 1ps;\n"
+                      "  int i;\n"
+                      "  initial i = 1500ps;\n"
+                      "endmodule\n",
+                      "i"),
+            2u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int b;\n"
+                      "  initial b = $bits(1ns);\n"
+                      "endmodule\n",
+                      "b"),
+            64u);
+}
+
 TEST(TimeLiteralSimulation, FixedPointNs) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.1ns;\nendmodule\n", "r");
