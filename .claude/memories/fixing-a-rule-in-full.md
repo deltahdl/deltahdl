@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 86699205-8167-4d43-95d1-668dd7cf1a13
-  modified: 2026-11-09T08:17:12.537Z
+  modified: 2026-11-10T05:42:37.609Z
 ---
 
 # Fixing a rule in full
@@ -24,6 +24,7 @@ Write a test for each case and make deltahdl pass all of them in the same commit
 
 - Draw the list from the clause itself, per [lrm-source-of-truth](lrm-source-of-truth.md); the cases the issue names are a start, not the whole.
 - For each forbidden form, write one test that it is reported, per [naming-the-report-in-a-rejection-test](naming-the-report-in-a-rejection-test.md), and one that the nearest allowed form is accepted without a report.
+- A case's test may already be in the tree with `DISABLED_` in front of its name, per [tests-land-before-their-fix](tests-land-before-their-fix.md). Run it and read why it fails, then remove the prefix in the commit that makes it pass.
 - Add a case found while fixing to the fix, never to a new issue.
 - Choose inputs that tell correct code from incorrect ([discriminating-test-inputs](discriminating-test-inputs.md)).
 - Build and run the tests before writing the fix ([verifying-through-ci](verifying-through-ci.md)). Each must fail because of the rule in hand. A test that fails for another reason has found a defect of another rule: fix it on the spot when that is quicker and safer, or else file it before designing the fix. Never bend the tests around it unrecorded.

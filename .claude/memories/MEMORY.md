@@ -56,7 +56,8 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Tests
 
-- [Test-driven development](test-driven-development.md) — tests first, in the same commit, each run and seen to fail for its issue's reason before the fix.
+- [Test-driven development](test-driven-development.md) — tests first, each run and seen to fail for its issue's reason before the fix; a Python test lands in the same commit as its code.
+- [Tests land before their fix](tests-land-before-their-fix.md) — push a C++ unit test once written: plain name when deltahdl passes it, `DISABLED_` in front until the fix removes it.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
