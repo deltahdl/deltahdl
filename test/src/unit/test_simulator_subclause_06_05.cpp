@@ -162,4 +162,45 @@ TEST(StrengthLostOnAVariable, InputPortVariableConvertsTheConnectedValue) {
   EXPECT_EQ(out, "4.0 3\n");
 }
 
+TEST(NetsAndVariablesSim, ForceOverridesANetAndReleaseRestoresItsResolved) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module m;\n"
+      "  wire w;\n"
+      "  assign w = 1'b1;\n"
+      "  assign w = 1'bz;\n"
+      "  initial begin\n"
+      "    #1 $display(\"%b\", w);\n"
+      "    force w = 1'b0;\n"
+      "    #1 $display(\"%b\", w);\n"
+      "    release w;\n"
+      "    #1 $display(\"%b\", w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n0\n1\n");
+}
+
+TEST(NetsAndVariablesSim, VariableDrivesThePortNetOnTheOtherSide) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module sub(input wire p, output wire q);\n"
+      "  assign q = ~p;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic v = 1'b0;\n"
+      "  wire o;\n"
+      "  sub s(.p(v), .q(o));\n"
+      "  initial begin\n"
+      "    #1 $display(\"%b\", o);\n"
+      "    v = 1'b1;\n"
+      "    #1 $display(\"%b\", o);\n"
+      "    v = 1'bx;\n"
+      "    #1 $display(\"%b\", o);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n0\nx\n");
+}
+
 }  // namespace
