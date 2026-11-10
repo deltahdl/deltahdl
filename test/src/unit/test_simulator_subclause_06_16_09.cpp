@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -278,6 +279,46 @@ TEST(StringMethods, AtohexTruncatesToThirtyTwoBits) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringAtoiSim, ConversionsReadTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; string ps = \"77\"; endpackage\n"
+                 "typedef struct { string s; int n; } st_t;\n"
+                 "class K; string ks = \"ff\"; endclass\n"
+                 "module t;\n"
+                 "  string q [$], a = \"4294967297\", b = \"_1_2x\";\n"
+                 "  st_t st;\n"
+                 "  K k = new;\n"
+                 "  initial begin\n"
+                 "    q.push_back(\"101\"); st.s = \"17\";\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                 "      p::ps.atoi(), k.ks.atohex(), q[0].atobin(),\n"
+                 "      st.s.atooct(), a.atoi(), b.atoi(), $bits(a.atoi()),\n"
+                 "      type(a.atoi()) == type(integer));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "77 255 5 15 1 12 32 1\n");
+}
+
+TEST(StringAtoiSim, DISABLED_ConversionsReturnASignedInteger) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string d = \"4294967295\", h = \"1ffffffff\";\n"
+                       "  string o = \"777777777777\";\n"
+                       "  string b = \"11111111111111111111111111111110\";\n"
+                       "  int i;\n"
+                       "  initial begin\n"
+                       "    i = h.atohex();\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d\", d.atoi(),\n"
+                       "             d.atoi() < 0, i, o.atooct(), b.atobin(),\n"
+                       "             b.atobin() + 0 < 0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "-1 1 -1 -1 -2 1\n");
 }
 
 }  // namespace

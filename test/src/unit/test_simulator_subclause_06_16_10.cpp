@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -179,6 +180,28 @@ TEST(StringMethods, AtorealResultAsExpressionOperand) {
       "endmodule\n",
       "r");
   EXPECT_NEAR(d, 3.5, 0.0001);
+}
+
+TEST(StringAtorealSim, AtorealReadsTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package p; string ps = \"2.5\"; endpackage\n"
+          "typedef struct { string s; int n; } st_t;\n"
+          "class K; string ks = \"ff\"; endclass\n"
+          "module t;\n"
+          "  string a = \"1.5e1x\", c = \"1e\";\n"
+          "  st_t st;\n"
+          "  K k = new;\n"
+          "  initial begin\n"
+          "    st.s = \"0.25\";\n"
+          "    $display(\"%0d %0d %0d %0d %0d\", p::ps.atoreal() == 2.5,\n"
+          "      st.s.atoreal() == 0.25, k.ks.atoreal() == 0.0,\n"
+          "      a.atoreal() == 15.0, c.atoreal() == 1.0);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 1 1 1 1\n");
 }
 
 }  // namespace

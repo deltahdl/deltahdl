@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -169,6 +170,42 @@ TEST(StringMethods, ItoaConvertsItsArgumentToInteger) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 7u);
+}
+
+TEST(StringItoaSim, ItoaWritesTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; string ps = \"old\"; endpackage\n"
+                 "class K; string ks = \"old\"; endclass\n"
+                 "module t;\n"
+                 "  string a, b, q [$];\n"
+                 "  K k = new;\n"
+                 "  initial begin\n"
+                 "    q.push_back(\"x\");\n"
+                 "    p::ps.itoa(12); k.ks.itoa(-7); q[0].itoa(0);\n"
+                 "    a.itoa(-5); b.itoa(64'h1_0000_0005);\n"
+                 "    $display(\"%s %s %s %s %s\", p::ps, k.ks, q[0], a,\n"
+                 "             b);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "12 -7 0 -5 5\n");
+}
+
+TEST(StringItoaSim, DISABLED_EachToaMethodWritesAStructureMemberString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct { string s; int n; } st_t;\n"
+                       "module t;\n"
+                       "  st_t a, b, c, d, e;\n"
+                       "  initial begin\n"
+                       "    a.s.itoa(12); b.s.hextoa(255); c.s.octtoa(8);\n"
+                       "    d.s.bintoa(5); e.s.realtoa(2.5);\n"
+                       "    $display(\"%s %s %s %s %s\", a.s, b.s, c.s, d.s,\n"
+                       "             e.s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "12 ff 10 101 2.5\n");
 }
 
 }  // namespace

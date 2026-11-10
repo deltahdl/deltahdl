@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -136,6 +137,21 @@ TEST(StringMethods, OcttoaResultUsedInConcatenation) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringOcttoaSim, OcttoaWritesNegativeAndWideValuesAsIntegers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p; string ps; endpackage\n"
+                       "module t;\n"
+                       "  string a, b;\n"
+                       "  initial begin\n"
+                       "    a.octtoa(-1); b.octtoa(40'h10_0000_0009);\n"
+                       "    p::ps.octtoa(8);\n"
+                       "    $display(\"%s %s %s\", a, b, p::ps);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "37777777777 11 10\n");
 }
 
 }  // namespace

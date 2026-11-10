@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -136,6 +137,21 @@ TEST(StringMethods, BintoaResultUsedInConcatenation) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringBintoaSim, BintoaWritesNegativeAndWideValuesAsIntegers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string a, b, q [$];\n"
+                       "  initial begin\n"
+                       "    q.push_back(\"\");\n"
+                       "    a.bintoa(-2); b.bintoa(36'h8_0000_0003);\n"
+                       "    q[0].bintoa(5);\n"
+                       "    $display(\"%s %s %s\", a, b, q[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11111111111111111111111111111110 11 101\n");
 }
 
 }  // namespace

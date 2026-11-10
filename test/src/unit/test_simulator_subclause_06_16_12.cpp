@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -148,6 +149,22 @@ TEST(StringMethods, HextoaConvertsItsArgumentToInteger) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringHextoaSim, HextoaWritesNegativeAndWideValuesAsIntegers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class K; string ks = \"old\"; endclass\n"
+                       "module t;\n"
+                       "  string a, b;\n"
+                       "  K k = new;\n"
+                       "  initial begin\n"
+                       "    a.hextoa(-1); b.hextoa(64'h1_0000_00ab);\n"
+                       "    k.ks.hextoa(255);\n"
+                       "    $display(\"%s %s %s\", a, b, k.ks);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ffffffff ab ff\n");
 }
 
 }  // namespace

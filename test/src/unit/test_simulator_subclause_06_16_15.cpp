@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -134,6 +135,24 @@ TEST(StringMethods, RealtoaResultUsedInConcatenation) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringRealtoaSim, RealtoaWritesTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p; string ps; endpackage\n"
+                       "class K; string ks; endclass\n"
+                       "module t;\n"
+                       "  string aa [int];\n"
+                       "  K k = new;\n"
+                       "  initial begin\n"
+                       "    p::ps.realtoa(2.5); k.ks.realtoa(-0.25);\n"
+                       "    aa[1] = \"\"; aa[1].realtoa(10.0);\n"
+                       "    $display(\"%s %s %0d\", p::ps, k.ks,\n"
+                       "             aa[1].atoreal() == 10.0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2.5 -0.25 1\n");
 }
 
 }  // namespace
