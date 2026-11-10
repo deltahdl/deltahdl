@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -190,6 +192,81 @@ TEST(VectorSpecification, NegativeBoundIsWrittenThrough) {
                        f),
             "b=100001 hi=10\n"
             "n=1011 n4=1 n3=0\n");
+}
+
+TEST(VectorSpecification, ExampleDeclarationsTakeTheirWidths) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wand w;\n"
+                       "  tri [15:0] busa;\n"
+                       "  trireg (small) storeit;\n"
+                       "  logic a;\n"
+                       "  logic [3:0] v;\n"
+                       "  logic [-1:4] b;\n"
+                       "  wire w1, w2;\n"
+                       "  logic [4:0] x, y, z;\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d "
+                       "%0d %0d %0d\",\n"
+                       "                   $bits(w), $bits(busa), "
+                       "$bits(storeit), $bits(a),\n"
+                       "                   $bits(v), $bits(b), $bits(w1), "
+                       "$bits(w2), $bits(x),\n"
+                       "                   $bits(y), $bits(z));\n"
+                       "endmodule\n",
+                       f),
+            "1 16 1 1 4 6 1 1 5 5 5\n");
+}
+
+TEST(VectorSpecification, MsbIsTheLeftBoundAndLsbTheRight) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] v;\n"
+                       "  logic [0:3] r;\n"
+                       "  initial begin\n"
+                       "    v = 4'b1000;\n"
+                       "    r = 4'b1000;\n"
+                       "    $display(\"%b%b%b%b %b%b%b%b\", v[3], v[2], v[1], "
+                       "v[0], r[0],\n"
+                       "             r[1], r[2], r[3]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1000 1000\n");
+}
+
+TEST(VectorSpecification, FourBitSignedVectorHoldsMinusEightToSeven) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic signed [3:0] signed_reg;\n"
+                       "  initial begin\n"
+                       "    signed_reg = 7;\n"
+                       "    $display(\"%0d\", signed_reg);\n"
+                       "    signed_reg = 8;\n"
+                       "    $display(\"%0d\", signed_reg);\n"
+                       "    signed_reg = -8;\n"
+                       "    $display(\"%0d\", signed_reg);\n"
+                       "    signed_reg = -9;\n"
+                       "    $display(\"%0d\", signed_reg);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "7\n-8\n-8\n7\n");
+}
+
+TEST(VectorSpecification, VectorOfTheGuaranteedLengthHoldsEveryBit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [65535:0] v;\n"
+                       "  initial begin\n"
+                       "    v = 0;\n"
+                       "    v[65535] = 1;\n"
+                       "    v[0] = 1;\n"
+                       "    $display(\"%0d %b %b %b\", $bits(v), v[65535], "
+                       "v[65534], v[0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "65536 1 0 1\n");
 }
 
 }  // namespace
