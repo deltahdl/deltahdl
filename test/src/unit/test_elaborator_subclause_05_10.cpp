@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -197,6 +200,49 @@ TEST(StructLiteralElaboration, ReplicationSupplyingTooManyMembersRejected) {
                             "replication supplies 3 values, but struct has 2 "
                             "members",
                             2, "5.10"));
+}
+
+TEST(StructLiteralElaboration, ReplicationSupplyingTooFewMembersRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  struct { int X, Y, Z; } short_xyz = '{2{1}};\n"
+      "  struct { int X, Y, Z; } exact_xyz = '{3{1}};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "replication supplies 2 values, but struct has 3 "
+                            "members",
+                            2, "5.10"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "replication supplies", 3, "5.10"));
+}
+
+TEST(StructLiteralElaboration, UntypedLiteralWithoutAssignmentContextRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { int a; int b; } ab;\n"
+      "  ab c;\n"
+      "  initial begin\n"
+      "    if (c == '{0, 0}) c.a = 1;\n"
+      "    $display(\"%p\", '{1, 2});\n"
+      "    if (c == ab'{0, 0}) c.a = 1;\n"
+      "    $display(\"%p\", ab'{1, 2});\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "assignment pattern without a type prefix outside an assignment-like "
+      "context";
+  for (uint32_t line : {5u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, line, "10.9"))
+        << line;
+  }
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, line, "10.9"))
+        << line;
+  }
 }
 
 TEST(StructLiteralElaboration,

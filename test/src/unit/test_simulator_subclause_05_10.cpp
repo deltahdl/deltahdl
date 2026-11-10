@@ -216,6 +216,24 @@ TEST(StructLiteralSim, PositionalLiteralFillsARealMember) {
   EXPECT_EQ(out, "s.a=165 s.b=2.5\n");
 }
 
+TEST(StructLiteralSim, TypeKeysFillTheMembersOfTheirType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; shortreal b; } ab;\n"
+      "  typedef struct { int a; logic [7:0] c; int e; real r; } s_t;\n"
+      "  ab d;\n"
+      "  s_t s;\n"
+      "  initial begin\n"
+      "    d = ab'{int: 3, shortreal: 1.5};\n"
+      "    s = '{int: 5, default: 1};\n"
+      "    $display(\"%0d %g %0d %0d %0d %g\", d.a, d.b, s.a, s.c, s.e, s.r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1.5 5 1 5 1\n");
+}
+
 TEST(StructLiteralSim, NamedLiteralFillsARealMember) {
   SimFixture f;
   auto out = RunCapture(
