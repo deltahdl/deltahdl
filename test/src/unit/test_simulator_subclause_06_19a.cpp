@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
+#include <string_view>
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -575,6 +577,184 @@ TEST(EnumerationSimulation, EnumerationMethodsReturnValuesOfItsBase) {
                       "endmodule\n",
                       "r"),
             0x3Fu);
+}
+
+constexpr std::string_view kValueDeclarations =
+    "typedef enum {a, b = 7, c, d = 3, e} t; "
+    "enum {n = -3, o} w; "
+    "enum integer {xa = 'x, xb = 'z, xc = 1} y;";
+
+constexpr std::string_view kValueDisplay =
+    "begin $display(\"%0d %0d %0d %0d %0d %0d %0d\", a, b, c, d, e, n, o); "
+    "$display(\"%0d %0d %0d\", xa, xb, xc); end";
+
+std::string ValuesIn(std::string_view place) {
+  const std::string kD(kValueDeclarations);
+  const std::string kP(kValueDisplay);
+  if (place == "module")
+    return "module m;\n" + kD + "\ninitial " + kP + "\nendmodule\n";
+  if (place == "interface") {
+    return "interface i;\n" + kD + "\ninitial " + kP +
+           "\nendinterface\nmodule m;\ni u();\nendmodule\n";
+  }
+  if (place == "program")
+    return "program p;\n" + kD + "\ninitial " + kP + "\nendprogram\n";
+  if (place == "package") {
+    return "package q;\n" + kD +
+           "\nendpackage\nmodule m;\nimport q::*;\ninitial " + kP +
+           "\nendmodule\n";
+  }
+  if (place == "compilation unit")
+    return kD + "\nmodule m;\ninitial " + kP + "\nendmodule\n";
+  if (place == "class") {
+    return "class K;\n" + kD + "\nstatic function void s();\n" + kP +
+           "\nendfunction\nendclass\nmodule m;\ninitial K::s();\nendmodule\n";
+  }
+  if (place == "function") {
+    return "module m;\nfunction void s();\n" + kD + "\n" + kP +
+           "\nendfunction\ninitial s();\nendmodule\n";
+  }
+  if (place == "task") {
+    return "module m;\ntask s();\n" + kD + "\n" + kP +
+           "\nendtask\ninitial s();\nendmodule\n";
+  }
+  if (place == "block")
+    return "module m;\ninitial begin\n" + kD + "\n" + kP + "\nend\nendmodule\n";
+  return "module m;\nif (1) begin : g\n" + kD + "\ninitial " + kP +
+         "\nend\nendmodule\n";
+}
+
+std::string LineOfValuesIn(std::string_view place, size_t line) {
+  SimFixture f;
+  std::string out = RunCapture(ValuesIn(place), f);
+  for (size_t at = 0; at < line; ++at) {
+    out.erase(0, out.find('\n') + 1);
+  }
+  return out.substr(0, out.find('\n'));
+}
+
+TEST(EnumerationSimulation, MemberValuesStartAtZeroAndCountOnInEveryPlace) {
+  for (std::string_view place :
+       {"module", "interface", "program", "package", "compilation unit",
+        "class", "function", "task", "block", "generate block"}) {
+    SCOPED_TRACE(place);
+    EXPECT_EQ(LineOfValuesIn(place, 0), "0 7 8 3 4 -3 -2");
+  }
+}
+
+TEST(EnumerationSimulation, XOrZMemberOfAFourStateEnumerationHoldsItsValue) {
+  for (std::string_view place :
+       {"module", "interface", "program", "package", "compilation unit",
+        "function", "task", "block", "generate block"}) {
+    SCOPED_TRACE(place);
+    EXPECT_EQ(LineOfValuesIn(place, 1), "x z 1");
+  }
+}
+
+TEST(EnumerationSimulation,
+     DISABLED_XOrZMemberOfAFourStateEnumerationInAClassHoldsItsValue) {
+  EXPECT_EQ(LineOfValuesIn("class", 1), "x z 1");
+}
+
+TEST(EnumerationSimulation, MemberValuesStartAtZeroAndCountOnInAChecker) {
+  EXPECT_EQ(RunAndGet("checker ck;\n"
+                      "  typedef enum {a, b = 7, c, d = 3, e} t;\n"
+                      "  enum {n = -3, o} w;\n"
+                      "  enum integer {xa = 'x, xc = 1} y;\n"
+                      "  bit ok;\n"
+                      "  always_comb ok = a == 0 && b == 7 && c == 8 && d == 3 "
+                      "&& e == 4 && n == -3 && o == -2 && $isunknown(xa) && "
+                      "xc == 1;\n"
+                      "endchecker\n"
+                      "module m;\n"
+                      "  ck u();\n"
+                      "endmodule\n",
+                      "u.ok"),
+            1u);
+}
+
+TEST(EnumerationSimulation,
+     DISABLED_SizedLiteralFillingASignedBaseTakesTheCastValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  enum byte {A = 8'hFF, B} v;\n"
+      "  enum bit signed [3:0] {C = 4'hF, D} w;\n"
+      "  enum shortint {E = 16'h8000, F} x;\n"
+      "  initial $display(\"%0d %0d %0d %0d %0d %0d\", A, B, C, D, E, F);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-1 0 -1 0 -32768 -32767\n");
+}
+
+TEST(EnumerationSimulation, DISABLED_GenvarOperandGivesEachIterationItsValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  for (genvar g = 0; g < 2; g++) begin : b\n"
+      "    enum {A = g + 1, B} v;\n"
+      "    initial #g $display(\"%0d %0d\", A, B);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2\n2 3\n");
+}
+
+TEST(EnumerationSimulation, DISABLED_EarlierConstantInAProductGivesItsValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  enum {A = 2, B = A * 3, C} v;\n"
+      "  initial $display(\"%0d %0d %0d\", A, B, C);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "2 6 7\n");
+}
+
+TEST(EnumerationSimulation, ConstantOfAnotherEnumerationGivesItsValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  enum {X = 5} a;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::*;\n"
+      "  enum {Q = 9} b;\n"
+      "  enum {Y = Q + 1, Z = X + 1} c;\n"
+      "  initial $display(\"%0d %0d\", Y, Z);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "10 6\n");
+}
+
+TEST(EnumerationSimulation,
+     DISABLED_PackageScopedConstantOfAnotherEnumerationGivesItsValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  enum {X = 5} a;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  enum {Z = p::X + 1} c;\n"
+      "  initial $display(\"%0d\", Z);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6\n");
+}
+
+TEST(EnumerationSimulation, ConstantFunctionCallsGiveTheirValues) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  function int f(int n);\n"
+      "    return n * 2;\n"
+      "  endfunction\n"
+      "  enum {A = f(3), B} v;\n"
+      "  enum {C = $clog2(16), D} w;\n"
+      "  initial $display(\"%0d %0d %0d %0d\", A, B, C, D);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "6 7 4 5\n");
 }
 
 }  // namespace

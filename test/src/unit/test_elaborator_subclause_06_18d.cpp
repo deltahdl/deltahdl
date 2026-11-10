@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <array>
 #include <cstdint>
 #include <initializer_list>
 #include <string>
@@ -8,88 +7,16 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_declaration_places.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
 
-struct Place {
-  std::string_view name;
-  std::string_view head;
-  std::string_view tail;
-};
-
-constexpr std::array<Place, 10> kPlaces = {{
-    {"module", "module m;\n", "endmodule\n"},
-    {"interface", "interface i;\n",
-     "endinterface\nmodule m;\n  i u();\nendmodule\n"},
-    {"program", "program p;\n", "endprogram\nmodule m;\n  p u();\nendmodule\n"},
-    {"package", "package q;\n",
-     "endpackage\nmodule m;\n  import q::*;\nendmodule\n"},
-    {"compilation unit", "", "module m;\nendmodule\n"},
-    {"generate block", "module m;\n  if (1) begin : g\n", "  end\nendmodule\n"},
-    {"class", "class K;\n", "endclass\nmodule m;\n  K k = new;\nendmodule\n"},
-    {"function", "module m;\n  function void f();\n",
-     "  endfunction\nendmodule\n"},
-    {"task", "module m;\n  task t();\n", "  endtask\nendmodule\n"},
-    {"block", "module m;\n  initial begin\n", "  end\nendmodule\n"},
-}};
-
 constexpr std::initializer_list<std::string_view> kDeclarationScopes = {
     "module",           "interface",      "program", "package",
     "compilation unit", "generate block", "class"};
-
-const Place& PlaceNamed(std::string_view name) {
-  for (const auto& place : kPlaces) {
-    if (place.name == name) return place;
-  }
-  ADD_FAILURE() << "no place named " << name;
-  return kPlaces[0];
-}
-
-std::string InPlace(std::string_view name, std::string_view body) {
-  const Place& place = PlaceNamed(name);
-  return std::string(place.head) + std::string(body) + std::string(place.tail);
-}
-
-void ExpectReportedIn(std::initializer_list<std::string_view> names,
-                      std::string_view body, std::string_view message,
-                      std::string_view at) {
-  for (std::string_view name : names) {
-    SCOPED_TRACE(name);
-    std::string src = InPlace(name, body);
-    ElabFixture f;
-    ElaborateSrc(src, f);
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
-                              LineHolding(src, at), "6.18"));
-  }
-}
-
-void ExpectReportedOnceIn(std::initializer_list<std::string_view> names,
-                          std::string_view body, std::string_view message,
-                          std::string_view at) {
-  for (std::string_view name : names) {
-    SCOPED_TRACE(name);
-    std::string src = InPlace(name, body);
-    ElabFixture f;
-    ElaborateSrc(src, f);
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
-                              LineHolding(src, at), "6.18"));
-    EXPECT_EQ(f.diag.ErrorCount(), 1u);
-  }
-}
-
-void ExpectCleanIn(std::initializer_list<std::string_view> names,
-                   std::string_view body) {
-  for (std::string_view name : names) {
-    SCOPED_TRACE(name);
-    std::string src = InPlace(name, body);
-    ElabFixture f;
-    ElaborateSrc(src, f);
-    EXPECT_FALSE(f.has_errors) << src;
-  }
-}
 
 uint32_t WidthOf(const RtlirDesign* design, std::string_view name) {
   if (design == nullptr || design->top_modules.empty()) return 0;
@@ -115,7 +42,7 @@ TEST(UserDefinedTypeElaboration,
                        "  typedef A A;\n"
                        "  A v;\n",
                        "typedef 'A' does not resolve to a data type",
-                       "typedef A A;");
+                       "typedef A A;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -126,7 +53,7 @@ TEST(UserDefinedTypeElaboration,
                    "  typedef B A;\n"
                    "  A v;\n",
                    "typedef 'A' does not resolve to a data type",
-                   "typedef B A;");
+                   "typedef B A;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -138,7 +65,7 @@ TEST(UserDefinedTypeElaboration,
                    "  typedef C A;\n"
                    "  A v;\n",
                    "typedef 'A' does not resolve to a data type",
-                   "typedef C A;");
+                   "typedef C A;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -153,7 +80,7 @@ TEST(UserDefinedTypeElaboration,
                        "  A v;\n";
     ExpectReportedIn(kDeclarationScopes, body,
                      "typedef 'A' does not resolve to a data type",
-                     "typedef B A;");
+                     "typedef B A;", "6.18");
   }
 }
 
@@ -244,7 +171,7 @@ TEST(UserDefinedTypeElaboration,
       "  int v;\n",
       "forward typedef 'T' is never resolved by a definition in the same "
       "scope",
-      "typedef T;");
+      "typedef T;", "6.18");
 }
 
 TEST(
@@ -255,7 +182,7 @@ TEST(
                    "  int v;\n",
                    "forward typedef 'T' is never resolved by a definition in "
                    "the same scope",
-                   "typedef T;");
+                   "typedef T;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -265,7 +192,7 @@ TEST(UserDefinedTypeElaboration,
                    "  localparam int T = 1;\n",
                    "forward typedef 'T' is never resolved by a definition in "
                    "the same scope",
-                   "typedef T;");
+                   "typedef T;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -275,7 +202,7 @@ TEST(UserDefinedTypeElaboration,
                    "  localparam int T = 1;\n",
                    "forward typedef 'T' is never resolved by a definition in "
                    "the same scope",
-                   "typedef T;");
+                   "typedef T;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -286,7 +213,7 @@ TEST(UserDefinedTypeElaboration,
                    "  T v;\n",
                    "typedef 'T' does not conform to its forward declaration "
                    "as struct",
-                   "typedef enum");
+                   "typedef enum", "6.18");
 }
 
 TEST(
@@ -299,7 +226,7 @@ TEST(
       "  T v;\n",
       "typedef 'T' does not conform to its forward declaration "
       "as struct",
-      "typedef enum");
+      "typedef enum", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
@@ -310,7 +237,7 @@ TEST(UserDefinedTypeElaboration,
                    "  endclass\n",
                    "typedef 'I' does not conform to its forward declaration "
                    "as interface class",
-                   "  class I;");
+                   "  class I;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration, InterfaceClassDefiningAForwardOneIsClean) {
@@ -359,7 +286,7 @@ TEST(UserDefinedTypeElaboration,
                    "  typedef int t_t;\n",
                    "declaration of type 't_t' does not precede this reference "
                    "to it",
-                   "t_t v;");
+                   "t_t v;", "6.18");
 }
 
 TEST(UserDefinedTypeElaboration,
