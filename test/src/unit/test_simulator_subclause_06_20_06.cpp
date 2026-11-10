@@ -368,4 +368,22 @@ TEST(ConstConstantSim, MemberWrittenThroughAConstHandleReadsBack) {
   EXPECT_EQ(out, "7\n");
 }
 
+TEST(ConstConstantSim,
+     DISABLED_StaticConstReadsAParameterThroughAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module sub; parameter P = 9; endmodule\n"
+                 "module t;\n"
+                 "  sub u();\n"
+                 "  if (1) begin : a\n"
+                 "    if (1) begin : b localparam logic [3:0] LP = 4'd6; end\n"
+                 "  end\n"
+                 "  const int c = u.P;\n"
+                 "  const logic [3:0] option = a.b.LP;\n"
+                 "  initial #1 $display(\"%0d %0d\", c, option);\n"
+                 "endmodule\n",
+                 f),
+      "9 6\n");
+}
+
 }  // namespace
