@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
@@ -553,6 +556,256 @@ TEST(BitStreamCastSim, CastIntoAStructOfNoWholeDynamicStringBytesIsAnError) {
                             "bits, which are no whole number of its 8-bit "
                             "elements",
                             5, "6.24.3"));
+}
+
+TEST(BitStreamCastSim, ClauseSizeExamplesAreEachReported) {
+  struct SizeExample {
+    std::string_view src;
+    std::string_view report;
+  };
+  constexpr SizeExample kExamples[] = {
+      {"module t;\n"
+       "  struct {bit [7:0] a; shortint b;} a;\n"
+       "  int b = int'(a);\n"
+       "endmodule\n",
+       "between fixed-size types of different sizes (24 bits to 32 bits)"},
+      {"module t;\n"
+       "  struct {bit a[$]; shortint b;} a = '{'{0, 1, 0, 1}, 67};\n"
+       "  int b = int'(a);\n"
+       "endmodule\n",
+       "the source streams 20 bits, where the type holds 32"},
+      {"module t;\n"
+       "  typedef struct {byte a[$]; bit b;} dest_t;\n"
+       "  int a;\n"
+       "  dest_t b = dest_t'(a);\n"
+       "endmodule\n",
+       "which are no whole number of its 8-bit elements"},
+  };
+  for (const auto& example : kExamples) {
+    std::string src(example.src);
+    SCOPED_TRACE(src);
+    SimFixture f;
+    RunCapture(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string(example.report),
+                              LineHolding(src, "'(a)"), "6.24.3"));
+  }
+}
+
+TEST(BitStreamCastSim, DynamicItemTakesWhatTheFixedItemsLeave) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte a[$]; bit b;} dest_t;\n"
+                       "  bit [32:0] a = 33'h1_0000_0003;\n"
+                       "  dest_t b;\n"
+                       "  initial begin\n"
+                       "    b = dest_t'(a);\n"
+                       "    $display(\"%0d %h %h %0d\", b.a.size(), b.a[0], "
+                       "b.a[3], b.b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 80 01 1\n");
+}
+
+TEST(BitStreamCastSim,
+     DISABLED_DescendingUnpackedSourceStreamsItsLeftElementFirst) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef bit up_t [1:8];\n"
+          "  typedef bit down_t [8:1];\n"
+          "  typedef struct {shortint address; logic [3:0] code;\n"
+          "                  byte command [2];} Control;\n"
+          "  typedef bit Bits [36:1];\n"
+          "  up_t u; down_t d; Bits w; Control q; byte y;\n"
+          "  initial begin\n"
+          "    for (int k = 1; k <= 8; k++) begin u[k] = 0; d[k] = 0; end\n"
+          "    u[1] = 1; d[8] = 1; d[3] = 1;\n"
+          "    $write(\"%h \", byte'(u));\n"
+          "    $write(\"%h \", byte'(d));\n"
+          "    for (int k = 1; k <= 36; k++) w[k] = 0;\n"
+          "    w[24] = 1;\n"
+          "    q = Control'(w);\n"
+          "    $display(\"%h %h\", q.address, q.command[0]);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "80 84 0008 00\n");
+}
+
+TEST(BitStreamCastSim,
+     DISABLED_ClauseControlPacketExampleRoundTripsThroughAQueue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {shortint address; logic [3:0] code;\n"
+                       "                  byte command [2];} Control;\n"
+                       "  typedef bit Bits [36:1];\n"
+                       "  Control p; Bits stream[$];\n"
+                       "  initial begin\n"
+                       "    p.address = 16'h1234; p.code = 4'hA;\n"
+                       "    p.command[0] = 8'h5C; p.command[1] = 8'h0F;\n"
+                       "    stream.push_back(Bits'(p));\n"
+                       "    begin\n"
+                       "      Bits b; Control q;\n"
+                       "      b = stream.pop_front();\n"
+                       "      q = Control'(b);\n"
+                       "      $display(\"%h %h %h %h %0d\", q.address, q.code, "
+                       "q.command[0],\n"
+                       "               q.command[1], stream.size());\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1234 a 5c 0f 0\n");
+}
+
+TEST(BitStreamCastSim, DISABLED_ClassHandleOfPublicMembersIsABitStreamSource) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef bit [39:0] b40_t;\n"
+                       "  class C; int x = 7; bit [7:0] y = 8'h22; endclass\n"
+                       "  C c; b40_t v;\n"
+                       "  initial begin c = new; v = b40_t'(c); "
+                       "$display(\"%h\", v); end\n"
+                       "endmodule\n",
+                       f),
+            "0000000722\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, DISABLED_ThisIsABitStreamSourceDespiteLocalMembers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef bit [31:0] b32_t;\n"
+                       "  class C;\n"
+                       "    local int x = 7;\n"
+                       "    function b32_t me(); return b32_t'(this); "
+                       "endfunction\n"
+                       "  endclass\n"
+                       "  C c;\n"
+                       "  initial begin c = new; $display(\"%0d\", c.me()); "
+                       "end\n"
+                       "endmodule\n",
+                       f),
+            "7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, DynamicItemsAfterTheFirstAreLeftEmpty) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte a[]; byte q[$];} s_t;\n"
+                       "  typedef struct {string s; byte q[$];} t_t;\n"
+                       "  s_t v; t_t w;\n"
+                       "  initial begin\n"
+                       "    v = s_t'(24'h010203);\n"
+                       "    w = t_t'(24'h414243);\n"
+                       "    $display(\"%0d %0d %h %h [%s] %0d\", v.a.size(), "
+                       "v.q.size(), v.a[0], v.a[2], w.s, w.q.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 0 01 03 [ABC] 0\n");
+}
+
+TEST(BitStreamCastSim, DynamicItemBetweenFixedItemsTakesTheMiddle) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte h; byte d[]; shortint t;} s_t;\n"
+                       "  s_t v;\n"
+                       "  initial begin\n"
+                       "    v = s_t'(40'h11_22_33_4455);\n"
+                       "    $display(\"%h %0d %h %h %h\", v.h, v.d.size(), "
+                       "v.d[0], v.d[1], v.t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 2 22 33 4455\n");
+}
+
+TEST(BitStreamCastSim, FirstDynamicItemOfPartElementsBeforeASecondIsReported) {
+  SimFixture f;
+  std::string src =
+      "module t;\n"
+      "  typedef struct {byte a[]; shortint q[$];} s_t;\n"
+      "  s_t v;\n"
+      "  initial v = s_t'(20'h12345);\n"
+      "endmodule\n";
+  RunCapture(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "which are no whole number of its 8-bit elements",
+                            4, "6.24.3"));
+}
+
+constexpr std::string_view kPacketDecls =
+    "  typedef struct {\n"
+    "    byte length; shortint address; byte payload[]; byte chksum;\n"
+    "  } Packet;\n"
+    "  typedef byte channel_type[$];\n"
+    "  function Packet genPkt();\n"
+    "    Packet p;\n"
+    "    p.length = 3; p.address = 16'hBEEF; p.payload = new[3];\n"
+    "    p.payload[0] = 8'h11; p.payload[1] = 8'h22; p.payload[2] = 8'h44;\n"
+    "    p.chksum = p.payload.xor();\n"
+    "    return p;\n"
+    "  endfunction\n"
+    "  channel_type channel;\n";
+
+TEST(BitStreamCastSim, DISABLED_CastToAQueueTypeTakesEveryByte) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n" + std::string(kPacketDecls) +
+                           "  Packet pk;\n"
+                           "  initial begin\n"
+                           "    pk = genPkt();\n"
+                           "    channel = channel_type'(pk);\n"
+                           "    $display(\"%0d %h %h\", channel.size(), "
+                           "channel[0], channel[6]);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "7 03 77\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, DISABLED_QueueSliceSourceStreamsItsElements) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n" + std::string(kPacketDecls) +
+                           "  Packet p;\n"
+                           "  initial begin\n"
+                           "    channel = {8'h03, 8'hBE, 8'hEF, 8'h11, 8'h22, "
+                           "8'h44, 8'h77, 8'h09};\n"
+                           "    p = Packet'(channel[0 : 6]);\n"
+                           "    $display(\"%0d %h %0d %h %h\", p.length, "
+                           "p.address, p.payload.size(), p.payload[2], "
+                           "p.chksum);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "3 beef 3 44 77\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, DISABLED_ClausePacketExampleSendsAndReceivesAPacket) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n" + std::string(kPacketDecls) +
+                     "  initial begin\n"
+                     "    channel = {channel, channel_type'(genPkt())};\n"
+                     "    begin\n"
+                     "      Packet p; int size;\n"
+                     "      size = channel[0] + 4;\n"
+                     "      p = Packet'(channel[0 : size - 1]);\n"
+                     "      channel = channel[size : $];\n"
+                     "      $display(\"%0d %h %0d %h %h %h %0d\", p.length, "
+                     "p.address, p.payload.size(), p.payload[0], "
+                     "p.payload[2], p.chksum, channel.size());\n"
+                     "    end\n"
+                     "  end\n"
+                     "endmodule\n",
+                 f),
+      "3 beef 3 11 44 77 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
