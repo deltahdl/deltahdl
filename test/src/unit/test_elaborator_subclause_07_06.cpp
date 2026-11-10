@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -538,6 +540,69 @@ TEST(ArrayAssignmentValidation, IntAndEnumElementsAreNotEquivalent) {
   EXPECT_TRUE(ReportedError(
       diags, "array element type mismatch in assignment ('x' vs 'ia')", 7,
       "7.6"));
+}
+
+TEST(ArrayAssignmentValidation, AssociativeArrayWithAQueueOrASliceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int q [$]; int m [int]; int m2 [int]; int a [2];\n"
+      "  initial begin\n"
+      "    q = m;\n"
+      "    m = q;\n"
+      "    m = a[0:1];\n"
+      "    m = q[0:1];\n"
+      "    m2 = m;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {4u, 5u, 6u, 7u}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "associative array cannot be assigned to or from "
+                              "a non-associative array",
+                              line, "7.9.9"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+TEST(ArrayAssignmentValidation, PackedArrayToAVariableSizeArrayIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  bit [31:0] p; byte d []; byte q [$];\n"
+      "  typedef byte u_t [4]; typedef byte d_t []; u_t u;\n"
+      "  initial begin\n"
+      "    d = p;\n"
+      "    q = p;\n"
+      "    u = u_t'(p); d = d_t'(p);\n"
+      "  end\n"
+      "  int v [1] = p;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "unpacked array 'd' without an explicit cast", 5, "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "unpacked array 'q' without an explicit cast", 6, "7.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "unpacked array 'v' without an explicit cast", 9, "7.6"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(ArrayAssignmentValidation,
+     DISABLED_PackedArrayContinuouslyAssignedToANetArrayIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  bit [31:0] p; wire [7:0] w [1];\n"
+      "  assign w = p;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked array 'w' without an explicit cast", 3,
+                            "7.6"));
 }
 
 }  // namespace

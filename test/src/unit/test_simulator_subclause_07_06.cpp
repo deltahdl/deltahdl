@@ -446,4 +446,71 @@ TEST(ArrayAssignmentSimulation, DynamicArrayOfRowsCopiesEveryRow) {
   EXPECT_EQ(out, "2 3 0 5\n");
 }
 
+TEST(ArrayAssignmentSim, PackedArrayCastToAFixedArrayOfBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [31:0] p = 32'h11223344; typedef byte u_t [4]; "
+                       "u_t u;\n"
+                       "  initial begin\n"
+                       "    u = u_t'(p);\n"
+                       "    $display(\"%h %h\", u[0], u[3]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 44\n");
+}
+
+TEST(ArrayAssignmentSim, DISABLED_PackedArrayCastToADynamicArrayOfBytes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [31:0] p = 32'h11223344; typedef byte d_t []; "
+                       "byte d [];\n"
+                       "  initial begin\n"
+                       "    d = d_t'(p);\n"
+                       "    $display(\"%0d %h %h\", d.size(), d[0], d[3]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 11 44\n");
+}
+
+TEST(ArrayAssignmentSim, SourceConcatenatingSlicesAndItems) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module t;\n"
+                "  string d [1:5] = '{\"a\", \"b\", \"c\", \"d\", \"e\"};\n"
+                "  string p []; string r [];\n"
+                "  int a [4] = '{1, 2, 3, 4}; int q [$]; int f [5];\n"
+                "  initial begin\n"
+                "    p = {d[1:3], \"hello\", d[4:5]};\n"
+                "    q = {a[0:1], 9, a[2:3]}; r = {d[1 +: 2], \"x\"};\n"
+                "    f = {a[0:1], 9, a[2:3]};\n"
+                "    $display(\"%0d %s %s %s %s %s %s\", p.size(), p[0], p[1], "
+                "p[2], p[3], p[4], p[5]);\n"
+                "    $display(\"%0d %0d %0d %0d %0d\", q.size(), q[2], q[4], "
+                "f[2], f[4]);\n"
+                "    $display(\"%0d %s %s %s\", r.size(), r[0], r[1], r[2]);\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "6 a b c hello d e\n5 9 4 9 4\n3 a b x\n");
+}
+
+TEST(ArrayAssignmentSim, DISABLED_ClauseWireArrayExampleCopiesBothWays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] V1 [10:1]; logic [7:0] V2 [10];\n"
+                       "  wire [7:0] W [9:0];\n"
+                       "  assign W = V1;\n"
+                       "  initial begin\n"
+                       "    foreach (V1[i]) V1[i] = 8'(i * 3);\n"
+                       "    #10 V2 = W;\n"
+                       "    $display(\"%0d %0d %0d %0d\", W[9], W[0], V2[0], "
+                       "V2[9]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "30 3 30 3\n");
+}
+
 }  // namespace
