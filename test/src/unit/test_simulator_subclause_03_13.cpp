@@ -128,4 +128,40 @@ TEST(NameSpaceSimulation, OuterEnumConstantReadWhereTheModuleDeclaresNone) {
   for (const char* src : kSources) EXPECT_EQ(RunAndGet(src, "y"), 2u) << src;
 }
 
+TEST(NameSpaceSimulation, ModuleAndPackageOfOneNameAreBothReached) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package shared;\n"
+                       "  localparam int K = 4;\n"
+                       "endpackage\n"
+                       "module shared;\n"
+                       "  initial $display(\"module %0d\", shared::K);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  shared s();\n"
+                       "endmodule\n",
+                       f),
+            "module 4\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NameSpaceSimulation, NestedModuleNamedLikeATopLevelModuleIsNoClash) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n"
+                       "  initial #1 $display(\"outer %m\");\n"
+                       "endmodule\n"
+                       "module holder;\n"
+                       "  module leaf;\n"
+                       "    initial $display(\"inner %m\");\n"
+                       "  endmodule\n"
+                       "  leaf l();\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  holder h();\n"
+                       "  leaf o();\n"
+                       "endmodule\n",
+                       f),
+            "inner top.h.l\nouter top.o\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

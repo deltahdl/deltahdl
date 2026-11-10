@@ -70,7 +70,8 @@ UnitParse ParseUnitText(const PreprocResult& pp,
                         Arena& arena) {
   auto file_id =
       src_mgr.AddPreprocessedFile("<preprocessed>", pp.source, pp.line_origins);
-  Lexer lexer(pp.source, file_id, diag, TextOrigin::kPreprocessorOutput);
+  Lexer lexer(src_mgr.FileContent(file_id), file_id, diag,
+              TextOrigin::kPreprocessorOutput);
   Parser parser(lexer, arena, diag);
   parser.AdoptCompilationUnitScope(known);
   auto* cu = parser.Parse();

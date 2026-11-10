@@ -13,6 +13,9 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "common/types.h"
+#include "driver/cli_options.h"
+#include "driver/protect_license_libraries.h"
+#include "driver/source_units.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -591,6 +594,49 @@ TEST(CompilationUnitPreprocessing, NewUnitRestoresPragmaKeywordDefaults) {
   ASSERT_FALSE(pp.ProtectKeywords().ValueOf("author").defaulted);
   pp.BeginCompilationUnit();
   EXPECT_TRUE(pp.ProtectKeywords().ValueOf("author").defaulted);
+}
+
+static std::vector<std::string> ModuleNamesOfEachUnit(
+    const std::vector<std::string>& srcs) {
+  fs::path dir = fs::temp_directory_path() /
+                 ("delta_test_cu_names_" + std::to_string(getpid()));
+  fs::create_directories(dir);
+  CliOptions opts;
+  for (const auto& src : srcs) {
+    auto path =
+        dir / ("unit" + std::to_string(opts.source_files.size()) + ".sv");
+    std::ofstream(path) << src;
+    opts.source_files.push_back(path.string());
+  }
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  ProtectLicenseLibraries licenses;
+  Arena arena;
+  auto parsed = ParseSeparateUnits(opts, mgr, diag, licenses, arena);
+  std::vector<std::string> names;
+  for (const auto& unit : parsed.units) {
+    for (const auto* mod : unit.cu->modules) names.emplace_back(mod->name);
+  }
+  fs::remove_all(dir);
+  return names;
+}
+
+TEST(CompilationUnitPreprocessing, ShortUnitsKeepTheirModuleNames) {
+  EXPECT_EQ(
+      ModuleNamesOfEachUnit({"module m; endmodule\n", "module n; endmodule\n",
+                             "module p; endmodule\n"}),
+      (std::vector<std::string>{"m", "n", "p"}));
+}
+
+TEST(CompilationUnitPreprocessing, LongUnitsKeepTheirModuleNames) {
+  EXPECT_EQ(
+      ModuleNamesOfEachUnit({"module first_unit_module;\n"
+                             "  logic [7:0] data;\n"
+                             "endmodule\n",
+                             "module second_unit_module;\n"
+                             "  logic [7:0] data;\n"
+                             "endmodule\n"}),
+      (std::vector<std::string>{"first_unit_module", "second_unit_module"}));
 }
 
 TEST(CompilationUnitPreprocessing, KeywordRegionOpenAtUnitEndIsReported) {
