@@ -342,4 +342,38 @@ TEST(TaggedUnionSimulation, RealMemberHoldsItsRealOnEveryWritePath) {
       1102u);
 }
 
+TEST(TaggedUnionSimulation,
+     DISABLED_TagSurvivesInitializersHierarchicalReadsAndPropertyCopies) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef union tagged { void N; int V; } T;\n"
+                 "class C;\n  T p;\n"
+                 "  union tagged { void N; int V; } q;\nendclass\n"
+                 "interface ifc;\n  T u = tagged N;\n  T w;\nendinterface\n"
+                 "module t;\n"
+                 "  if (1) begin : g\n"
+                 "    T u = tagged N;\n    T w = tagged V 4;\n    int r;\n"
+                 "    initial #1 r = u matches tagged N ? 1 : 0;\n"
+                 "  end\n"
+                 "  function automatic int f();\n"
+                 "    union tagged { void N; int V; } l = tagged N;\n"
+                 "    return l matches tagged N ? 1 : 0;\n"
+                 "  endfunction\n"
+                 "  C c = new;\n  ifc i();\n  T x;\n"
+                 "  initial begin\n"
+                 "    c.p = tagged N;\n    c.q = tagged N;\n"
+                 "    x = c.p;\n    i.w = tagged N;\n"
+                 "    #2;\n"
+                 "    $display(\"%0d %0d %0d %0d\", g.r, "
+                 "g.u matches tagged N ? 1 : 0, "
+                 "g.w matches tagged V .v ? 1 : 0, f());\n"
+                 "    $display(\"%0d %0d %0d %0d\", "
+                 "x matches tagged N ? 1 : 0, c.q matches tagged N ? 1 : 0, "
+                 "i.u matches tagged N ? 1 : 0, "
+                 "i.w matches tagged N ? 1 : 0);\n"
+                 "  end\nendmodule\n",
+                 f),
+      "1 1 1 1\n1 1 1 1\n");
+}
+
 }  // namespace
