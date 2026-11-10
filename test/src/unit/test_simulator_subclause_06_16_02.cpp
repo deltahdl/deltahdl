@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -196,6 +199,97 @@ TEST(StringMethods, PutcWritesAnElementOfAnArrayOfStrings) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 15u);
+}
+
+TEST(StringPutcSim, PutcWritesTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; string ps = \"pkg\"; endpackage\n"
+                 "class K; string ks = \"klass\"; endclass\n"
+                 "module t;\n"
+                 "  string s = \"abcd\", q [$], aa [int], da [];\n"
+                 "  K k = new;\n"
+                 "  function automatic void put_ref(ref string r);\n"
+                 "    r.putc(0, \"Z\");\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    q.push_back(\"queue\"); aa[3] = \"assoc7\";\n"
+                 "    da = new[1]; da[0] = \"dy\";\n"
+                 "    p::ps.putc(0, \"P\"); k.ks.putc(1, \"L\"); q[0].putc(0, "
+                 "\"Q\");\n"
+                 "    aa[3].putc(0, \"A\"); da[0].putc(1, \"Y\"); put_ref(s);\n"
+                 "    $display(\"%s %s %s %s %s %s\", p::ps, k.ks, q[0], "
+                 "aa[3], da[0],\n"
+                 "             s);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "Pkg kLass Queue Assoc7 dY Zbcd\n");
+}
+
+TEST(StringPutcSim, PutcTakesTheLowByteOfItsValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string s = \"abcd\";\n"
+                       "  initial begin\n"
+                       "    s.putc(0, 16'h142);\n"
+                       "    s.putc(1, 12'h300);\n"
+                       "    s.putc(2, 8'bx);\n"
+                       "    s.putc(3, -191);\n"
+                       "    $display(\"%s %0d\", s, s.len());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "BbcA 4\n");
+}
+
+TEST(StringPutcSim, DISABLED_PutcWritesAStructureMemberString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct { string s; int n; } st_t;\n"
+                       "module t;\n"
+                       "  st_t st, sa [2];\n"
+                       "  initial begin\n"
+                       "    st.s = \"struct\"; sa[1].s = \"elem\";\n"
+                       "    st.s.putc(0, \"S\"); sa[1].s.putc(3, \"!\");\n"
+                       "    $display(\"%s %s\", st.s, sa[1].s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "Struct ele!\n");
+}
+
+TEST(StringPutcSim, DISABLED_PutcWritesAStringReachedByAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; string is = \"ifc!\"; endinterface\n"
+                       "module sub; string ms = \"sub!\"; endmodule\n"
+                       "module t;\n"
+                       "  ifc i();\n"
+                       "  sub u();\n"
+                       "  string s = \"ab\";\n"
+                       "  initial begin\n"
+                       "    #1 i.is.putc(3, \"?\"); u.ms.putc(0, \"S\");\n"
+                       "    t.s.putc(1, \"B\");\n"
+                       "    $display(\"%s %s %s\", i.is, u.ms, s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ifc? Sub! aB\n");
+}
+
+TEST(StringPutcSim, DISABLED_PutcConvertsARealIndexToInt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string s = \"abcd\";\n"
+                       "  real r = 2.5;\n"
+                       "  initial begin\n"
+                       "    s.putc(0.6, \"Y\");\n"
+                       "    s.putc(-0.4, \"Z\");\n"
+                       "    s.putc(r, \"W\");\n"
+                       "    $display(\"%s\", s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ZYcW\n");
 }
 
 }  // namespace

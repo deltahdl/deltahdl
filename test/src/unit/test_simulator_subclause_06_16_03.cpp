@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
+#include "fixture_simulator.h"
 #include "fixture_string.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
@@ -187,6 +189,74 @@ TEST(StringMethods, GetcReturnsByteWidth) {
   auto* call = f.MakeMethodCall("s", "getc", {f.MakeIntLiteral(1)});
   auto result = EvalExpr(call, f.ctx, f.arena);
   EXPECT_EQ(result.width, 8u);
+}
+
+TEST(StringGetcSim, GetcReadsTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package p; string ps = \"Pkg\"; endpackage\n"
+          "typedef struct { string s; int n; } st_t;\n"
+          "class K; string ks = \"kLass\"; endclass\n"
+          "module t;\n"
+          "  string q [$];\n"
+          "  st_t st;\n"
+          "  K k = new;\n"
+          "  function string f(); return \"hello\"; endfunction\n"
+          "  initial begin\n"
+          "    q.push_back(\"Queue\"); st.s = \"struct\";\n"
+          "    $display(\"%0d %0d %0d %0d %0d\", p::ps.getc(0),\n"
+          "      k.ks.getc(1), q[0].getc(0), st.s.getc(0), f().getc(1));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "80 76 81 115 101\n");
+}
+
+TEST(StringGetcSim, DISABLED_GetcReturnsASignedByte) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string s;\n"
+                       "  byte b;\n"
+                       "  int x, y;\n"
+                       "  initial begin\n"
+                       "    s = string'(16'hFF41);\n"
+                       "    b = s.getc(0);\n"
+                       "    x = s.getc(0);\n"
+                       "    y = s[0];\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d\", b, x, y,\n"
+                       "             s.getc(0) < 0, s[0] < 0, s.getc(1) < 0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "-1 -1 -1 1 1 0\n");
+}
+
+TEST(StringGetcSim, DISABLED_GetcOfAStringReachedByAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; string is = \"ifc!\"; endinterface\n"
+                       "module sub; string ms = \"Sub!\"; endmodule\n"
+                       "module t;\n"
+                       "  ifc i();\n"
+                       "  sub u();\n"
+                       "  string s = \"ab\";\n"
+                       "  initial #1 $display(\"%0d %0d %0d\", i.is.getc(0),\n"
+                       "                      u.ms.getc(0), t.s.getc(1));\n"
+                       "endmodule\n",
+                       f),
+            "105 83 98\n");
+}
+
+TEST(StringGetcSim, DISABLED_GetcConvertsARealIndexToInt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string s = \"abcd\";\n"
+                       "  real r = 2.5;\n"
+                       "  initial $display(\"%0d %0d %0d\", s.getc(0.6),\n"
+                       "                   s.getc(-0.4), s.getc(r));\n"
+                       "endmodule\n",
+                       f),
+            "98 97 100\n");
 }
 
 }  // namespace

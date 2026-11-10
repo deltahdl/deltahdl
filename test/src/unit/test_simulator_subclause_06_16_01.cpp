@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "fixture_string.h"
 #include "helpers_scheduler.h"
 #include "simulator/evaluation.h"
@@ -147,6 +150,49 @@ TEST(StringMethods, LenCountsCharactersOfATypedefStringInASubroutine) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 11u);
+}
+
+TEST(StringLenSim, LenCountsTheCharactersWhereverTheStringIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package p; string ps = \"pkg\"; endpackage\n"
+          "typedef struct { string s; int n; } st_t;\n"
+          "class K;\n"
+          "  string ks = \"klass\";\n"
+          "  static string ss = \"st\";\n"
+          "  function int klen(); return ks.len(); endfunction\n"
+          "endclass\n"
+          "module t;\n"
+          "  string q [$], aa [int], da [];\n"
+          "  st_t st;\n"
+          "  K k = new;\n"
+          "  function string f(); return \"hello\"; endfunction\n"
+          "  initial begin\n"
+          "    q.push_back(\"queue\"); aa[3] = \"assoc7\";\n"
+          "    da = new[1]; da[0] = \"dy\"; st.s = \"struct\";\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d\", p::ps.len(),\n"
+          "      k.ks.len(), K::ss.len(), k.klen(), q[0].len(), aa[3].len(),\n"
+          "      da[0].len(), st.s.len(), f().len());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "3 5 2 5 5 6 2 6 5\n");
+}
+
+TEST(StringLenSim, DISABLED_LenOfAStringReachedByAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc; string is = \"ifc!\"; endinterface\n"
+                       "module sub; string ms = \"sub!!\"; endmodule\n"
+                       "module t;\n"
+                       "  ifc i();\n"
+                       "  sub u();\n"
+                       "  string s = \"ab\";\n"
+                       "  initial #1 $display(\"%0d %0d %0d\", i.is.len(),\n"
+                       "                      u.ms.len(), t.s.len());\n"
+                       "endmodule\n",
+                       f),
+            "4 5 2\n");
 }
 
 }  // namespace
