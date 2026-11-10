@@ -144,6 +144,28 @@ TEST(LexicalConventionSim, EscapedNewlineIsSingleByte) {
   EXPECT_EQ(v, 0x0Au);
 }
 
+TEST(LexicalConventionSim, StringLiteralOperandIsUnsigned) {
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  int i = -1;\n"
+                      "  bit b;\n"
+                      "  initial b = (\"\\xff\" > i);\n"
+                      "endmodule\n",
+                      "b"),
+            0u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  bit b;\n"
+                      "  initial b = (\"A\" > -1);\n"
+                      "endmodule\n",
+                      "b"),
+            0u);
+  EXPECT_EQ(RunAndGet("module t;\n"
+                      "  logic [15:0] w;\n"
+                      "  initial w = \"\\x80\" >>> 1;\n"
+                      "endmodule\n",
+                      "w"),
+            0x0040u);
+}
+
 TEST(LexicalConventionSim, CastStringLiteralToPackedArrayExactWidth) {
   auto v = RunAndGet(
       "module t;\n  bit [15:0] x;\n  initial x = 16'(\"AB\");\nendmodule\n",
