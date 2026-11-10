@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -291,4 +292,130 @@ TEST(NettypeInitialization, InitialValueVisibleToProcedureAtTimeZero) {
   ASSERT_NE(res, nullptr);
   EXPECT_EQ(res->value.words[0].aval & 0x3, 0x2u);
   EXPECT_EQ(res->value.words[0].bval & 0x3, 0x0u);
+}
+
+TEST(NettypeInitialization,
+     DISABLED_UndrivenTwoStateIntegralNettypeNetsDefaultToZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  nettype bit [3:0] b_t;\n"
+      "  nettype int i_t;\n"
+      "  nettype byte y_t;\n"
+      "  nettype shortint s_t;\n"
+      "  nettype longint l_t;\n"
+      "  typedef struct packed { bit [1:0] a; bit b; } ps_t;\n"
+      "  nettype ps_t p_t;\n"
+      "  b_t b; i_t i; y_t y; s_t s; l_t l; p_t p;\n"
+      "  initial #1 $display(\"%b %0d %0d %0d %0d %b\", b, i, y, s, l, p);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0000 0 0 0 0 000\n");
+}
+
+TEST(NettypeInitialization, UndrivenRealAndShortrealNettypeNetsDefaultToZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  nettype real r_t;\n"
+      "  nettype shortreal s_t;\n"
+      "  r_t r; s_t s;\n"
+      "  initial #1 $display(\"%f %f\", r, s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0.000000 0.000000\n");
+}
+
+TEST(NettypeInitialization,
+     UndrivenFourStatePackedStructNettypeNetsDefaultToX) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct packed { logic [1:0] a; logic b; } p4_t;\n"
+      "  typedef struct packed { bit [1:0] a; logic b; } pm_t;\n"
+      "  nettype p4_t n4_t;\n"
+      "  nettype pm_t nm_t;\n"
+      "  n4_t p4; nm_t pm;\n"
+      "  initial #1 $display(\"%b %b\", p4, pm);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xxx xxx\n");
+}
+
+TEST(NettypeInitialization,
+     DISABLED_UndrivenUnpackedStructNettypeNetTakesItsMemberInitializers) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a = 5; bit [3:0] b = 4'hA; } s_t;\n"
+      "  nettype s_t n_t;\n"
+      "  n_t n;\n"
+      "  initial #1 $display(\"%0d %h\", n.a, n.b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "5 a\n");
+}
+
+TEST(NettypeInitialization,
+     UndrivenUnpackedStructNettypeNetMembersTakeTheirOwnDefaults) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct { int a; logic c; } s_t;\n"
+      "  nettype s_t n_t;\n"
+      "  n_t n;\n"
+      "  initial #1 $display(\"%0d %b\", n.a, n.c);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 x\n");
+}
+
+TEST(NettypeInitialization,
+     DISABLED_UndrivenUnpackedArrayNettypeNetElementsDefaultToZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef bit ab_t [2];\n"
+      "  typedef int ai_t [2];\n"
+      "  nettype ab_t nb_t;\n"
+      "  nettype ai_t ni_t;\n"
+      "  nb_t b; ni_t i;\n"
+      "  initial #1 $display(\"%b %b %0d %0d\", b[0], b[1], i[0], i[1]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0 0 0\n");
+}
+
+TEST(NettypeInitialization,
+     DISABLED_TwoStateNettypeNetHoldsItsDefaultForAProcedureAtTimeZero) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  nettype bit [3:0] b_t;\n"
+      "  nettype int i_t;\n"
+      "  b_t b; i_t i;\n"
+      "  initial $display(\"%b %0d\", b, i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0000 0\n");
+}
+
+TEST(NettypeInitialization,
+     DISABLED_UndrivenResolvedNettypeNetTakesItsFunctionOfNoDrivers) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  function automatic int f(input int d[]);\n"
+      "    return 7;\n"
+      "  endfunction\n"
+      "  function automatic logic [3:0] g(input logic [3:0] d[]);\n"
+      "    return 4'b1010;\n"
+      "  endfunction\n"
+      "  nettype int r_t with f;\n"
+      "  nettype logic [3:0] q_t with g;\n"
+      "  r_t r; q_t q;\n"
+      "  initial #1 $display(\"%0d %b\", r, q);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 1010\n");
 }

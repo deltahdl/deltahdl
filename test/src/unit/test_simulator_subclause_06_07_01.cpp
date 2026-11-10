@@ -177,4 +177,19 @@ TEST(StructNetLayout, AnonymousPackedStructWireReadsItsMembers) {
   EXPECT_EQ(d->value.ToUint64(), 90u);
 }
 
+TEST(NetDefaultValue, NetsOfFourStateTypesTakeTheirWidthsAndStartAtZOrTriregX) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  trireg (large) logic #(0, 0, 0) cap1;\n"
+      "  typedef logic [31:0] addressT;\n"
+      "  wire addressT w1;\n"
+      "  wire struct packed { logic ecc; logic [7:0] data; } memsig;\n"
+      "  initial #1 $display(\"%b %v %0d %0d %b %b\", cap1, cap1, $bits(w1),\n"
+      "                      $bits(memsig), w1[31:28], memsig);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x LaX 32 9 zzzz zzzzzzzzz\n");
+}
+
 }  // namespace

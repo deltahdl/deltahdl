@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -584,6 +585,68 @@ TEST(NetDataType, TypesResolvingToNothingAreNotReported) {
     ValidateNetDataTypeIs4State(*type, kTable, f.diag, SourceLoc{});
   }
   EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
+TEST(NetDataType, DISABLED_ClassCovergroupAndVirtualInterfaceNetsAreRejected) {
+  const std::string kHead =
+      "class C;\n"
+      "endclass\n"
+      "package p;\n"
+      "  class D;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "interface I;\n"
+      "endinterface\n"
+      "module m;\n"
+      "  typedef C CT;\n"
+      "  typedef struct { C c; } S;\n"
+      "  covergroup cg;\n"
+      "  endgroup\n";
+  for (const char* decl :
+       {"  wire C w;\n", "  wire CT w;\n", "  wire p::D w;\n",
+        "  wire C w [2];\n", "  wire S w;\n", "  wire cg w;\n",
+        "  wire virtual I w;\n"}) {
+    ElabFixture f;
+    ElaborateSrc(kHead + decl + "endmodule\n", f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "net data type must be 4-state", 14, "6.7.1"))
+        << decl;
+  }
+  ElabFixture f;
+  ElaborateSrc(kHead +
+                   "  typedef struct { logic c; } L;\n"
+                   "  wire logic w;\n"
+                   "  wire L v;\n"
+                   "endmodule\n",
+               f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NetDataType, DISABLED_ClassNetIsRejectedInEveryPlace) {
+  struct Place {
+    const char* src;
+    uint32_t line;
+  };
+  for (const Place& place : {
+           Place{"class C;\nendclass\nwire C w;\n", 3},
+           Place{"class C;\nendclass\nmodule m(input wire C w);\nendmodule\n",
+                 3},
+           Place{"class C;\nendclass\ninterface i;\n  wire C w;\n"
+                 "endinterface\n",
+                 4},
+           Place{"class C;\nendclass\nprogram q;\n  wire C w;\nendprogram\n",
+                 4},
+           Place{"class C;\nendclass\nmodule m;\n  if (1) begin : g\n"
+                 "    wire C w;\n  end\nendmodule\n",
+                 5},
+       }) {
+    ElabFixture f;
+    ElaborateSrc(place.src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "net data type must be 4-state", place.line,
+                              "6.7.1"))
+        << place.src;
+  }
 }
 
 }  // namespace

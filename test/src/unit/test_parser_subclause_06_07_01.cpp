@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -641,6 +644,76 @@ TEST(DataTypeParsing, WireLogicTwoPackedDims) {
   EXPECT_EQ(item->data_type.extra_packed_dims[0].first->int_val, 1u);
   EXPECT_EQ(item->name, "y");
   EXPECT_TRUE(item->unpacked_dims.empty());
+}
+
+constexpr const char* kRegAfterNetType =
+    "'reg' cannot come right after a net type keyword";
+
+TEST(DataTypeParsing, EveryNetTypeKeywordFollowedByRegIsError) {
+  for (const char* net_type : {"wand", "wor", "triand", "trior", "tri0", "tri1",
+                               "trireg", "supply0", "supply1", "uwire"}) {
+    auto r =
+        Parse(std::string("module t;\n  ") + net_type + " reg r;\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, kRegAfterNetType, 2, "6.7.1"))
+        << net_type;
+  }
+}
+
+TEST(DataTypeParsing, RegAfterAChargeStrengthOrVectoredIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module t;\n"
+              "  trireg (small) reg t;\n"
+              "  wire vectored reg [3:0] v;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, RegAfterANetTypeOnAnInputOutputOrNonAnsiPortIsError) {
+  EXPECT_TRUE(ReportedError(Parse("module t(input wire reg a);\n"
+                                  "endmodule\n")
+                                .diags,
+                            kRegAfterNetType, 1, "6.7.1"));
+  EXPECT_TRUE(ReportedError(Parse("module t(output tri reg b);\n"
+                                  "endmodule\n")
+                                .diags,
+                            kRegAfterNetType, 1, "6.7.1"));
+  EXPECT_TRUE(ReportedError(Parse("module t(a);\n"
+                                  "  input wire reg a;\n"
+                                  "endmodule\n")
+                                .diags,
+                            kRegAfterNetType, 2, "6.7.1"));
+  EXPECT_TRUE(
+      ParseOk("module t(input wire logic a, output tri logic b);\n"
+              "endmodule\n"
+              "module u(a);\n"
+              "  input wire logic a;\n"
+              "endmodule\n"));
+}
+
+TEST(DataTypeParsing, RegAfterANetTypeIsErrorInEveryPlace) {
+  struct Place {
+    const char* src;
+    uint32_t line;
+  };
+  for (const Place& place : {
+           Place{"interface t;\n  wire reg r;\nendinterface\n", 2},
+           Place{"program t;\n  wire reg r;\nendprogram\n", 2},
+           Place{"module t;\n  if (1) begin : g\n    wire reg r;\n  end\n"
+                 "endmodule\n",
+                 3},
+           Place{"package t;\n  wire reg r;\nendpackage\n", 2},
+           Place{"wire reg r;\n", 1},
+       }) {
+    EXPECT_TRUE(ReportedError(Parse(place.src).diags, kRegAfterNetType,
+                              place.line, "6.7.1"))
+        << place.src;
+  }
+  EXPECT_TRUE(
+      ParseOk("interface i;\n  wire logic r;\nendinterface\n"
+              "program p;\n  wire logic r;\nendprogram\n"
+              "module m;\n  if (1) begin : g\n    wire logic r;\n  end\n"
+              "endmodule\n"
+              "package k;\n  wire logic r;\nendpackage\n"
+              "wire logic r;\n"));
 }
 
 }  // namespace
