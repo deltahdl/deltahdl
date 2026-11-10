@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -79,6 +82,34 @@ TEST(UnionSimulation, UnpackedUnionCommonInitialSequenceSharedPrefix) {
       "endmodule\n",
       "result");
   EXPECT_EQ(v, 42u);
+}
+
+TEST(UnionShortrealMemberWrite, DISABLED_StaticUnionKeepsTheValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  typedef union { shortreal r; int k; } u_t;\n"
+                       "  u_t u;\n"
+                       "  initial begin\n"
+                       "    u.r = 3.5;\n"
+                       "    $display(\"%0.2f\", u.r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3.50\n");
+}
+
+TEST(UnionShortrealMemberWrite, RealMemberOfAStaticUnionKeepsTheValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  typedef union { real r; longint k; } u_t;\n"
+                       "  u_t u;\n"
+                       "  initial begin\n"
+                       "    u.r = 3.5;\n"
+                       "    $display(\"%0.2f\", u.r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3.50\n");
 }
 
 }  // namespace

@@ -702,4 +702,90 @@ TEST(UnpackedStructClassMember, AMemberDeclaredThroughAClassTypedefIsAHandle) {
   EXPECT_EQ(out, "5 7 9\n");
 }
 
+std::string RunShortrealMemberWrite(const std::string& decls,
+                                    const std::string& body) {
+  SimFixture f;
+  return RunCapture("module top;\n" + decls + "  initial begin\n" + body +
+                        "  end\n"
+                        "endmodule\n",
+                    f);
+}
+
+TEST(ShortrealMemberSelectWrite, DISABLED_StaticStructureKeepsTheValue) {
+  EXPECT_EQ(
+      RunShortrealMemberWrite("  typedef struct { shortreal r; int k; } s_t;\n"
+                              "  s_t m;\n",
+                              "    m.r = 1.5;\n"
+                              "    m.k = 3;\n"
+                              "    $display(\"%0.2f %0d\", m.r, m.k);\n"),
+      "1.50 3\n");
+}
+
+TEST(ShortrealMemberSelectWrite, DISABLED_NestedStructureMemberKeepsTheValue) {
+  EXPECT_EQ(RunShortrealMemberWrite("  typedef struct { shortreal r; } in_t;\n"
+                                    "  typedef struct { in_t inner; } out_t;\n"
+                                    "  out_t n;\n",
+                                    "    n.inner.r = 2.5;\n"
+                                    "    $display(\"%0.2f\", n.inner.r);\n"),
+            "2.50\n");
+}
+
+TEST(ShortrealMemberSelectWrite, DISABLED_ArrayElementMemberKeepsTheValue) {
+  EXPECT_EQ(RunShortrealMemberWrite("  typedef struct { shortreal r; } s_t;\n"
+                                    "  s_t arr [2];\n",
+                                    "    arr[1].r = 4.5;\n"
+                                    "    $display(\"%0.2f\", arr[1].r);\n"),
+            "4.50\n");
+}
+
+TEST(ShortrealMemberSelectWrite, DISABLED_CompoundAssignmentUpdatesTheValue) {
+  EXPECT_EQ(RunShortrealMemberWrite("  typedef struct { shortreal r; } s_t;\n"
+                                    "  s_t m;\n",
+                                    "    m = '{1.5};\n"
+                                    "    m.r += 1.0;\n"
+                                    "    $display(\"%0.2f\", m.r);\n"),
+            "2.50\n");
+}
+
+TEST(ShortrealMemberSelectWrite, RealMemberOfAStaticStructureKeepsTheValue) {
+  EXPECT_EQ(RunShortrealMemberWrite("  typedef struct { real r; int k; } s_t;\n"
+                                    "  s_t m;\n",
+                                    "    m.r = 1.5;\n"
+                                    "    m.k = 3;\n"
+                                    "    $display(\"%0.2f %0d\", m.r, m.k);\n"),
+            "1.50 3\n");
+}
+
+TEST(ShortrealMemberSelectWrite, PatternFillsTheShortrealMembers) {
+  EXPECT_EQ(
+      RunShortrealMemberWrite("  typedef struct { shortreal i, r; } c_t;\n"
+                              "  c_t c;\n",
+                              "    c = '{2.5, 1.5};\n"
+                              "    $display(\"%0.2f %0.2f\", c.i, c.r);\n"),
+      "2.50 1.50\n");
+}
+
+TEST(ShortrealMemberSelectWrite, FunctionResultMemberKeepsTheValue) {
+  EXPECT_EQ(RunShortrealMemberWrite("  typedef struct { shortreal r; } s_t;\n"
+                                    "  s_t got;\n"
+                                    "  function s_t make(shortreal v);\n"
+                                    "    make.r = v;\n"
+                                    "  endfunction\n",
+                                    "    got = make(5.5);\n"
+                                    "    $display(\"%0.2f\", got.r);\n"),
+            "5.50\n");
+}
+
+TEST(ShortrealMemberSelectWrite, AutomaticStructureMemberKeepsTheValue) {
+  EXPECT_EQ(RunShortrealMemberWrite(
+                "  typedef struct { shortreal r; } s_t;\n"
+                "  function automatic shortreal through_local(shortreal v);\n"
+                "    s_t t;\n"
+                "    t.r = v;\n"
+                "    return t.r;\n"
+                "  endfunction\n",
+                "    $display(\"%0.2f\", through_local(6.5));\n"),
+            "6.50\n");
+}
+
 }  // namespace
