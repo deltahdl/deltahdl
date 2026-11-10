@@ -17,7 +17,7 @@ Commit first, then run, from anywhere in the checkout:
 
 It refuses to start while a tracked file has uncommitted changes, since what it checks has to be exactly what will be pushed. `PRE_PUSH_BASE=<commit>` checks the commits after that one in place of those after `origin/main`. The first run configures `build-check/`, a Debug tree built by Homebrew's `llvm@22` clang with coverage instrumentation, and builds the whole library, which takes several minutes; later runs rebuild only what changed. Run it in the background, per `.claude/memories/long-running-commands-in-the-background.md`. While it runs, do nothing but wait, per `.claude/memories/waiting-while-anything-runs-in-the-background.md`: it reads the working tree until it finishes, and it reports a commit or tracked edit made during its run.
 
-Every touched file under `test/src/unit/` is built and run as its own target. Name as arguments any other test targets that reach the changed src code, such as the file holding the existing tests of a function a refactor moved. Coverage is read only from the tests that ran, so a changed line that only some other file's tests reach is reported until that file is named. To find that file, grep `test/src/unit/` for the construct the line handles; when no test reaches the line, write one.
+Every touched file under `test/src/unit/` is built and run as its own target. Name as arguments at most the files that hold the existing tests of the rule in hand, such as the file holding the tests of a function a refactor moved. Never name every target that might reach the changed code, since the other unit tests run in CI, per `.claude/memories/verifying-through-ci.md`. Coverage is read only from the tests that ran, so it reports a changed line that only some other file's tests reach. Grep `test/src/unit/` for the construct the line handles. When a test there reaches the line, leave it to `assert-coverage` in CI; when none does, write one.
 
 ## What it checks
 
@@ -35,4 +35,4 @@ The copy-paste detectors, the comment, suppression and citation scans, the sanit
 
 ## When it fails
 
-Fix each problem it lists, amend the commit or add one, and run it again until it prints that every check passed; only then push. A finding that holds only on macOS, where CI's verdict on Linux differs, goes to CI: push, and if the run is green, add the case to this skill so the next run does not report it.
+Fix each problem it lists, amend the commit or add one, and run it again until it prints that every check passed; only then push. A coverage finding on a line that an existing test in a file it did not run reaches goes to CI: push once it is the only finding left. A finding that holds only on macOS, where CI's verdict on Linux differs, goes to CI: push, and if the run is green, add the case to this skill so the next run does not report it.

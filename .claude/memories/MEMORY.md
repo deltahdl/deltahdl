@@ -76,7 +76,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Verification
 
-- [Checking locally, then verifying through CI](verifying-through-ci.md) — see each new test fail first, run the `pre-push-checks` skill before every push, then read the run for the verdict.
+- [Checking locally, then verifying through CI](verifying-through-ci.md) — run locally only what shows a change works: new tests, the rule's test files, `pre-push-checks` over touched files; suite-wide runs are CI's.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — only a test asserting the standard's outcome shows a case conforms; an untested case is filed.
 - [Reading a CI run](reading-a-ci-run.md) — `gh run list --limit 1` before pushing, `gh run view --log-failed` after.
 - [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — read missed lines from the run's coverage artifacts with the local `llvm@<major>` CI ran.
