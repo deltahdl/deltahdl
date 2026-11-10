@@ -414,4 +414,95 @@ TEST(EnumMethodOnAnArrayElement, ElementIsOfTheEnumWhereverItsTypeIsAsked) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+TEST(EnumMethodReceivers, MethodsWorkInEveryDesignElementAndSubroutine) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef enum {A, B, C, D} e4;\n"
+          "typedef enum {X, Y, Z} e3;\n"
+          "function automatic string cuf(e4 v);\n"
+          "  return v.next(2).name();\n"
+          "endfunction\n"
+          "interface ifc;\n"
+          "  e4 v = B;\n"
+          "  function string nm(); return v.prev().name(); endfunction\n"
+          "endinterface\n"
+          "program pg;\n"
+          "  e3 w = Z;\n"
+          "  initial #5 $display(\"pg %s %0d\", w.first().name(), w.num());\n"
+          "endprogram\n"
+          "checker ck;\n"
+          "  e4 cv = D;\n"
+          "  function automatic string nx(); return cv.next().name();\n"
+          "  endfunction\n"
+          "endchecker\n"
+          "module t;\n"
+          "  ifc i();\n"
+          "  pg p();\n"
+          "  ck k();\n"
+          "  initial $display(\"%s %s %s\", cuf(D), i.nm(), k.nx());\n"
+          "endmodule\n",
+          f),
+      "B A A\npg X 3\n");
+}
+
+TEST(EnumMethodReceivers, CountIsAnUnsignedIntOfThePrototype) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef enum {A, B, C, D} e4;\n"
+                       "  typedef enum {X, Y, Z} e3;\n"
+                       "  e4 a = B;\n"
+                       "  e3 b = Y;\n"
+                       "  initial begin\n"
+                       "    $display(\"%s %s %s %s\", a.next(-1).name(),\n"
+                       "      b.next(-1).name(), a.prev(-1).name(),\n"
+                       "      a.next(64'h1_0000_0001).name());\n"
+                       "    $display(\"%0d %0d %0d %0d\",\n"
+                       "      type(a.first()) == type(e4),\n"
+                       "      type(a.name()) == type(string),\n"
+                       "      type(a.num()) == type(int),\n"
+                       "      type(a.next()) == type(e4));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "A Y C C\n1 1 1 1\n");
+}
+
+TEST(EnumMethodReceivers, DISABLED_RealCountIsRoundedToAnInteger) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef enum {A, B, C, D} e4;\n"
+                       "  e4 a = B;\n"
+                       "  real r = 2.5;\n"
+                       "  initial\n"
+                       "    $display(\"%s %s %s %s %s\", a.prev(2.0).name(),\n"
+                       "      a.prev(2.5).name(), a.next(2.5).name(),\n"
+                       "      a.prev(r).name(), a.next(1.4).name());\n"
+                       "endmodule\n",
+                       f),
+            "D C A C C\n");
+}
+
+TEST(EnumMethodReceivers, DISABLED_MethodsOfAVariableDeclaredInAGenerateBlock) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef enum {X, Y, Z} e3;\n"
+                 "module t;\n"
+                 "  if (1) begin : g\n"
+                 "    e3 gv = Y;\n"
+                 "    initial #1 $display(\"%0d %0d %s %s\", gv, gv.num(),\n"
+                 "                        gv.first().name(), gv.name());\n"
+                 "  end\n"
+                 "  for (genvar k = 0; k < 1; k++) begin : lp\n"
+                 "    e3 lv = Z;\n"
+                 "    initial #2 $display(\"%s %0d\", lv.prev().name(),\n"
+                 "                        lv.num());\n"
+                 "  end\n"
+                 "  initial #3 $display(\"%s %0d\", g.gv.next().name(),\n"
+                 "                      g.gv.num());\n"
+                 "endmodule\n",
+                 f),
+      "1 3 X Y\nY 3\nZ 3\n");
+}
+
 }  // namespace
