@@ -718,4 +718,169 @@ TEST(ParameterDeclarationSim,
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ClassParameterWithoutDefaultSim,
+     ClauseExampleSizesItsArrayFromTheTypedef) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Mem #(type T, int size);\n"
+                       "  T words[size];\n"
+                       "endclass\n"
+                       "typedef Mem#(byte, 1024) Kbyte;\n"
+                       "module t;\n"
+                       "  Kbyte k;\n"
+                       "  initial begin\n"
+                       "    k = new;\n"
+                       "    k.words[1023] = 8'h5A;\n"
+                       "    $display(\"%0d %0d %h\", $size(k.words), "
+                       "$bits(k.words[0]), k.words[1023]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1024 8 5a\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ClassParameterWithoutDefaultSim,
+     OrderedAndNamedSpecializationsEachSizeTheirOwnArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Mem #(type T, int size);\n"
+                       "  T words[size];\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Mem#(shortint, 6) a;\n"
+                       "  Mem#(.size(3), .T(int)) b;\n"
+                       "  initial begin\n"
+                       "    a = new;\n"
+                       "    b = new;\n"
+                       "    a.words[5] = 16'hBEEF;\n"
+                       "    b.words[2] = 32'h12345678;\n"
+                       "    $display(\"%0d %0d %h\", $size(a.words), "
+                       "$bits(a.words[0]), a.words[5]);\n"
+                       "    $display(\"%0d %0d %h\", $size(b.words), "
+                       "$bits(b.words[0]), b.words[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "6 16 beef\n3 32 12345678\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ClassParameterWithoutDefaultSim, RangesAndTwoDimensionsTakeTheValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Mem #(type T, int size);\n"
+                       "  T up[0:size-1];\n"
+                       "  T down[size+1:2];\n"
+                       "  T grid[size][2];\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Mem#(shortint, 6) k;\n"
+                       "  initial begin\n"
+                       "    k = new;\n"
+                       "    k.up[5] = 16'h0AAA;\n"
+                       "    k.down[7] = 16'h0BBB;\n"
+                       "    k.grid[5][1] = 16'h0CCC;\n"
+                       "    $display(\"%0d %0d %0d %h\", $size(k.up), "
+                       "$low(k.up), $high(k.up), k.up[5]);\n"
+                       "    $display(\"%0d %0d %0d %h\", $size(k.down), "
+                       "$low(k.down), $high(k.down), k.down[7]);\n"
+                       "    $display(\"%0d %0d %h\", $size(k.grid, 1), "
+                       "$size(k.grid, 2), k.grid[5][1]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "6 0 5 0aaa\n6 2 7 0bbb\n6 2 0ccc\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ClassParameterWithoutDefaultSim, DerivedClassForwardsItsOwnToTheBase) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Mem #(type T, int size);\n"
+                       "  T words[size];\n"
+                       "endclass\n"
+                       "class Sub #(type U, int n) extends Mem#(U, n);\n"
+                       "  U extra[n];\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  Sub#(shortint, 6) s;\n"
+                       "  initial begin\n"
+                       "    s = new;\n"
+                       "    s.words[5] = 16'h0123;\n"
+                       "    s.extra[5] = 16'h0456;\n"
+                       "    $display(\"%0d %0d %h %h\", $size(s.words), "
+                       "$size(s.extra), s.words[5], s.extra[5]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "6 6 0123 0456\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ClassParameterWithoutDefaultSim,
+     PackageAndModuleSpecializationsSizeTheirArrays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  class PMem #(type T, int size);\n"
+                       "    T words[size];\n"
+                       "  endclass\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  class MMem #(type T, int size);\n"
+                       "    T words[size];\n"
+                       "  endclass\n"
+                       "  function automatic int local_size();\n"
+                       "    MMem#(shortint, 7) h;\n"
+                       "    h = new;\n"
+                       "    return $size(h.words) * 100 + $bits(h.words[0]);\n"
+                       "  endfunction\n"
+                       "  pk::PMem#(byte, 5) held;\n"
+                       "  initial begin\n"
+                       "    held = new;\n"
+                       "    $display(\"%0d %0d %0d\", $size(held.words), "
+                       "$bits(held.words[0]), local_size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 8 716\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ClassParameterWithoutDefaultSim, TheValueReachesEveryOtherUseInTheBody) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class Mem #(type T, int size);\n"
+                 "  bit [size-1:0] v;\n"
+                 "  T x;\n"
+                 "  T q[$];\n"
+                 "  T d[];\n"
+                 "  localparam int twice = size * 2;\n"
+                 "  static int cnt = size;\n"
+                 "  typedef T elem_t;\n"
+                 "  elem_t e;\n"
+                 "  function int held(int a);\n"
+                 "    T local_copy;\n"
+                 "    local_copy = a;\n"
+                 "    return local_copy;\n"
+                 "  endfunction\n"
+                 "  function int tb(); return $bits(T) + size; endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  Mem#(shortint, 6) k;\n"
+                 "  initial begin\n"
+                 "    k = new;\n"
+                 "    k.d = new[k.size];\n"
+                 "    k.q.push_back(16'h1234);\n"
+                 "    $display(\"%0d %0d %0d\", $bits(k.v), $bits(k.x), "
+                 "$bits(k.e));\n"
+                 "    $display(\"%0d %h %0d\", k.d.size(), k.q[0], "
+                 "$bits(k.q[0]));\n"
+                 "    $display(\"%0d %0d %0d %h\", k.twice, "
+                 "Mem#(shortint, 6)::cnt, k.tb(), k.held(32'h12345678));\n"
+                 "    $display(\"%0d %0d\", Mem#(shortint, 6)::size, "
+                 "Mem#(shortint, 6)::twice);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "6 16 16\n6 1234 16\n12 6 22 00005678\n6 12\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

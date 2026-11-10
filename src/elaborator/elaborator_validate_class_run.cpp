@@ -17,7 +17,7 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   ValidateWeakReferenceMembers();
 
-  ReportUnadornedClassesWithoutDefaults(*unit_, diag_);
+  ReportClassSpecializationsWithoutValues(*unit_, diag_);
 
   ReportBasesNamingNoClass(*unit_, diag_);
 

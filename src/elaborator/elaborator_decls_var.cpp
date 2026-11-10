@@ -75,21 +75,6 @@ void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
   var.dtype = arena.Create<DataType>(*bound);
 }
 
-static void ValidateParameterizedClassDefaults(const ModuleItem* item,
-                                               const CompilationUnit* unit,
-                                               DiagEngine& diag) {
-  if (!item->data_type.type_params.empty()) return;
-  const auto* cls = FindClassDecl(item->data_type.type_name, unit);
-  if (cls == nullptr) return;
-  const std::string_view kMissing = ParameterWithoutDefault(*cls);
-  if (kMissing.empty()) return;
-  diag.Error(item->loc,
-             std::format("parameterized class '{}' has no default "
-                         "specialization; parameter '{}' has no default value",
-                         cls->name, kMissing),
-             Subclause("8.25"));
-}
-
 static void ValidateSpecializationArgsConstant(const ModuleItem* item,
                                                const ScopeMap& scope,
                                                DiagEngine& diag) {
@@ -146,7 +131,7 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
       class_names_.count(item->data_type.type_name)) {
     if (item->unpacked_dims.empty()) class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
-    ValidateParameterizedClassDefaults(item, unit_, diag_);
+    ReportSpecializationWithoutValue(item->data_type, item->loc, *unit_, diag_);
     ReportSpecializationOverrideMismatches(item->data_type, item->loc, unit_,
                                            typedefs_, diag_);
     ReportSpecializationBaseNotClass(item->data_type, item->loc, *unit_, diag_);

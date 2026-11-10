@@ -382,15 +382,6 @@ void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
   }
 }
 
-void RefoldPropertyArraySize(ClassTypeInfo::PropertyInfo& prop,
-                             const ClassMember& member, const ScopeMap& scope,
-                             SimContext& ctx, Arena& arena) {
-  if (prop.array_size == 0 || member.unpacked_dims.size() != 1) return;
-  PropertyArrayDim dim =
-      FoldPropertyDimension(member.unpacked_dims[0], scope, ctx, arena);
-  if (dim.size > 0) prop.array_size = dim.size;
-}
-
 void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
                               const std::vector<DataType>& actuals,
                               SimContext& ctx, Arena& arena) {
@@ -398,10 +389,10 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
   ScopeMap scope = SpecializationParamScope(spec, values);
   TypedefMap type_params = TypeParamTypes(spec->decl, actuals, ctx);
   TypedefRegistryGuard type_param_guard(&type_params, nullptr);
+  ShapeArrayProperties(spec, spec->decl, scope, ctx, arena);
   for (auto& prop : spec->properties) {
     const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
     if (member == nullptr) continue;
-    RefoldPropertyArraySize(prop, *member, scope, ctx, arena);
     const DataType& type = *TypeOfThisNamed(&member->data_type, spec, ctx);
     if (SizeClassTypedefProperty(prop, type, spec, scope, ctx)) continue;
     uint32_t width = EvalTypeWidth(type, {}, scope);

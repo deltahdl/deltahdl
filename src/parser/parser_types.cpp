@@ -297,6 +297,21 @@ DataType Parser::ParseNamedType() {
     assignment_written = true;
   }
 
+  ParseTypeScopePath(dtype, assignment_written);
+  return dtype;
+}
+
+static DataType SpecializedScope(const DataType& path) {
+  DataType scope;
+  scope.kind = DataTypeKind::kNamed;
+  scope.type_name = path.type_name;
+  scope.scope_name = path.scope_name;
+  scope.type_params = path.type_params;
+  return scope;
+}
+
+void Parser::ParseTypeScopePath(DataType& dtype, bool assignment_written) {
+  dtype.param_assignment_written = assignment_written;
   while (Check(TokenKind::kColonColon)) {
     auto saved = lexer_.SavePos();
     Consume();
@@ -304,18 +319,19 @@ DataType Parser::ParseNamedType() {
       lexer_.RestorePos(saved);
       break;
     }
+    if (dtype.param_assignment_written)
+      dtype.specialized_scopes.push_back(SpecializedScope(dtype));
     if (!dtype.scope_name.empty())
       dtype.outer_scope_names.push_back(dtype.scope_name);
     dtype.scope_name = dtype.type_name;
-    dtype.scope_param_assignment_written = assignment_written;
+    dtype.scope_param_assignment_written = dtype.param_assignment_written;
     dtype.type_name = Consume().text;
-    assignment_written = Check(TokenKind::kHash);
-    if (assignment_written) {
+    dtype.param_assignment_written = Check(TokenKind::kHash);
+    if (dtype.param_assignment_written) {
       Consume();
       dtype.type_params = ParseTypeParamList();
     }
   }
-  return dtype;
 }
 
 static void ApplyNetInfo(DataType& inner, const DataType& net) {

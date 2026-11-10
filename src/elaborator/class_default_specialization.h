@@ -1,16 +1,18 @@
 #pragma once
 
-#include <string_view>
+#include "common/source_loc.h"
 
 namespace delta {
 
 class DiagEngine;
-struct ClassDecl;
 struct CompilationUnit;
+struct DataType;
 
-std::string_view ParameterWithoutDefault(const ClassDecl& cls);
+void ReportSpecializationWithoutValue(const DataType& named, SourceLoc loc,
+                                      const CompilationUnit& unit,
+                                      DiagEngine& diag);
 
-void ReportUnadornedClassesWithoutDefaults(const CompilationUnit& unit,
-                                           DiagEngine& diag);
+void ReportClassSpecializationsWithoutValues(const CompilationUnit& unit,
+                                             DiagEngine& diag);
 
 }  // namespace delta

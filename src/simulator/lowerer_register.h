@@ -17,6 +17,7 @@ namespace delta {
 
 class Arena;
 struct AssocArrayObject;
+struct ClassDecl;
 struct ClassTypeInfo;
 struct DataType;
 struct Expr;
@@ -153,6 +154,9 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
                                       Arena& arena);
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx);
 void RegisterProcessClassType(SimContext& ctx, Arena& arena);
+
+void ShapeArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
+                          const ScopeMap& scope, SimContext& ctx, Arena& arena);
 
 void FillMultiDimLeaves(std::string_view name, const RtlirVariable& var,
                         SimContext& ctx, Arena& arena, bool in_place);

@@ -124,6 +124,9 @@ struct DataType {
   DataTypeKind net_keyword = DataTypeKind::kImplicit;
 
   bool names_unpacked_array = false;
+
+  bool param_assignment_written = false;
+  std::vector<DataType> specialized_scopes;
 };
 
 struct FunctionArg {

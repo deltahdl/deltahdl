@@ -588,4 +588,38 @@ TEST(ClassSpecializationSim, ModuleClassMethodSpecializationsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "v"), 31u);
 }
 
+TEST(ClassSpecializationSim, OverriddenDefaultsReshapeRangesAndDimensions) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class Grid #(type T = byte, int size = 3);\n"
+                 "  T up[0:size-1];\n"
+                 "  T down[size+1:2];\n"
+                 "  T grid[size][2];\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  Grid#(shortint, 6) g;\n"
+                 "  Grid d;\n"
+                 "  initial begin\n"
+                 "    g = new;\n"
+                 "    d = new;\n"
+                 "    g.up[5] = 16'h0AAA;\n"
+                 "    g.down[7] = 16'h0BBB;\n"
+                 "    g.grid[5][1] = 16'h0CCC;\n"
+                 "    d.grid[2][1] = 8'h5A;\n"
+                 "    $display(\"%0d %0d %0d %h\", $size(g.up), $left(g.up), "
+                 "$right(g.up), g.up[5]);\n"
+                 "    $display(\"%0d %0d %0d %h\", $size(g.down), "
+                 "$right(g.down), $left(g.down), g.down[7]);\n"
+                 "    $display(\"%0d %0d %h\", $size(g.grid), "
+                 "$size(g.grid, 2), g.grid[5][1]);\n"
+                 "    $display(\"%0d %0d %0d %0d %h\", $size(d.up), "
+                 "$left(d.down), $size(d.grid), $size(d.grid, 2), "
+                 "d.grid[2][1]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "6 0 5 0aaa\n6 2 7 0bbb\n6 2 0ccc\n3 4 3 2 5a\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

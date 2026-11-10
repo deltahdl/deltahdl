@@ -523,6 +523,7 @@ class Parser {
   std::vector<DataType> ParseTypeParamList();
   DataType ParseOneTypeParam();
   DataType ParseNamedType();
+  void ParseTypeScopePath(DataType& dtype, bool assignment_written);
 
   Stmt* ParseStmt();
   std::string_view TryParseStmtLabel();

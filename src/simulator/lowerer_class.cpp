@@ -399,10 +399,9 @@ static void ShapeArrayProperty(ClassTypeInfo::PropertyInfo* prop,
   prop->is_dynamic = kDynamic;
 }
 
-static void RecordArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
-                                  const ScopeMap& constants, SimContext& ctx,
-                                  Arena& arena) {
-  ScopeMap scope = ClassParamScope(cls, constants);
+void ShapeArrayProperties(ClassTypeInfo* info, const ClassDecl* cls,
+                          const ScopeMap& scope, SimContext& ctx,
+                          Arena& arena) {
   for (const auto* member : cls->members) {
     if (member->kind != ClassMemberKind::kProperty) continue;
     const ModuleItem* item = PropertyTypedefItem(member, info, ctx);
@@ -533,7 +532,8 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   }
   CollectClassMembers(info, cls, scope.constants, ctx);
   AttachScopeMethodBodies(info, cls, scope.items);
-  RecordArrayProperties(info, cls, scope.constants, ctx, arena);
+  ShapeArrayProperties(info, cls, ClassParamScope(cls, scope.constants), ctx,
+                       arena);
   MakeParamArraysStatic(info, cls, scope.constants, ctx, arena);
   BuildVTable(info, cls);
   CreateStaticProperties(info, arena);
