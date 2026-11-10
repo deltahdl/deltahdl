@@ -53,8 +53,6 @@ fi
 fable=$(cat "$fable_cache" 2>/dev/null)
 
 out=''
-[ -n "$model" ] && out="$model"
-[ -n "$effort" ] && out="${out}${out:+ }${effort} effort"
 if [ -n "$ctx" ]; then
   context=$(printf 'Context %.0fK' "$(echo "$ctx / 1000" | bc -l)")
   [ -n "$ceiling" ] && context="${context}/$(printf '%.0fK' "$(echo "$ceiling / 1000" | bc -l)")"
@@ -72,5 +70,9 @@ if [ -n "$cwd" ]; then
   issues=$(cat "$cache" 2>/dev/null)
   [ -n "$issues" ] && out="${out}${out:+  |  }Open issues: $issues"
 fi
+
+modeleffort="$model"
+[ -n "$effort" ] && modeleffort="${modeleffort}${modeleffort:+ }${effort} effort"
+[ -n "$modeleffort" ] && out="${out}${out:+  |  }${modeleffort}"
 
 printf '%s' "$out"
