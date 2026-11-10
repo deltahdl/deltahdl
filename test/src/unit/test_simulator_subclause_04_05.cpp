@@ -374,4 +374,31 @@ TEST(SimulationAlgorithmSim, FutureTimeSlotCreatedDuringExecutionIsAdvancedTo) {
   EXPECT_EQ(times[1], 5u);
 }
 
+TEST(SimulationAlgorithmSim, ProgramWriteWakesAModuleProcessInTheSameSlot) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  int a = 0;\n"
+                 "  always @(a) $display(\"%0t module a=%0d\", $time, a);\n"
+                 "  program p;\n"
+                 "    initial #1 a = 7;\n"
+                 "  endprogram\n"
+                 "endmodule\n",
+                 f),
+      "1 module a=7\n");
+}
+
+TEST(SimulationAlgorithmSim, PostponedRegionSeesTheReactiveSetsWrite) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int a = 0;\n"
+                       "  initial #1 $strobe(\"%0t strobe a=%0d\", $time, a);\n"
+                       "  program p;\n"
+                       "    initial #1 a = 9;\n"
+                       "  endprogram\n"
+                       "endmodule\n",
+                       f),
+            "1 strobe a=9\n");
+}
+
 }  // namespace
