@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -438,6 +439,28 @@ TEST(TriregResolution, VectoredTriregEntersCapacitiveStateAndHoldsItsValue) {
   EXPECT_TRUE(net->InCapacitiveState());
   ASSERT_NE(net->resolved, nullptr);
   EXPECT_EQ(net->resolved->value.ToUint64() & 0xFFu, 0xA5u);
+}
+
+TEST(TriregResolution,
+     MediumTriregBehindTwoNmosSwitchesKeepsItsDrivenOneAtMedium) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, b, i1, i2;\n"
+      "  wire c, g;\n"
+      "  trireg (medium) d;\n"
+      "  and a1 (g, i1, i2);\n"
+      "  nmos n1 (c, g, a);\n"
+      "  nmos n2 (d, c, b);\n"
+      "  initial begin\n"
+      "    a = 1; b = 1; i1 = 1; i2 = 1;\n"
+      "    #1 $display(\"%v %v\", c, d);\n"
+      "    #9 a = 0;\n"
+      "    #1 $display(\"%v %v\", c, d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1 St1\nHiZ Me1\n");
 }
 
 }  // namespace

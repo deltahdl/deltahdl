@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
+#include <initializer_list>
 #include <string>
+#include <string_view>
 
 #include "common/types.h"
 #include "fixture_elaborator.h"
@@ -603,6 +606,243 @@ TEST(InterconnectElaboration, ProceduralUseInsideGenerateBlocksIsRejected) {
       "6.6.8"));
   EXPECT_TRUE(AcceptedInsideGenerateBlocks(
       {"", "interconnect ic; logic y, z;", "initial y = z;"}));
+}
+
+struct ItemPlace {
+  const char* head;
+  const char* tail;
+};
+
+constexpr ItemPlace kModulePlace{"module t;\n", "endmodule\n"};
+constexpr ItemPlace kInterfacePlace{
+    "interface t;\n", "endinterface\nmodule top;\n  t x();\nendmodule\n"};
+constexpr ItemPlace kProgramPlace{
+    "program t;\n", "endprogram\nmodule top;\n  t x();\nendmodule\n"};
+constexpr ItemPlace kGeneratePlace{"module t;\n  if (1) begin : g\n",
+                                   "  end\nendmodule\n"};
+constexpr std::initializer_list<ItemPlace> kEveryPlace = {
+    kModulePlace, kInterfacePlace, kProgramPlace, kGeneratePlace};
+constexpr std::initializer_list<ItemPlace> kEveryPlaceButAProgram = {
+    kModulePlace, kInterfacePlace, kGeneratePlace};
+
+constexpr const char* kInProceduralExpression =
+    "interconnect net cannot be used in a procedural expression";
+
+::testing::AssertionResult LastLineReportedInEachPlace(
+    std::initializer_list<ItemPlace> places, const std::string& prefix,
+    const std::string& body, std::string_view message,
+    std::string_view subclause = "6.6.8") {
+  for (const ItemPlace& place : places) {
+    std::string src = prefix;
+    src += place.head;
+    src += body;
+    const auto kLine = static_cast<uint32_t>(std::ranges::count(src, '\n'));
+    src += place.tail;
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    auto reported =
+        ReportedError(f.diag.Diagnostics(), message, kLine, subclause);
+    if (!reported) return reported << "\nin\n" << src;
+  }
+  return ::testing::AssertionSuccess();
+}
+
+::testing::AssertionResult AcceptedInEachPlace(
+    std::initializer_list<ItemPlace> places, const std::string& prefix,
+    const std::string& body) {
+  for (const ItemPlace& place : places) {
+    std::string src = prefix;
+    src += place.head;
+    src += body;
+    src += place.tail;
+    if (!ElabOk(src)) {
+      return ::testing::AssertionFailure() << "rejected\n" << src;
+    }
+  }
+  return ::testing::AssertionSuccess();
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_NetDeclarationAssignmentReadingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "", "  interconnect ic;\n  wire w = ic;\n", kInExpression));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "", "  wire x;\n  wire w = x;\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_VariableInitializerReadingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "", "  interconnect ic;\n  logic v = ic;\n", kInExpression));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "", "  wire x;\n  logic v = x;\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_SubroutineBodyReadingForcingOrReleasingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  function logic f(); return ic; endfunction\n",
+      kInProceduralExpression));
+  EXPECT_TRUE(
+      LastLineReportedInEachPlace(kEveryPlace, "",
+                                  "  interconnect ic;\n"
+                                  "  task k(); force ic = 1'b1; endtask\n",
+                                  kInProcContAssign));
+  EXPECT_TRUE(LastLineReportedInEachPlace(kEveryPlace, "",
+                                          "  interconnect ic;\n"
+                                          "  task k(); release ic; endtask\n",
+                                          kInProcContAssign));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "",
+                          "  wire x;\n"
+                          "  function logic f(); return x; endfunction\n"
+                          "  task k(); force x = 1'b1; endtask\n"
+                          "  task r(); release x; endtask\n"));
+}
+
+TEST(InterconnectElaboration, SubroutineBodyAssigningAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  function void f(); ic = 1'b1; endfunction\n",
+      "net 'ic' cannot be the target of a procedural assignment", "10.4"));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "",
+                          "  logic v;\n"
+                          "  function void f(); v = 1'b1; endfunction\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_EventControlNamingAnInterconnectIsError) {
+  for (const char* item : {"  initial @(ic);\n", "  initial @(posedge ic);\n",
+                           "  initial @(negedge ic);\n"}) {
+    EXPECT_TRUE(LastLineReportedInEachPlace(
+        kEveryPlace, "", std::string("  interconnect ic;\n") + item,
+        kInProceduralExpression));
+  }
+  for (const char* item : {"  always @(ic) y = 1'b1;\n",
+                           "  always_ff @(posedge ic) y <= 1'b1;\n"}) {
+    EXPECT_TRUE(LastLineReportedInEachPlace(
+        kEveryPlaceButAProgram, "",
+        std::string("  interconnect ic;\n  logic y;\n") + item,
+        kInProceduralExpression));
+  }
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlace, "",
+                                  "  wire x;\n"
+                                  "  initial @(x);\n"
+                                  "  initial @(posedge x);\n"
+                                  "  initial @(negedge x);\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlaceButAProgram, "",
+                                  "  wire x;\n"
+                                  "  logic y, z;\n"
+                                  "  always @(x) y = 1'b1;\n"
+                                  "  always_ff @(posedge x) z <= 1'b1;\n"));
+}
+
+TEST(InterconnectElaboration, WaitConditionReadingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "", "  interconnect ic;\n  initial wait (ic);\n",
+      kInProceduralExpression));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "", "  wire x;\n  initial wait (x);\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_AssertionOrItsDeclarationReadingAnInterconnectIsError) {
+  for (const char* item :
+       {"  assert property (@(posedge clk) ic);\n",
+        "  assume property (@(posedge clk) ic);\n",
+        "  cover property (@(posedge clk) ic);\n",
+        "  restrict property (@(posedge clk) ic);\n",
+        "  sequence s; ic; endsequence\n", "  property p; ic; endproperty\n",
+        "  let l = ic;\n"}) {
+    EXPECT_TRUE(LastLineReportedInEachPlace(
+        kEveryPlace, "",
+        std::string("  interconnect ic;\n  logic clk;\n") + item,
+        kInExpression));
+  }
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlace, "",
+                                  "  wire x;\n"
+                                  "  logic clk;\n"
+                                  "  assert property (@(posedge clk) x);\n"
+                                  "  sequence s; x; endsequence\n"
+                                  "  let l = x;\n"));
+}
+
+TEST(InterconnectElaboration, DISABLED_CovergroupNamingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  logic clk;\n"
+      "  covergroup cg @(posedge clk); coverpoint ic; endgroup\n",
+      kInExpression));
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  logic a;\n"
+      "  covergroup cg @(posedge ic); coverpoint a; endgroup\n",
+      kInExpression));
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlace, "",
+                                  "  wire x;\n"
+                                  "  covergroup cg @(posedge x); coverpoint x; "
+                                  "endgroup\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_ClockingBlockNamingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  logic a;\n"
+      "  clocking cb @(posedge ic); input a; endclocking\n",
+      kInExpression));
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  logic clk;\n"
+      "  clocking cb @(posedge clk); input ic; endclocking\n",
+      kInExpression));
+  EXPECT_TRUE(AcceptedInEachPlace(
+      kEveryPlace, "",
+      "  wire x, y;\n"
+      "  clocking cb @(posedge x); input y; endclocking\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_CheckerArgumentThatIsAnInterconnectIsError) {
+  const std::string kCheckers =
+      "checker ci(input logic a);\n"
+      "endchecker\n"
+      "checker co(output logic a);\n"
+      "endchecker\n";
+  EXPECT_TRUE(LastLineReportedInEachPlace(kEveryPlaceButAProgram, kCheckers,
+                                          "  interconnect ic;\n  ci x(ic);\n",
+                                          kInExpression));
+  EXPECT_TRUE(LastLineReportedInEachPlace(kEveryPlaceButAProgram, kCheckers,
+                                          "  interconnect ic;\n  co x(ic);\n",
+                                          kInExpression));
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlaceButAProgram, kCheckers,
+                                  "  wire w;\n  ci x(w);\n  co y(w);\n"));
+}
+
+TEST(InterconnectElaboration,
+     DISABLED_SpecifyBlockNamingAnInterconnectPortIsError) {
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input interconnect a, output wire b);\n"
+                              "  specify (a => b) = 1; endspecify\n"
+                              "endmodule\n",
+                              kInExpression, 2));
+  EXPECT_TRUE(
+      InterconnectUseReported("module t(input interconnect a, input wire b);\n"
+                              "  specify $setup(a, posedge b, 1); endspecify\n"
+                              "endmodule\n",
+                              kInExpression, 2));
+  EXPECT_TRUE(
+      ElabOk("module t(input wire a, output wire b, input wire c);\n"
+             "  specify (a => b) = 1; $setup(a, posedge c, 1); endspecify\n"
+             "endmodule\n"));
 }
 
 }  // namespace

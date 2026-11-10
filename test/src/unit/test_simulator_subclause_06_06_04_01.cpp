@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -257,6 +258,192 @@ TEST(CapacitiveNetwork, EqualSizeSameValueRetainedFromSource) {
   EXPECT_EQ(me2->resolved->value.ToUint64() & 1u, 1u);
   EXPECT_EQ(me1->charge_strength, Strength::kMedium);
   EXPECT_EQ(me2->charge_strength, Strength::kMedium);
+}
+
+TEST(CapacitiveNetwork, SmallerTriregJoinedThroughASwitchTakesTheLargersValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, b, c, d;\n"
+      "  trireg (large) la;\n"
+      "  trireg (small) sm;\n"
+      "  trireg (medium) me1, me2;\n"
+      "  nmos n1 (la, c, a);\n"
+      "  tranif1 t1 (la, sm, b);\n"
+      "  nmos n2 (me1, d, a);\n"
+      "  tranif1 t2 (me1, me2, b);\n"
+      "  initial begin\n"
+      "    a = 1; b = 1; c = 1; d = 1;\n"
+      "    #1 $display(\"%b %b\", la, sm);\n"
+      "    #9 b = 0;\n"
+      "    #1 $display(\"%b %b\", la, sm);\n"
+      "    #9 c = 0;\n"
+      "    #1 $display(\"%b %b\", la, sm);\n"
+      "    #9 d = 0;\n"
+      "    #1 $display(\"%b %b\", la, sm);\n"
+      "    #9 a = 0;\n"
+      "    #1 $display(\"%b %b\", la, sm);\n"
+      "    #9 b = 1;\n"
+      "    #1 $display(\"%b %b\", la, sm);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n1 1\n0 1\n0 1\n0 1\n0 0\n");
+}
+
+TEST(CapacitiveNetwork,
+     DISABLED_EqualTriregsJoinedThroughASwitchHoldingDifferentValuesGoToX) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, b, c, d;\n"
+      "  trireg (large) la;\n"
+      "  trireg (small) sm;\n"
+      "  trireg (medium) me1, me2;\n"
+      "  nmos n1 (la, c, a);\n"
+      "  tranif1 t1 (la, sm, b);\n"
+      "  nmos n2 (me1, d, a);\n"
+      "  tranif1 t2 (me1, me2, b);\n"
+      "  initial begin\n"
+      "    a = 1; b = 1; c = 1; d = 1;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "    #9 b = 0;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "    #9 c = 0;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "    #9 d = 0;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "    #9 a = 0;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "    #9 b = 1;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n1 1\n1 1\n0 1\n0 1\nx x\n");
+}
+
+TEST(CapacitiveNetwork, JoinedTriregsShareTheLargerChargeUntilCutApart) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  wire a;\n"
+      "  reg b, c;\n"
+      "  trireg (large) la;\n"
+      "  trireg (small) sm;\n"
+      "  assign (strong0, strong1) a = 1'b1;\n"
+      "  tranif1 t1 (a, la, b);\n"
+      "  tranif1 t2 (la, sm, c);\n"
+      "  initial begin\n"
+      "    b = 1; c = 1;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 b = 0;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 c = 0;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 c = 1;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 c = 0;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1 St1\nLa1 La1\nLa1 Sm1\nLa1 La1\nLa1 Sm1\n");
+}
+
+TEST(CapacitiveNetwork, ResistiveSwitchPassesAReducedChargeBetweenTriregs) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  wire a;\n"
+      "  reg b, c;\n"
+      "  trireg (large) la;\n"
+      "  trireg (small) sm;\n"
+      "  assign (strong0, strong1) a = 1'b1;\n"
+      "  tranif1 t1 (a, la, b);\n"
+      "  rtranif0 t2 (la, sm, c);\n"
+      "  initial begin\n"
+      "    b = 1; c = 0;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 b = 0;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 c = 1;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "    #9 c = 0;\n"
+      "    #1 $display(\"%v %v\", la, sm);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1 Pu1\nLa1 Me1\nLa1 Sm1\nLa1 Me1\n");
+}
+
+TEST(CapacitiveNetwork, TranPassesTheLargerChargeWholeAndRtranReducesIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, c;\n"
+      "  trireg (large) la;\n"
+      "  trireg (small) sm1, sm2;\n"
+      "  nmos n (la, c, a);\n"
+      "  tran t1 (la, sm1);\n"
+      "  rtran t2 (la, sm2);\n"
+      "  initial begin\n"
+      "    a = 1; c = 0;\n"
+      "    #1 $display(\"%v %v %v\", la, sm1, sm2);\n"
+      "    #9 a = 0;\n"
+      "    #1 $display(\"%v %v %v\", la, sm1, sm2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St0 St0 Pu0\nLa0 La0 Me0\n");
+}
+
+TEST(CapacitiveNetwork, VectorTriregJoinedOnOneBitTakesTheLargersValueThere) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, b;\n"
+      "  reg [1:0] c;\n"
+      "  trireg (large) [1:0] la;\n"
+      "  trireg (small) [1:0] sm;\n"
+      "  nmos n0 (la[0], c[0], a);\n"
+      "  nmos n1 (la[1], c[1], a);\n"
+      "  tranif1 t0 (la[0], sm[0], b);\n"
+      "  tranif1 t1 (la[1], sm[1], 1'b0);\n"
+      "  initial begin\n"
+      "    b = 0; a = 1; c = 2'b01;\n"
+      "    #10 a = 0;\n"
+      "    #10 b = 1;\n"
+      "    #1 $display(\"%b %b %v %v\", la, sm, sm[0], sm[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "01 x1 La1 SmX\n");
+}
+
+TEST(CapacitiveNetwork,
+     DISABLED_EqualVectorTriregsGoToXOnlyOnTheBitsWhereTheyDiffer) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, b;\n"
+      "  reg [1:0] c, d;\n"
+      "  trireg (medium) [1:0] me1, me2;\n"
+      "  nmos n0 (me1[0], c[0], a);\n"
+      "  nmos n1 (me1[1], c[1], a);\n"
+      "  nmos n2 (me2[0], d[0], a);\n"
+      "  nmos n3 (me2[1], d[1], a);\n"
+      "  tranif1 t0 (me1[0], me2[0], b);\n"
+      "  tranif1 t1 (me1[1], me2[1], b);\n"
+      "  initial begin\n"
+      "    b = 0; a = 1; c = 2'b01; d = 2'b11;\n"
+      "    #10 a = 0;\n"
+      "    #10 b = 1;\n"
+      "    #1 $display(\"%b %b\", me1, me2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x1 x1\n");
 }
 
 }  // namespace

@@ -648,4 +648,41 @@ TEST(UwireElaboration, NonConstantSelectDrivesNoCountedBit) {
                              "6.6.2"));
 }
 
+TEST(UwireElaboration, DISABLED_CheckerOutputArgumentIsADriver) {
+  const std::string kChecker =
+      "checker c(output logic o);\n"
+      "  assign o = 1'b1;\n"
+      "endchecker\n";
+  EXPECT_TRUE(UwireReported(kChecker + "module t;\n"
+                                       "  uwire u;\n"
+                                       "  assign u = 1'b0;\n"
+                                       "  c x(u);\n"
+                                       "endmodule\n",
+                            "u", 7));
+  EXPECT_TRUE(UwireReported(kChecker + "module t;\n"
+                                       "  uwire u;\n"
+                                       "  c x(u);\n"
+                                       "  c y(u);\n"
+                                       "endmodule\n",
+                            "u", 7));
+  EXPECT_TRUE(UwireReported(kChecker + "module t;\n"
+                                       "  uwire u;\n"
+                                       "  logic clk;\n"
+                                       "  assign u = 1'b0;\n"
+                                       "  always @(posedge clk) begin\n"
+                                       "    c x(u);\n"
+                                       "  end\n"
+                                       "endmodule\n",
+                            "u", 9));
+  EXPECT_TRUE(ElabOk(kChecker + "module t;\n"
+                                "  uwire u;\n"
+                                "  c x(u);\n"
+                                "endmodule\n"));
+  EXPECT_TRUE(ElabOk(kChecker + "module t;\n"
+                                "  uwire [1:0] u;\n"
+                                "  c x(u[0]);\n"
+                                "  c y(u[1]);\n"
+                                "endmodule\n"));
+}
+
 }  // namespace

@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/net.h"
 #include "simulator/scheduler.h"
@@ -513,6 +516,31 @@ TEST(Tri0Tri1ResolutionE2e, Tri0ConflictingStrongDriversResolveToX) {
                       "endmodule\n",
                       "result"),
             1u);
+}
+
+TEST(Tri0Tri1ResolutionE2e,
+     StrongDriverGivesAStrongResultAndOnlyAllZGivesPull) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  tri0 n0;\n"
+      "  tri1 n1;\n"
+      "  reg v;\n"
+      "  assign n0 = v;\n"
+      "  assign n0 = 1'bz;\n"
+      "  assign n1 = v;\n"
+      "  assign n1 = 1'bz;\n"
+      "  initial begin\n"
+      "    v = 1'b1;\n"
+      "    #1 $display(\"%v %v\", n0, n1);\n"
+      "    v = 1'b0;\n"
+      "    #1 $display(\"%v %v\", n0, n1);\n"
+      "    v = 1'bz;\n"
+      "    #1 $display(\"%v %v\", n0, n1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1 St1\nSt0 St0\nPu0 Pu1\n");
 }
 
 }  // namespace
