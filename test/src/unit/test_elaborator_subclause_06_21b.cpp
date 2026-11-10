@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <format>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -448,6 +449,333 @@ TEST(LifetimeElaboration, ContinuousWriteOfANonStaticPropertyRejected) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                                "is a non-static class property", line, "6.21"));
   }
+}
+
+constexpr std::string_view kContinuousDynamicWrite =
+    "continuous assignment to element of dynamically sized array";
+constexpr std::string_view kDynamicReadOutsideAProcedure =
+    "element of dynamically sized array referenced outside a procedural block";
+
+void ExpectReportedOnEachLine(const std::string& src, std::string_view message,
+                              std::initializer_list<std::string_view> needles) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  for (std::string_view needle : needles) {
+    SCOPED_TRACE(needle);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                              LineHolding(src, needle), "6.21"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), needles.size());
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_ContinuousWriteOfADynamicArrayElementReported) {
+  ExpectReportedOnEachLine(
+      "module top;\n"
+      "  int d[];\n"
+      "  int q[$];\n"
+      "  int a[string];\n"
+      "  int f[2];\n"
+      "  int x;\n"
+      "  assign d[0] = x;\n"
+      "  assign q[1] = x;\n"
+      "  assign a[\"k\"] = x;\n"
+      "  assign f[0] = x;\n"
+      "endmodule\n",
+      kContinuousDynamicWrite, {"d[0] = x", "q[1] = x", "a[\"k\"] = x"});
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_ContinuousWriteOfAPartOrMemberOfADynamicElementReported) {
+  ExpectReportedOnEachLine(
+      "module top;\n"
+      "  typedef struct {int f;} s_t;\n"
+      "  int d[];\n"
+      "  s_t s[];\n"
+      "  int x, y, z;\n"
+      "  assign d[0][3:0] = x;\n"
+      "  assign s[0].f = x;\n"
+      "  assign {d[1], y} = z;\n"
+      "endmodule\n",
+      kContinuousDynamicWrite, {"d[0][3:0]", "s[0].f", "{d[1], y}"});
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_GateAndPortOutputOnADynamicElementReported) {
+  ExpectReportedOnEachLine(
+      "module child(input var int i, output int o);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  int d[];\n"
+      "  int x;\n"
+      "  logic l;\n"
+      "  buf (d[0], l);\n"
+      "  child c(.i(x), .o(d[1]));\n"
+      "endmodule\n",
+      kContinuousDynamicWrite, {"buf (d[0]", ".o(d[1])"});
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_ContinuousWriteOfADynamicElementReportedInEveryScope) {
+  ExpectReportedOnEachLine(
+      "interface ifc;\n"
+      "  int d[];\n"
+      "  int x;\n"
+      "  assign d[0] = x;\n"
+      "endinterface\n"
+      "program prg;\n"
+      "  int q[$];\n"
+      "  int x;\n"
+      "  assign q[0] = x;\n"
+      "endprogram\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  prg p();\n"
+      "  for (genvar g = 0; g < 1; g++) begin : gb\n"
+      "    int a[int];\n"
+      "    int x;\n"
+      "    assign a[0] = x;\n"
+      "  end\n"
+      "endmodule\n",
+      kContinuousDynamicWrite, {"d[0] = x", "q[0] = x", "a[0] = x"});
+}
+
+TEST(DynamicElementLifetime, FixedArrayElementContinuousWritesAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module child(input var int i, output int o);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  typedef struct {int f;} s_t;\n"
+             "  int f[4];\n"
+             "  s_t s[1];\n"
+             "  logic g[2];\n"
+             "  int x, y, z;\n"
+             "  logic l;\n"
+             "  assign f[0] = x;\n"
+             "  assign f[1][3:0] = x;\n"
+             "  assign s[0].f = x;\n"
+             "  assign {f[2], y} = z;\n"
+             "  buf (g[0], l);\n"
+             "  child c(.i(x), .o(f[3]));\n"
+             "endmodule\n"));
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_DynamicElementReadOutsideAProcedureReported) {
+  ExpectReportedOnEachLine(
+      "module top;\n"
+      "  int d[];\n"
+      "  int q[$];\n"
+      "  int a[string];\n"
+      "  int w1, w2, w3;\n"
+      "  assign w1 = d[0];\n"
+      "  assign w2 = q[$];\n"
+      "  assign w3 = a[\"k\"];\n"
+      "endmodule\n",
+      kDynamicReadOutsideAProcedure, {"= d[0]", "= q[$]", "= a[\"k\"]"});
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_DynamicElementAsAGateInputPortOrDelayReported) {
+  ExpectReportedOnEachLine(
+      "module child(input var int i, output int o);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic d[];\n"
+      "  int e[];\n"
+      "  int w, x, o1;\n"
+      "  logic o;\n"
+      "  buf (o, d[0]);\n"
+      "  child c(.i(e[0]), .o(o1));\n"
+      "  assign #(e[1]) w = x;\n"
+      "endmodule\n",
+      kDynamicReadOutsideAProcedure, {"buf (o", ".i(e[0])", "#(e[1])"});
+}
+
+TEST(DynamicElementLifetime,
+     DISABLED_ClassMemberReadOutsideAProcedureReported) {
+  ElabFixture f;
+  std::string src =
+      "class K;\n"
+      "  int v;\n"
+      "endclass\n"
+      "module top;\n"
+      "  K h = new;\n"
+      "  int w;\n"
+      "  assign w = h.v;\n"
+      "endmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "member of a class object referenced outside a procedural block",
+      LineHolding(src, "h.v"), "6.21"));
+}
+
+TEST(DynamicElementLifetime, DynamicReadsInProceduresAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class K;\n"
+             "  int v;\n"
+             "endclass\n"
+             "module top;\n"
+             "  int d[];\n"
+             "  int q[$];\n"
+             "  int a[string];\n"
+             "  K h = new;\n"
+             "  int w, n;\n"
+             "  function int pick();\n"
+             "    return d[0] + q[$] + a[\"k\"] + h.v;\n"
+             "  endfunction\n"
+             "  always @* w = d[0] + q[$] + a[\"k\"] + h.v;\n"
+             "  always @* n = pick();\n"
+             "  final $display(d[0], q[$], a[\"k\"], h.v);\n"
+             "endmodule\n"));
+}
+
+TEST(HierarchicalLifetime, DISABLED_PathToAnAutomaticLocalReported) {
+  ExpectReportedOnEachLine(
+      "module top;\n"
+      "  task automatic ta;\n"
+      "    int a;\n"
+      "    a = 1;\n"
+      "  endtask\n"
+      "  function automatic int fa;\n"
+      "    int v;\n"
+      "    v = 2;\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  task ts;\n"
+      "    automatic int y;\n"
+      "    y = 3;\n"
+      "  endtask\n"
+      "  initial $display(ta.a);\n"
+      "  initial $display(fa.v);\n"
+      "  initial $display(ts.y);\n"
+      "endmodule\n",
+      "automatic variable", {"ta.a", "fa.v", "ts.y"});
+}
+
+TEST(HierarchicalLifetime, DISABLED_PathIntoAnUnnamedBlockReported) {
+  ExpectReportedOnEachLine(
+      "module top;\n"
+      "  initial begin : n\n"
+      "    begin\n"
+      "      static int x = 1;\n"
+      "    end\n"
+      "  end\n"
+      "  task t;\n"
+      "    begin\n"
+      "      static int y;\n"
+      "      y = 1;\n"
+      "    end\n"
+      "  endtask\n"
+      "  initial #1 $display(n.x);\n"
+      "  initial #1 $display(t.y);\n"
+      "endmodule\n",
+      "unnamed block", {"n.x", "t.y"});
+}
+
+TEST(HierarchicalLifetime, PathsToStaticLocalsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module top;\n"
+             "  initial begin : n\n"
+             "    begin : inner\n"
+             "      static int x = 1;\n"
+             "    end\n"
+             "  end\n"
+             "  task automatic ta;\n"
+             "    static int s;\n"
+             "    s++;\n"
+             "  endtask\n"
+             "  task t;\n"
+             "    int y;\n"
+             "    y = 1;\n"
+             "  endtask\n"
+             "  initial #1 $display(n.inner.x, ta.s, t.y);\n"
+             "endmodule\n"));
+}
+
+TEST(LoopAndMethodLifetime,
+     NonblockingWriteOfAnAutomaticByDefaultLocalReported) {
+  ElabFixture f;
+  std::string src =
+      "class C;\n"
+      "  task m;\n"
+      "    int c;\n"
+      "    c <= 1;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module top;\n"
+      "  task t;\n"
+      "    for (int j = 0; j < 1; j++) j <= 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    for (int i = 0; i < 1; i++) i <= 1;\n"
+      "  end\n"
+      "endmodule\n";
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic task variable in nonblocking assignment",
+                            LineHolding(src, "c <= 1"), "13.3.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment",
+                            LineHolding(src, "j <= 1"), "6.21"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "automatic variable in nonblocking assignment",
+                            LineHolding(src, "i <= 1"), "6.21"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  static int c;\n"
+             "  task m;\n"
+             "    c <= 1;\n"
+             "  endtask\n"
+             "endclass\n"
+             "module top;\n"
+             "  int i;\n"
+             "  initial for (i = 0; i < 1; i++) i <= 1;\n"
+             "endmodule\n"));
+}
+
+TEST(LifetimeIntentElaboration,
+     InitializedLocalsInInterfaceAndProgramReported) {
+  ExpectReportedOnEachLine(
+      "interface ifc;\n"
+      "  initial begin\n"
+      "    int x = 1;\n"
+      "  end\n"
+      "endinterface\n"
+      "program prg;\n"
+      "  initial begin\n"
+      "    int y = 1;\n"
+      "  end\n"
+      "  task t;\n"
+      "    int z = 2;\n"
+      "  endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  prg p();\n"
+      "endmodule\n",
+      "declared with an initializer in a static block, task or function",
+      {"int x", "int y", "int z"});
+  EXPECT_TRUE(
+      ElabOk("interface automatic ifc;\n"
+             "  initial begin\n"
+             "    int x = 1;\n"
+             "  end\n"
+             "endinterface\n"
+             "program automatic prg;\n"
+             "  initial begin\n"
+             "    int y = 1;\n"
+             "  end\n"
+             "  task t;\n"
+             "    int z = 2;\n"
+             "  endtask\n"
+             "endprogram\n"
+             "module top;\n"
+             "  ifc i();\n"
+             "  prg p();\n"
+             "endmodule\n"));
 }
 
 }  // namespace
