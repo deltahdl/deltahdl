@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -23,9 +24,10 @@
 using namespace delta;
 
 inline DpiSymbolLookup LookupIn(const std::map<std::string, void*>& functions) {
-  return [functions](const std::string& name) -> void* {
-    auto it = functions.find(name);
-    return it == functions.end() ? nullptr : it->second;
+  auto table = std::make_shared<const std::map<std::string, void*>>(functions);
+  return [table](const std::string& name) -> void* {
+    auto it = table->find(name);
+    return it == table->end() ? nullptr : it->second;
   };
 }
 
