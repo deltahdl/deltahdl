@@ -93,4 +93,42 @@ TEST(RealLiteralLexing, UnderscoresAmongExponentAndFractionDigits) {
       ReportedError(LexDiagnostics(".1_2"), "no digit before", 1, "5.7.2"));
 }
 
+TEST(RealLiteralLexing, WhiteSpaceInsideARealLiteralSplitsIt) {
+  auto whole = Lex("1.5e3 ");
+  ASSERT_EQ(whole.size(), 2u);
+  EXPECT_EQ(whole[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(whole[0].text, "1.5e3");
+
+  auto before_exponent = Lex("1.5 e3 ");
+  ASSERT_EQ(before_exponent.size(), 3u);
+  EXPECT_EQ(before_exponent[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(before_exponent[0].text, "1.5");
+  EXPECT_EQ(before_exponent[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(before_exponent[1].text, "e3");
+
+  auto inside_exponent = Lex("1.5e 3 ");
+  ASSERT_EQ(inside_exponent.size(), 4u);
+  EXPECT_EQ(inside_exponent[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(inside_exponent[0].text, "1.5");
+  EXPECT_EQ(inside_exponent[1].kind, TokenKind::kIdentifier);
+  EXPECT_EQ(inside_exponent[1].text, "e");
+  EXPECT_EQ(inside_exponent[2].kind, TokenKind::kIntLiteral);
+  EXPECT_EQ(inside_exponent[2].text, "3");
+
+  EXPECT_TRUE(
+      ReportedError(LexDiagnostics("1 .5 "), "no digit before", 1, "5.7.2"));
+  EXPECT_TRUE(
+      ReportedError(LexDiagnostics("1. 5 "), "no digit after", 1, "5.7.2"));
+}
+
+TEST(RealLiteralLexing, UnderscoreOpeningTheFractionIsReported) {
+  EXPECT_TRUE(
+      ReportedError(LexDiagnostics("1._5 "), "no digit after", 1, "5.7.2"));
+  EXPECT_TRUE(LexDiagnostics("1_.5_ ").empty());
+  auto trailing = Lex("1_.5_e3 ");
+  ASSERT_EQ(trailing.size(), 2u);
+  EXPECT_EQ(trailing[0].kind, TokenKind::kRealLiteral);
+  EXPECT_EQ(trailing[0].text, "1_.5_e3");
+}
+
 }  // namespace
