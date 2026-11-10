@@ -3,10 +3,12 @@
 #include <cstdint>
 #include <format>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 #include <utility>
 
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -276,6 +278,184 @@ TEST(MatchingTypesElaboration, InstancesOfAnUndeclaredModuleAreNotJudged) {
                             "23.3.2"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "each declare for themselves", 4, "6.22"));
+}
+
+struct TypeComparison {
+  std::string_view name;
+  std::string_view left;
+  std::string_view right;
+  int64_t matches;
+};
+
+void ExpectComparisons(std::string_view before_module,
+                       std::string_view declarations,
+                       std::initializer_list<TypeComparison> comparisons) {
+  std::string src =
+      std::string(before_module) + "module m;\n" + std::string(declarations);
+  for (const auto& c : comparisons) {
+    src += std::format("  localparam bit {} = type({}) == type({});\n", c.name,
+                       c.left, c.right);
+  }
+  src += "endmodule\n";
+  ElabFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  for (const auto& c : comparisons) {
+    SCOPED_TRACE(c.name);
+    EXPECT_EQ(ParamValue(design, c.name), c.matches);
+  }
+}
+
+TEST(MatchingTypeComparison, BuiltInTypeMatchesOnlyItself) {
+  ExpectComparisons("", "",
+                    {{"kInt", "int", "int", 1},
+                     {"kIntInteger", "int", "integer", 0},
+                     {"kReal", "real", "real", 1},
+                     {"kRealShortreal", "real", "shortreal", 0},
+                     {"kString", "string", "string", 1},
+                     {"kStringChandle", "string", "chandle", 0}});
+}
+
+TEST(MatchingTypeComparison, RenamingTypedefMatchesWhatItRenames) {
+  ExpectComparisons("typedef bit node;\n",
+                    "  typedef node type2;\n"
+                    "  typedef logic [3:0] nib_t;\n",
+                    {{"kNode", "node", "bit", 1},
+                     {"kType2", "type2", "bit", 1},
+                     {"kType2Node", "type2", "node", 1},
+                     {"kNodeLogic", "node", "logic", 0},
+                     {"kNib", "nib_t", "logic [3:0]", 1},
+                     {"kNibReversed", "nib_t", "logic [0:3]", 0}});
+}
+
+TEST(MatchingTypeComparison, AnonymousTypeMatchesOnlyItsOwnStatement) {
+  ExpectComparisons("",
+                    "  struct packed {int A; int B;} AB1, AB2;\n"
+                    "  struct packed {int A; int B;} AB3;\n"
+                    "  enum {E0, E1} EN1, EN2;\n"
+                    "  enum {F0, F1} EN3;\n"
+                    "  union packed {int A; bit [31:0] B;} U1, U2;\n"
+                    "  union packed {int A; bit [31:0] B;} U3;\n",
+                    {{"kStructSame", "AB1", "AB2", 1},
+                     {"kStructOther", "AB1", "AB3", 0},
+                     {"kEnumSame", "EN1", "EN2", 1},
+                     {"kEnumOther", "EN1", "EN3", 0},
+                     {"kUnionSame", "U1", "U2", 1},
+                     {"kUnionOther", "U1", "U3", 0}});
+}
+
+TEST(MatchingTypeComparison, NamedUserTypeMatchesOnlyItsOwnObjects) {
+  ExpectComparisons("",
+                    "  typedef struct packed {int A; int B;} AB_t;\n"
+                    "  typedef struct packed {int A; int B;} otherAB_t;\n"
+                    "  typedef enum {R, G} col_t;\n"
+                    "  typedef enum {R2, G2} col2_t;\n"
+                    "  typedef union packed {int A;} un_t;\n"
+                    "  typedef union packed {int A;} un2_t;\n"
+                    "  class C1; int a; endclass\n"
+                    "  class C2; int a; endclass\n"
+                    "  AB_t AB1; AB_t AB2;\n"
+                    "  otherAB_t AB3;\n"
+                    "  col_t c1;\n"
+                    "  un_t u1;\n"
+                    "  C1 h1;\n",
+                    {{"kStructObjects", "AB1", "AB2", 1},
+                     {"kStructTypedef", "AB1", "AB_t", 1},
+                     {"kStructOther", "AB3", "AB1", 0},
+                     {"kEnum", "c1", "col_t", 1},
+                     {"kEnumOther", "c1", "col2_t", 0},
+                     {"kUnion", "u1", "un_t", 1},
+                     {"kUnionOther", "u1", "un2_t", 0},
+                     {"kClass", "h1", "C1", 1},
+                     {"kClassOther", "C1", "C2", 0}});
+}
+
+TEST(MatchingTypeComparison, BitVectorMatchesTheWidthedTypeItSpellsOut) {
+  ExpectComparisons("",
+                    "  typedef bit signed [7:0] BYTE;\n"
+                    "  typedef bit signed [0:7] ETYB;\n",
+                    {{"kByte", "BYTE", "byte", 1},
+                     {"kEtyb", "ETYB", "byte", 0},
+                     {"kInt", "bit signed [31:0]", "int", 1},
+                     {"kIntUnsigned", "bit [31:0]", "int", 0},
+                     {"kShortint", "bit signed [15:0]", "shortint", 1},
+                     {"kLongint", "bit signed [63:0]", "longint", 1},
+                     {"kInteger", "logic signed [31:0]", "integer", 1},
+                     {"kIntegerTwoState", "bit signed [31:0]", "integer", 0},
+                     {"kIntegerUnsigned", "logic [31:0]", "integer", 0},
+                     {"kTime", "logic [63:0]", "time", 1},
+                     {"kTimeWidth", "logic [62:0]", "time", 0}});
+}
+
+TEST(MatchingTypeComparison, ArraysMatchByKindBoundsIndexAndElement) {
+  ExpectComparisons("",
+                    "  typedef byte MEM_BYTES [256];\n"
+                    "  typedef bit signed [7:0] MY_MEM_BYTES [256];\n"
+                    "  typedef logic [1:0][3:0] NIBBLES;\n"
+                    "  typedef logic [7:0] MY_BYTE;\n"
+                    "  typedef logic MD_ARY [][2:0];\n"
+                    "  typedef logic MD_ARY_TOO [][0:2];\n"
+                    "  typedef int FA [0:3];\n"
+                    "  typedef int FB [1:4];\n"
+                    "  typedef int FC [0:3];\n"
+                    "  typedef int FD [4];\n"
+                    "  typedef int DA [];\n"
+                    "  typedef int DB [];\n"
+                    "  typedef int QA [$];\n"
+                    "  typedef int AS [string];\n"
+                    "  typedef int AS2 [string];\n"
+                    "  typedef int AI [int];\n"
+                    "  typedef bit [7:0] PK;\n"
+                    "  typedef bit UP [7:0];\n",
+                    {{"kMemBytes", "MEM_BYTES", "MY_MEM_BYTES", 1},
+                     {"kNibbles", "NIBBLES", "MY_BYTE", 0},
+                     {"kMdAry", "MD_ARY", "MD_ARY_TOO", 0},
+                     {"kSameBounds", "FA", "FC", 1},
+                     {"kShiftedBounds", "FA", "FB", 0},
+                     {"kSizeForm", "FA", "FD", 1},
+                     {"kDynamic", "DA", "DB", 1},
+                     {"kDynamicQueue", "DA", "QA", 0},
+                     {"kAssocIndex", "AS", "AS2", 1},
+                     {"kAssocOtherIndex", "AS", "AI", 0},
+                     {"kPackedUnpacked", "PK", "UP", 0}});
+}
+
+TEST(MatchingTypeComparison, DefaultSigningSpelledOutMatches) {
+  ExpectComparisons("",
+                    "  typedef byte signed MY_CHAR;\n"
+                    "  typedef byte unsigned MY_UCHAR;\n"
+                    "  typedef logic unsigned [3:0] LU4;\n",
+                    {{"kByteSigned", "MY_CHAR", "byte", 1},
+                     {"kByteUnsigned", "MY_UCHAR", "byte", 0},
+                     {"kLogicUnsigned", "LU4", "logic [3:0]", 1},
+                     {"kIntSigned", "int signed", "int", 1},
+                     {"kIntUnsigned", "int unsigned", "int", 0},
+                     {"kIntegerSigned", "integer signed", "integer", 1},
+                     {"kBitUnsigned", "bit unsigned", "bit", 1},
+                     {"kBitSigned", "bit signed", "bit", 0}});
+}
+
+TEST(MatchingTypeComparison, PackageTypeMatchesItselfWhereverImported) {
+  ExpectComparisons(
+      "package p;\n"
+      "  typedef struct packed {int A;} pt;\n"
+      "  typedef enum {PA, PB} pe;\n"
+      "  class PC; endclass\n"
+      "endpackage\n"
+      "package r;\n"
+      "  typedef struct packed {int A;} pt;\n"
+      "endpackage\n",
+      "  import p::pt;\n"
+      "  import p::*;\n"
+      "  pt pv;\n"
+      "  pe ev;\n"
+      "  PC hv;\n",
+      {{"kStruct", "pt", "p::pt", 1},
+       {"kStructObject", "pv", "p::pt", 1},
+       {"kEnum", "ev", "p::pe", 1},
+       {"kClass", "hv", "p::PC", 1},
+       {"kOtherPackage", "pt", "r::pt", 0}});
 }
 
 }  // namespace
