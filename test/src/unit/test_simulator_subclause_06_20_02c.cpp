@@ -785,4 +785,36 @@ TEST(AggregateParameterConstantReads,
   ExpectValues(f, {{"n1", 9}, {"n2", 4}, {"n3", 5}, {"n4", 6}, {"n5", 2}});
 }
 
+TEST(ValueParameterSim, ClauseExamplesTakeTheTypesAndRangesItsRulesGive) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module c #(parameter p = 4, parameter signed s = 4'sb1010,\n"
+          "           parameter [3:0] g = 5, parameter int unsigned u = 1,\n"
+          "           parameter int at = 0) ();\n"
+          "  initial #at $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+          "    $bits(p), $bits(s), $bits(g), $bits(u), p, s, g, u, s < 0);\n"
+          "endmodule\n"
+          "module t;\n"
+          "  parameter a = 2'b1x;\n"
+          "  parameter b = 3'h4;\n"
+          "  parameter real r1 = 3.5e17;\n"
+          "  parameter [31:0] dec_const = 1'b1;\n"
+          "  parameter p1 = 13'h7e;\n"
+          "  parameter e = 25, f = 9, r = 5.7;\n"
+          "  parameter byte_size = 8, byte_mask = byte_size - 1;\n"
+          "  parameter average_delay = (r + f) / 2;\n"
+          "  c #(.p(8'hff), .s(-3), .g(-1), .u(-1)) c1();\n"
+          "  c #(.at(1)) c2();\n"
+          "  initial #2 $display(\"%b %0d %0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+          "    a, type(a) == type(logic [1:0]), $bits(b),\n"
+          "    type(b) == type(logic [2:0]), $bits(dec_const), r1 == 3.5e17,\n"
+          "    p1, $bits(p1), byte_mask, average_delay == 7.35);\n"
+          "endmodule\n",
+          f),
+      "8 32 4 32 255 -3 15 4294967295 1\n"
+      "32 4 4 32 4 -6 5 1 1\n"
+      "1x 1 3 1 32 1 126 13 7 1\n");
+}
+
 }  // namespace
