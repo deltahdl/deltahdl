@@ -465,4 +465,22 @@ TEST(PortConnectionSchedulingSim, InoutPortOnSelectsJoinsEveryKindOfSource) {
   }
 }
 
+TEST(PortConnectionSchedulingSim, InputPortOntoALocalVariableFollowsOutside) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(input var logic [7:0] a);\n"
+                       "  always @(a) if ($time > 0) $display(\"%0t a=%h\", "
+                       "$time, a);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic [7:0] src = 8'h11;\n"
+                       "  initial begin\n"
+                       "    #5 src = 8'h22;\n"
+                       "    #5 src = 8'h33;\n"
+                       "  end\n"
+                       "  child u(src + 8'h01);\n"
+                       "endmodule\n",
+                       f),
+            "5 a=23\n10 a=34\n");
+}
+
 }  // namespace

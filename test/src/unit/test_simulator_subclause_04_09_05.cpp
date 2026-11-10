@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
 #include "helpers_switch_network.h"
 #include "simulator/net.h"
 #include "simulator/switch_network.h"
@@ -158,6 +160,54 @@ TEST(BidirectionalSwitchNetwork,
   EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif1, {1, 1}));
   EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kTranif0, {0, 1}));
   EXPECT_TRUE(BidirSwitchControlIsUnknown(BidirSwitchKind::kRtranif1, {1, 1}));
+}
+
+std::string RunSwitch(const std::string& net_decl, const std::string& kind,
+                      const std::string& control) {
+  SimFixture f;
+  return RunCapture("module top;\n" + net_decl + "  logic c = 1'b" + control +
+                        ";\n"
+                        "  assign a = 1'b1;\n"
+                        "  " +
+                        kind +
+                        " t (a, b, c);\n"
+                        "  initial #1 $display(\"a=%b b=%b\", a, b);\n"
+                        "endmodule\n",
+                    f);
+}
+
+TEST(BidirectionalSwitchNetwork, BuiltinNetSwitchWithUnknownControlGivesX) {
+  for (const char* kind : {"tranif1", "tranif0", "rtranif1", "rtranif0"}) {
+    for (const char* control : {"x", "z"}) {
+      EXPECT_EQ(RunSwitch("  wire a, b;\n", kind, control), "a=1 b=x\n")
+          << kind << " " << control;
+    }
+  }
+}
+
+constexpr const char* kOredNets =
+    "  function automatic logic ored(input logic d[]);\n"
+    "    ored = 1'b0;\n"
+    "    foreach (d[i]) ored |= d[i];\n"
+    "  endfunction\n"
+    "  nettype logic ored_t with ored;\n"
+    "  ored_t a, b;\n"
+    "  assign b = 1'b0;\n";
+
+TEST(BidirectionalSwitchNetwork, UserDefinedNetSwitchWithUnknownControlIsOff) {
+  for (const char* kind : {"tranif1", "tranif0"}) {
+    for (const char* control : {"x", "z"}) {
+      EXPECT_EQ(RunSwitch(kOredNets, kind, control), "a=1 b=0\n")
+          << kind << " " << control;
+    }
+  }
+}
+
+TEST(BidirectionalSwitchNetwork, UserDefinedNetSwitchWithKnownControlConducts) {
+  EXPECT_EQ(RunSwitch(kOredNets, "tranif1", "1"), "a=1 b=1\n");
+  EXPECT_EQ(RunSwitch(kOredNets, "tranif0", "0"), "a=1 b=1\n");
+  EXPECT_EQ(RunSwitch(kOredNets, "tranif1", "0"), "a=1 b=0\n");
+  EXPECT_EQ(RunSwitch(kOredNets, "tranif0", "1"), "a=1 b=0\n");
 }
 
 }  // namespace
