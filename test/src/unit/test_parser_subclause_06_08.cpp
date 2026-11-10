@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -606,6 +607,212 @@ TEST(VariableDeclaration, PackageScopedTypedefWithPackedDimension) {
   EXPECT_EQ(items[0]->data_type.type_name, "ps_t");
   ASSERT_NE(items[0]->data_type.packed_dim_left, nullptr);
   EXPECT_EQ(items[0]->data_type.packed_dim_left->int_val, 1u);
+}
+
+constexpr std::string_view kVarRequired =
+    "data_declaration without an explicit data type requires the 'var' "
+    "keyword";
+
+TEST(VariableDeclarations, DISABLED_BareNameDeclarationIsErrorInEveryPlace) {
+  auto r = Parse(
+      "module m;\n"
+      "  x;\n"
+      "  y = 1;\n"
+      "  int w;\n"
+      "  w = 1;\n"
+      "endmodule\n"
+      "interface i;\n"
+      "  x;\n"
+      "  y = 1;\n"
+      "  int w;\n"
+      "  w = 1;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  x;\n"
+      "  y = 1;\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  x;\n"
+      "  y = 1;\n"
+      "  int w;\n"
+      "  w = 1;\n"
+      "endchecker\n"
+      "package k;\n"
+      "  x;\n"
+      "  y = 1;\n"
+      "endpackage\n"
+      "module g;\n"
+      "  if (1) begin : b\n"
+      "    x;\n"
+      "    y = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line :
+       {2U, 3U, 5U, 8U, 9U, 11U, 14U, 15U, 18U, 19U, 21U, 24U, 25U, 29U, 30U}) {
+    EXPECT_TRUE(ReportedError(r.diags, kVarRequired, line, "6.8"));
+  }
+}
+
+TEST(VariableDeclarations, DISABLED_BareNameAtCompilationUnitIsReportedAsSuch) {
+  auto r = Parse(
+      "x;\n"
+      "y = 1;\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVarRequired, 1, "6.8"));
+  EXPECT_TRUE(ReportedError(r.diags, kVarRequired, 2, "6.8"));
+}
+
+TEST(VariableDeclarations, BareNameWithVarOrADataTypeIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  var x = 1;\n"
+      "  logic y = 1;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(VariableDeclarations, DISABLED_PackedDimensionsAloneIsErrorInEveryPlace) {
+  auto r = Parse(
+      "[3:0] cu;\n"
+      "module m;\n"
+      "  [3:0] x;\n"
+      "  if (1) begin : b\n"
+      "    [3:0] y;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    [3:0] z;\n"
+      "  end\n"
+      "endmodule\n"
+      "interface i;\n"
+      "  [7:0] x;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  [3:0] x;\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  [3:0] x;\n"
+      "endchecker\n"
+      "package k;\n"
+      "  [3:0] x;\n"
+      "endpackage\n");
+  for (uint32_t line : {1U, 3U, 5U, 8U, 12U, 15U, 18U, 21U}) {
+    EXPECT_TRUE(ReportedError(r.diags, kVarRequired, line, "6.8"));
+  }
+}
+
+TEST(VariableDeclarations, SigningAloneIsErrorInADesignElementOrPackage) {
+  auto r = Parse(
+      "interface i;\n"
+      "  signed x;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  signed x;\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  signed x;\n"
+      "endchecker\n"
+      "package k;\n"
+      "  signed x;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  if (1) begin : b\n"
+      "    signed y;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {2U, 5U, 8U, 11U, 15U}) {
+    EXPECT_TRUE(ReportedError(r.diags, kVarRequired, line, "6.8"));
+  }
+}
+
+TEST(VariableDeclarations,
+     DISABLED_SigningAloneIsErrorInCompilationUnitAndProcedure) {
+  auto r = Parse(
+      "signed cu;\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    signed z;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVarRequired, 1, "6.8"));
+  EXPECT_TRUE(ReportedError(r.diags, kVarRequired, 4, "6.8"));
+}
+
+TEST(VariableDeclarations, VarWithImplicitTypeIsAcceptedInEveryPlace) {
+  auto r = Parse(
+      "var [3:0] cu;\n"
+      "interface i;\n"
+      "  var [7:0] x;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  var signed x;\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  var [7:0] x;\n"
+      "endchecker\n"
+      "package k;\n"
+      "  var signed y;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  if (1) begin : b\n"
+      "    var [7:0] x;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    var signed [7:0] y;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(VariableDeclarations, TypeRefWithoutVarIsErrorInEveryPlace) {
+  auto r = Parse(
+      "package p;\n"
+      "  int a;\n"
+      "  type(a) b;\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int a;\n"
+      "  type(a) b;\n"
+      "endclass\n"
+      "interface i;\n"
+      "  logic a;\n"
+      "  type(a) b;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  int a;\n"
+      "  initial begin\n"
+      "    type(a) b;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {3U, 7U, 11U, 16U}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "type_reference in a variable declaration must "
+                              "be preceded by the 'var' keyword",
+                              line, "6.8"));
+  }
+}
+
+TEST(VariableDeclarations, TypeRefAfterVarOrANetTypeIsAcceptedInEveryPlace) {
+  auto r = Parse(
+      "package p;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int a;\n"
+      "  var type(a) b;\n"
+      "endclass\n"
+      "interface i;\n"
+      "  logic a;\n"
+      "  var type(a) b;\n"
+      "  wire type(a) w;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic a;\n"
+      "  wire type(a) w;\n"
+      "  initial begin\n"
+      "    var type(a) v;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -313,6 +315,189 @@ TEST(StaticVariableInitializers,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(VarDecl, AutomaticInEveryNonProceduralPlaceIsError) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "interface i;\n"
+      "  automatic int x;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  automatic int x;\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  automatic int x;\n"
+      "endchecker\n"
+      "module t;\n"
+      "  for (genvar k = 0; k < 2; k++) begin : g\n"
+      "    automatic int x;\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : h\n"
+      "      automatic int y;\n"
+      "    end\n"
+      "  endcase\n"
+      "  if (1)\n"
+      "    automatic int z;\n"
+      "  var automatic logic v;\n"
+      "  const automatic int c = 1;\n"
+      "  const var automatic int d = 2;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2U, 5U, 8U, 12U, 16U, 20U, 21U, 22U, 23U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'automatic' is not allowed in a data_declaration outside", line,
+        "6.8"));
+  }
+}
+
+TEST(VarDecl, AutomaticInEveryProceduralPlaceOk) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  task m();\n"
+      "    automatic int a;\n"
+      "  endtask\n"
+      "endclass\n"
+      "interface i;\n"
+      "  initial begin automatic int x; end\n"
+      "endinterface\n"
+      "program p;\n"
+      "  initial begin automatic int x; end\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  initial begin automatic int x; end\n"
+      "endchecker\n"
+      "module t;\n"
+      "  task k();\n"
+      "    automatic int x;\n"
+      "  endtask\n"
+      "  function void fn();\n"
+      "    automatic int y;\n"
+      "  endfunction\n"
+      "  logic clk;\n"
+      "  initial fork automatic int z; join\n"
+      "  always @(posedge clk) begin : b\n"
+      "    automatic int w;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    var automatic logic v;\n"
+      "    const automatic int c = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(VarDecl, DISABLED_AutomaticInCompilationUnitIsError) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "automatic int x;\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'automatic' is not allowed in a data_declaration outside", 1, "6.8"));
+}
+
+TEST(VarDecl, DISABLED_AutomaticClassPropertyIsError) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "class C;\n"
+      "  automatic int x;\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'automatic' is not allowed in a data_declaration outside", 2, "6.8"));
+}
+
+TEST(VarDecl, StructWithoutPackedKeywordIsErrorInEveryPlace) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "struct { int a; } [1:0] cu;\n"
+      "package p;\n"
+      "  struct { int a; } [1:0] s;\n"
+      "endpackage\n"
+      "program q;\n"
+      "  struct { int a; } [1:0] s;\n"
+      "endprogram\n"
+      "class C;\n"
+      "  union { int a; int b; } [1:0] u;\n"
+      "endclass\n"
+      "interface i;\n"
+      "  struct { int a; } [1:0] s;\n"
+      "  typedef union { int a; } [1:0] U;\n"
+      "endinterface\n"
+      "checker c;\n"
+      "  struct { int a; } [1:0] s;\n"
+      "endchecker\n"
+      "module t(input struct { logic a; } [1:0] pt);\n"
+      "  typedef struct { int a; } [1:0] T;\n"
+      "  function void fn(struct { int a; } [1:0] s);\n"
+      "  endfunction\n"
+      "  if (1) begin : g\n"
+      "    struct { int a; } [1:0] s;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    struct { int a; } [1:0] s;\n"
+      "  end\n"
+      "  q qq();\n"
+      "  i ii();\n"
+      "  c cc();\n"
+      "  struct { struct { int y; } [1:0] m; } s2;\n"
+      "  function struct { int a; } [1:0] fr();\n"
+      "  endfunction\n"
+      "  task tk(input struct { int a; } [1:0] a);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    automatic struct { int a; } [1:0] s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line :
+       {1U, 3U, 6U, 12U, 16U, 18U, 19U, 20U, 23U, 26U, 31U, 32U, 34U, 37U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "packed dimension on struct requires the packed keyword", line, "7.2"));
+  }
+  for (uint32_t line : {9U, 13U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "packed dimension on union requires the packed keyword", line, "7.2"));
+  }
+}
+
+TEST(VarDecl, PackedStructWithPackedDimOkInAnInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n"
+      "  struct packed { int a; } [1:0] s;\n"
+      "  typedef union packed { int a; } [1:0] U;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  i ii();\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(VarDecl, BareNameInProcedureStaysAnExpressionStatement) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module t;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'x' names a variable or a net, and a call names a",
+                            4, "A.8.2"));
 }
 
 }  // namespace

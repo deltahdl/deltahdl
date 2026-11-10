@@ -437,4 +437,187 @@ TEST(VariableDeclaration, Logic4StateSubroutineLocalDefaultsToX) {
       "fa: l=x v=xxxx n=0 s=[] r=0.000000\nta: l=x\nfs: i=xxxx\nm: l=x\n");
 }
 
+TEST(VariableDeclaration, UrandomInitializerAtModuleScopeMatchesTheSameCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int r = $urandom;\n"
+                       "  int s = $urandom(7);\n"
+                       "  int e;\n"
+                       "  initial begin\n"
+                       "    e = $urandom(7);\n"
+                       "    $display(\"%0d\", s == e);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(VariableDeclaration, MailboxInitializedByNewIsUsableAtTimeZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  mailbox mb = new;\n"
+                       "  int v;\n"
+                       "  initial begin\n"
+                       "    mb.put(42);\n"
+                       "    mb.get(v);\n"
+                       "    $display(\"%0d\", v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "42\n");
+}
+
+TEST(VariableDeclaration,
+     DISABLED_FunctionCallInitializerIsSetBeforeAnyProcedureStarts) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function int f();\n"
+                       "    return 9;\n"
+                       "  endfunction\n"
+                       "  function int g(int a);\n"
+                       "    return a + 1;\n"
+                       "  endfunction\n"
+                       "  int v = f();\n"
+                       "  int w = g(4);\n"
+                       "  logic clk = 0;\n"
+                       "  initial $display(\"%0d %0d\", v, w);\n"
+                       "  always @(clk) $display(\"always %0d\", v);\n"
+                       "  initial #1 clk = 1;\n"
+                       "endmodule\n",
+                       f),
+            "9 5\nalways 9\n");
+}
+
+TEST(VariableDeclaration,
+     DISABLED_FunctionCallInitializerInAnInterfaceOrProgramIsSet) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface i;\n"
+                       "  function int h();\n"
+                       "    return 5;\n"
+                       "  endfunction\n"
+                       "  int iv = h();\n"
+                       "  mailbox mb = new;\n"
+                       "endinterface\n"
+                       "program p;\n"
+                       "  function int f();\n"
+                       "    return 6;\n"
+                       "  endfunction\n"
+                       "  int qv = f();\n"
+                       "  initial $display(\"p %0d\", qv);\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  i ii();\n"
+                       "  p pp();\n"
+                       "  int v;\n"
+                       "  initial begin\n"
+                       "    ii.mb.put(1);\n"
+                       "    ii.mb.get(v);\n"
+                       "    $display(\"m %0d %0d\", ii.iv, v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "m 5 1\np 6\n");
+}
+
+TEST(VariableDeclaration, RunTimeInitializersInAPackageAreSetBeforeProcedures) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package k;\n"
+                       "  function int f();\n"
+                       "    return 3;\n"
+                       "  endfunction\n"
+                       "  int pv = f();\n"
+                       "  int pu = $urandom(7) * 0 + 4;\n"
+                       "  mailbox mb = new;\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  int v;\n"
+                       "  initial begin\n"
+                       "    k::mb.put(8);\n"
+                       "    k::mb.get(v);\n"
+                       "    $display(\"%0d %0d %0d\", k::pv, k::pu, v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 4 8\n");
+}
+
+TEST(VariableDeclaration, StaticInitializerIsNoChangeAnAlwaysProcedureSees) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int i = 5;\n"
+                       "  int n = 0;\n"
+                       "  always @(i) n++;\n"
+                       "  initial #1 $display(\"%0d %0d\", i, n);\n"
+                       "endmodule\n",
+                       f),
+            "5 0\n");
+}
+
+TEST(VariableDeclaration, StaticClassMemberInitializerIsSetBeforeProcedures) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  static int s = 5;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d\", C::s);\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
+TEST(VariableDeclaration, EveryIntegralTypeStartsAtItsTableDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  integer a; time b; reg c; logic [2:0] d;\n"
+          "  byte e; shortint g; longint h; int i; bit [2:0] j;\n"
+          "  struct packed {bit [1:0] p; bit q;} k;\n"
+          "  struct packed {bit [1:0] p; logic q;} l;\n"
+          "  initial $display(\"%b %b %b %b %0d %0d %0d %0d %b %b %b\",\n"
+          "                   a[1:0], b[1:0], c, d, e, g, h, i, j, k, l);\n"
+          "endmodule\n",
+          f),
+      "xx xx x xxx 0 0 0 0 000 000 xxx\n");
+}
+
+TEST(VariableDeclaration,
+     StringInterfaceClassAndVirtualInterfaceStartEmptyOrNull) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface class IC;\n"
+                       "endclass\n"
+                       "interface I;\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  IC ic;\n"
+                       "  virtual I vi;\n"
+                       "  string s;\n"
+                       "  initial $display(\"%0d %0d [%s] %0d\", ic == null,\n"
+                       "                   vi == null, s, s.len());\n"
+                       "endmodule\n",
+                       f),
+            "1 1 [] 0\n");
+}
+
+TEST(VariableDeclaration, OnlySignedTypesKeepTheSignOfANegativeValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  byte a; shortint b; int c; integer d; longint e;\n"
+          "  logic [7:0] g; bit [7:0] h; reg [7:0] i; time j;\n"
+          "  logic signed [7:0] k; bit signed [7:0] l; reg signed [7:0] m;\n"
+          "  initial begin\n"
+          "    a = -1; b = -1; c = -1; d = -1; e = -1;\n"
+          "    g = -1; h = -1; i = -1; j = -1;\n"
+          "    k = -1; l = -1; m = -1;\n"
+          "    $display(\"%0d %0d %0d %0d %0d\", a, b, c, d, e);\n"
+          "    $display(\"%0d %0d %0d %0d\", g, h, i, j < 0);\n"
+          "    $display(\"%0d %0d %0d\", k, l, m);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "-1 -1 -1 -1 -1\n255 255 255 0\n-1 -1 -1\n");
+}
+
 }  // namespace
