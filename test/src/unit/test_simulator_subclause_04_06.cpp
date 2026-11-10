@@ -201,3 +201,54 @@ TEST(DeterminismSim, NBAOfATaskEnabledFirstIsPerformedFirst) {
       "a");
   EXPECT_EQ(result, 1u);
 }
+
+TEST(DeterminismSim, SuspendedBlockKeepsItsOrderWhileAnotherProcessRuns) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $display(\"a1\");\n"
+                       "    #2 $display(\"a2\");\n"
+                       "    $display(\"a3\");\n"
+                       "  end\n"
+                       "  initial #1 $display(\"b1\");\n"
+                       "  initial #3 $display(\"b2\");\n"
+                       "endmodule\n",
+                       f),
+            "a1\nb1\na2\na3\nb2\n");
+}
+
+TEST(DeterminismSim, NBAsOfTwoProcessesArePerformedInExecutionOrder) {
+  SimFixture f;
+  auto* a = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] a;\n"
+      "  initial #1 #0 a <= 8'd2;\n"
+      "  initial #1 a <= 8'd1;\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(a, nullptr);
+  EXPECT_EQ(a->value.ToUint64(), 2u);
+}
+
+TEST(DeterminismSim, OverlappingNBAsToOneVectorApplyInExecutionOrder) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] v, w;\n"
+      "  initial begin\n"
+      "    v <= 8'hff;\n"
+      "    v[3:0] <= 4'h0;\n"
+      "    w[3:0] <= 4'h0;\n"
+      "    w <= 8'hff;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  auto* v = f.ctx.FindVariable("v");
+  auto* w = f.ctx.FindVariable("w");
+  ASSERT_NE(v, nullptr);
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(v->value.ToUint64(), 0xf0u);
+  EXPECT_EQ(w->value.ToUint64(), 0xffu);
+}
