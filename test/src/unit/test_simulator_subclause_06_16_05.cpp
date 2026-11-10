@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -173,6 +174,32 @@ TEST(StringMethods, TolowerResultUsableAsStringOperand) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringTolowerSim, TolowerConvertsTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package p; string ps = \"PkG\"; endpackage\n"
+          "typedef struct { int n; string s; } rec_t;\n"
+          "class Q;\n"
+          "  string qs = \"QuEuE\";\n"
+          "  function string low(); return qs.tolower(); endfunction\n"
+          "endclass\n"
+          "module t;\n"
+          "  string dq [$], hi;\n"
+          "  rec_t r;\n"
+          "  Q q = new;\n"
+          "  function string g(); return \"WoRLD_9\"; endfunction\n"
+          "  initial begin\n"
+          "    dq.push_back(\"DeQue\"); r.s = \"ReC\"; hi = string'(8'hC9);\n"
+          "    $display(\"%s %s %s %s %s %0d %s\", p::ps.tolower(),\n"
+          "      q.low(), dq[0].tolower(), r.s.tolower(), g().tolower(),\n"
+          "      hi.tolower() == hi, q.qs);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "pkg queue deque rec world_9 1 QuEuE\n");
 }
 
 }  // namespace

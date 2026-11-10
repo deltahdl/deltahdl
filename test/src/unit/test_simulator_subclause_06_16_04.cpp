@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -173,6 +174,33 @@ TEST(StringMethods, ToupperResultUsableAsStringOperand) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringToupperSim, ToupperConvertsTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package p; string ps = \"pKg\"; endpackage\n"
+          "typedef struct { string s; int n; } st_t;\n"
+          "class K;\n"
+          "  string ks = \"KlaSs\";\n"
+          "  static string ss = \"sT\";\n"
+          "  function string up(); return ks.toupper(); endfunction\n"
+          "endclass\n"
+          "module t;\n"
+          "  string aa [int], hi;\n"
+          "  st_t st;\n"
+          "  K k = new;\n"
+          "  function string f(); return \"HeLlo\"; endfunction\n"
+          "  initial begin\n"
+          "    aa[3] = \"AsSoc\"; st.s = \"stRuct\"; hi = string'(8'hE9);\n"
+          "    $display(\"%s %s %s %s %s %s %0d %s\", p::ps.toupper(),\n"
+          "      K::ss.toupper(), k.up(), aa[3].toupper(), st.s.toupper(),\n"
+          "      f().toupper(), hi.toupper() == hi, k.ks);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "PKG ST KLASS ASSOC STRUCT HELLO 1 KlaSs\n");
 }
 
 }  // namespace

@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -265,6 +266,29 @@ TEST(StringMethods, IcompareResultIsSignedWhereverItIsUsed) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 7u);
+}
+
+TEST(StringIcompareSim, IcompareFoldsTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; string ps = \"PkG\"; endpackage\n"
+                 "typedef struct { int n; string s; } two_t;\n"
+                 "class D; static string ds = \"DyN\"; endclass\n"
+                 "module t;\n"
+                 "  string u = \"_\", aa [string];\n"
+                 "  two_t w;\n"
+                 "  function string m(); return \"MiXeD\"; endfunction\n"
+                 "  initial begin\n"
+                 "    w.s = \"TWO\"; aa[\"k\"] = \"Assoc\";\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d %0d\",\n"
+                 "      p::ps.icompare(\"pkg\"), D::ds.icompare(\"dyn\"),\n"
+                 "      w.s.icompare(aa[\"k\"]) > 0, m().icompare(\"mixed\"),\n"
+                 "      u.icompare(\"a\") < 0, u.icompare(\"A\") < 0,\n"
+                 "      u.compare(\"A\") > 0);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 0 1 0 1 1 1\n");
 }
 
 }  // namespace

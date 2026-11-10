@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -229,6 +230,29 @@ TEST(StringMethods, CompareResultIsSignedWhereverItIsUsed) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 7u);
+}
+
+TEST(StringCompareSim, CompareOrdersTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; string ps = \"pkg\"; endpackage\n"
+                 "typedef struct { string s; } one_t;\n"
+                 "class C; string cs = \"Class\"; endclass\n"
+                 "module t;\n"
+                 "  string hi, lo = \"a\";\n"
+                 "  one_t o;\n"
+                 "  C c = new;\n"
+                 "  function string h(); return \"Help\"; endfunction\n"
+                 "  initial begin\n"
+                 "    o.s = \"one\"; hi = string'(8'hE9);\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d\",\n"
+                 "      p::ps.compare(\"pkg\"), c.cs.compare(\"class\") < 0,\n"
+                 "      o.s.compare(h()) > 0, h().compare(\"Hello\") > 0,\n"
+                 "      hi.compare(lo) > 0, lo.compare(hi) < 0);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 1 1 1 1 1\n");
 }
 
 }  // namespace

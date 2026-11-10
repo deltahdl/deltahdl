@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -264,6 +265,29 @@ TEST(StringMethods, SubstrOnDefaultInitializedOperandYieldsEmpty) {
       "endmodule\n",
       "n");
   EXPECT_EQ(v, 1u);
+}
+
+TEST(StringSubstrSim, SubstrTakesTheStringWhereverItIsReached) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p; string ps = \"pKg\"; endpackage\n"
+                 "typedef struct { string s; int n; } st_t;\n"
+                 "class K; string ks = \"klass\"; endclass\n"
+                 "module t;\n"
+                 "  string da [];\n"
+                 "  st_t st;\n"
+                 "  K k = new;\n"
+                 "  function string f(); return \"HeLLo\"; endfunction\n"
+                 "  initial begin\n"
+                 "    da = new[1]; da[0] = \"dynamic\"; st.s = \"StRuct\";\n"
+                 "    $display(\"%s %s %s %s %s %s\", f().substr(1, 3),\n"
+                 "      st.s.substr(0, 2).toupper(), p::ps.substr(1, 2),\n"
+                 "      k.ks.substr(2, 4), da[0].substr(3, 6),\n"
+                 "      f().substr(1, 4).substr(1, 2));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "eLL STR Kg ass amic LL\n");
 }
 
 }  // namespace
