@@ -157,4 +157,35 @@ TEST(SpecparamParsing, SpecparamInBothSpecifyAndModuleBody) {
   EXPECT_EQ(items[1]->kind, ModuleItemKind::kSpecifyBlock);
 }
 
+TEST(SpecparamParsing, SpecparamInAGenerateBlockIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  if (1) begin : g specparam sp = 1; end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block or region",
+                            2, "27.2"));
+}
+
+TEST(SpecparamParsing, SpecparamInProceduralCodeIsReported) {
+  for (const char* src :
+       {"module t;\n  function int f(); specparam sp = 1; return sp;\n"
+        "  endfunction\nendmodule\n",
+        "module t;\n  initial begin specparam sp = 1; end\nendmodule\n"}) {
+    SCOPED_TRACE(src);
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+  }
+}
+
+TEST(SpecparamParsing, SpecparamInTheModuleBodyAndASpecifyBlockIsAccepted) {
+  auto r = Parse(
+      "module t;\n"
+      "  specparam a = 2, b = a * 3.5;\n"
+      "  specify specparam c = b; endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

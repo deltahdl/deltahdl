@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 #include "helpers_param_value.h"
 #include "helpers_param_value_assignability.h"
 #include "helpers_reported_error.h"
@@ -536,6 +537,42 @@ TEST(LocalparamElaboration, CompilationUnitParameterFromAPackageParameter) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(ParamValue(design, "Q"), 4);
+}
+
+TEST(LocalparamElaboration, LocalGroupEndsAtTheNextParameterKeyword) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module child #(parameter int A = 1, localparam int B = 2,\n"
+                 "               int C = 3, parameter int D = 4) ();\n"
+                 "  initial $display(\"%0d %0d %0d %0d\", A, B, C, D);\n"
+                 "endmodule\n"
+                 "module top; child #(.D(9)) u(); endmodule\n",
+                 f),
+      "1 2 3 9\n");
+}
+
+TEST(LocalparamElaboration, TypeParameterInALocalGroupRejectsAnOverride) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(localparam int B = 2, type T = int) (); T x;\n"
+      "endmodule\n"
+      "module top; m #(.T(byte)) u(); endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'm' has no parameter 'T'", 3, "23.10.2.2"));
+}
+
+TEST(LocalparamElaboration, TypeParameterInALocalGroupKeepsItsDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m #(localparam int B = 2, type T = int) (); T x;\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  m u();\n"
+                 "  initial $display(\"%0d\", $bits(u.x));\n"
+                 "endmodule\n",
+                 f),
+      "32\n");
 }
 
 }  // namespace
