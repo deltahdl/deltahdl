@@ -2,8 +2,11 @@
 
 #include <cstdint>
 #include <format>
+#include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
+#include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -303,6 +306,95 @@ TEST(Elaboration, EnumRangeLrmExample) {
   EXPECT_EQ(it->second[6].value, 16);
   EXPECT_EQ(it->second[8].name, "jmp8");
   EXPECT_EQ(it->second[8].value, 18);
+}
+
+TEST(Elaboration, EnumRangesGenerateTheirConstantsInEveryPlace) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef enum {cu[2] = 5} cu_e;\n"
+          "package p; typedef enum {pk[1:3]} pk_e; endpackage\n"
+          "class K; typedef enum {kc[3:1] = 7} k_e; endclass\n"
+          "interface ifc; typedef enum {ii[2]} i_e; i_e v = ii1; endinterface\n"
+          "module t;\n"
+          "  typedef enum {x = 3, r[2], s[4:4], u} m_e;\n"
+          "  m_e m;\n"
+          "  ifc i();\n"
+          "  function automatic int ff();\n"
+          "    typedef enum {fn[2:0]} f_e;\n"
+          "    f_e e = fn0;\n"
+          "    return e;\n"
+          "  endfunction\n"
+          "  initial begin\n"
+          "    m = m.last();\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d\", cu1, p::pk3,\n"
+          "      K::kc1, i.v, ff(), r0, r1, s4, m);\n"
+          "    $display(\"%s %s %0d %s\", m.name(), m.prev().name(), m.num(),\n"
+          "      K::kc2.name());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "6 2 9 1 2 4 5 6 7\nu s4 5 kc2\n");
+}
+
+TEST(Elaboration, DISABLED_EnumRangeNameDuplicatingAnotherIsReported) {
+  std::string src =
+      "typedef enum {cu0, cu[2]} cu_e;\n"
+      "package p; typedef enum {pk[1:3], pk2} pk_e; endpackage\n"
+      "class K; typedef enum {kc[2], kc[1:0]} k_e; endclass\n"
+      "module t;\n"
+      "  typedef enum {a1, a[2] = 5} m_e;\n"
+      "  function automatic void ff();\n"
+      "    typedef enum {fn[3:1], fn[2]} f_e;\n"
+      "  endfunction\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  for (std::string_view at :
+       {"} cu_e;", "} pk_e;", "} k_e;", "} m_e;", "} f_e;"}) {
+    SCOPED_TRACE(at);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "duplicate enum member name",
+                              LineHolding(src, at), "6.19"));
+  }
+}
+
+TEST(Elaboration, DISABLED_EnumRangeValuePastTheBaseTypeIsReported) {
+  std::string src =
+      "typedef enum bit [1:0] {cu[5]} cu_e;\n"
+      "package p; typedef enum bit [1:0] {pk[3:7]} pk_e; endpackage\n"
+      "class K; typedef enum bit [1:0] {kc[2] = 3} k_e; endclass\n"
+      "module t;\n"
+      "  typedef enum logic [2:0] {a = 6, b[1:0]} m_e;\n"
+      "  function automatic void ff();\n"
+      "    typedef enum bit {fn[0:2] = 0} f_e;\n"
+      "  endfunction\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  for (std::string_view at :
+       {"} cu_e;", "} pk_e;", "} k_e;", "} m_e;", "} f_e;"}) {
+    SCOPED_TRACE(at);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "exceeds maximum representable value",
+                              LineHolding(src, at), "6.19"));
+  }
+}
+
+TEST(Elaboration, EnumRangesThatFitAndNameDistinctConstantsAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef enum bit [1:0] {cu[4]} cu_e;\n"
+      "package p; typedef enum bit [1:0] {pk[2:4], pk1x} pk_e; endpackage\n"
+      "class K; typedef enum bit [1:0] {kc[1] = 3} k_e; endclass\n"
+      "module t;\n"
+      "  typedef enum logic [2:0] {a = 4, b[1:0], a0} m_e;\n"
+      "  function automatic void ff();\n"
+      "    typedef enum bit {fn[0:1] = 0} f_e;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
