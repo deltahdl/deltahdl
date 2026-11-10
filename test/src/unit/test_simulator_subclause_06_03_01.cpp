@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <string>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -225,6 +226,29 @@ TEST(LogicValuesSim, UnknownAndHighImpedanceDoNotDriveTrueConditionFromSource) {
     ASSERT_NE(r, nullptr);
     EXPECT_EQ(r->value.ToUint64(), 0x55u) << "condition literal: " << lit;
   }
+}
+
+TEST(LogicValuesSim,
+     HighImpedanceAtAGateInputActsAsUnknownButAMosSwitchPassesIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  wire a, an, o, bf, n, x, nm, pm, cm;\n"
+      "  assign a = 1'bz;\n"
+      "  and  g1 (an, a, 1'b1);\n"
+      "  or   g2 (o, a, 1'b0);\n"
+      "  buf  g3 (bf, a);\n"
+      "  not  g4 (n, a);\n"
+      "  xor  g5 (x, a, 1'b0);\n"
+      "  nmos m1 (nm, a, 1'b1);\n"
+      "  pmos m2 (pm, a, 1'b0);\n"
+      "  cmos m3 (cm, a, 1'b1, 1'b0);\n"
+      "  initial #1 $display(\"%b %b %b %b %b %b %b %b\", an, o, bf, n, x, "
+      "nm,\n"
+      "                      pm, cm);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "x x x x x z z z\n");
 }
 
 }  // namespace
