@@ -395,4 +395,97 @@ TEST(StringMethodElaboration, PackageScopeIsNoSelectFromAString) {
              "endmodule\n"));
 }
 
+constexpr std::string_view kStringToNumeric =
+    "type-incompatible assignment between string and numeric type";
+
+::testing::AssertionResult StringRuleReportedOn(const std::string& src,
+                                                std::string_view marker) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  return ReportedError(f.diag.Diagnostics(), kStringToNumeric,
+                       LineHolding(src, marker), "6.16");
+}
+
+TEST(Elaboration,
+     AStringWrittenToACharacterInAnInterfaceProgramOrModuleIsReported) {
+  EXPECT_TRUE(StringRuleReportedOn(
+      "interface ifc;\n  string a, b;\n  initial a[0] = b;\nendinterface\n"
+      "module t;\n  ifc i();\nendmodule\n",
+      "a[0] = b"));
+  EXPECT_TRUE(StringRuleReportedOn(
+      "program pg;\n  string a, b;\n  initial a[0] = b;\nendprogram\n"
+      "module t;\n  pg u();\nendmodule\n",
+      "a[0] = b"));
+  EXPECT_TRUE(StringRuleReportedOn(
+      "module t;\n  string a, b;\n  initial a[0] = b;\nendmodule\n",
+      "a[0] = b"));
+}
+
+TEST(
+    Elaboration,
+    DISABLED_AStringWrittenToACharacterInAClassPackageUnitOrGenerateBlockIsReported) {
+  EXPECT_TRUE(StringRuleReportedOn(
+      "class C;\n  string a, b;\n  function void f();\n    a[0] = b;\n"
+      "  endfunction\nendclass\nmodule t;\nendmodule\n",
+      "a[0] = b"));
+  EXPECT_TRUE(StringRuleReportedOn(
+      "package k;\n  string a, b;\n  function void f();\n    a[0] = b;\n"
+      "  endfunction\nendpackage\nmodule t;\nendmodule\n",
+      "a[0] = b"));
+  EXPECT_TRUE(StringRuleReportedOn(
+      "string a, b;\nfunction void f();\n  a[0] = b;\nendfunction\n"
+      "module t;\nendmodule\n",
+      "a[0] = b"));
+  EXPECT_TRUE(
+      StringRuleReportedOn("module t;\n  if (1) begin : g\n    string a, b;\n"
+                           "    initial a[0] = b;\n  end\nendmodule\n",
+                           "a[0] = b"));
+}
+
+TEST(Elaboration,
+     ACharacterOrALiteralWrittenToACharacterIsAcceptedInEveryPlace) {
+  EXPECT_TRUE(ElabOk(
+      "class C;\n  string a, b;\n  function void f();\n    a[0] = b[0];\n"
+      "  endfunction\nendclass\npackage k;\n  string a;\n"
+      "  function void f();\n    a[0] = \"h\";\n  endfunction\nendpackage\n"
+      "string ua;\nbyte ub;\nfunction void f();\n  ua[0] = ub;\nendfunction\n"
+      "interface ifc;\n  string a;\n  initial a[1] = 8'h41;\nendinterface\n"
+      "module t;\n  ifc i();\n  if (1) begin : g\n    string a;\n"
+      "    initial a[0] = 66;\n  end\nendmodule\n"));
+}
+
+TEST(Elaboration,
+     DISABLED_ANonConstantReplicationOfLiteralsIntoAnIntegralIsReported) {
+  EXPECT_TRUE(
+      StringRuleReportedOn("module t;\n  logic [15:0] r;\n  integer i = 2;\n"
+                           "  initial r = {i{\"Hi\"}};\nendmodule\n",
+                           "r = {i"));
+  EXPECT_TRUE(StringRuleReportedOn(
+      "class C;\n  logic [15:0] r;\n  int i = 2;\n  function void f();\n"
+      "    r = {i{\"Hi\"}};\n  endfunction\nendclass\nmodule t;\nendmodule\n",
+      "r = {i"));
+  EXPECT_TRUE(StringRuleReportedOn(
+      "package k;\n  logic [15:0] r;\n  int i = 2;\n  function void f();\n"
+      "    r = {i{\"Hi\"}};\n  endfunction\nendpackage\nmodule t;\nendmodule\n",
+      "r = {i"));
+}
+
+TEST(Elaboration,
+     ReplicationsOfStringsIntoStringsOrConstantLiteralsAreAccepted) {
+  EXPECT_TRUE(ElabOk(
+      "module t;\n  logic [31:0] r;\n  integer i = 2;\n  string a, b = \"x\";\n"
+      "  initial begin\n    a = {i{\"Hi\"}};\n    a = {i{b}};\n"
+      "    r = {2{\"Hi\"}};\n    a = {5{\"Hi\"}};\n    a = {a, b};\n"
+      "    a = {\"Hi\", b};\n  end\nendmodule\n"));
+}
+
+TEST(Elaboration,
+     DISABLED_AZeroReplicationOfStringsStandsAloneAsTheEmptyString) {
+  EXPECT_TRUE(ElabOk(
+      "module t;\n  parameter string P = {0{\"ab\"}};\n  string s, b = \"x\";\n"
+      "  int n;\n  initial begin\n    s = {0{\"ab\"}};\n    s = {0{b}};\n"
+      "    s = {0{\"ab\", \"c\"}};\n    n = {0{\"ab\"}} == \"\";\n  end\n"
+      "endmodule\n"));
+}
+
 }  // namespace
