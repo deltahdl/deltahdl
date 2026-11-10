@@ -236,6 +236,55 @@ TEST(DataTypeParsing, HierarchicalTypeReferenceRejected) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '.'", 6, "6.8"));
 }
 
+TEST(DataTypeParsing, InterfacePortTypeWrittenWithoutALocalTypedefIsRejected) {
+  auto r = Parse(
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n"
+      "module sub(intf_i p);\n"
+      "  p.data_t data;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '.'", 5, "6.8"));
+}
+
+TEST(
+    DataTypeParsing,
+    DISABLED_TypeNamedBeforeItsTypedefInAClassSubroutineBlockOrUnitIsReported) {
+  for (const char* src : {
+           "class C;\n"
+           "  t_t v;\n"
+           "  typedef int t_t;\n"
+           "endclass\n",
+           "module m;\n"
+           "  function void f();\n"
+           "    t_t v;\n"
+           "    typedef int t_t;\n"
+           "  endfunction\n"
+           "endmodule\n",
+           "class C;\n"
+           "  function void f();\n"
+           "    t_t v;\n"
+           "    typedef int t_t;\n"
+           "  endfunction\n"
+           "endclass\n",
+           "module m;\n"
+           "  initial begin\n"
+           "    t_t v;\n"
+           "    typedef int t_t;\n"
+           "  end\n"
+           "endmodule\n",
+           "t_t v;\n"
+           "typedef int t_t;\n",
+       }) {
+    SCOPED_TRACE(src);
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "declaration of type 't_t' does not precede this reference to it",
+        LineHolding(src, "t_t v;"), "6.18"));
+  }
+}
+
 TEST(DataTypeParsing, InterfacePortTypedef) {
   auto r = Parse(
       "interface intf_i;\n"

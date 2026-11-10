@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 
 #include "common/arena.h"
 #include "elaborator/rtlir.h"
@@ -361,6 +362,314 @@ TEST(TypedefSim, BlockTypeNameWalkStepsOverANullStatement) {
   auto& shaped_decls = f.ctx.ClassTypedefShapedDecls();
   ASSERT_TRUE(shaped_decls.contains(decl));
   EXPECT_EQ(shaped_decls.at(decl)->var_decl_type.kind, DataTypeKind::kInt);
+}
+
+std::string BitsInEveryLocalScope(std::string_view typedef_line,
+                                  std::string_view operand) {
+  std::string decls = "      " + std::string(typedef_line) + "\n      t_t v;\n";
+  std::string bits = "$bits(" + std::string(operand) + ")";
+  return "module t;\n"
+         "  typedef logic [3:0] m_t;\n"
+         "  class C;\n"
+         "    function int f();\n" +
+         decls + "      return " + bits +
+         ";\n"
+         "    endfunction\n"
+         "  endclass\n"
+         "  function automatic int fa();\n" +
+         decls + "      return " + bits +
+         ";\n"
+         "  endfunction\n"
+         "  function int fs();\n" +
+         decls + "      return " + bits +
+         ";\n"
+         "  endfunction\n"
+         "  task tk(output int r);\n" +
+         decls + "      r = " + bits +
+         ";\n"
+         "  endtask\n"
+         "  initial begin\n"
+         "    C c;\n"
+         "    int r;\n"
+         "    c = new;\n"
+         "    $display(\"%0d\", fa());\n"
+         "    $display(\"%0d\", fs());\n"
+         "    tk(r);\n"
+         "    $display(\"%0d\", r);\n"
+         "    begin : nb\n" +
+         decls + "      $display(\"%0d\", " + bits +
+         ");\n"
+         "    end\n"
+         "    begin\n" +
+         decls + "      $display(\"%0d\", " + bits +
+         ");\n"
+         "    end\n"
+         "    fork\n" +
+         decls + "      $display(\"%0d\", " + bits +
+         ");\n"
+         "    join\n"
+         "    $display(\"%0d\", c.f());\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string SevenLinesOf(std::string_view value) {
+  std::string out;
+  for (int i = 0; i < 7; ++i) out += std::string(value) + "\n";
+  return out;
+}
+
+constexpr std::string_view kLocalStruct =
+    "typedef struct packed { logic [7:0] a; m_t e; } t_t;";
+constexpr std::string_view kLocalSoftUnion =
+    "typedef union soft packed { logic [7:0] a; logic [3:0] b; } t_t;";
+constexpr std::string_view kLocalVector = "typedef logic [5:0] t_t;";
+constexpr std::string_view kLocalPackedArray = "typedef m_t [2:0] t_t;";
+constexpr std::string_view kLocalUnpackedArray = "typedef int t_t [3];";
+constexpr std::string_view kLocalEnum = "typedef enum shortint {A, B} t_t;";
+
+TEST(TypedefSim, DISABLED_LocalStructTypedefNameBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalStruct, "t_t"), f),
+            SevenLinesOf("12"));
+}
+
+TEST(TypedefSim, LocalStructTypedefVariableBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalStruct, "v"), f),
+            SevenLinesOf("12"));
+}
+
+TEST(TypedefSim, DISABLED_LocalSoftUnionTypedefNameBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalSoftUnion, "t_t"), f),
+            SevenLinesOf("8"));
+}
+
+TEST(TypedefSim, LocalSoftUnionTypedefVariableBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalSoftUnion, "v"), f),
+            SevenLinesOf("8"));
+}
+
+TEST(TypedefSim, DISABLED_LocalVectorTypedefNameBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalVector, "t_t"), f),
+            SevenLinesOf("6"));
+}
+
+TEST(TypedefSim, LocalVectorTypedefVariableBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalVector, "v"), f),
+            SevenLinesOf("6"));
+}
+
+TEST(TypedefSim, DISABLED_LocalPackedArrayTypedefNameBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalPackedArray, "t_t"), f),
+            SevenLinesOf("12"));
+}
+
+TEST(TypedefSim, LocalPackedArrayTypedefVariableBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalPackedArray, "v"), f),
+            SevenLinesOf("12"));
+}
+
+TEST(TypedefSim, DISABLED_LocalUnpackedArrayTypedefNameBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalUnpackedArray, "t_t"), f),
+            SevenLinesOf("96"));
+}
+
+TEST(TypedefSim,
+     DISABLED_LocalUnpackedArrayTypedefVariableBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalUnpackedArray, "v"), f),
+            SevenLinesOf("96"));
+}
+
+TEST(TypedefSim, DISABLED_LocalEnumTypedefNameBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalEnum, "t_t"), f),
+            SevenLinesOf("16"));
+}
+
+TEST(TypedefSim, LocalEnumTypedefVariableBitsInEveryLocalScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalEnum, "v"), f),
+            SevenLinesOf("16"));
+}
+
+TEST(TypedefSim, DISABLED_LocalTypedefHidesTheModuleTypedefOfItsName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef logic [9:0] s_t;\n"
+                       "  function int f();\n"
+                       "    typedef logic [2:0] s_t;\n"
+                       "    return $bits(s_t);\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    $display(\"%0d\", f());\n"
+                       "    begin : b\n"
+                       "      typedef logic [4:0] s_t;\n"
+                       "      $display(\"%0d\", $bits(s_t));\n"
+                       "    end\n"
+                       "    $display(\"%0d\", $bits(s_t));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3\n5\n10\n");
+}
+
+std::string InterfaceBasedTypedefSource(std::string_view data_type,
+                                        std::string_view body) {
+  return "interface intf_i;\n"
+         "  typedef " +
+         std::string(data_type) +
+         " data_t;\n"
+         "endinterface\n"
+         "module sub(intf_i p);\n"
+         "  typedef p.data_t my_data_t;\n"
+         "  my_data_t data;\n"
+         "  initial begin\n" +
+         std::string(body) +
+         "  end\n"
+         "endmodule\n"
+         "module top;\n"
+         "  intf_i i();\n"
+         "  sub s(i);\n"
+         "endmodule\n";
+}
+
+TEST(TypedefSim, InterfaceBasedTypedefOfIntIsSignedTwoStateAndThirtyTwoBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(InterfaceBasedTypedefSource(
+                           "int",
+                           "    data = -1;\n"
+                           "    data = data >>> 1;\n"
+                           "    $display(\"%0d %0d\", $bits(data), data);\n"
+                           "    data = 'x;\n"
+                           "    $display(\"%0d\", data);\n"),
+                       f),
+            "32 -1\n0\n");
+}
+
+TEST(TypedefSim, InterfaceBasedTypedefOfALogicVectorKeepsItsWidthAndZ) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(InterfaceBasedTypedefSource(
+                           "logic [7:0]",
+                           "    data = 'z;\n"
+                           "    $display(\"%0d %b\", $bits(data), data);\n"),
+                       f),
+            "8 zzzzzzzz\n");
+}
+
+TEST(TypedefSim, InterfaceBasedTypedefOfAPackedStructReachesItsMembers) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(InterfaceBasedTypedefSource(
+                     "struct packed { logic [3:0] hi; logic [1:0] lo; }",
+                     "    data.hi = 5;\n"
+                     "    data.lo = 2;\n"
+                     "    $display(\"%0d %0d %0d\", $bits(data), data.hi, "
+                     "data);\n"),
+                 f),
+      "6 5 22\n");
+}
+
+TEST(TypedefSim,
+     DISABLED_InterfaceBasedTypedefThroughAGenericPortTakesEachInterfacesType) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ia;\n"
+      "  typedef logic [3:0] data_t;\n"
+      "endinterface\n"
+      "interface ib;\n"
+      "  typedef logic [9:0] data_t;\n"
+      "endinterface\n"
+      "module sub(interface p);\n"
+      "  typedef p.data_t my_data_t;\n"
+      "  my_data_t data;\n"
+      "  initial $display(\"%0d\", $bits(data));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ia a();\n"
+      "  ib b();\n"
+      "  sub s1(a);\n"
+      "  sub s2(b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(out == "4\n10\n" || out == "10\n4\n") << out;
+}
+
+TEST(TypedefSim, InterfaceBasedTypedefThroughAModportPortTakesTheType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface intf_i;\n"
+                       "  typedef logic [4:0] data_t;\n"
+                       "  logic x;\n"
+                       "  modport mp(input x);\n"
+                       "endinterface\n"
+                       "module sub(intf_i.mp p);\n"
+                       "  typedef p.data_t my_data_t;\n"
+                       "  my_data_t data;\n"
+                       "  initial $display(\"%0d\", $bits(data));\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  intf_i i();\n"
+                       "  sub s(i.mp);\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
+TEST(TypedefSim, InterfaceBasedTypedefThroughAPortArrayElementTakesTheType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface intf_i;\n"
+                       "  typedef logic [6:0] data_t;\n"
+                       "endinterface\n"
+                       "module sub(intf_i p [2]);\n"
+                       "  typedef p[0].data_t my_data_t;\n"
+                       "  my_data_t data;\n"
+                       "  initial $display(\"%0d\", $bits(data));\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  intf_i i [2] ();\n"
+                       "  sub s(i);\n"
+                       "endmodule\n",
+                       f),
+            "7\n");
+}
+
+TEST(TypedefSim, CastToAnUnpackedArrayTypeGoesThroughItsTypedefName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef int arr_t [3];\n"
+                       "  arr_t a;\n"
+                       "  int b [3];\n"
+                       "  initial begin\n"
+                       "    b = '{1, 2, 3};\n"
+                       "    a = arr_t'(b);\n"
+                       "    $display(\"%0d %0d\", a[0], a[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 3\n");
+}
+
+TEST(TypedefSim,
+     DISABLED_TypeParameterGivenAnUnpackedArrayTypedefKeepsItsDimensions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub #(parameter type T = int);\n"
+                       "  T v;\n"
+                       "  initial $display(\"%0d %0d\", $size(v), $bits(v));\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  typedef byte arr_t [4];\n"
+                       "  sub #(.T(arr_t)) s();\n"
+                       "endmodule\n",
+                       f),
+            "4 32\n");
 }
 
 }  // namespace
