@@ -636,4 +636,50 @@ TEST(ImplicitDeclaration,
                             "10.3"));
 }
 
+TEST(ImplicitDeclaration,
+     InterfaceProgramAndCheckerInstancePortsForbiddenUnderNone) {
+  ElabFixture f;
+  auto fid = f.mgr.AddFile("<test>",
+                           "interface i(input logic a);\n"
+                           "endinterface\n"
+                           "program p(input logic a);\n"
+                           "endprogram\n"
+                           "checker c(logic a);\n"
+                           "endchecker\n"
+                           "module top;\n"
+                           "  i ii(.a(n1));\n"
+                           "  p pp(.a(n2));\n"
+                           "  c cc(n3);\n"
+                           "endmodule\n");
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  cu->default_nettype = NetType::kNone;
+  Elaborator elab(f.arena, f.diag, cu);
+  elab.Elaborate("top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'n1' forbidden by", 8, "22.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'n2' forbidden by", 9, "22.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'n3' forbidden by", 10, "22.8"));
+}
+
+TEST(ImplicitDeclaration,
+     DISABLED_ProceduralCheckerInstanceDeclaresNoImplicitNet) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "checker c(logic a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  always @(posedge clk) begin\n"
+      "    c cc(nproc);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier 'nproc'", 6, "23.9"));
+}
+
 }  // namespace

@@ -254,9 +254,13 @@ TEST(VectorSpecification, DISABLED_NonConstantOrRealBoundIsError) {
       "  parameter real R = 2.0;\n"
       "  logic [R:0] k;\n"
       "  logic [3:0][n:0] l;\n"
+      "  typedef logic [3:0] U;\n"
+      "  U [n:0] o;\n"
+      "  typedef enum logic [1:0] { A, B } E;\n"
+      "  E [n:0] q;\n"
       "endmodule\n",
       f);
-  for (uint32_t line : {4U, 5U, 9U, 10U, 11U, 12U, 14U, 15U}) {
+  for (uint32_t line : {4U, 5U, 9U, 10U, 11U, 12U, 14U, 15U, 17U, 19U}) {
     EXPECT_TRUE(
         ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
   }
