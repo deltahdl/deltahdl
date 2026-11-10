@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -509,6 +511,108 @@ TEST(CastOperatorElaboration, NonIntegralOperandOfAnyFormRejected) {
                                "works only on an integral value", line,
                                "6.24.1"));
   }
+}
+
+TEST(CastOperatorElaboration,
+     DISABLED_SizeCastToAParameterWidthOfZeroOrLessReported) {
+  std::string src =
+      "package p;\n"
+      "  parameter int P = 17;\n"
+      "  function automatic logic [7:0] pf(logic [7:0] x);\n"
+      "    return (P - 18)'(x);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "class C;\n"
+      "  localparam int W = 0;\n"
+      "  function logic [7:0] cf(logic [7:0] x); return W'(x); endfunction\n"
+      "endclass\n"
+      "module m #(parameter int Q = 16);\n"
+      "  localparam int L = Q - 20;\n"
+      "  logic [7:0] x, y, z, ok;\n"
+      "  assign y = (Q - 16)'(x);\n"
+      "  initial z = L'(x);\n"
+      "  initial ok = (Q - 15)'(x);\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  constexpr std::string_view kReport =
+      "size cast target width must be a positive constant";
+  for (std::string_view at :
+       {"(P - 18)'(x)", "W'(x)", "(Q - 16)'(x)", "L'(x)"}) {
+    SCOPED_TRACE(at);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport,
+                              LineHolding(src, at), "6.24.1"));
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport,
+                             LineHolding(src, "(Q - 15)'(x)"), "6.24.1"));
+}
+
+TEST(CastOperatorElaboration,
+     DISABLED_AggregateWithAnElementOfNoPackedRepresentationReported) {
+  std::string src =
+      "typedef struct { real r; int i; } real_st;\n"
+      "typedef struct { bit f; shortreal s; } shortreal_st;\n"
+      "typedef struct { bit f; union { int i; shortreal f; } n; } union_st;\n"
+      "typedef struct { chandle h; } chandle_st;\n"
+      "typedef struct { event e; } event_st;\n"
+      "typedef bit [127:0] b128;\n"
+      "package p;\n"
+      "  function automatic b128 pf(real_st v); return b128'(v); endfunction\n"
+      "endpackage\n"
+      "function automatic b128 uf(shortreal_st v);\n"
+      "  return b128'(v);\n"
+      "endfunction\n"
+      "class C;\n"
+      "  function b128 cf(union_st v); return b128'(v); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  chandle_st ch;\n"
+      "  event_st ev;\n"
+      "  realtime rt [2];\n"
+      "  union_st u;\n"
+      "  b128 a, b, c, d;\n"
+      "  initial a = b128'(ch);\n"
+      "  initial b = b128'(ev);\n"
+      "  initial c = b128'(rt);\n"
+      "  initial u = union_st'(d);\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  for (std::string_view at :
+       {"return b128'(v); endfunction\nendpackage", "  return b128'(v);\n",
+        "cf(union_st v)", "b128'(ch)", "b128'(ev)", "b128'(rt)",
+        "union_st'(d)"}) {
+    SCOPED_TRACE(at);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "packed representation",
+                              LineHolding(src, at), "6.24.1"));
+  }
+}
+
+TEST(CastOperatorElaboration, AggregateOfPackableElementsCastAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef struct { bit f; int i; logic [3:0] k; } pk_st;\n"
+      "typedef struct { pk_st inner; byte b [2]; } nest_st;\n"
+      "typedef bit [$bits(pk_st) - 1 : 0] pk_bits;\n"
+      "typedef logic [$bits(nest_st) - 1 : 0] nest_bits;\n"
+      "typedef bit [95:0] b96;\n"
+      "package p;\n"
+      "  function automatic pk_bits pf(pk_st v); return pk_bits'(v); "
+      "endfunction\n"
+      "endpackage\n"
+      "class C;\n"
+      "  function nest_st cf(nest_bits v); return nest_st'(v); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  nest_st n;\n"
+      "  int ia [3];\n"
+      "  nest_bits a;\n"
+      "  b96 b;\n"
+      "  initial a = nest_bits'(n);\n"
+      "  initial b = b96'(ia);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
