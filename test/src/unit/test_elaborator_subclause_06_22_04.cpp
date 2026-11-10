@@ -154,4 +154,21 @@ TEST(CastCompatibleElaboration, CastInitializerForEnumDeclIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(CastCompatibleElaboration,
+     ExplicitCastsBetweenNonequivalentTypesAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef enum {A, B, C} e_t;\n"
+      "  typedef struct {int a;} us_t;\n"
+      "  e_t e; int i; us_t s; real r; logic [99:0] w; byte y;\n"
+      "  initial begin\n"
+      "    e = e_t'(i); void'($cast(e, i)); i = int'(s); r = real'(w);\n"
+      "    y = byte'(r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

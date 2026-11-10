@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -199,6 +202,42 @@ TEST(AssignmentCompatibleElaboration, UnrelatedTypesAreNotCompatible) {
   DataType event_t;
   event_t.kind = DataTypeKind::kEvent;
   EXPECT_FALSE(IsAssignmentCompatible(event_t, int_t));
+}
+
+constexpr std::string_view kCompatibilityTypes =
+    "  typedef enum {A, B, C} e_t;\n"
+    "  typedef struct packed {bit [3:0] h, l;} ps_t;\n"
+    "  typedef struct {int a;} us_t;\n";
+
+TEST(AssignmentCompatibleElaboration,
+     IntegralRealAndEnumSourcesAreAssignmentCompatible) {
+  ElabFixture f;
+  ElaborateSrc(std::string("module t;\n") + std::string(kCompatibilityTypes) +
+                   "  int i; bit [3:0] b; logic [99:0] w; ps_t p; e_t e;\n"
+                   "  real r; shortreal sr; byte y;\n"
+                   "  initial begin\n"
+                   "    i = b; i = w; i = p; i = e; i = r; r = i; sr = i;\n"
+                   "    y = i; p = i; b = r; r = e; w = sr;\n"
+                   "  end\n"
+                   "endmodule\n",
+               f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentCompatibleElaboration,
+     DISABLED_UnpackedAggregateAssignedToAnIntegralIsReported) {
+  for (std::string_view use : {"i = z;", "i = s;"}) {
+    std::string src = std::string("module t;\n") +
+                      std::string(kCompatibilityTypes) +
+                      "  int i; int z [2]; us_t s;\n"
+                      "  initial " +
+                      std::string(use) + "\nendmodule\n";
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment-compatible",
+                              LineHolding(src, use), "6.22.3"));
+  }
 }
 
 }  // namespace

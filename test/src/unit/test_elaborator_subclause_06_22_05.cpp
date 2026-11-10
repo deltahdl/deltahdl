@@ -1,6 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "elaborator/type_eval.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_type.h"
 
 using namespace delta;
@@ -105,6 +110,84 @@ TEST(TypeIncompatibleElaboration, EventResidualIncompatibleWithInt) {
   DataType ev2;
   ev2.kind = DataTypeKind::kEvent;
   EXPECT_FALSE(IsTypeIncompatible(ev, ev2));
+}
+
+constexpr std::string_view kHandleTypes =
+    "  class K; endclass\n"
+    "  interface class IC; endclass\n"
+    "  class KI implements IC; endclass\n"
+    "  K k; IC ic; KI ki; chandle ch; int i; string s; event ev;\n";
+
+std::string HandleModule(std::string_view stmt) {
+  return "module t;\n" + std::string(kHandleTypes) + "  initial " +
+         std::string(stmt) + "\nendmodule\n";
+}
+
+struct IncompatibleWrite {
+  std::string_view stmt;
+  std::string_view report;
+  std::string_view subclause;
+};
+
+constexpr IncompatibleWrite kReportedIncompatibleWrites[] = {
+    {"i = k;", "cannot assign class object handle to a non-class variable",
+     "8.4"},
+    {"s = k;", "cannot assign class object handle to a non-class variable",
+     "8.4"},
+    {"i = ic;", "cannot assign class object handle to a non-class variable",
+     "8.4"},
+    {"i = int'(k);", "cannot cast class object handle to a non-class type",
+     "8.4"},
+    {"k = K'(i);", "cannot cast non-class value to a class type", "8.4"},
+    {"ch = i;", "chandle can only be assigned from another chandle or null",
+     "6.14"},
+    {"i = ch;", "chandle cannot be assigned to a non-chandle variable", "6.14"},
+    {"s = ch;", "chandle cannot be assigned to a non-chandle variable", "6.14"},
+    {"k = ch;", "chandle cannot be assigned to a non-chandle variable", "6.14"},
+    {"ic = ch;", "chandle cannot be assigned to a non-chandle variable",
+     "6.14"},
+};
+
+TEST(TypeIncompatibleElaboration, HandleWritesAcrossTypesAreReported) {
+  for (const auto& write : kReportedIncompatibleWrites) {
+    std::string src = HandleModule(write.stmt);
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string(write.report),
+                              LineHolding(src, write.stmt),
+                              std::string(write.subclause)));
+  }
+}
+
+TEST(TypeIncompatibleElaboration,
+     DISABLED_NonClassVariableWrittenToAHandleIsReported) {
+  for (std::string_view stmt : {"k = i;", "ic = i;", "k = ev;"}) {
+    std::string src = HandleModule(stmt);
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "cannot assign non-class value to class object handle",
+                      LineHolding(src, stmt), "8.4"));
+  }
+}
+
+TEST(TypeIncompatibleElaboration, DISABLED_ChandleCastToAnIntIsReported) {
+  std::string src = HandleModule("i = int'(ch);");
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "chandle",
+                            LineHolding(src, "int'(ch)"), "6.14"));
+}
+
+TEST(TypeIncompatibleElaboration, HandlesOfTheirOwnKindAndNullAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(HandleModule("begin ic = ki; ic = null; k = null; ch = null; "
+                            "k = new; end"),
+               f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

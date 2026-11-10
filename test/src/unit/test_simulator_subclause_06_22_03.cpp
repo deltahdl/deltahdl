@@ -40,4 +40,17 @@ TEST(AssignmentCompatibleSimulation, EquivalentAssignmentPropagatesValue) {
   EXPECT_EQ(var->value.ToUint64(), 0x77u);
 }
 
+TEST(AssignmentCompatibleSimulation, ConversionsRoundRealsAndTruncateIntegers) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int i, j; byte y; real r;\n"
+                       "  initial begin\n"
+                       "    i = 2.5; j = -2.5; y = 300; r = 3;\n"
+                       "    $display(\"%0d %0d %0d %0.1f\", i, j, y, r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 -3 44 3.0\n");
+}
+
 }  // namespace
