@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -131,6 +133,105 @@ TEST(EventSimulationSim, AlwaysCombProcessRespondsToAnInputUpdateEvent) {
       f, "outv");
   ASSERT_NE(outv, nullptr);
   EXPECT_EQ(outv->value.ToUint64(), 21u);
+}
+
+std::string RunStimulus(const std::string& process) {
+  SimFixture f;
+  return RunCapture(
+      "module t;\n"
+      "  logic clk = 0, en = 0, d = 0;\n"
+      "  wire y;\n"
+      "  logic q;\n" +
+          process +
+          "  initial begin\n"
+          "    #1 d = 1;\n"
+          "    #1 en = 1;\n"
+          "    #1 clk = 1;\n"
+          "    #1 d = 0;\n"
+          "  end\n"
+          "  initial #10 $finish;\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(EventSimulationSim, GatePrimitiveRespondsToAnInputUpdateEvent) {
+  EXPECT_EQ(
+      RunStimulus(
+          "  buf g(y, d);\n"
+          "  always @(y) if ($time > 0) $display(\"%0t y=%b\", $time, y);\n"),
+      "1 y=1\n4 y=0\n$finish at time 10\n");
+}
+
+TEST(EventSimulationSim, UserDefinedPrimitiveRespondsToAnInputUpdateEvent) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "primitive pass(output o, input i);\n"
+          "  table\n"
+          "    0 : 0;\n"
+          "    1 : 1;\n"
+          "  endtable\n"
+          "endprimitive\n"
+          "module t;\n"
+          "  logic d = 0;\n"
+          "  wire y;\n"
+          "  pass u(y, d);\n"
+          "  always @(y) if ($time > 0) $display(\"%0t y=%b\", $time, y);\n"
+          "  initial begin\n"
+          "    #1 d = 1;\n"
+          "    #1 d = 0;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 y=1\n2 y=0\n");
+}
+
+TEST(EventSimulationSim, AlwaysLatchRespondsToAnInputUpdateEvent) {
+  EXPECT_EQ(
+      RunStimulus(
+          "  always_latch if (en) q = d;\n"
+          "  always @(q) if ($time > 0) $display(\"%0t q=%b\", $time, q);\n"),
+      "2 q=1\n4 q=0\n$finish at time 10\n");
+}
+
+TEST(EventSimulationSim, AlwaysFfRespondsToItsClockUpdateEvent) {
+  EXPECT_EQ(
+      RunStimulus(
+          "  always_ff @(posedge clk) q <= d;\n"
+          "  always @(q) if ($time > 0) $display(\"%0t q=%b\", $time, q);\n"),
+      "3 q=1\n$finish at time 10\n");
+}
+
+TEST(EventSimulationSim, ContinuousAssignmentRespondsToAnOperandUpdateEvent) {
+  EXPECT_EQ(
+      RunStimulus(
+          "  assign y = d & en;\n"
+          "  always @(y) if ($time > 0) $display(\"%0t y=%b\", $time, y);\n"),
+      "2 y=1\n4 y=0\n$finish at time 10\n");
+}
+
+TEST(EventSimulationSim, ProceduralContinuousAssignmentRespondsToAnUpdate) {
+  EXPECT_EQ(
+      RunStimulus(
+          "  initial assign q = d;\n"
+          "  always @(q) if ($time > 0) $display(\"%0t q=%b\", $time, q);\n"),
+      "1 q=1\n4 q=0\n$finish at time 10\n");
+}
+
+TEST(EventSimulationSim, ForcedValueRespondsToAnOperandUpdateEvent) {
+  EXPECT_EQ(
+      RunStimulus(
+          "  initial force q = d | clk;\n"
+          "  always @(q) if ($time > 0) $display(\"%0t q=%b\", $time, q);\n"),
+      "1 q=1\n$finish at time 10\n");
+}
+
+TEST(EventSimulationSim, SpawnedTaskRespondsToAnUpdateEvent) {
+  EXPECT_EQ(RunStimulus("  task automatic watch();\n"
+                        "    @(en) $display(\"%0t en=%b\", $time, en);\n"
+                        "  endtask\n"
+                        "  initial fork watch(); join_none\n"),
+            "2 en=1\n$finish at time 10\n");
 }
 
 }  // namespace
