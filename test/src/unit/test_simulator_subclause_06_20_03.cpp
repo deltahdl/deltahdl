@@ -324,4 +324,27 @@ TEST(TypeParameterSim, InterfaceInstancesKeepTheirOwnTypes) {
   }
 }
 
+TEST(TypeParameterSim, ClauseExampleRedefinesTheTypeOfItsVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module ma #(parameter p1 = 1, parameter type p2 = shortint)\n"
+                 "    (input logic [p1:0] i, output logic [p1:0] o);\n"
+                 "  p2 j = 0;\n"
+                 "  always @(i) begin o = i; j++; end\n"
+                 "endmodule\n"
+                 "module mb;\n"
+                 "  logic [3:0] i, o;\n"
+                 "  logic [1:0] o2;\n"
+                 "  ma #(.p1(3), .p2(int)) u1(i, o);\n"
+                 "  ma u2(i[1:0], o2);\n"
+                 "  initial begin\n"
+                 "    #1 i = 5; #1 i = 6;\n"
+                 "    #1 $display(\"%0d %0d %0d %0d %0d %0d\", $bits(u1.j),\n"
+                 "      $bits(u2.j), u1.j, o, $bits(u1.i), $bits(u2.i));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "32 16 2 6 4 2\n");
+}
+
 }  // namespace

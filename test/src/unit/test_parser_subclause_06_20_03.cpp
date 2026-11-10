@@ -193,4 +193,14 @@ TEST(TypeParameterParsing, ClassBodyLocalTypeParamIsATypedefOfItsType) {
   EXPECT_EQ(u->typedef_item->typedef_type.type_name, "T");
 }
 
+TEST(TypeParameterParsing, HierarchicalNameAsAPortListTypeDefaultIsReported) {
+  EXPECT_TRUE(
+      Parse("interface ifc; typedef logic [5:0] w6_t; endinterface\n"
+            "module t #(parameter type T = i.w6_t) (); ifc i(); endmodule\n")
+          .has_errors);
+  EXPECT_FALSE(Parse("typedef logic [5:0] w6_t;\n"
+                     "module t #(parameter type T = w6_t) (); endmodule\n")
+                   .has_errors);
+}
+
 }  // namespace
