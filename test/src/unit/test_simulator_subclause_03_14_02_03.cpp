@@ -96,4 +96,48 @@ TEST(TimescalePrecedenceSimulation, NestedModuleTakesTheEnclosingTimeunit) {
       "top 3\ninner 5 -6\n");
 }
 
+TEST(TimescalePrecedenceSimulation,
+     InterfaceNestedInAnInterfaceTakesItsTimeunit) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("interface bus;\n"
+                           "  timeunit 1us; timeprecision 1us;\n"
+                           "  interface inner;\n"
+                           "    initial begin\n"
+                           "      #5 $display(\"inner %0d %0d\", $time, "
+                           "$timeunit);\n"
+                           "    end\n"
+                           "  endinterface\n"
+                           "  inner i();\n"
+                           "endinterface\n"
+                           "module top;\n"
+                           "  timeunit 1ns; timeprecision 1ns;\n"
+                           "  bus b();\n"
+                           "  initial begin #3 $display(\"top %0d\", $time); "
+                           "end\n"
+                           "endmodule\n",
+                           f),
+      "top 3\ninner 5 -6\n");
+}
+
+TEST(TimescalePrecedenceSimulation, InterfaceNestedInAModuleTakesItsTimeunit) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("`timescale 1ns/1ns\n"
+                           "module top;\n"
+                           "  timeunit 1us; timeprecision 1us;\n"
+                           "  interface inner;\n"
+                           "    initial begin\n"
+                           "      #5 $display(\"inner %0d %0d\", $time, "
+                           "$timeunit);\n"
+                           "    end\n"
+                           "  endinterface\n"
+                           "  inner i();\n"
+                           "  initial begin #3 $display(\"top %0d\", $time); "
+                           "end\n"
+                           "endmodule\n",
+                           f),
+      "top 3\ninner 5 -6\n");
+}
+
 }  // namespace
