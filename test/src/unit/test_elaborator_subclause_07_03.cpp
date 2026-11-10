@@ -256,4 +256,75 @@ TEST(UnionDeclarationValidation, DynamicMembersOfAnUntaggedUnionRejected) {
   }
 }
 
+TEST(UnionDeclarationValidation, DynamicAndChandleMembersReportedInEveryPlace) {
+  std::string src =
+      "typedef union {int d []; int i;} cu_t;\n"
+      "package pk; typedef union {int q [$]; int i;} pu_t; endpackage\n"
+      "interface I; union {chandle h; int i;} a; endinterface\n"
+      "checker ck; union {int q [$]; int i;} d; endchecker\n"
+      "program P; union {string s; int i;} c; endprogram\n"
+      "module t;\n"
+      "  I ii(); ck c1(); P pp();\n"
+      "  class C; union {chandle h; int i;} cu; endclass\n"
+      "  function automatic void f(); union {int m [int]; int i;} u; "
+      "endfunction\n"
+      "  if (1) begin : g union {string s; int i;} gu; end\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "member 'd' can only be used in tagged", 1,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'q' can only be used in tagged", 2,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "chandle type can only be used in tagged", 3,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'q' can only be used in tagged", 4,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "string type can only be used in tagged", 5,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "chandle type can only be used in tagged", 8,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'm' can only be used in tagged", 9,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "string type can only be used in tagged", 10,
+                            "7.3.2"));
+}
+
+TEST(UnionDeclarationValidation,
+     DISABLED_TypedefOfADynamicArrayQueueOrAssociativeArrayIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef int da_t []; typedef int qq_t [$]; typedef int aa_t "
+      "[string];\n"
+      "  union {da_t d; int i;} a;\n"
+      "  union {qq_t q; int i;} b;\n"
+      "  union {aa_t m; int i;} c;\n"
+      "  union tagged {da_t d; qq_t q; aa_t m; int i;} ok;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "member 'd' can only be used in tagged", 3,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'q' can only be used in tagged", 4,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'm' can only be used in tagged", 5,
+                            "7.3.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(UnionDeclarationValidation,
+     TaggedUnionAcceptsEveryDynamicAndChandleMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  union tagged {int d []; int q [$]; int m [string]; chandle h;\n"
+      "                string s; int i;} ok;\n"
+      "  class C; union tagged {int d []; chandle h; int i;} cu; endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
