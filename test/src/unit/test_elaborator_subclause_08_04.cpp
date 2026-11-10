@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <initializer_list>
+#include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "helpers_generate_block_items.h"
@@ -796,6 +798,65 @@ TEST(ClassObjectElaboration,
       "class object handle cannot be used in continuous assignment", "10.3"));
   EXPECT_TRUE(AcceptedInsideGenerateBlocks(
       {"class C; endclass ", "C h; wire w;", "assign w = (h == null);"}));
+}
+
+std::string WithHandleWritesIn(std::string_view writes) {
+  return std::string(
+             "class C;\nendclass\nclass D;\nendclass\n"
+             "package k;\n  class E;\n  endclass\n  class F;\n  endclass\n"
+             "  E e;\n  F ff;\n  int n;\n  function void f();\n    ")
+      .append(writes == "bad" ? "e = 5;\n    n = e;\n    e = ff;"
+                              : "e = new;\n    e = null;\n    n = e == null;")
+      .append(
+          "\n  endfunction\nendpackage\nC uc;\nD ud;\nint un;\n"
+          "function void uf();\n  ")
+      .append(writes == "bad" ? "uc = 5;\n  un = uc;\n  uc = ud;"
+                              : "uc = new;\n  uc = null;\n  un = uc == null;")
+      .append(
+          "\nendfunction\nmodule t;\n  if (1) begin : g\n    C c;\n"
+          "    D d;\n    int n;\n    initial begin\n      ")
+      .append(writes == "bad"
+                  ? "c = 5;\n      n = c;\n      c = d;"
+                  : "c = new;\n      c = null;\n      n = c == null;")
+      .append("\n    end\n  end\n  C c0;\n  D d0;\n")
+      .append(writes == "bad" ? "  C h1 = 5;\n  int i1 = c0;\n  C h2 = d0;\n"
+                              : "  C h1 = new;\n  C h2 = c0;\n  C h3 = null;\n")
+      .append("endmodule\n");
+}
+
+TEST(
+    ClassObjectElaboration,
+    DISABLED_IncompatibleHandleWritesInPackageUnitGenerateAndInitializersAreReported) {
+  std::string src = WithHandleWritesIn("bad");
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  const struct {
+    std::string_view marker;
+    std::string_view message;
+  } kReports[] = {
+      {"e = 5", "cannot assign non-class value"},
+      {"n = e;", "cannot assign class object handle"},
+      {"e = ff", "assignment compatible types"},
+      {"uc = 5", "cannot assign non-class value"},
+      {"un = uc;", "cannot assign class object handle"},
+      {"uc = ud", "assignment compatible types"},
+      {" c = 5", "cannot assign non-class value"},
+      {"n = c;", "cannot assign class object handle"},
+      {"c = d;", "assignment compatible types"},
+      {"h1 = 5", "cannot assign non-class value"},
+      {"i1 = c0", "cannot assign class object handle"},
+      {"h2 = d0", "assignment compatible types"},
+  };
+  for (const auto& report : kReports) {
+    SCOPED_TRACE(report.marker);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), report.message,
+                              LineHolding(src, report.marker), "8.4"));
+  }
+}
+
+TEST(ClassObjectElaboration,
+     CompatibleHandleWritesInPackageUnitGenerateAndInitializersAreAccepted) {
+  EXPECT_TRUE(ElabOk(WithHandleWritesIn("good")));
 }
 
 }  // namespace
