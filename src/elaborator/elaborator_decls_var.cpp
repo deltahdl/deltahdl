@@ -131,7 +131,8 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
       class_names_.count(item->data_type.type_name)) {
     if (item->unpacked_dims.empty()) class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
-    ReportSpecializationWithoutValue(item->data_type, item->loc, *unit_, diag_);
+    ReportClassWithoutDefaultSpecialization(item->data_type, item->loc, *unit_,
+                                            diag_);
     ReportSpecializationOverrideMismatches(item->data_type, item->loc, unit_,
                                            typedefs_, diag_);
     ReportSpecializationBaseNotClass(item->data_type, item->loc, *unit_, diag_);

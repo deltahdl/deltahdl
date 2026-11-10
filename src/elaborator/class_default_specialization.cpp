@@ -320,11 +320,13 @@ class SpecializationWalk {
 
 }  // namespace
 
-void ReportSpecializationWithoutValue(const DataType& named, SourceLoc loc,
-                                      const CompilationUnit& unit,
-                                      DiagEngine& diag) {
-  ReportParameterLeftWithoutValue(FindClassDecl(named.type_name, &unit),
-                                  ArgumentsOfName(named), loc, diag);
+void ReportClassWithoutDefaultSpecialization(const DataType& named,
+                                             SourceLoc loc,
+                                             const CompilationUnit& unit,
+                                             DiagEngine& diag) {
+  if (!named.type_params.empty()) return;
+  ReportParameterLeftWithoutValue(FindClassDecl(named.type_name, &unit), {},
+                                  loc, diag);
 }
 
 void ReportClassSpecializationsWithoutValues(const CompilationUnit& unit,
