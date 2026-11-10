@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -277,6 +279,30 @@ TEST(BuiltinMethodSim, MethodResultInConditional) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 1u);
+}
+
+TEST(BuiltinMethodSim, ImplicitVariableWithParenthesesIsTheResult) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  string s = \"ab\";\n"
+      "  initial $display(\"%0d %0d %0d\", q.min()[0], s.toupper()[1],\n"
+      "                   q.unique().size());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 66 3\n");
+}
+
+TEST(BuiltinMethodSim, DISABLED_LastCallOfAChainWithoutParenthesesIsCalled) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  initial $display(\"%0d\", q.unique().size);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3\n");
 }
 
 }  // namespace

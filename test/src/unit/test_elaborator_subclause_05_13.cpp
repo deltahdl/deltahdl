@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -106,6 +109,48 @@ TEST(BuiltinMethodElaboration, StringLenNoParensElaborates) {
              "  int n;\n"
              "  initial n = s.len;\n"
              "endmodule\n"));
+}
+
+TEST(BuiltinMethodElaboration, ImplicitVariableWithParenthesesIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  string s = \"ab\";\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = q.min()[0];\n"
+      "    x = s.toupper()[1];\n"
+      "    x = q.unique().size();\n"
+      "    x = q.unique().size;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BuiltinMethodElaboration,
+     DISABLED_ImplicitVariableWithoutParenthesesIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  string s = \"ab\";\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = q.min[0];\n"
+      "    x = s.toupper[1];\n"
+      "    x = q.unique.size();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {6u, 7u, 8u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a built-in method call used as an implicit "
+                              "variable shall include its parentheses",
+                              line, "5.13"))
+        << line;
+  }
 }
 
 }  // namespace
