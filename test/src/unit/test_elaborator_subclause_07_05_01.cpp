@@ -128,8 +128,8 @@ TEST(DynamicArrayNewValidation, DimensionWithoutAnIndexOnTheLeftIsReported) {
       "endmodule\n",
       f, "", parse_failed);
   EXPECT_TRUE(parse_failed);
-  ASSERT_TRUE(f.diag.HasErrors());
-  EXPECT_EQ(f.diag.Diagnostics().front().loc.line, 3u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "expected expression", 3, "11.2"));
 }
 
 TEST(DynamicArrayNewValidation,
