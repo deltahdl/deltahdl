@@ -392,4 +392,94 @@ TEST(Simulator, StaticEventPropertyIsTheClassesOneEvent) {
   EXPECT_EQ(out, "scope 2\ntask 2\nhandle 4\n");
 }
 
+TEST(EventDataType, EventsDeclaredWithoutAnInitializerAreDistinctInEveryPlace) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package k;\n  event pa, pb;\n  task fire();\n    -> pa;\n"
+          "  endtask\nendpackage\n"
+          "event ua, ub;\n"
+          "interface ifc;\n  event a, b;\nendinterface\n"
+          "class C;\n  event e;\nendclass\n"
+          "module t;\n  ifc i();\n  if (1) begin : g\n    event a, b;\n  end\n"
+          "  event arr[2];\n  C c1 = new, c2 = new;\n"
+          "  int w_pb, w_ub, w_ib, w_gb, w_arr, w_c;\n"
+          "  int h_pa, h_ua, h_ia, h_ga, h_arr, h_c;\n"
+          "  initial begin @(k::pb); w_pb = 1; end\n"
+          "  initial begin @(ub); w_ub = 1; end\n"
+          "  initial begin @(i.b); w_ib = 1; end\n"
+          "  initial begin @(g.b); w_gb = 1; end\n"
+          "  initial begin @(arr[1]); w_arr = 1; end\n"
+          "  initial begin @(c2.e); w_c = 1; end\n"
+          "  initial begin @(k::pa); h_pa = 1; end\n"
+          "  initial begin @(ua); h_ua = 1; end\n"
+          "  initial begin @(i.a); h_ia = 1; end\n"
+          "  initial begin @(g.a); h_ga = 1; end\n"
+          "  initial begin @(arr[0]); h_arr = 1; end\n"
+          "  initial begin @(c1.e); h_c = 1; end\n"
+          "  initial begin\n    #1;\n    k::fire();\n    -> ua;\n    -> i.a;\n"
+          "    -> g.a;\n    -> arr[0];\n    -> c1.e;\n"
+          "    #1 $display(\"%0d%0d%0d%0d%0d%0d %0d%0d%0d%0d%0d%0d\", "
+          "w_pb, w_ub, w_ib, w_gb, w_arr, w_c, h_pa, h_ua, h_ia, h_ga, "
+          "h_arr, h_c);\n"
+          "  end\nendmodule\n",
+          f),
+      "000000 111111\n");
+}
+
+TEST(EventDataType,
+     AnAliasWakesTheOriginalsWaiterAndNullingOneNameKeepsTheOther) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n  event done;\n  event done_too = done;\n"
+                       "  event a, b;\n  int w_alias, w_a;\n"
+                       "  initial begin @(done_too); w_alias = 1; end\n"
+                       "  initial begin b = a; b = null; end\n"
+                       "  initial begin #1 @(a); w_a = 1; end\n"
+                       "  initial begin\n    #2;\n    -> done;\n    -> a;\n"
+                       "    $display(\"%0d\", a.triggered);\n"
+                       "    #1 $display(\"%0d %0d %0d %0d\", w_alias, w_a, "
+                       "a.triggered, b == null);\n"
+                       "  end\nendmodule\n",
+                       f),
+            "1\n1 1 0 1\n");
+}
+
+TEST(EventDataType,
+     DISABLED_EventsReachedThroughADottedNameOrElementCompareByObject) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package k;\n  event pa, pb;\nendpackage\n"
+          "class C;\n  event e;\nendclass\n"
+          "interface ifc;\n  event a, b;\nendinterface\n"
+          "module t;\n  ifc i();\n  if (1) begin : g\n    event a, b;\n  end\n"
+          "  typedef struct { event e; } S;\n  S s1, s2;\n  event arr[2];\n"
+          "  event y;\n  C c1 = new, c2 = new;\n"
+          "  initial begin\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", c1.e == c2.e, "
+          "arr[0] != arr[1], k::pa != k::pb, i.a === i.b, g.a == g.b, "
+          "s1.e == s2.e, k::pa == null);\n"
+          "    y = i.a;\n    $display(\"%0d %0d\", y == i.a, y == i.b);\n"
+          "  end\nendmodule\n",
+          f),
+      "0 1 1 0 0 0 0\n1 0\n");
+}
+
+TEST(EventDataType, DISABLED_AnEventMemberOfAStructureIsTriggeredAndWaitedFor) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n  typedef struct { event e; int k; } S;\n"
+                 "  S s1, s2;\n  S sa[2];\n  int w1, w2, wa;\n"
+                 "  initial begin @(s1.e); w1 = 1; end\n"
+                 "  initial begin @(s2.e); w2 = 1; end\n"
+                 "  initial begin @(sa[1].e); wa = 1; end\n"
+                 "  initial begin\n    #1;\n    -> s1.e;\n    -> sa[1].e;\n"
+                 "    $display(\"%0d %0d\", s1.e.triggered, "
+                 "sa[1].e.triggered);\n"
+                 "    #1 $display(\"%0d %0d %0d\", w1, w2, wa);\n"
+                 "  end\nendmodule\n",
+                 f),
+      "1 1\n1 0 1\n");
+}
+
 }  // namespace
