@@ -99,4 +99,27 @@ TEST(EnumNumericalExpr, ExplicitBaseTypeElementValueInArithmetic) {
   EXPECT_EQ(x->value.ToUint64(), 10u);
 }
 
+TEST(EnumNumericalExpr, ElementTakesItsBaseTypesSignWidthAndStates) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef enum {A, B} d_e;\n"
+                 "  typedef enum byte {NB = -1} b_e;\n"
+                 "  typedef enum logic signed [3:0] {M = -2} s_e;\n"
+                 "  typedef enum bit [3:0] {N = 4'hE} u_e;\n"
+                 "  typedef enum logic [1:0] {X = 2'bx1, Y = 2'b10} x_e;\n"
+                 "  int i;\n"
+                 "  logic [4:0] w;\n"
+                 "  logic [7:0] lw;\n"
+                 "  initial begin\n"
+                 "    i = NB; w = N + 4'd2; lw = M;\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d %b\", i,\n"
+                 "      A - B, M < 0, N < 0, w, $bits(N), $bits(NB),\n"
+                 "      $isunknown(X), $isunknown(Y), lw);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "-1 -1 1 0 16 4 8 1 0 11111110\n");
+}
+
 }  // namespace
