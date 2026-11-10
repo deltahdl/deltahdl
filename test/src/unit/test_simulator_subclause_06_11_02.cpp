@@ -708,4 +708,83 @@ TEST(TwoStateAndFourState, SignednessDefaultsDecideTheReadOfAnInitializer) {
       "si=-1 sb=-1 ul=4294967295\n");
 }
 
+TEST(TwoStateAndFourState, ConversionsIntoAClassAStructAndAPackage) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package k;\n"
+                 "  int ps; int pu; byte pt;\n"
+                 "endpackage\n"
+                 "class C;\n"
+                 "  int cs; int cu; byte ct;\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  typedef struct { int ss; int su; byte st; } S;\n"
+                 "  S s; S a [2];\n"
+                 "  C c = new;\n"
+                 "  byte n = -3;\n"
+                 "  bit [7:0] u = 8'hFD;\n"
+                 "  logic [11:0] w = 12'h3x5;\n"
+                 "  initial begin\n"
+                 "    k::ps = n; k::pu = u; k::pt = w;\n"
+                 "    c.cs = n; c.cu = u; c.ct = w;\n"
+                 "    a[1].ss = n; a[1].su = u; a[1].st = w;\n"
+                 "    s.su = u; s.st = w;\n"
+                 "    $display(\"%0d %0d %h\", k::ps, k::pu, k::pt);\n"
+                 "    $display(\"%0d %0d %h\", c.cs, c.cu, c.ct);\n"
+                 "    $display(\"%0d %0d %h\", a[1].ss, a[1].su, a[1].st);\n"
+                 "    $display(\"%0d %h\", s.su, s.st);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "-3 253 05\n-3 253 05\n-3 253 05\n253 05\n");
+}
+
+TEST(TwoStateAndFourState, DISABLED_SignedValueWidenedIntoAMemberSignExtends) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct { int ss; } S;\n"
+                       "typedef struct packed { int ps; } P;\n"
+                       "typedef union packed { int a; bit [31:0] b; } U;\n"
+                       "class C; S s; endclass\n"
+                       "package k; S ks; endpackage\n"
+                       "module t;\n"
+                       "  byte n = -3;\n"
+                       "  wire signed [7:0] nw = -3;\n"
+                       "  S s1, s2, s3, s4, s5, s6; P p; U u; C c = new;\n"
+                       "  S s7 = '{ss: 8'sd253};\n"
+                       "  assign s6.ss = nw;\n"
+                       "  initial begin\n"
+                       "    s1.ss = n; p.ps = n; u.a = n; c.s.ss = n;\n"
+                       "    k::ks.ss = n; s2.ss <= n; s3 = '{ss: n};\n"
+                       "    s4 = '{n}; s5.ss = 8'sd253;\n"
+                       "    #1 $display(\"%0d %0d %0d %0d %0d %0d\", s1.ss, "
+                       "p.ps, u.a, c.s.ss,\n"
+                       "                k::ks.ss, s2.ss);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", s3.ss, s4.ss, "
+                       "s5.ss, s6.ss, s7.ss);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "-3 -3 -3 -3 -3 -3\n-3 -3 -3 -3 -3\n");
+}
+
+TEST(TwoStateAndFourState, LogicAndRegDenoteTheSameType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  task automatic tk(ref logic [3:0] a);\n"
+                 "    a = 4'h5;\n"
+                 "  endtask\n"
+                 "  reg [3:0] r;\n"
+                 "  initial begin\n"
+                 "    tk(r);\n"
+                 "    $display(\"%0d %0d %0d %h\", type(logic [3:0]) == "
+                 "type(reg [3:0]),\n"
+                 "             type(reg) == type(logic),\n"
+                 "             type(bit [3:0]) == type(logic [3:0]), r);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 1 0 5\n");
+}
+
 }  // namespace
