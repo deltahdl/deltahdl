@@ -133,6 +133,10 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 - [Working without subagents](working-without-subagents.md) — no Agent or Workflow call for any part of the work, unless the user's own message asks for one.
 
+## Talking with the user
+
+- [One point per message](one-point-per-message.md) — one point or one decision per message, in plain words; say what each named thing is and whether it exists or is proposed.
+
 ## The notes themselves
 
 - [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory.
