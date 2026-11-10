@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 
 #include "fixture_real.h"
@@ -157,6 +158,171 @@ TEST(RealDataType, ShortrealRoundsTiesSubnormalsAndOverflowLikeBinary32) {
     EXPECT_EQ(RunAndGet(ReadShortrealBackAsReal(rounding.source), "b"),
               rounding.widened);
   }
+}
+
+void ExpectEveryReadBack(std::initializer_list<ShortrealSource> sources,
+                         uint64_t bits) {
+  for (const ShortrealSource& source : sources) {
+    SCOPED_TRACE(source.where);
+    EXPECT_EQ(RunAndGet(ReadShortrealBackAsReal(source), "b"), bits);
+  }
+}
+
+constexpr uint64_t kTenthAsBinary64 = 0x3FB999999999999Au;
+
+TEST(RealDataType, RealAndRealtimeHoldTheNearestBinary64InEveryPlace) {
+  ExpectEveryReadBack(
+      {
+          {"real blocking assignment", "", "  real s;\n", "    s = 0.1;\n",
+           "s"},
+          {"real nonblocking assignment", "", "  real s;\n",
+           "    s <= 0.1;\n    #1;\n", "s"},
+          {"real declaration initializer", "", "  real s = 0.1;\n", "", "s"},
+          {"realtime declaration initializer", "", "  realtime s = 0.1;\n", "",
+           "s"},
+          {"realtime assignment from a real", "",
+           "  real r = 0.1;\n  realtime s;\n", "    s = r;\n", "s"},
+          {"real continuous assignment", "",
+           "  realtime r = 0.1;\n  real s;\n  assign s = r;\n", "    #1;\n",
+           "s"},
+          {"real parameter", "", "  parameter real P = 0.1;\n", "", "P"},
+          {"realtime parameter", "", "  parameter realtime P = 0.1;\n", "",
+           "P"},
+          {"realtime function argument and return value", "",
+           "  function automatic realtime f(realtime x);\n    return x;\n"
+           "  endfunction\n",
+           "", "f(0.1)"},
+          {"realtime task output argument", "",
+           "  realtime s;\n  task automatic k(output realtime x);\n"
+           "    x = 0.1;\n  endtask\n",
+           "    k(s);\n", "s"},
+          {"realtime input port",
+           "module c(input var realtime x, output real y);\n"
+           "  assign y = x;\nendmodule\n",
+           "  real r = 0.1;\n  real y;\n  c u(r, y);\n", "    #1;\n", "y"},
+          {"package realtime initializer",
+           "package pk;\n  realtime s = 0.1;\nendpackage\n", "", "", "pk::s"},
+          {"compilation-unit real initializer", "real s = 0.1;\n", "", "", "s"},
+          {"interface realtime initializer",
+           "interface ifc;\n  realtime s = 0.1;\nendinterface\n",
+           "  ifc i();\n", "", "i.s"},
+          {"generate block real initializer", "",
+           "  if (1) begin : g\n    real s = 0.1;\n  end\n", "", "g.s"},
+          {"class realtime property initializer",
+           "class C;\n  realtime s = 0.1;\nendclass\n", "  C h = new;\n", "",
+           "h.s"},
+          {"realtime array element initializer", "",
+           "  realtime a[2] = '{0.1, 0.2};\n", "", "a[0]"},
+          {"realtime structure member initializer", "",
+           "  struct { realtime m; int k; } st = '{0.1, 1};\n", "", "st.m"},
+          {"block local realtime", "", "",
+           "    begin : blk\n      realtime x;\n      x = 0.1;\n      w = x;\n"
+           "    end\n",
+           "w"},
+          {"real typedef of a package, declared in the package",
+           "package pk;\n  typedef real R;\n  R s = 0.1;\nendpackage\n", "", "",
+           "pk::s"},
+          {"real typedef of the compilation unit, declared there",
+           "typedef real R;\nR s = 0.1;\n", "", "", "s"},
+          {"real typedef, as an array element", "",
+           "  typedef real R;\n  R a[2] = '{0.1, 0.2};\n", "", "a[0]"},
+          {"real typedef, as a function return type", "",
+           "  typedef real R;\n  function automatic R f();\n"
+           "    return 0.1;\n  endfunction\n",
+           "", "f()"},
+      },
+      kTenthAsBinary64);
+}
+
+TEST(RealDataType, DISABLED_AVariableOfARealTypedefHoldsTheNearestBinary64) {
+  ExpectEveryReadBack(
+      {
+          {"module real typedef initializer", "",
+           "  typedef real R;\n  R s = 0.1;\n", "", "s"},
+          {"module realtime typedef initializer", "",
+           "  typedef realtime T;\n  T s = 0.1;\n", "", "s"},
+          {"module real typedef assignment", "", "  typedef real R;\n  R s;\n",
+           "    s = 0.1;\n", "s"},
+          {"package real typedef, declared in a module",
+           "package pk;\n  typedef real R;\nendpackage\n", "  pk::R s = 0.1;\n",
+           "", "s"},
+          {"compilation-unit real typedef, declared in a module",
+           "typedef real R;\n", "  R s = 0.1;\n", "", "s"},
+          {"interface real typedef",
+           "interface ifc;\n  typedef real R;\n  R s = 0.1;\nendinterface\n",
+           "  ifc i();\n", "", "i.s"},
+          {"real typedef in a generate block", "",
+           "  typedef real R;\n  if (1) begin : g\n    R s = 0.1;\n  end\n", "",
+           "g.s"},
+          {"structure member of a real typedef", "",
+           "  typedef real R;\n  struct { R m; } st = '{m: 0.1};\n", "",
+           "st.m"},
+          {"task output into a real typedef variable", "",
+           "  typedef real R;\n  R s;\n"
+           "  task automatic k(output R x);\n    x = 0.1;\n  endtask\n",
+           "    k(s);\n", "s"},
+          {"block local real typedef", "", "  typedef real R;\n",
+           "    begin : blk\n      static R x = 0.1;\n      w = x;\n"
+           "    end\n",
+           "w"},
+      },
+      kTenthAsBinary64);
+  ExpectEveryReadBack({{"module shortreal typedef initializer", "",
+                        "  typedef shortreal S;\n  S s = 0.1;\n", "", "s"}},
+                      0x3FB99999A0000000u);
+}
+
+TEST(RealDataType, BitsOfARealVariableIsItsBinaryFormatsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  real r;\n  shortreal s;\n  realtime q;\n"
+                       "  typedef real R;\n  typedef shortreal S;\n"
+                       "  typedef realtime T;\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d\", "
+                       "$bits(r), $bits(s), $bits(q), $bits(R), $bits(S), "
+                       "$bits(T));\n"
+                       "endmodule\n",
+                       f),
+            "64 32 64 64 32 64\n");
+}
+
+TEST(RealDataType, DISABLED_BitsOfARealTypeKeywordIsItsBinaryFormatsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial $display(\"%0d %0d %0d\", $bits(real), "
+                       "$bits(shortreal), $bits(realtime));\n"
+                       "endmodule\n",
+                       f),
+            "64 32 64\n");
+}
+
+TEST(RealDataType, DISABLED_RealtimeIsTheSameTypeAsReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  real r;\n  realtime q;\n  shortreal s;\n"
+                       "  typedef realtime T;\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d\", "
+                       "type(realtime) == type(real), type(q) == type(r), "
+                       "type(T) == type(real), type(s) == type(realtime), "
+                       "type(q) != type(r));\n"
+                       "endmodule\n",
+                       f),
+            "1 1 1 0 0\n");
+}
+
+TEST(RealDataType, RealAndRealtimeActualsBindToEachOthersRefFormals) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  real r = 1.0;\n  realtime q = 1.0;\n"
+                       "  task automatic a(ref realtime x);\n"
+                       "    x += 1.5;\n  endtask\n"
+                       "  task automatic b(ref real x);\n"
+                       "    x += 2.5;\n  endtask\n"
+                       "  initial begin\n    a(r);\n    b(q);\n"
+                       "    $display(\"%f %f\", r, q);\n  end\n"
+                       "endmodule\n",
+                       f),
+            "2.500000 3.500000\n");
 }
 
 TEST(RealDataType, RealKeepsDoublePrecision) {
