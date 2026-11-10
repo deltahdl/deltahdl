@@ -16,9 +16,6 @@ Logic4Vec* AssocEntryForWrite(const Expr* sel, SimContext& ctx, Arena& arena);
 bool TryWriteAssocMemberField(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena);
 
-bool TryEvalAssocMemberField(const Expr* expr, SimContext& ctx, Arena& arena,
-                             Logic4Vec& out);
-
 bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena);
 

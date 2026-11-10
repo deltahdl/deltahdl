@@ -12,7 +12,6 @@
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/expr_substitute.h"
-#include "simulator/assoc_element.h"
 #include "simulator/class_event_property.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
@@ -539,8 +538,7 @@ static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
 
 static bool TryObjectMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
-  return TryEvalAssocMemberField(expr, ctx, arena, out) ||
-         TryEvalElementObjectMember(expr, ctx, arena, out) ||
+  return TryEvalElementObjectMember(expr, ctx, arena, out) ||
          TryEvalCallResultMember(expr, ctx, arena, out) ||
          TryPackageClassStaticMember(expr, ctx, arena, out) ||
          TryStaticHandleMember(expr, ctx, arena, out);

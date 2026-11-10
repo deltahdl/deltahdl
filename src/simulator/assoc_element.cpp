@@ -135,17 +135,6 @@ bool TryWriteAssocMemberField(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-bool TryEvalAssocMemberField(const Expr* expr, SimContext& ctx, Arena& arena,
-                             Logic4Vec& out) {
-  AssocMemberWindow member;
-  if (!ResolveAssocMember(expr, ctx, member)) return false;
-  auto elem = EvalExpr(member.select, ctx, arena);
-  out = MemberValueOf(
-      ExtractBitField(arena, elem, member.bit_offset, member.width),
-      member.kind, arena);
-  return true;
-}
-
 bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena) {
   if (!lhs || lhs->kind != ExprKind::kSelect) return false;

@@ -67,10 +67,6 @@ const DataType* RegisteredTypedef(std::string_view name) {
   return it == g_typedefs->end() ? nullptr : &it->second;
 }
 
-const std::unordered_map<std::string_view, DataType>* RegisteredTypedefMap() {
-  return g_typedefs;
-}
-
 const std::unordered_map<std::string_view, DataType>&
 RegisteredTypedefsOrNone() {
   static const std::unordered_map<std::string_view, DataType> kNone;

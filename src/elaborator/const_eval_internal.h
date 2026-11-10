@@ -189,7 +189,6 @@ const RtlirParamDecl* RegisteredParamNamed(std::string_view name);
 ScopeMap RegisteredModuleScope();
 
 const DataType* RegisteredTypedef(std::string_view name);
-const std::unordered_map<std::string_view, DataType>* RegisteredTypedefMap();
 const std::unordered_map<std::string_view, DataType>&
 RegisteredTypedefsOrNone();
 uint32_t RegisteredTypeWidth(const DataType& type, const ScopeMap& scope);
