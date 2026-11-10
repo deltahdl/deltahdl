@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -26,6 +28,26 @@ TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
       f.diag.Diagnostics(),
       "assignment pattern has 6 elements, but array dimension requires 2", 2,
       "10.9.1"));
+}
+
+TEST(ArrayLiteralElaboration, ReplicationReachingAcrossDimensionsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int n [1:2][1:3] = '{6{4}};\n"
+      "  int m [1:2][1:3] = '{2{1, 2, 3}};\n"
+      "  int k [1:2][1:3] = '{2{'{3{4}}}};\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2u, 3u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "assignment pattern has 6 elements, but array dimension requires 2",
+        line, "10.9.1"))
+        << line;
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "assignment pattern has", 4,
+                             "10.9.1"));
 }
 
 TEST(ArrayLiteralElaboration, WrongElementCountRejected) {
