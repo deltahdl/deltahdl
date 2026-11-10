@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -253,4 +254,34 @@ TEST(ReactiveRegionSim,
   auto* hits = f.ctx.FindVariable("hits");
   ASSERT_NE(hits, nullptr);
   EXPECT_EQ(hits->value.ToUint64(), 2u);
+}
+
+static std::string RunEdgeReader(const std::string& reader) {
+  SimFixture f;
+  return RunCapture(
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  logic [7:0] q = 8'd0;\n"
+      "  always @(posedge clk) q <= 8'd5;\n"
+      "  initial #1 clk = 1;\n" +
+          reader + "endmodule\n",
+      f);
+}
+
+TEST(ReactiveRegionSim, ProgramWokenByAnEdgeSeesTheNonblockingUpdate) {
+  EXPECT_EQ(RunEdgeReader("  program p;\n"
+                          "    initial begin\n"
+                          "      @(posedge clk);\n"
+                          "      $display(\"program q=%0d\", q);\n"
+                          "    end\n"
+                          "  endprogram\n"),
+            "program q=5\n");
+}
+
+TEST(ReactiveRegionSim, ModuleWokenByAnEdgeSeesTheValueBeforeTheUpdate) {
+  EXPECT_EQ(RunEdgeReader("  initial begin\n"
+                          "    @(posedge clk);\n"
+                          "    $display(\"module q=%0d\", q);\n"
+                          "  end\n"),
+            "module q=0\n");
 }

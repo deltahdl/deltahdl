@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -28,7 +29,8 @@ inline void ScheduleLabeled(Scheduler& sched, Region region,
                             const std::string& label,
                             std::vector<std::string>& order) {
   auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&order, label]() { order.push_back(label); };
+  auto text = std::make_shared<const std::string>(label);
+  ev->callback = [&order, text]() { order.push_back(*text); };
   sched.ScheduleEvent({0}, region, ev);
 }
 
@@ -36,7 +38,8 @@ inline void ScheduleLabeled(Scheduler& sched, uint64_t time, Region region,
                             const std::string& label,
                             std::vector<std::string>& order) {
   auto* ev = sched.GetEventPool().Acquire();
-  ev->callback = [&order, label]() { order.push_back(label); };
+  auto text = std::make_shared<const std::string>(label);
+  ev->callback = [&order, text]() { order.push_back(*text); };
   sched.ScheduleEvent({time}, region, ev);
 }
 
@@ -100,9 +103,8 @@ inline void VerifyIterationChain(Region main_region,
     side->callback = [&]() {
       order.push_back(side_label);
       auto* main2 = sched.GetEventPool().Acquire();
-      main2->callback = [&order, main_label]() {
-        order.push_back(main_label + "2");
-      };
+      auto text = std::make_shared<const std::string>(main_label + "2");
+      main2->callback = [&order, text]() { order.push_back(*text); };
       sched.ScheduleEvent({0}, main_region, main2);
     };
     sched.ScheduleEvent({0}, side_region, side);
@@ -122,16 +124,20 @@ inline void VerifyRegionRestart(const RegionLabel& initial,
   Scheduler sched(arena);
   std::vector<std::string> order;
   auto* first = sched.GetEventPool().Acquire();
-  first->callback = [&order, lbl = initial.label]() { order.push_back(lbl); };
+  auto initial_text = std::make_shared<const std::string>(initial.label);
+  first->callback = [&order, initial_text]() {
+    order.push_back(*initial_text);
+  };
   sched.ScheduleEvent({0}, initial.region, first);
   auto* trig = sched.GetEventPool().Acquire();
-  trig->callback = [&, trigger_label = trigger.label,
-                    target_region = target.region,
-                    target_label = target.label]() {
-    order.push_back(trigger_label);
+  auto trigger_text = std::make_shared<const std::string>(trigger.label);
+  auto target_text = std::make_shared<const std::string>(target.label);
+  trig->callback = [&, trigger_text, target_region = target.region,
+                    target_text]() {
+    order.push_back(*trigger_text);
     auto* restart = sched.GetEventPool().Acquire();
-    restart->callback = [&order, target_label]() {
-      order.push_back(target_label);
+    restart->callback = [&order, target_text]() {
+      order.push_back(*target_text);
     };
     sched.ScheduleEvent({0}, target_region, restart);
   };
