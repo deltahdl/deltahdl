@@ -2,6 +2,7 @@
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 using namespace delta;
@@ -49,6 +50,24 @@ TEST(ParameterizedDataTypesElab, ClassTypedefTakesDefaultsAndNamedArgs) {
   ASSERT_NE(a1, nullptr);
   EXPECT_EQ(a1->width, 1u);
   EXPECT_EQ(a1->unpacked_size, 5u);
+}
+
+TEST(ParameterizedDataTypesElab, VirtualParameterizedClassIsNotConstructed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "virtual class C#(parameter type T = logic, parameter SIZE = 1);\n"
+      "  typedef logic [SIZE-1:0] t_vector;\n"
+      "endclass\n"
+      "module top;\n"
+      "  C#(int, 2) h;\n"
+      "  C#(int, 2)::t_vector v;\n"
+      "  initial h = new;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of abstract class", 7,
+                            "8.21"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "", 6, "8.21"));
 }
 
 }  // namespace
