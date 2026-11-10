@@ -303,6 +303,23 @@ TEST(SingularAggregateTypes, UnpackedArrayPortDefaultRejected) {
                             "23.2.2.4"));
 }
 
+TEST(SingularAggregateTypes, VariableSizeUnpackedArrayPortDefaultRejected) {
+  for (const char* port :
+       {"input var int p [] = {}", "input var int p [$] = {}",
+        "input var int p [string] = '{default: 0}",
+        "input var int p [int] = '{default: 0}"}) {
+    ElabFixture f;
+    Elaborate(std::format("module t({});\nendmodule\n", port), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "default value on non-singular port 'p'", 1,
+                              "23.2.2.4"))
+        << port;
+  }
+  ElabFixture f;
+  Elaborate("module t(input logic [7:0] p = 8'h0);\nendmodule\n", f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(SingularAggregateTypes, PackedStructPortDefaultAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
