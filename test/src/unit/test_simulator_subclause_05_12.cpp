@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -113,6 +115,29 @@ TEST(LexicalConventionSim, AttrOnForLoop) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.FindVariable("e")->value.ToUint64(), 3);
+}
+
+TEST(LexicalConventionSim, AttrsOnDeclarationsAndOperatorsLeaveTheResult) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m ((* pin *) input logic a, output logic y);\n"
+      "  (* tdef *) typedef logic [3:0] nib_t;\n"
+      "  (* fn *) function automatic int f(int x); return x; endfunction\n"
+      "  int i, j;\n"
+      "  nib_t n = 4'hf;\n"
+      "  initial begin\n"
+      "    i = - (* neg *) 5;\n"
+      "    j = ~ (* inv *) i;\n"
+      "    i (* inc *) ++;\n"
+      "    ++ (* pre *) j;\n"
+      "    n[0] = & (* red *) n;\n"
+      "    i = f (* call *) (i);\n"
+      "    $display(\"%0d %0d %b\", i, j, n);\n"
+      "  end\n"
+      "  assign y = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-4 5 1111\n");
 }
 
 }  // namespace
