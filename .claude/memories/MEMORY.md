@@ -38,7 +38,8 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## The LRM
 
-- [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change against the clause; the standard beats the linter.
+- [Adherence is the goal](adherence-is-the-goal.md) — full adherence to IEEE 1800-2023 is the only aim; never advise a release, a nearer finish line or fewer findings in its place.
+- [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change, and every statement of what a clause requires, against the clause; the standard beats the linter.
 - [A shall outranks an example and a can](shall-outranks-examples-and-can.md) — §1.5 and §1.10 settle a clash inside the standard; only two equal requirements go to a person.
 - [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
 - [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag in its own edition.
