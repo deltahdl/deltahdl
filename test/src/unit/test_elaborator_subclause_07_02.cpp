@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
@@ -315,6 +317,57 @@ TEST(StructDeclarationValidation, AggregatesInPackagesAndTheUnitAreJudged) {
   EXPECT_TRUE(ReportedError(
       diags, "void member is only allowed in tagged unions", 6, "7.2"));
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 4u) << d.message;
+}
+
+TEST(StructureDeclarationElaboration, RandomQualifierInEveryUnionIsReported) {
+  for (const char* decl : {
+           "  union {rand int a; int b;} u;\n",
+           "  union tagged {randc bit [1:0] a; int b;} u;\n",
+           "  union packed {rand bit [7:0] a; bit [7:0] b;} u;\n",
+           "  union soft {rand bit [7:0] a; bit [7:0] b;} u;\n",
+       }) {
+    std::string src = std::string("module t;\n") + decl + "endmodule\n";
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "random qualifier is only allowed in unpacked "
+                              "structures",
+                              2, "7.2"));
+  }
+}
+
+TEST(StructureDeclarationElaboration,
+     RandomQualifierInANestedUnpackedStructure) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  struct {struct {rand int x;} n; rand int y;} s;\n"
+      "  class C; rand struct {rand bit [3:0] a; bit [3:0] b;} s; endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(StructureDeclarationElaboration, TaggedUnionDimensionNeedsPackedOrSoft) {
+  std::string src =
+      "module t;\n"
+      "  union tagged {bit [3:0] a; void b;} [1:0] u;\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "packed dimension on union requires the packed "
+                            "keyword",
+                            2, "7.2"));
+  ElabFixture g;
+  ElaborateSrc(
+      "module t;\n"
+      "  union tagged packed {bit [3:0] a; bit [3:0] b;} [1:0] u;\n"
+      "  union soft {bit [3:0] a; bit [3:0] b;} [1:0] w;\n"
+      "endmodule\n",
+      g);
+  EXPECT_FALSE(g.diag.HasErrors());
 }
 
 }  // namespace

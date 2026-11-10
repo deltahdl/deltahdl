@@ -240,4 +240,23 @@ TEST(AssignmentCompatibleElaboration,
   }
 }
 
+TEST(AssignmentCompatibleElaboration,
+     DISABLED_PackedStructureReturnedFromAnIntegralFunctionIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct packed {bit [7:0] p; bit [7:0] q;} pq_t;\n"
+      "  pq_t g = 16'hABCD;\n"
+      "  function automatic int f(); return g; endfunction\n"
+      "  function automatic int h(input pq_t a); return a; endfunction\n"
+      "  function automatic int k();\n"
+      "    struct packed {bit [7:0] p; bit [7:0] q;} FL;\n"
+      "    FL = 16'h1234;\n"
+      "    return FL;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
