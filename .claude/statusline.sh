@@ -65,15 +65,26 @@ if [ -n "$cwd" ]; then
   cache="${TMPDIR:-/tmp}/claude-statusline-issues-$(printf '%s' "$cwd" | cksum | cut -d' ' -f1)"
   trend_file="${cache}-trend"
   if stale "$cache"; then
-    count=$(cd "$cwd" 2>/dev/null && GH_PROMPT_DISABLED=1 gh repo view --json issues -q .issues.totalCount 2>/dev/null)
+    read -r repo count < <(cd "$cwd" 2>/dev/null && GH_PROMPT_DISABLED=1 gh repo view --json nameWithOwner,issues \
+      -q '"\(.nameWithOwner) \(.issues.totalCount)"' 2>/dev/null)
     if [ -n "$count" ]; then
-      previous=$(cat "$cache" 2>/dev/null)
-      if [ -n "$previous" ] && [ "$count" -gt "$previous" ]; then
-        printf '\342\226\262' > "$trend_file"
-      elif [ -n "$previous" ] && [ "$count" -lt "$previous" ]; then
-        printf '\342\226\274' > "$trend_file"
-      fi
       printf '%s' "$count" > "$cache"
+      since=$(date -u -v-24H +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+      delta=$(GH_PROMPT_DISABLED=1 gh api graphql \
+        -f opened="repo:$repo is:issue created:>=$since" -f closed="repo:$repo is:issue closed:>=$since" \
+        -f query='query($opened: String!, $closed: String!) {
+          opened: search(type: ISSUE, query: $opened) { issueCount }
+          closed: search(type: ISSUE, query: $closed) { issueCount } }' \
+        --jq '.data.opened.issueCount - .data.closed.issueCount' 2>/dev/null)
+      if [ -n "$delta" ]; then
+        if [ "$delta" -gt 0 ]; then
+          printf '\342\226\262' > "$trend_file"
+        elif [ "$delta" -lt 0 ]; then
+          printf '\342\226\274' > "$trend_file"
+        else
+          : > "$trend_file"
+        fi
+      fi
     fi
   fi
   issues=$(cat "$cache" 2>/dev/null)
