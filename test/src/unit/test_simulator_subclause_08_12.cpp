@@ -565,4 +565,204 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCopiesQueueProperty) {
             323u);
 }
 
+TEST(ClassAssignRenameSim, ClassVariableIsNullUntilAnObjectIsCreated) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pk;\n"
+      "  class Q; int v; endclass\n"
+      "  Q pv;\n"
+      "  function int f(); Q l; return (pv == null) * 10 + (l == null); "
+      "endfunction\n"
+      "endpackage\n"
+      "class P; int v; endclass\n"
+      "class H; P p; static P sp; endclass\n"
+      "P uv;\n"
+      "module t;\n"
+      "  P m;\n"
+      "  H h = new;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8, r9;\n"
+      "  initial begin\n"
+      "    automatic P a;\n"
+      "    static P s;\n"
+      "    r1 = m == null; r2 = h.p == null; r3 = H::sp == null;\n"
+      "    r4 = a == null; r5 = s == null; r6 = pk::pv == null;\n"
+      "    r7 = pk::f(); r8 = uv == null;\n"
+      "    m = new;\n"
+      "    r9 = m == null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 1u},
+                    {"r2", 1u},
+                    {"r3", 1u},
+                    {"r4", 1u},
+                    {"r5", 1u},
+                    {"r6", 1u},
+                    {"r7", 11u},
+                    {"r8", 1u},
+                    {"r9", 0u}});
+}
+
+TEST(ClassAssignRenameSim, ShallowCopyCopiesEveryKindOfProperty) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class A; int j = 5; endclass\n"
+      "class C;\n"
+      "  real r; string s; int fa[3]; int da[]; int aa[string];\n"
+      "  typedef struct { int x; byte y; } st_t;\n"
+      "  st_t st;\n"
+      "  enum {E0, E1, E2} e;\n"
+      "  A a = new;\n"
+      "endclass\n"
+      "module t;\n"
+      "  C c = new, d;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11;\n"
+      "  initial begin\n"
+      "    c.r = 2.5; c.s = \"hi\"; c.fa = '{1, 2, 3}; c.da = new[2];\n"
+      "    c.da[1] = 4; c.aa[\"k\"] = 5; c.st = '{6, 7}; c.e = C::E2;\n"
+      "    c.a.j = 11;\n"
+      "    d = new c;\n"
+      "    r1 = d.r * 10; r2 = d.s == \"hi\"; r3 = d.fa[2]; r4 = d.da[1];\n"
+      "    r5 = d.aa[\"k\"]; r6 = d.st.y; r7 = d.e;\n"
+      "    d.r = 1.5; d.s = \"x\"; d.fa[0] = 9; d.da[1] = 8; d.aa[\"k\"] = 1;\n"
+      "    d.st.x = 0; d.e = C::E0;\n"
+      "    r8 = c.r * 10 + c.fa[0] * 100 + c.da[1] * 1000 + c.aa[\"k\"] * "
+      "10000;\n"
+      "    r9 = c.st.x * 10 + c.e + (c.s == \"hi\") * 100;\n"
+      "    d.a.j = 50;\n"
+      "    r10 = c.a.j;\n"
+      "    r11 = d.a == c.a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 25u},
+                    {"r2", 1u},
+                    {"r3", 3u},
+                    {"r4", 4u},
+                    {"r5", 5u},
+                    {"r6", 7u},
+                    {"r7", 2u},
+                    {"r8", 54125u},
+                    {"r9", 162u},
+                    {"r10", 50u},
+                    {"r11", 1u}});
+}
+
+TEST(ClassAssignRenameSim, ShallowCopyRunsInEveryPlaceAndFromAnyHandle) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int i = 1; endclass\n"
+      "package pk;\n"
+      "  class K; int i = 1; endclass\n"
+      "  function int f(K c); K d; d = new c; d.i = 9; return c.i * 10 + "
+      "d.i; endfunction\n"
+      "endpackage\n"
+      "function int uf(C c); C d; d = new c; d.i = 8; return c.i * 10 + "
+      "d.i; endfunction\n"
+      "class O;\n"
+      "  function int g(C c); C d; d = new c; d.i = 7; return c.i * 10 + "
+      "d.i; endfunction\n"
+      "endclass\n"
+      "class Q; static C proto = new; C mine = new proto; endclass\n"
+      "interface ifc;\n"
+      "  int r;\n"
+      "  C c = new;\n"
+      "  initial begin C d; #1 d = new c; d.i = 6; r = c.i * 10 + d.i; end\n"
+      "endinterface\n"
+      "module t;\n"
+      "  C c = new;\n"
+      "  C arr[2];\n"
+      "  O o = new;\n"
+      "  ifc i();\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8;\n"
+      "  function C get(); return c; endfunction\n"
+      "  initial begin\n"
+      "    C e, g;\n"
+      "    Q q;\n"
+      "    automatic pk::K k = new;\n"
+      "    r1 = pk::f(k); r2 = uf(c); r3 = o.g(c);\n"
+      "    arr[1] = c;\n"
+      "    e = new arr[1];\n"
+      "    g = new get();\n"
+      "    e.i = 4; g.i = 5;\n"
+      "    r4 = (e != c) * 10 + c.i; r5 = (g != c) * 10 + c.i;\n"
+      "    q = new;\n"
+      "    Q::proto.i = 3;\n"
+      "    r6 = (q.mine != Q::proto) * 10 + q.mine.i;\n"
+      "    #2 r7 = i.r;\n"
+      "    r8 = e.i * 10 + g.i;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 19u},
+                    {"r2", 18u},
+                    {"r3", 17u},
+                    {"r4", 11u},
+                    {"r5", 11u},
+                    {"r6", 11u},
+                    {"r7", 16u},
+                    {"r8", 45u}});
+}
+
+TEST(ClassAssignRenameSim,
+     DISABLED_ShallowCopySetsEveryEmbeddedCovergroupHandleToNull) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int v;\n"
+      "  covergroup cg; coverpoint v; endgroup\n"
+      "  covergroup cg2; coverpoint v; endgroup\n"
+      "  function new(); cg = new; cg2 = new; endfunction\n"
+      "endclass\n"
+      "class D extends C; int w; endclass\n"
+      "module t;\n"
+      "  C a = new, b;\n"
+      "  D d1 = new, d2;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  initial begin\n"
+      "    a.v = 3;\n"
+      "    b = new a;\n"
+      "    d2 = new d1;\n"
+      "    r1 = b.cg == null; r2 = a.cg == null; r3 = b.cg2 == null;\n"
+      "    r4 = d2.cg == null; r5 = d1.cg == null; r6 = b.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r1", 1u}, {"r2", 0u}, {"r3", 1u}, {"r4", 1u}, {"r5", 0u}, {"r6", 3u}});
+}
+
+TEST(ClassAssignRenameSim,
+     ShallowCopyKeepsTheSourcesCoverageAndSharesAnOutsideCovergroup) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "covergroup cg_t with function sample(int x);\n"
+      "  coverpoint x;\n"
+      "endgroup\n"
+      "class C;\n"
+      "  int v;\n"
+      "  cg_t h;\n"
+      "  covergroup cg; coverpoint v { bins z = {0}; } endgroup\n"
+      "  function new(); cg = new; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C a = new, b;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    a.h = new;\n"
+      "    b = new a;\n"
+      "    r1 = b.h == a.h;\n"
+      "    a.v = 0; b.v = 1;\n"
+      "    a.cg.sample();\n"
+      "    r2 = a.cg.get_inst_coverage();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 100u}});
+}
+
 }  // namespace

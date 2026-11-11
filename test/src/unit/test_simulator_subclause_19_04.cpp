@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -163,6 +164,32 @@ TEST(EmbeddedCovergroupSim,
                        f),
             "25.00 25.00\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(Coverage, DISABLED_EmbeddedCovergroupVariableHoldsTheInstanceNewMade) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "covergroup cg_t; endgroup\n"
+      "class C;\n"
+      "  int v;\n"
+      "  covergroup cg; coverpoint v; endgroup\n"
+      "  function new(); cg = new; endfunction\n"
+      "  function int inside_null(); return cg == null; endfunction\n"
+      "endclass\n"
+      "class E; int v; covergroup cg; coverpoint v; endgroup endclass\n"
+      "module t;\n"
+      "  C a = new;\n"
+      "  E e = new;\n"
+      "  cg_t m = new;\n"
+      "  int r1, r2, r3, r4, r5;\n"
+      "  initial begin\n"
+      "    r1 = a.cg == null; r2 = a.cg != null; r3 = a.inside_null();\n"
+      "    r4 = e.cg == null; r5 = m == null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design, {{"r1", 0u}, {"r2", 1u}, {"r3", 0u}, {"r4", 1u}, {"r5", 0u}});
 }
 
 }  // namespace

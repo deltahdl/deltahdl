@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 
 #include "common/diagnostic.h"
 #include "fixture_parser.h"
@@ -209,6 +210,37 @@ TEST(ClassAssignRenameParsing, TypedConstructorCallWithArgumentAccepted) {
               "  C c2;\n"
               "  initial c2 = C::new(1);\n"
               "endmodule\n"));
+}
+
+TEST(ClassAssignRenameParsing,
+     TypedConstructorShallowCopyIsRejectedInEveryPlace) {
+  auto r = Parse(
+      "class C; int x; endclass\n"
+      "class D;\n"
+      "  function C mk(C c1); C c2; c2 = C::new c1; return c2; endfunction\n"
+      "  function C ok(C c1); C c2; c2 = new c1; return c2; endfunction\n"
+      "endclass\n"
+      "package pk;\n"
+      "  class E; endclass\n"
+      "  function void f(E e1); E e2; e2 = E::new e1; endfunction\n"
+      "  function void g(E e1); E e2; e2 = new e1; endfunction\n"
+      "endpackage\n"
+      "function void uf(C c1); C c2 = C::new c1; endfunction\n"
+      "function void ug(C c1); C c2 = new c1; endfunction\n"
+      "module m;\n"
+      "  C c1;\n"
+      "  C c2 = C::new c1;\n"
+      "  C c3 = new c1;\n"
+      "endmodule\n");
+  for (const uint32_t kLine : {3, 8, 11, 15}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "a typed constructor call cannot take a shallow-copy source",
+        kLine, "8.12"))
+        << kLine;
+  }
+  for (const uint32_t kLine : {4, 9, 12, 16}) {
+    EXPECT_FALSE(ErrorOnLine(r.diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace
