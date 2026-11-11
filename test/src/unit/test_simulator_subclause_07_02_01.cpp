@@ -639,4 +639,116 @@ TEST(PackedStructSimulation, AMemberWrittenWithATypeNameTakesItsWidth) {
             "7 17 17 24 8\n9 18 34\n");
 }
 
+TEST(PackedStructSimulation, ExplicitSigningDecidesExtensionAndComparison) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  struct packed unsigned { bit [3:0] a; bit [3:0] b; } u;\n"
+                 "  struct packed signed { bit [3:0] a; bit [3:0] b; } s;\n"
+                 "  struct packed { bit [3:0] a; bit [3:0] b; } d;\n"
+                 "  int w;\n"
+                 "  initial begin\n"
+                 "    u = 8'hF0; s = 8'hF0; d = 8'hF0;\n"
+                 "    w = u;\n"
+                 "    $display(\"%0d %0d %0d %0d\", w, s < 0, d < 0, u < 0);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "240 1 0 0\n");
+}
+
+TEST(PackedStructSimulation,
+     DISABLED_MemberAboveBit63OfAParameterFoldsInEveryConstantContext) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef struct packed { logic [7:0] a; logic [63:0] b; } T;\n"
+          "package pk;\n"
+          "  parameter struct packed { logic [7:0] a; logic [63:0] b; } W =\n"
+          "      {8'h5A, 64'h1};\n"
+          "endpackage\n"
+          "parameter struct packed { logic [7:0] a; logic [63:0] b; } UW =\n"
+          "    {8'h3C, 64'h2};\n"
+          "module t;\n"
+          "  parameter struct packed { logic [7:0] a; logic [63:0] b; } W =\n"
+          "      {8'hA5, 64'h7};\n"
+          "  parameter T TP = {8'h96, 64'h3};\n"
+          "  parameter union packed {\n"
+          "    struct packed { logic [7:0] a; logic [63:0] b; } s;\n"
+          "    logic [71:0] r;\n"
+          "  } X = {8'h77, 64'h4};\n"
+          "  parameter logic [3:0][71:0] Q = {72'h1, 72'h2, 72'h3, 72'h4};\n"
+          "  localparam int L1 = W.a, L2 = TP.a, L3 = pk::W.a, L4 = UW.a;\n"
+          "  localparam int L5 = $unit::UW.a, L6 = W.a[7:4], L7 = X.s.a;\n"
+          "  localparam int L8 = W.b, L9 = Q[2];\n"
+          "  logic [W.a[3:0]:0] w;\n"
+          "  if (W.a == 8'hA5) begin : g\n"
+          "    initial $display(\"taken\");\n"
+          "  end else begin : h\n"
+          "    initial $display(\"not taken\");\n"
+          "  end\n"
+          "  initial #1 $display(\"%h %h %h %h %h %h %h %h %h %0d\", L1, L2,\n"
+          "      L3, L4, L5, L6, L7, L8, L9, $bits(w));\n"
+          "endmodule\n",
+          f),
+      "taken\n000000a5 00000096 0000005a 0000003c 0000003c 0000000a "
+      "00000077 00000007 00000002 6\n");
+}
+
+TEST(PackedStructSimulation,
+     DISABLED_TypedefMemberOfAnInPlaceStructInAClassKeepsItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef struct packed { logic [2:0] x; } ps_t;\n"
+          "class D #(parameter struct packed { ps_t p; logic b; } HS =\n"
+          "              4'b1011);\n"
+          "  parameter struct packed { ps_t p; logic b; } BP = 4'b0111;\n"
+          "  static struct packed { ps_t p; logic b; } sp;\n"
+          "  struct packed { ps_t p; logic b; } ip;\n"
+          "  static union packed { ps_t p; logic [2:0] q; } su;\n"
+          "  struct packed { ps_t [1:0][1:0] pq; logic b; } aq;\n"
+          "  function void show();\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %h %h\", $bits(HS),\n"
+          "        $bits(BP), $bits(sp), $bits(ip), $bits(su), $bits(aq),\n"
+          "        HS.p, BP.p);\n"
+          "    ip = 4'b1101;\n"
+          "    $display(\"%h %h\", ip.p, ip.p.x[2:1]);\n"
+          "  endfunction\n"
+          "endclass\n"
+          "module t;\n"
+          "  D #() d;\n"
+          "  initial begin\n"
+          "    d = new;\n"
+          "    d.show();\n"
+          "    d.ip = 4'b0011;\n"
+          "    $display(\"%h\", d.ip.p);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "4 4 4 4 3 13 5 3\n6 3\n1\n");
+}
+
+TEST(PackedStructSimulation,
+     TypedefMemberOfAnInPlaceStructOutsideAClassKeepsItsWidth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef struct packed { logic [2:0] x; } ps_t;\n"
+                       "package pk;\n"
+                       "  struct packed { ps_t p; logic b; } ps;\n"
+                       "endpackage\n"
+                       "struct packed { ps_t p; logic b; } us;\n"
+                       "module t;\n"
+                       "  struct packed { ps_t p; logic b; } m;\n"
+                       "  union packed { ps_t p; logic [2:0] q; } mu;\n"
+                       "  initial begin\n"
+                       "    m = 4'b1101; pk::ps = 4'b0111; us = 4'b1001;\n"
+                       "    $display(\"%0d %0d %0d %0d %h %h %h\", $bits(m),\n"
+                       "        $bits(pk::ps), $bits(us), $bits(mu), m.p,\n"
+                       "        pk::ps.p, us.p);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 4 4 3 6 3 4\n");
+}
+
 }  // namespace

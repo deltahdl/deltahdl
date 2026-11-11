@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <string_view>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -320,6 +324,62 @@ TEST(PackedStructValidation, MemberTypesAreJudgedThroughNamesAndNesting) {
     EXPECT_NE(d.loc.line, 9u) << d.message;
     EXPECT_NE(d.loc.line, 10u) << d.message;
   }
+}
+
+TEST(PackedStructValidation, DISABLED_ClassHandleMemberIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "typedef C CT;\n"
+      "module t;\n"
+      "  struct packed { C h; bit b; } s1;\n"
+      "  struct packed { CT h; bit b; } s2;\n"
+      "  struct packed { bit [3:0] h; bit b; } s3;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "type of member 'h' is not allowed in a packed structure", line,
+        "7.2.1"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(PackedStructValidation,
+     VariableSizeArrayVirtualInterfaceAndUnpackedUnionMembersAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface I; endinterface\n"
+      "typedef union { bit a; bit b; } UU;\n"
+      "module t;\n"
+      "  struct packed { bit d []; bit b; } s1;\n"
+      "  struct packed { bit q [$]; bit b; } s2;\n"
+      "  struct packed { bit a [int]; bit b; } s3;\n"
+      "  struct packed { bit a [string]; bit b; } s4;\n"
+      "  struct packed { bit a [*]; bit b; } s5;\n"
+      "  struct packed { virtual I vi; bit b; } s6;\n"
+      "  struct packed { union { bit a; bit b; } u; bit b; } s7;\n"
+      "  struct packed { UU u; bit b; } s8;\n"
+      "  struct packed { union packed { bit a; bit b; } u; bit b; } s9;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const std::pair<uint32_t, const char*> kReports[] = {
+      {4, "unpacked array member 'd' is not allowed in a packed structure"},
+      {5, "unpacked array member 'q' is not allowed in a packed structure"},
+      {6, "unpacked array member 'a' is not allowed in a packed structure"},
+      {7, "unpacked array member 'a' is not allowed in a packed structure"},
+      {8, "unpacked array member 'a' is not allowed in a packed structure"},
+      {9, "type of member 'vi' is not allowed in a packed structure"},
+      {10, "type of member 'u' is not allowed in a packed structure"},
+      {11, "type of member 'u' is not allowed in a packed structure"},
+  };
+  for (const auto& [line, message] : kReports) {
+    EXPECT_TRUE(ReportedError(diags, message, line, "7.2.1")) << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), std::size(kReports));
 }
 
 }  // namespace
