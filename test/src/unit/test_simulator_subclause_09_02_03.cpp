@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -8,6 +9,7 @@
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 using namespace delta;
@@ -248,6 +250,86 @@ TEST(FinalProcedureSimulation, FinishInsideFinalStopsRemainingFinals) {
   auto* var = f.ctx.FindVariable("x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 0u);
+}
+
+int g_finish_level = 0;
+int g_end_of_simulation_calls = 0;
+Variable* g_x_at_end = nullptr;
+uint64_t g_x_seen_at_end = 0;
+
+PLI_INT32 FinishFromCalltf(PLI_BYTE8*) {
+  vpi_control(vpiFinish, g_finish_level);
+  return 0;
+}
+
+PLI_INT32 NoteEndOfSimulation(p_cb_data) {
+  ++g_end_of_simulation_calls;
+  g_x_seen_at_end = g_x_at_end->value.ToUint64();
+  return 0;
+}
+
+class FinishFromAFinalProcedure : public ::testing::Test {
+ protected:
+  void SetUp() override {
+    SetGlobalVpiContext(&vpi_ctx_);
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$finish_now");
+    data.calltf = FinishFromCalltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+    s_cb_data ended = {};
+    ended.reason = cbEndOfSimulation;
+    ended.cb_rtn = &NoteEndOfSimulation;
+    ASSERT_NE(vpi_register_cb(&ended), nullptr);
+    g_end_of_simulation_calls = 0;
+    g_x_seen_at_end = 0;
+  }
+  void TearDown() override { SetGlobalVpiContext(nullptr); }
+
+  uint64_t RunToTheEnd(const char* first_final) {
+    LowerFixture f;
+    const std::string kSrc =
+        std::string(
+            "module t;\n"
+            "  logic [31:0] x;\n"
+            "  function void stop(); $finish; endfunction\n"
+            "  initial x = 0;\n"
+            "  final begin x = 1; ") +
+        first_final +
+        " end\n"
+        "  final x = 99;\n"
+        "endmodule\n";
+    g_x_at_end = RunAndFindVar(kSrc, f, "x");
+    EXPECT_NE(g_x_at_end, nullptr);
+    if (g_x_at_end == nullptr) return 0;
+    f.scheduler.EndSimulation();
+    return g_x_at_end->value.ToUint64();
+  }
+
+  VpiContext vpi_ctx_;
+};
+
+TEST_F(FinishFromAFinalProcedure, WithoutAFinishEveryFinalProcedureRuns) {
+  EXPECT_EQ(RunToTheEnd(""), 99u);
+}
+
+TEST_F(FinishFromAFinalProcedure, VpiControlFinishSkipsTheRemainingFinals) {
+  for (int level : {0, 1, 2}) {
+    g_finish_level = level;
+    EXPECT_EQ(RunToTheEnd("$finish_now;"), 1u) << "level " << level;
+  }
+}
+
+TEST_F(FinishFromAFinalProcedure, TheEndOfSimulationCallbackRunsOnceAfterIt) {
+  g_finish_level = 0;
+  RunToTheEnd("$finish_now;");
+  EXPECT_EQ(g_end_of_simulation_calls, 1);
+  EXPECT_EQ(g_x_seen_at_end, 1u);
+}
+
+TEST_F(FinishFromAFinalProcedure,
+       FinishInACalledFunctionSkipsTheRemainingFinals) {
+  EXPECT_EQ(RunToTheEnd("stop();"), 1u);
 }
 
 }  // namespace

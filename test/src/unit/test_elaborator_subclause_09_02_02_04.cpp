@@ -350,4 +350,36 @@ TEST(AlwaysFFElaboration, ATargetAnotherProcessWritesIsReported) {
       ReportedError(f.diag.Diagnostics(), "variable 'r'", 4, "9.2.2.4"));
 }
 
+TEST(AlwaysFFElaboration, AVariableACalledTaskAssignsIsNoDriver) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, q, y;\n"
+      "  task automatic t();\n"
+      "    y = d;\n"
+      "  endtask\n"
+      "  always_ff @(posedge clk) begin\n"
+      "    t();\n"
+      "    q <= d;\n"
+      "  end\n"
+      "  initial y = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysFFElaboration, NonblockingIntraAssignmentTimingAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic clk, d, e, q, r;\n"
+      "  always_ff @(posedge clk) q <= #1 d;\n"
+      "  always_ff @(posedge clk) r <= @(negedge clk) e;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <iostream>
+#include <sstream>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -122,6 +126,70 @@ TEST(StructuredProcedureSimulation, FinalExecutesOnlyOnce) {
       "endmodule\n",
       "marker");
   EXPECT_EQ(val, 1u);
+}
+
+std::string RunThroughTheFinalProcedures(const std::string& src) {
+  SimFixture f;
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
+    f.scheduler.EndSimulation();
+  }
+  std::cout.rdbuf(old_buf);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return captured.str();
+}
+
+TEST(StructuredProcedureSimulation, EveryProcedureKindRunsInAnInterface) {
+  EXPECT_EQ(RunThroughTheFinalProcedures(
+                "interface ifc;\n"
+                "  int a, b, c, d;\n"
+                "  initial begin a = 1; #1 a = 2; end\n"
+                "  always @(a) b = a * 10;\n"
+                "  always_comb c = a + 100;\n"
+                "  always_latch if (a > 1) d = a + 5;\n"
+                "  final $display(\"a=%0d b=%0d c=%0d d=%0d\", a, b, c, d);\n"
+                "endinterface\n"
+                "module t;\n"
+                "  ifc i();\n"
+                "endmodule\n"),
+            "a=2 b=20 c=102 d=7\n");
+}
+
+TEST(StructuredProcedureSimulation, InitialAndFinalProceduresRunInAProgram) {
+  EXPECT_EQ(
+      RunThroughTheFinalProcedures("program p;\n"
+                                   "  int a;\n"
+                                   "  initial begin a = 1; #1 a = 2; end\n"
+                                   "  final $display(\"a=%0d\", a);\n"
+                                   "endprogram\n"
+                                   "module t;\n"
+                                   "  p prog();\n"
+                                   "endmodule\n"),
+      "a=2\n");
+}
+
+TEST(StructuredProcedureSimulation, EveryProcedureKindRunsInGenerateBlocks) {
+  EXPECT_EQ(RunThroughTheFinalProcedures(
+                "module t;\n"
+                "  int a, c, d;\n"
+                "  int b[2];\n"
+                "  case (1)\n"
+                "    1: begin : sel initial begin a = 1; #1 a = 2; end end\n"
+                "  endcase\n"
+                "  for (genvar g = 0; g < 2; g++) begin : gen\n"
+                "    always @(a) b[g] = a + g;\n"
+                "  end\n"
+                "  if (1) begin : cond\n"
+                "    always_comb c = a * 3;\n"
+                "    always_latch if (a > 1) d = a + 5;\n"
+                "    final $display(\"b0=%0d b1=%0d c=%0d d=%0d\", b[0], "
+                "b[1], c, d);\n"
+                "  end\n"
+                "endmodule\n"),
+            "b0=2 b1=3 c=6 d=7\n");
 }
 
 }  // namespace

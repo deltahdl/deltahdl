@@ -103,6 +103,16 @@ TEST(AlwaysCombSim, TheTimeZeroEvaluationFollowsTheInitialProcedures) {
             "y=1\n");
 }
 
+TEST(AlwaysCombSim, TheTimeZeroEvaluationFollowsTheAlwaysProcedures) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t; logic a, b, y;\n"
+                       "  always_comb begin y = a; $display(\"y=%b\", y); end\n"
+                       "  always begin a = 1; @(b); end\n"
+                       "endmodule\n",
+                       f),
+            "y=1\n");
+}
+
 TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
   SimFixture f;
   auto* b = RunAndFindVar(

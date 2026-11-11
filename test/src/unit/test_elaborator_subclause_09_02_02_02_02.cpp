@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <string>
+
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -550,6 +554,136 @@ TEST(AlwaysCombVsAlwaysStar, BlockingIntraAssignmentTimingIsRejected) {
                             "controls",
                             4, "9.2.2.4"));
   EXPECT_FALSE(ReportedError(diags, "shall not contain", 5, "9.2.2.2.2"));
+}
+
+struct TaskEnablingProcedure {
+  const char* keyword;
+  const char* subclause;
+};
+
+constexpr TaskEnablingProcedure kCombAndLatch[] = {
+    {"always_comb", "9.2.2.2.2"},
+    {"always_latch", "9.2.2.3"},
+};
+
+struct TaskEnablingDesign {
+  const char* outside;
+  const char* inside;
+  const char* call;
+};
+
+std::string ProcedureEnablingTask(const TaskEnablingDesign& d,
+                                  const std::string& procedure) {
+  return std::string(d.outside) + "module m;\n  logic a, y;\n" + d.inside +
+         "  " + procedure + " " + d.call + ";\nendmodule\n";
+}
+
+uint32_t TaskEnableLine(const TaskEnablingDesign& d) {
+  const std::string kAbove = std::string(d.outside) + d.inside;
+  return 3 +
+         static_cast<uint32_t>(std::count(kAbove.begin(), kAbove.end(), '\n'));
+}
+
+void ExpectBlockingTaskReported(const TaskEnablingDesign& d) {
+  for (const auto& p : kCombAndLatch) {
+    ElabFixture f;
+    ElaborateSrc(ProcedureEnablingTask(d, p.keyword), f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string(p.keyword) + " shall not enable a task that blocks",
+        TaskEnableLine(d), p.subclause))
+        << p.keyword;
+  }
+}
+
+void ExpectTaskEnableAccepted(const TaskEnablingDesign& d,
+                              const std::string& procedure) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(ProcedureEnablingTask(d, procedure), f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors) << procedure;
+}
+
+constexpr TaskEnablingDesign kDelayingTask = {
+    "", "  task automatic t; #1 y = a; endtask\n", "t()"};
+
+TEST(AlwaysCombVsAlwaysStar, ATaskThatTakesNoTimeIsAccepted) {
+  constexpr TaskEnablingDesign kTimeless = {
+      "", "  task automatic t; y = a; endtask\n", "t()"};
+  for (const auto& p : kCombAndLatch)
+    ExpectTaskEnableAccepted(kTimeless, p.keyword);
+}
+
+TEST(AlwaysCombVsAlwaysStar, DISABLED_ATaskWhoseBodyDelaysIsReported) {
+  ExpectBlockingTaskReported(kDelayingTask);
+}
+
+TEST(AlwaysCombVsAlwaysStar, DISABLED_ATaskWhoseBodyWaitsOnAnEventIsReported) {
+  ExpectBlockingTaskReported(
+      {"", "  task automatic t; @(a) y = a; endtask\n", "t()"});
+}
+
+TEST(AlwaysCombVsAlwaysStar, DISABLED_ATaskWhoseBodyWaitsOnALevelIsReported) {
+  ExpectBlockingTaskReported(
+      {"", "  task automatic t; wait (a) y = a; endtask\n", "t()"});
+}
+
+TEST(AlwaysCombVsAlwaysStar, DISABLED_ATaskWhoseBodyForksAndJoinsIsReported) {
+  ExpectBlockingTaskReported({"",
+                              "  task automatic t;\n"
+                              "    fork y = a; join\n"
+                              "  endtask\n",
+                              "t()"});
+}
+
+TEST(AlwaysCombVsAlwaysStar,
+     DISABLED_ATaskBlockingThroughATaskItEnablesIsReported) {
+  ExpectBlockingTaskReported({"",
+                              "  task automatic inner; #1 y = a; endtask\n"
+                              "  task automatic t; inner(); endtask\n",
+                              "t()"});
+}
+
+TEST(AlwaysCombVsAlwaysStar, DISABLED_ATaskBlockingOnOneBranchIsReported) {
+  ExpectBlockingTaskReported(
+      {"", "  task automatic t; if (a) #1; y = a; endtask\n", "t()"});
+}
+
+TEST(AlwaysCombVsAlwaysStar,
+     DISABLED_AnImportedPackageTaskThatBlocksIsReported) {
+  ExpectBlockingTaskReported(
+      {"package p;\n"
+       "  task automatic t(output logic o); #1 o = 1; "
+       "endtask\n"
+       "endpackage\n",
+       "  import p::*;\n", "t(y)"});
+}
+
+TEST(AlwaysCombVsAlwaysStar,
+     DISABLED_AClassStaticTaskThatBlocksCalledThroughScopeIsReported) {
+  ExpectBlockingTaskReported({"",
+                              "  class c;\n"
+                              "    static task t(output logic o); #1 o = 1; "
+                              "endtask\n"
+                              "  endclass\n",
+                              "c::t(y)"});
+}
+
+TEST(AlwaysCombVsAlwaysStar, AlwaysStarAndGeneralAlwaysAcceptABlockingTask) {
+  constexpr TaskEnablingDesign kEveryBlockingTask[] = {
+      kDelayingTask,
+      {"", "  task automatic t; @(a) y = a; endtask\n", "t()"},
+      {"", "  task automatic t; wait (a) y = a; endtask\n", "t()"},
+      {"", "  task automatic t; fork y = a; join endtask\n", "t()"},
+      {"",
+       "  task automatic inner; #1 y = a; endtask\n"
+       "  task automatic t; inner(); endtask\n",
+       "t()"},
+  };
+  for (const auto& d : kEveryBlockingTask) {
+    ExpectTaskEnableAccepted(d, "always @*");
+    ExpectTaskEnableAccepted(d, "always @(a)");
+  }
 }
 
 }  // namespace

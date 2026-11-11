@@ -447,4 +447,54 @@ TEST(AlwaysLatchElaboration, ForkJoinArmAssignmentLeavesNothingLatched) {
                               "9.2.2.3"));
 }
 
+TEST(AlwaysLatchElaboration, AVariableACalledFunctionAssignsIsADriver) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, y, z;\n"
+      "  function automatic logic g();\n"
+      "    y = a;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  always_latch if (en) z = g();\n"
+      "  assign y = a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "variable 'y' driven by always_latch and continuous assignment", 7,
+      "10.3.2"));
+}
+
+TEST(AlwaysLatchElaboration, AVariableACalledTaskAssignsIsNoDriver) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, a, y, z;\n"
+      "  task automatic t();\n"
+      "    y = a;\n"
+      "  endtask\n"
+      "  always_latch if (en) begin\n"
+      "    t();\n"
+      "    z = a;\n"
+      "  end\n"
+      "  initial y = 1'b0;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AlwaysLatchElaboration, NonblockingIntraAssignmentTimingAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic en, d, q;\n"
+      "  always_latch if (en) q <= #1 d;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
