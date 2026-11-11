@@ -308,4 +308,180 @@ TEST(ArrayIteratorIndex, AssociativeReductionIndexIsTheKey) {
   EXPECT_EQ(out, "14 11\n");
 }
 
+TEST(ArrayIteratorIndex,
+     DISABLED_IndexMethodCalledWithParenthesesOrADimension) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int arr[] = '{0, 5, 2, 7};\n"
+      "  int aa[int];\n"
+      "  int m[2][3];\n"
+      "  int q[$], r[$], s[$], u[$], w[$], z[$];\n"
+      "  int d = 1;\n"
+      "  initial begin\n"
+      "    aa[3] = 3;\n"
+      "    aa[4] = 9;\n"
+      "    q = arr.find with (item == item.index());\n"
+      "    r = arr.find with (item == item.index(1));\n"
+      "    s = arr.find(x) with (x == x.index(d));\n"
+      "    u = arr.find_index(x, i) with (x == x.i());\n"
+      "    w = aa.find with (item == item.index());\n"
+      "    z = arr.map with (item.index(1) * 2);\n"
+      "    $display(\"%p %p %p %p %p %p\", q, r, s, u, w, z);\n"
+      "    $display(\"%0d %0d\", arr.sum with (item.index()),\n"
+      "             m.sum with (item.sum(y) with (y.index(1))));\n"
+      "    arr.rsort with (item.index());\n"
+      "    $display(\"%p\", arr);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{0, 2} '{0, 2} '{0, 2} '{0, 2} '{3} '{0, 2, 4, 6}\n"
+            "6 6\n'{7, 2, 5, 0}\n");
+}
+
+TEST(ArrayIteratorIndex, DISABLED_IndexIsASignedIntAndAKeyKeepsItsSignedness) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int arr[] = '{3, 1, 2};\n"
+      "  int fx[1:3] = '{1, 2, 3};\n"
+      "  int ba[byte];\n"
+      "  int sh[shortint];\n"
+      "  int q[$], r[$];\n"
+      "  initial begin\n"
+      "    ba[-2] = 7;\n"
+      "    ba[4] = 8;\n"
+      "    sh[-300] = 5;\n"
+      "    sh[6] = 6;\n"
+      "    q = arr.find with (item.index - 1 < 0);\n"
+      "    r = ba.find with (item.index < 0);\n"
+      "    $display(\"%p %p %0d %0d\", q, r,\n"
+      "             sh.sum with (int'(item.index < 0)),\n"
+      "             fx.sum with (int'(item.index - 2 < 0)));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{3} '{7} 1 1\n");
+}
+
+TEST(ArrayIteratorIndex, IndexHasTheWidthOfTheKeyType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int fx[1:3] = '{1, 2, 3};\n"
+      "  int la[longint];\n"
+      "  int ba[byte];\n"
+      "  int na[bit [3:0]];\n"
+      "  int q[$];\n"
+      "  initial begin\n"
+      "    la[64'd1 << 40] = 5;\n"
+      "    la[3] = 6;\n"
+      "    ba[-2] = 7;\n"
+      "    ba[4] = 8;\n"
+      "    na[4'd15] = 9;\n"
+      "    q = la.find with (item.index > 64'd1 << 39);\n"
+      "    $display(\"%0d %p %0d %0d %0d\", $bits(fx.sum with (item.index)), "
+      "q,\n"
+      "             na.sum with (item.index + 1'b1),\n"
+      "             ba.sum with ($bits(item.index)),\n"
+      "             la.sum with ($bits(item.index)));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 '{5} 0 16 128\n");
+}
+
+TEST(ArrayIteratorIndex, RenamedIndexBesideAMemberOrPropertyNamedIndex) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct {int index; int v;} idx_type;\n"
+      "  class C;\n"
+      "    int index;\n"
+      "  endclass\n"
+      "  idx_type q[$];\n"
+      "  idx_type r[$];\n"
+      "  idx_type fa[4];\n"
+      "  idx_type sa[int];\n"
+      "  C cq[$];\n"
+      "  int ix[$];\n"
+      "  initial begin\n"
+      "    q.push_back('{0, 10});\n"
+      "    q.push_back('{5, 11});\n"
+      "    q.push_back('{2, 12});\n"
+      "    q.push_back('{9, 13});\n"
+      "    r = q.find(item, iter_index) with (item.index != item.iter_index);\n"
+      "    $display(\"%0d %0d %0d\", r.size(), r[0].v, r[1].v);\n"
+      "    ix = q.find_index(item, p) with (item.index != item.p);\n"
+      "    r = q.find_first(item, p) with (item.index != item.p);\n"
+      "    $display(\"%p %0d %0d\", ix, r[0].v,\n"
+      "             q.sum(item, p) with (item.index * item.p));\n"
+      "    r = q.max(item, p) with (item.index - item.p);\n"
+      "    $display(\"%0d\", r[0].v);\n"
+      "    sa[7] = '{7, 1};\n"
+      "    sa[8] = '{3, 2};\n"
+      "    r = sa.find(item, k) with (item.index == item.k);\n"
+      "    $display(\"%0d %0d\", r.size(), r[0].v);\n"
+      "    fa = '{'{9, 10}, '{5, 11}, '{2, 12}, '{7, 13}};\n"
+      "    fa.sort(item, p) with (item.index);\n"
+      "    foreach (fa[i]) $write(\"%0d \", fa[i].v);\n"
+      "    fa.rsort(item, p) with (item.p);\n"
+      "    foreach (fa[i]) $write(\"%0d \", fa[i].v);\n"
+      "    begin\n"
+      "      C c;\n"
+      "      c = new;\n"
+      "      c.index = 0;\n"
+      "      cq.push_back(c);\n"
+      "      c = new;\n"
+      "      c.index = 4;\n"
+      "      cq.push_back(c);\n"
+      "      c = new;\n"
+      "      c.index = 2;\n"
+      "      cq.push_back(c);\n"
+      "    end\n"
+      "    ix = cq.find_index(item, p) with (item.index != item.p);\n"
+      "    $display(\"%p\", ix);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "2 11 13\n'{1, 3} 11 36\n13\n1 1\n12 11 13 10 10 13 11 12 "
+            "'{1}\n");
+}
+
+TEST(ArrayIteratorIndex, DISABLED_RenamedIndexBesideAMethodNamedIndex) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class K;\n"
+      "    int v;\n"
+      "    function int index();\n"
+      "      return v;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  K kq[$];\n"
+      "  int ix[$];\n"
+      "  initial begin\n"
+      "    begin\n"
+      "      K k;\n"
+      "      k = new;\n"
+      "      k.v = 0;\n"
+      "      kq.push_back(k);\n"
+      "      k = new;\n"
+      "      k.v = 4;\n"
+      "      kq.push_back(k);\n"
+      "      k = new;\n"
+      "      k.v = 2;\n"
+      "      kq.push_back(k);\n"
+      "    end\n"
+      "    ix = kq.find_index(item, p) with (item.index() != item.p);\n"
+      "    $display(\"%p %0d\", ix, kq.sum(item, p) with (item.index() * "
+      "10));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{1} 60\n");
+}
+
 }  // namespace

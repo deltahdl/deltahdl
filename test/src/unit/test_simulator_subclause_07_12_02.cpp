@@ -666,4 +666,31 @@ TEST(ArrayOrderingSim, DISABLED_SortAndRsortOrderRealValuesNumerically) {
             "'{3, -0.5}\n'{5, 3, 1, -4}\n'{5, 3, 1, -4}\n");
 }
 
+TEST(ArrayOrderingSim, DISABLED_IteratorArgumentSortsAQueueOfStructures) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  typedef struct {int k; int v;} s_t;\n"
+      "  s_t q[$];\n"
+      "  s_t r[$];\n"
+      "  initial begin\n"
+      "    q.push_back('{3, 10});\n"
+      "    q.push_back('{1, 11});\n"
+      "    q.push_back('{2, 12});\n"
+      "    r = q;\n"
+      "    q.sort(x) with (x.k);\n"
+      "    foreach (q[i]) $write(\"%0d \", q[i].k);\n"
+      "    q.rsort(item) with (item.v);\n"
+      "    foreach (q[i]) $write(\"%0d \", q[i].v);\n"
+      "    r.sort(x, p) with (x.k);\n"
+      "    foreach (r[i]) $write(\"%0d \", r[i].k);\n"
+      "    r.rsort(x) with (x.k);\n"
+      "    foreach (r[i]) $write(\"%0d \", r[i].k);\n"
+      "    $display;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 2 3 12 11 10 1 2 3 3 2 1 \n");
+}
+
 }  // namespace
