@@ -310,4 +310,34 @@ TEST(PackageDeclarationSim, InitializerIsConvertedToTheVariablesType) {
             "8 -1 4464 4 100 0101 1 2.500000\n-56\n");
 }
 
+TEST(PackageDeclarationSim, EveryAlwaysKindReadsThePackageInitializerFirst) {
+  for (const char* procedure :
+       {"  always @(posedge clk) $display(\"%0d\", g);\n",
+        "  always_ff @(posedge clk) $display(\"%0d\", g);\n",
+        "  always_latch $display(\"%0d\", g);\n",
+        "  always_comb $display(\"%0d\", g);\n"}) {
+    const std::string kSrc = std::string(
+                                 "package p; int g = 3; endpackage\n"
+                                 "module t;\n"
+                                 "  import p::*;\n"
+                                 "  logic clk = 0;\n"
+                                 "  initial clk = 1;\n") +
+                             procedure + "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), "3\n") << kSrc;
+    EXPECT_FALSE(f.diag.HasErrors()) << kSrc;
+  }
+}
+
+TEST(PackageDeclarationSim, ScopedReadOfAPackageInitializerAtTimeZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p; int g = 3; endpackage\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d\", p::g);\n"
+                       "endmodule\n",
+                       f),
+            "3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

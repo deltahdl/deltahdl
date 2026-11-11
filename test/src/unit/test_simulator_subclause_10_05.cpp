@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_scheduler.h"
@@ -517,6 +519,27 @@ TEST(VariableInitSim, SpecializationMethodStaticLocalsAreSetEarly) {
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "r"), 11u);
   EXPECT_EQ(RunAndGet(src, "u"), 21u);
+}
+
+TEST(VariableInitSim, StaticInitializersOfEveryScopeLandBeforeTheProcedures) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I; int a = 4;\n"
+                       "  initial #2 $display(\"I %0d\", a);\n"
+                       "endinterface\n"
+                       "program pr; int b = 5;\n"
+                       "  initial #3 $display(\"P %0d\", b);\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  I u(); pr q();\n"
+                       "  if (1) begin : g int c = 6; initial #1 $display(\"G "
+                       "%0d\", c); end\n"
+                       "  task tk(); static int d = 7; $display(\"T %0d\", d); "
+                       "endtask\n"
+                       "  initial tk();\n"
+                       "endmodule\n",
+                       f),
+            "T 7\nG 6\nI 4\nP 5\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
