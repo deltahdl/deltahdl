@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -321,6 +324,65 @@ TEST(OutOfBlockDeclParsing, ClassTypedefLeavesWithTheMethod) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kParamDecl);
   EXPECT_EQ(item->data_type.kind, DataTypeKind::kImplicit);
+}
+
+TEST(OutOfBlockDeclParsing, QualifiersRepeatedOutOfBlockAreRefused) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern protected virtual function int f();\n"
+      "  extern static function int g();\n"
+      "endclass\n"
+      "protected function int C::f(); return 1; endfunction\n"
+      "static function int C::g(); return 1; endfunction\n"
+      "module m; endmodule\n");
+  const auto& diags = r.diags;
+  EXPECT_TRUE(
+      ReportedError(diags, "expected top-level declaration", 5, "3.12.1"));
+  EXPECT_TRUE(ReportedError(diags, "requires the 'var' keyword", 6, "6.8"));
+}
+
+TEST(OutOfBlockDeclParsing, PrototypeSeesNoClassTypeDeclaredAfterIt) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern function void f(T x);\n"
+      "  typedef real T;\n"
+      "endclass\n"
+      "function void C::f(T x); endfunction\n"
+      "module m; endmodule\n");
+  const auto& diags = r.diags;
+  EXPECT_TRUE(ReportedError(diags, "expected ')', got identifier", 2, "13.3"));
+}
+
+TEST(OutOfBlockDeclParsing, BareClassLocalReturnTypeIsRefused) {
+  auto r = Parse(
+      "class C;\n"
+      "  typedef int T;\n"
+      "  typedef struct { int a; } S;\n"
+      "  typedef enum {A, B} E;\n"
+      "  class N; endclass\n"
+      "  extern function T f();\n"
+      "  extern function S g();\n"
+      "  extern function N h();\n"
+      "  extern function E e();\n"
+      "endclass\n"
+      "function T C::f(); return 1; endfunction\n"
+      "function S C::g(); return '{a: 1}; endfunction\n"
+      "function N C::h(); return null; endfunction\n"
+      "function E C::e(); return A; endfunction\n"
+      "package p;\n"
+      "  class PC; typedef byte U; extern function U u(); endclass\n"
+      "  function U PC::u(); return 1; endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class MC; typedef byte U; extern function U u(); endclass\n"
+      "  function U MC::u(); return 1; endfunction\n"
+      "endmodule\n");
+  const auto& diags = r.diags;
+  for (const int kLine : {11, 12, 13, 14, 17, 21}) {
+    EXPECT_TRUE(
+        ReportedError(diags, "expected ';', got identifier", kLine, "13.4"))
+        << kLine;
+  }
 }
 
 }  // namespace

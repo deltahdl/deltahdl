@@ -398,4 +398,69 @@ TEST(ClassSim, OutOfBlockVoidMethodAmongModuleItemsWritesThroughThis) {
             "area 30\n");
 }
 
+TEST(ClassSim, OutOfBlockBodyReadsMembersDeclaredAfterThePrototype) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  extern function int f();\n"
+      "  local int lp = 3;\n"
+      "  static int sp = 4;\n"
+      "  typedef byte B;\n"
+      "endclass\n"
+      "function int C::f(); B b; return lp * 100 + sp * 10 + $bits(b); "
+      "endfunction\n"
+      "module m;\n"
+      "  C c = new;\n"
+      "  int r1;\n"
+      "  initial r1 = c.f();\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 348u}});
+}
+
+TEST(ClassSim, DISABLED_SubroutinesSharingAMethodsNameAreEachCalled) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class UC; extern function int f(); extern task t(); endclass\n"
+      "function int UC::f(); return 2; endfunction\n"
+      "task UC::t(); endtask\n"
+      "function int f(); return 1; endfunction\n"
+      "task t(); endtask\n"
+      "package p;\n"
+      "  class PC; extern function int f(); endclass\n"
+      "  function int PC::f(); return 4; endfunction\n"
+      "  function int f(); return 3; endfunction\n"
+      "endpackage\n"
+      "interface ifc;\n"
+      "  class IC; extern function int f(); endclass\n"
+      "  function int IC::f(); return 6; endfunction\n"
+      "  function int f(); return 5; endfunction\n"
+      "endinterface\n"
+      "module m;\n"
+      "  class MC; extern function int f(); extern task t(); endclass\n"
+      "  function int MC::f(); return 8; endfunction\n"
+      "  task MC::t(); endtask\n"
+      "  function int f(); return 7; endfunction\n"
+      "  task t(); endtask\n"
+      "  ifc i();\n"
+      "  UC u = new;\n"
+      "  MC c = new;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7;\n"
+      "  initial begin\n"
+      "    automatic p::PC pc = new;\n"
+      "    r1 = $unit::f(); r2 = u.f(); r3 = p::f(); r4 = pc.f(); r5 = f(); r6 "
+      "= c.f(); r7 = i.f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 1u},
+                    {"r2", 2u},
+                    {"r3", 3u},
+                    {"r4", 4u},
+                    {"r5", 7u},
+                    {"r6", 8u},
+                    {"r7", 5u}});
+}
+
 }  // namespace
