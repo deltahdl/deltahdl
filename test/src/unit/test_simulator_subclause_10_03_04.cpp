@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -153,6 +155,39 @@ TEST(DriveStrengthSim, PullStrengthBeatsWeakDriver) {
       f, "w");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 1u);
+}
+
+TEST(DriveStrengthSim, EitherOrderOfTheTwoStrengthsDrivesTheSame) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 1, b = 0;\n"
+                       "  wire w1, w2;\n"
+                       "  assign (pull0, strong1) w1 = a;\n"
+                       "  assign (weak0, weak1) w1 = b;\n"
+                       "  assign (strong1, pull0) w2 = a;\n"
+                       "  assign (weak0, weak1) w2 = b;\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%b %v %b %v\", w1, w1, w2, w2);\n"
+                       "    a = 0; b = 1;\n"
+                       "    #1 $display(\"%b %v %b %v\", w1, w1, w2, w2);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 St1 1 St1\n0 Pu0 0 Pu0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DriveStrengthSim, AStrengthAppliesToEveryAssignmentOfItsList) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic x = 1, y = 0;\n"
+                       "  wire p, q;\n"
+                       "  assign (weak0, weak1) p = x, q = y;\n"
+                       "  initial #1 $display(\"%v %v\", p, q);\n"
+                       "endmodule\n",
+                       f),
+            "We1 We0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

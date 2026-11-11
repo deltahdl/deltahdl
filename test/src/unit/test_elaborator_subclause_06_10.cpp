@@ -682,4 +682,30 @@ TEST(ImplicitDeclaration,
                             "undeclared identifier 'nproc'", 6, "23.9"));
 }
 
+TEST(ImplicitDeclaration,
+     DISABLED_SelectOfAnUndeclaredContAssignTargetSelectsAScalar) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  assign q[0] = 1'b1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            2, "11.5.1"));
+}
+
+TEST(ImplicitDeclaration,
+     DISABLED_SelectOfAnUndeclaredConcatenationMemberSelectsAScalar) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  assign {q[1:0], r} = 3'b101;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select or part-select of a scalar is illegal",
+                            2, "11.5.1"));
+}
+
 }  // namespace

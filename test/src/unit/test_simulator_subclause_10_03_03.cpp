@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -537,6 +539,85 @@ TEST(AssignmentDelaySim, ConcatenationTargetSettlesTogether) {
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "v"), 0x10u);
   EXPECT_EQ(RunAndGet(src, "w"), 2u);
+}
+
+TEST(AssignmentDelaySim,
+     ADeclarationAssignmentDelayLeavesAnotherAssignUndelayed) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 0, b = 0;\n"
+                       "  wor #10 w = a;\n"
+                       "  assign w = b;\n"
+                       "  initial begin\n"
+                       "    #20 b = 1;\n"
+                       "    #1 $display(\"%0t %b\", $time, w);\n"
+                       "    #10 b = 0; a = 1;\n"
+                       "    #1 $display(\"%0t %b\", $time, w);\n"
+                       "    #10 $display(\"%0t %b\", $time, w);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "21 1\n32 0\n42 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentDelaySim, ADeclarationAssignmentDelayLeavesAGateUndelayed) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 0, b = 0;\n"
+                       "  wor #10 w = a;\n"
+                       "  buf #3 g (w, b);\n"
+                       "  initial begin\n"
+                       "    #20 b = 1;\n"
+                       "    #2 $display(\"%0t %b\", $time, w);\n"
+                       "    #1 $display(\"%0t %b\", $time, w);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "22 0\n23 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentDelaySim, ANetDelayDelaysEveryContinuousAssignmentToTheNet) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 0, b = 0;\n"
+                       "  wor #10 w;\n"
+                       "  assign w = a;\n"
+                       "  assign w = b;\n"
+                       "  initial begin\n"
+                       "    #20 b = 1;\n"
+                       "    #9 $display(\"%0t %b\", $time, w);\n"
+                       "    #2 $display(\"%0t %b\", $time, w);\n"
+                       "    b = 0;\n"
+                       "    #9 $display(\"%0t %b\", $time, w);\n"
+                       "    #2 $display(\"%0t %b\", $time, w);\n"
+                       "    a = 1;\n"
+                       "    #9 $display(\"%0t %b\", $time, w);\n"
+                       "    #2 $display(\"%0t %b\", $time, w);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "29 0\n31 1\n40 1\n42 0\n51 0\n53 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentDelaySim, ARhsValueEqualToThePendingOneKeepsThePendingEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 0, b = 0;\n"
+                       "  wire w;\n"
+                       "  assign #5 w = a | b;\n"
+                       "  initial begin\n"
+                       "    #10 a = 1;\n"
+                       "    #2 b = 1; a = 0;\n"
+                       "    #2 $display(\"%0t %b\", $time, w);\n"
+                       "    #1 $display(\"%0t %b\", $time, w);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "14 0\n15 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

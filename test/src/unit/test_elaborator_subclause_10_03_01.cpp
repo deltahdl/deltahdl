@@ -164,4 +164,17 @@ TEST(ContinuousAssignDeclElaboration, InterconnectVectorNetDeclAssignIsError) {
       "10.3.1"));
 }
 
+TEST(ContinuousAssignDeclElaboration, NetDeclAssignOnARedeclaredNetIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  wire w = a;\n"
+      "  wire w = b;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 4, "6.5"));
+}
+
 }  // namespace

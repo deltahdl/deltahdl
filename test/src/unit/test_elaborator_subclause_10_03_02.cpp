@@ -541,4 +541,108 @@ TEST(ContAssignStatementElaboration, InitializerAndDriverInTwoScopesAreApart) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(ContAssignStatementElaboration,
+     VariableDeclaredAfterItsContAssignIsError) {
+  for (const char* src :
+       {"module m;\n  assign v = 1'b1;\n  logic v;\nendmodule\n",
+        "interface m;\n  assign v = 1'b1;\n  logic v;\n"
+        "endinterface\nmodule top;\n  m u();\nendmodule\n",
+        "program m;\n  assign v = 1'b1;\n  logic v;\n"
+        "endprogram\n"}) {
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "6.5"))
+        << src;
+  }
+}
+
+TEST(ContAssignStatementElaboration,
+     VariableDeclaredAfterItsContAssignInAGenerateBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    assign v = 1'b1;\n"
+      "    logic v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 4, "6.5"));
+}
+
+TEST(ContAssignStatementElaboration,
+     VariableDeclaredBeforeItsContAssignIsValid) {
+  for (const char* src :
+       {"module m;\n  logic v;\n  logic [1:0] s;\n  assign v = 1'b1;\n"
+        "  assign s[0] = 1'b1;\nendmodule\n",
+        "interface m;\n  logic v;\n  assign v = 1'b1;\nendinterface\n"
+        "module top;\n  m u();\nendmodule\n",
+        "program m;\n  logic v;\n  assign v = 1'b1;\nendprogram\n",
+        "module m;\n  if (1) begin : g\n    logic v;\n    assign v = 1'b1;\n"
+        "  end\nendmodule\n"}) {
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
+}
+
+TEST(ContAssignStatementElaboration,
+     DISABLED_SelectOfAVariableDeclaredAfterItsContAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  assign v[0] = 1'b1;\n"
+      "  logic [1:0] v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "6.5"));
+}
+
+TEST(ContAssignStatementElaboration,
+     NamesDeclaredAfterTheirConcatenationTargetAreErrors) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  assign {v, w} = 2'b10;\n"
+      "  logic v;\n"
+      "  wire w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'v'", 3, "6.5"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 4, "6.5"));
+}
+
+TEST(ContAssignStatementElaboration,
+     VariableDeclaredAfterItsContAssignUnderDefaultNettypeNoneIsReportedOnce) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "`default_nettype none\n"
+      "module m;\n"
+      "  assign v = 1'b1;\n"
+      "  logic v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit net 'v' forbidden by `default_nettype none", 3, "22.8"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(ContAssignStatementElaboration, NetDeclaredAfterItsContAssignIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  assign n = 1'b1;\n"
+      "  wire n;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'n'", 3, "6.5"));
+}
+
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -93,6 +95,63 @@ TEST(ContinuousAssignSim, RhsBitSelectOfAPackedVectorTracksLaterChanges) {
       f, "y");
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(y->value.ToUint64(), 0u);
+}
+
+TEST(ContinuousAssignSim, ProgramContinuousAssignmentsDriveANetAndAVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  logic a = 1; wire w; logic v;\n"
+                       "  assign w = a;\n"
+                       "  assign v = ~a;\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%b %b\", w, v);\n"
+                       "    a = 0;\n"
+                       "    #1 $display(\"%b %b\", w, v);\n"
+                       "  end\n"
+                       "endprogram\n",
+                       f),
+            "1 0\n0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ContinuousAssignSim, InterfaceContinuousAssignmentsDriveANetAndAVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface i;\n"
+                       "  logic a = 1; wire w; logic v;\n"
+                       "  assign w = a;\n"
+                       "  assign v = ~a;\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  i u();\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%b %b\", u.w, u.v);\n"
+                       "    u.a = 0;\n"
+                       "    #1 $display(\"%b %b\", u.w, u.v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 0\n0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ContinuousAssignSim, CheckerContinuousAssignmentDrivesAVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("checker c(logic a);\n"
+                       "  logic v;\n"
+                       "  assign v = ~a;\n"
+                       "endchecker\n"
+                       "module t;\n"
+                       "  logic a = 1;\n"
+                       "  c u(a);\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%b\", u.v);\n"
+                       "    a = 0;\n"
+                       "    #1 $display(\"%b\", u.v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

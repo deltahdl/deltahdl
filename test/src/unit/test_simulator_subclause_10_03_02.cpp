@@ -413,4 +413,23 @@ TEST(ContAssignSim, ReEvaluatedWhenAPackageVariableItReadsChanges) {
   EXPECT_EQ(v, 6u);
 }
 
+TEST(ContAssignStatementSim, AnUnchangedRhsValueGivesTheTargetNoEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 0, b = 0; int n = 0;\n"
+                       "  wire w;\n"
+                       "  assign w = a & b;\n"
+                       "  always @(w) if ($time > 0) n++;\n"
+                       "  initial begin\n"
+                       "    #1 a = 1; #1 a = 0; #1 b = 1;\n"
+                       "    #1 $display(\"%0d %b\", n, w);\n"
+                       "    a = 1;\n"
+                       "    #1 $display(\"%0d %b\", n, w);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 0\n1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
