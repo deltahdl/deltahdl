@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
@@ -580,6 +581,56 @@ TEST(UnpackedArrayConcatElaboration, IncompatibleItemIsError) {
                             "concatenation",
                             5, "10.10"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "is not", 6, "10.10"));
+}
+
+TEST(UnpackedArrayConcatElaboration,
+     DISABLED_ConcatenationOfArraysAsAnEqualityOperandIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int A3[1:3], A6[1:6]; bit e;\n"
+      "  initial e = ({A3, A3} == A6);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an unpacked array concatenation has no "
+                            "self-determined type",
+                            3, "10.10"));
+}
+
+TEST(UnpackedArrayConcatElaboration, EqualityOfTwoArraysIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int A6[1:6]; bit e;\n"
+      "  initial e = (A6 == A6);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnpackedArrayConcatElaboration,
+     DISABLED_AssociativeTargetInEveryOtherContextIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef int aa_t [int];\n"
+      "module s(input var int x[int]); endmodule\n"
+      "module m #(parameter int P[int] = {1, 2}); endmodule\n"
+      "module t;\n"
+      "  int a = 3, b = 4;\n"
+      "  function aa_t f(); return {a, b}; endfunction\n"
+      "  function void g(input int x[int]); endfunction\n"
+      "  s u(.x({a, b}));\n"
+      "  m mm();\n"
+      "  initial g({a, b});\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "unpacked array concatenation cannot target an associative array";
+  for (const int kLine : {3, 6, 8, 10}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "10.10"))
+        << kLine;
+  }
 }
 
 }  // namespace

@@ -491,4 +491,143 @@ TEST(UnpackedArrayConcatSim, ContinuousAssignmentOfConcatToFixedArray) {
   EXPECT_EQ(RunAndGet(src, "a3"), 30u);
 }
 
+TEST(UnpackedArrayConcatSim,
+     NullItemsForInterfaceClassAndVirtualInterfaceElements) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface class IC; endclass\n"
+          "class K implements IC; endclass\n"
+          "interface bus_if; logic v; endinterface\n"
+          "module t;\n"
+          "  bus_if b();\n"
+          "  IC arr[2]; K k; virtual bus_if vifs[2];\n"
+          "  initial begin\n"
+          "    k = new; arr = {null, k};\n"
+          "    vifs = {null, b};\n"
+          "    $display(\"%b %b %b %b\", arr[0] == null, arr[1] != null,\n"
+          "             vifs[0] == null, vifs[1] != null);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 1 1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnpackedArrayConcatSim, ReturnAndOutputArgumentTakeTheConcatenation) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef int i2_t [2];\n"
+                       "typedef int iq_t [$];\n"
+                       "module t;\n"
+                       "  int a = 3, b = 4;\n"
+                       "  function i2_t f(); return {a, b}; endfunction\n"
+                       "  function iq_t g(); return {a, b, a}; endfunction\n"
+                       "  task get(output int o[2]); o = {7, 8}; endtask\n"
+                       "  int r[2], rq[$], oo[2];\n"
+                       "  initial begin\n"
+                       "    r = f(); rq = g(); get(oo);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", r[0], r[1], "
+                       "rq.size(), rq[1],\n"
+                       "             oo[1]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 4 3 4 8\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnpackedArrayConcatSim, DISABLED_InputArgumentsTakeTheConcatenation) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a = 3, b = 4;\n"
+                       "  function int f1(input int x[2]);\n"
+                       "    return x[0] * 10 + x[1];\n"
+                       "  endfunction\n"
+                       "  function int f2(input int q[$]);\n"
+                       "    return q.size() * 100 + q[1];\n"
+                       "  endfunction\n"
+                       "  function int f3(input int d[]);\n"
+                       "    return d.size() * 100 + d[1];\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d %0d %0d\", f1({a, b}), "
+                       "f2({a, b, a}),\n"
+                       "                   f3({b, a}));\n"
+                       "endmodule\n",
+                       f),
+            "34 304 203\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnpackedArrayConcatSim, DISABLED_InputPortTakesTheConcatenation) {
+  for (const char* declaration :
+       {"module s(input var int x[2]);\n"
+        "  initial #1 $display(\"%0d %0d\", x[0], x[1]);\n"
+        "endmodule\n",
+        "interface s(input var int x[2]);\n"
+        "  initial #1 $display(\"%0d %0d\", x[0], x[1]);\n"
+        "endinterface\n",
+        "program s(input var int x[2]);\n"
+        "  initial #1 $display(\"%0d %0d\", x[0], x[1]);\n"
+        "endprogram\n"}) {
+    const std::string kSrc = std::string(declaration) +
+                             "module t;\n"
+                             "  int a = 5, b = 6;\n"
+                             "  s u(.x({a, b}));\n"
+                             "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), "5 6\n") << kSrc;
+    EXPECT_FALSE(f.diag.HasErrors()) << kSrc;
+  }
+}
+
+TEST(UnpackedArrayConcatSim,
+     DISABLED_ParameterValueAndOverrideTakeTheConcatenation) {
+  for (const auto& [instance, expected] :
+       {std::pair{"  m u();\n", "1 2\n"},
+        std::pair{"  m #(.P({3, 4})) u();\n", "3 4\n"}}) {
+    const std::string kSrc =
+        std::string(
+            "module m #(parameter int P[2] = {1, 2});\n"
+            "  initial $display(\"%0d %0d\", P[0], P[1]);\n"
+            "endmodule\n"
+            "module t;\n") +
+        instance + "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), expected) << kSrc;
+    EXPECT_FALSE(f.diag.HasErrors()) << kSrc;
+  }
+}
+
+TEST(UnpackedArrayConcatSim, ConcatenationInAPackageClassInterfaceAndProgram) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n"
+                 "  function automatic int f();\n"
+                 "    int q[$]; q = {1, 2, 3}; return q.size();\n"
+                 "  endfunction\n"
+                 "endpackage\n"
+                 "class C;\n"
+                 "  int q[$];\n"
+                 "  function int g(); q = {4, 5}; q = {q, q}; return q.size(); "
+                 "endfunction\n"
+                 "endclass\n"
+                 "interface I;\n"
+                 "  int a[2];\n"
+                 "  initial begin a = {7, 8}; $display(\"I %0d\", a[1]); end\n"
+                 "endinterface\n"
+                 "program P;\n"
+                 "  int d[];\n"
+                 "  initial begin d = {1, 2, 3, 4}; #1 $display(\"P %0d\", "
+                 "d.size()); end\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  I i(); P pp(); C c;\n"
+                 "  initial begin c = new; $display(\"%0d %0d\", p::f(), "
+                 "c.g()); end\n"
+                 "endmodule\n",
+                 f),
+      "3 4\nI 8\nP 4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
