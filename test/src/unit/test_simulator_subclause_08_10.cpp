@@ -337,4 +337,68 @@ TEST(StaticMethodSimulation, SameNamedTasksOfTwoClassesKeepTheirOwnStatics) {
   EXPECT_EQ(RunAndGet(src, "b"), 11u);
 }
 
+TEST(StaticMethodSimulation, StaticMethodIsCalledFromEachPlaceWithoutAnObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  static int current = 0;\n"
+      "  static function int next_id(); next_id = ++current; endfunction\n"
+      "endclass\n"
+      "package k;\n"
+      "  class PC; static function int two(); return 2; endfunction endclass\n"
+      "  function int pf(); return PC::two(); endfunction\n"
+      "endpackage\n"
+      "function int uf(); return C::next_id(); endfunction\n"
+      "class O; function int m(); return C::next_id(); endfunction endclass\n"
+      "interface ifc; int r; initial r = C::next_id(); endinterface\n"
+      "module t;\n"
+      "  ifc i();\n"
+      "  int r0, r1, r2, r3, r4, r5;\n"
+      "  C h;\n"
+      "  O o = new;\n"
+      "  if (1) begin : g\n"
+      "    int gr;\n"
+      "    initial gr = C::next_id();\n"
+      "  end\n"
+      "  initial begin\n"
+      "    #1 r0 = i.r + g.gr;\n"
+      "    r1 = C::next_id();\n"
+      "    r2 = h.next_id();\n"
+      "    r3 = uf();\n"
+      "    r4 = o.m();\n"
+      "    r5 = k::pf();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r0", 3u}, {"r1", 3u}, {"r2", 4u}, {"r3", 5u}, {"r4", 6u}, {"r5", 2u}});
+}
+
+TEST(StaticMethodSimulation, StaticMethodLocalsAreAutomatic) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  static function int step(); int x; x++; return x; endfunction\n"
+      "  static function int fact(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * fact(n - 1);\n"
+      "  endfunction\n"
+      "  static task slow(int d, output int o);\n"
+      "    int x; x = d; #(d); o = x;\n"
+      "  endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r1, r2, o1, o2;\n"
+      "  initial begin\n"
+      "    r1 = C::step() * 10 + C::step();\n"
+      "    r2 = C::fact(5);\n"
+      "    fork C::slow(5, o1); C::slow(2, o2); join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 11u}, {"r2", 120u}, {"o1", 5u}, {"o2", 2u}});
+}
+
 }  // namespace
