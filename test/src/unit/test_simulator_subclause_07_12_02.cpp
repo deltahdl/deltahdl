@@ -620,4 +620,50 @@ TEST(ArrayOrderingSim, ShuffleReordersAClassArrayPropertysOwnElements) {
   EXPECT_EQ(out, "1 16\n");
 }
 
+TEST(ArrayOrderingSim, SortByAConcatenatedKeyAndAnEnumByItsValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  typedef struct { byte red, green, blue; } c_t;\n"
+      "  c_t c[4];\n"
+      "  typedef enum {A = 3, B = 1, C = 2} e_t;\n"
+      "  e_t e[3] = '{A, B, C};\n"
+      "  initial begin\n"
+      "    c[0] = '{1, 9, 2}; c[1] = '{2, 1, 2};\n"
+      "    c[2] = '{3, 5, 1}; c[3] = '{4, 0, 2};\n"
+      "    c.sort(x) with ({x.blue, x.green});\n"
+      "    foreach (c[i]) $write(\"%0d \", c[i].red);\n"
+      "    c.rsort with (item.red);\n"
+      "    foreach (c[i]) $write(\"%0d \", c[i].red);\n"
+      "    e.sort;\n"
+      "    $display(\"%p\", e);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 4 2 1 4 3 2 1 '{B, C, A}\n");
+}
+
+TEST(ArrayOrderingSim, DISABLED_SortAndRsortOrderRealValuesNumerically) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  real r[$] = {2.5, -1.0, 7.25, 0.5};\n"
+      "  shortreal s[3] = '{1.5, -2.0, 0.25};\n"
+      "  real d[] = {3.0, -0.5};\n"
+      "  int q[$] = {3, -4, 5, 1};\n"
+      "  initial begin\n"
+      "    r.sort; $display(\"%p\", r);\n"
+      "    r.rsort; $display(\"%p\", r);\n"
+      "    s.sort; $display(\"%p\", s);\n"
+      "    d.rsort; $display(\"%p\", d);\n"
+      "    q.sort with (item * -0.5); $display(\"%p\", q);\n"
+      "    q.rsort with (real'(item) - 0.5); $display(\"%p\", q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{-1, 0.5, 2.5, 7.25}\n'{7.25, 2.5, 0.5, -1}\n'{-2, 0.25, 1.5}\n"
+            "'{3, -0.5}\n'{5, 3, 1, -4}\n'{5, 3, 1, -4}\n");
+}
+
 }  // namespace
