@@ -2,6 +2,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_class_object.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "parser/ast_module.h"
 #include "simulator/class_object.h"
@@ -260,6 +261,95 @@ TEST(ClassSim, E2eAbstractBaseVariableDispatch) {
                       "endmodule\n",
                       "result"),
             42u);
+}
+
+TEST(ClassSim, VirtualMethodThroughArrayElementsDispatchesPerElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class BasePacket;\n"
+      "  pure virtual function int send();\n"
+      "  pure virtual task run(output int r);\n"
+      "endclass\n"
+      "class EtherPacket extends BasePacket;\n"
+      "  function int send(); return 1; endfunction\n"
+      "  task run(output int r); r = 10; endtask\n"
+      "endclass\n"
+      "class TokenPacket extends BasePacket;\n"
+      "  function int send(); return 2; endfunction\n"
+      "  task run(output int r); r = 20; endtask\n"
+      "endclass\n"
+      "class GPSPacket extends EtherPacket;\n"
+      "  function int send(); return 3; endfunction\n"
+      "  task run(output int r); r = 30; endtask\n"
+      "endclass\n"
+      "class Holder;\n"
+      "  BasePacket packets[3];\n"
+      "  function int pick(); return this.packets[1].send(); endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  BasePacket packets[100];\n"
+      "  BasePacket dyn[];\n"
+      "  BasePacket q[$];\n"
+      "  BasePacket aa[string];\n"
+      "  EtherPacket ep = new;\n"
+      "  TokenPacket tp = new;\n"
+      "  GPSPacket gp = new;\n"
+      "  Holder h = new;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11;\n"
+      "  initial begin\n"
+      "    packets[0] = ep; packets[1] = tp; packets[2] = gp;\n"
+      "    r1 = packets[0].send() * 100 + packets[1].send() * 10 + "
+      "packets[2].send();\n"
+      "    for (int i = 0; i < 3; i++) r2 = r2 * 10 + packets[i].send();\n"
+      "    for (int i = 0; i < 3; i++) begin int t; packets[i].run(t); r3 = r3 "
+      "* 100 + t; end\n"
+      "    dyn = new[3]; dyn[0] = gp; dyn[1] = ep; dyn[2] = tp;\n"
+      "    for (int i = 0; i < 3; i++) r4 = r4 * 10 + dyn[i].send();\n"
+      "    q.push_back(tp); q.push_back(gp); q.push_back(ep);\n"
+      "    foreach (q[i]) r5 = r5 * 10 + q[i].send();\n"
+      "    aa[\"a\"] = gp; aa[\"b\"] = tp;\n"
+      "    r6 = aa[\"a\"].send() * 10 + aa[\"b\"].send();\n"
+      "    h.packets[1] = gp; r7 = h.pick();\n"
+      "    packets[1] = ep; r8 = packets[1].send();\n"
+      "    r9 = q[1].send();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 123u},
+                    {"r2", 123u},
+                    {"r3", 102030u},
+                    {"r4", 312u},
+                    {"r5", 231u},
+                    {"r6", 32u},
+                    {"r7", 3u},
+                    {"r8", 1u},
+                    {"r9", 3u}});
+}
+
+TEST(ClassSim, NonAbstractBaseElementAndNullElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class BasePacket; virtual function int send(); return 5; endfunction "
+      "endclass\n"
+      "class TokenPacket extends BasePacket; function int send(); return 2; "
+      "endfunction endclass\n"
+      "module m;\n"
+      "  BasePacket packets[4];\n"
+      "  TokenPacket t = new;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    packets[0] = new; packets[1] = t;\n"
+      "    r1 = packets[0].send() * 10 + packets[1].send();\n"
+      "    r2 = packets[3].send();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 52u}, {"r2", 0u}});
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "method 'send' called through a null handle", 10,
+                            "8.4"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 9));
 }
 
 }  // namespace

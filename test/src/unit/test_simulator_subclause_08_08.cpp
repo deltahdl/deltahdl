@@ -387,4 +387,35 @@ TEST(TypedConstructorCallSim,
       {{"r1", 7u}, {"r2", 7u}, {"r3", 7u}, {"r4", 6u}, {"r5", 7u}, {"r6", 7u}});
 }
 
+TEST(TypedConstructorCallSim,
+     DISABLED_TypedConstructorIntoAnElementOrPropertyBuildsTheObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class BasePacket; virtual function int send(); return 5; endfunction "
+      "endclass\n"
+      "class TokenPacket extends BasePacket; function int send(); return 2; "
+      "endfunction endclass\n"
+      "class H; BasePacket p; endclass\n"
+      "module m;\n"
+      "  BasePacket packets[4];\n"
+      "  BasePacket dq[$];\n"
+      "  BasePacket b;\n"
+      "  H h = new;\n"
+      "  int r1, r2, r3, r4, r5;\n"
+      "  initial begin\n"
+      "    packets[2] = TokenPacket::new(); r1 = (packets[2] == null) ? 99 : "
+      "packets[2].send();\n"
+      "    packets[3] = new; r2 = (packets[3] == null) ? 99 : "
+      "packets[3].send();\n"
+      "    h.p = TokenPacket::new; r3 = (h.p == null) ? 99 : h.p.send();\n"
+      "    dq = '{null}; dq[0] = TokenPacket::new; r4 = (dq[0] == null) ? 99 : "
+      "dq[0].send();\n"
+      "    b = TokenPacket::new; r5 = (b == null) ? 99 : b.send();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design, {{"r1", 2u}, {"r2", 5u}, {"r3", 2u}, {"r4", 2u}, {"r5", 2u}});
+}
+
 }  // namespace
