@@ -602,4 +602,106 @@ TEST(ArrayReductionSim, ReductionOnAnElementThatIsAnArrayFoldsItsValues) {
   EXPECT_EQ(out, "11 3 7 -3 30 30\n");
 }
 
+TEST(ArrayReductionSim, ReductionsInSubroutinesAndThroughANamedIterator) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int a[4] = '{1, 2, 3, 4};\n"
+      "  int q[$] = '{1, 2, 3};\n"
+      "  function automatic int prod_plus_one(int v[$]);\n"
+      "    return v.product with (item + 1);\n"
+      "  endfunction\n"
+      "  task automatic squares(output int r);\n"
+      "    r = a.sum(v) with (v * v);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    int s;\n"
+      "    squares(s);\n"
+      "    $display(\"%0d %0d %0d\", prod_plus_one(q), s,\n"
+      "             q.xor(e) with (e + 1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "24 30 5\n");
+}
+
+TEST(ArrayReductionSim, DISABLED_PackedStructElementsReduceAsTheirPackedValue) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } p_t;\n"
+      "  p_t ps[3] = '{8'h12, 8'h34, 8'h01};\n"
+      "  p_t r;\n"
+      "  initial begin\n"
+      "    r = ps.sum; $display(\"%h\", r);\n"
+      "    r = ps.xor; $display(\"%h\", r);\n"
+      "    r = ps.or; $display(\"%h\", r);\n"
+      "    $display(\"%h\", ps.sum with (item.lo));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "47\n27\n37\n7\n");
+}
+
+TEST(ArrayReductionSim,
+     DISABLED_ReductionsAfterAnObjectIsBuiltAndOverClassPropertyArrays) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    int a[3];\n"
+      "    int d[];\n"
+      "    int q[$];\n"
+      "    function int total();\n"
+      "      return a.sum + d.sum + q.sum;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  logic [7:0] b[0:2] = '{8'h12, 8'h34, 8'h01};\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    $display(\"%h %h\", b.sum, b.xor);\n"
+      "    c = new;\n"
+      "    c.a[0] = 3; c.a[2] = 4;\n"
+      "    c.d = new[2]; c.d[1] = 5;\n"
+      "    c.q.push_back(7);\n"
+      "    $display(\"%h %h %0d %0d %0d %0d\", b.sum, b.xor, c.a.sum,\n"
+      "             c.d.sum, c.q.sum, c.total());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "47 27\n47 27 7 5 7 19\n");
+}
+
+TEST(ArrayReductionSim, DISABLED_UnknownBitsOfFourStateElementsReachTheResult) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  logic [3:0] lx[3] = '{4'b0001, 4'b00x0, 4'b0100};\n"
+      "  initial $display(\"%b %b %b %b %b\", lx.sum, lx.product, lx.and,\n"
+      "                   lx.or, lx.xor);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "xxxx xxxx 0000 01x1 01x1\n");
+}
+
+TEST(ArrayReductionSim,
+     DISABLED_RealWithExpressionsAndRealElementsReduceAsReals) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int ia[3] = '{1, 2, 4};\n"
+      "  real ra[2] = '{1.5, 2.25};\n"
+      "  real r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    r1 = ia.sum with (item * 0.5);\n"
+      "    r2 = ia.product with (item / 2.0);\n"
+      "    r3 = ra.sum;\n"
+      "    r4 = ra.product;\n"
+      "    $display(\"%.4f %.4f %.4f %.4f\", r1, r2, r3, r4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3.5000 1.0000 3.7500 3.3750\n");
+}
+
 }  // namespace

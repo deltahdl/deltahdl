@@ -205,4 +205,50 @@ TEST(BuiltinMethodElaboration, WithExpressionOfAnyFormNeedsTheReduction) {
   }
 }
 
+TEST(
+    BuiltinMethodElaboration,
+    DISABLED_ReductionWithoutItsOperationReportedInSubroutinesClassesAndPackages) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  function automatic int f1();\n"
+      "    string s[3];\n"
+      "    int ok[3];\n"
+      "    return s.sum + ok.sum;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class C;\n"
+      "    string s[3];\n"
+      "    int ok[3];\n"
+      "    function int g(); return s.xor + ok.xor; endfunction\n"
+      "  endclass\n"
+      "  function automatic int f2();\n"
+      "    string s[3];\n"
+      "    return s.product;\n"
+      "  endfunction\n"
+      "  task automatic t1(output int n);\n"
+      "    int a[3];\n"
+      "    string tag;\n"
+      "    n = a.and with (tag);\n"
+      "    n = a.or with (item);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    automatic int n;\n"
+      "    automatic C c = new;\n"
+      "    n = p::f1() + f2() + c.g();\n"
+      "    t1(n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  const char* const kReport =
+      "reduces values of a type its operation is not defined for";
+  const uint32_t kLines[] = {5, 12, 16, 21};
+  for (uint32_t line : kLines) {
+    EXPECT_TRUE(ReportedError(diags, kReport, line, "7.12.3")) << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
 }  // namespace
