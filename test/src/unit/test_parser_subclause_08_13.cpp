@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 namespace {
@@ -96,6 +99,45 @@ TEST(InheritanceParsing, NonFinalDerivedClassIsFinalFalse) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   EXPECT_FALSE(r.cu->classes[1]->is_final);
+}
+
+TEST(InheritanceParsing, AClassNamingTwoBasesIsReportedInEveryPlace) {
+  auto r = Parse(
+      "class A; function new(int x); endfunction endclass\n"
+      "class B; endclass\n"
+      "class P #(int N = 1); endclass\n"
+      "interface class IA; endclass\n"
+      "interface class IB; endclass\n"
+      "interface class IC extends IA, IB; endclass\n"
+      "module m;\n"
+      "  class M1 extends A, B; endclass\n"
+      "  class M2 extends A; function new(); super.new(1); endfunction "
+      "endclass\n"
+      "endmodule\n"
+      "package pk;\n"
+      "  class K1 extends P #(1), B; endclass\n"
+      "  class K2 extends P #(1); endclass\n"
+      "endpackage\n"
+      "program pr;\n"
+      "  class R1 extends A(1), B; endclass\n"
+      "  class R2 extends A(1); endclass\n"
+      "endprogram\n"
+      "interface itf;\n"
+      "  virtual class F1 extends A, B; endclass\n"
+      "  virtual class F2 extends A(2); endclass\n"
+      "endinterface\n"
+      "class U1 extends IA, IB; endclass\n"
+      "class U2 extends A(3) implements IA, IB; endclass\n");
+  for (const int kLine : {8, 12, 16, 20, 23}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a class extends one class type; only an "
+                              "interface class extends several",
+                              kLine, "A.1.2"))
+        << kLine;
+  }
+  for (const int kLine : {6, 9, 13, 17, 21, 24}) {
+    EXPECT_FALSE(ErrorOnLine(r.diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

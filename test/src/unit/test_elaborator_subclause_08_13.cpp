@@ -216,4 +216,115 @@ TEST(InheritanceElaboration, ABaseIsTheClassItsOwnScopeResolves) {
   EXPECT_FALSE(ReportedError(diags, kMessage, 9, "8.13"));
 }
 
+TEST(InheritanceElaboration, ExtendFinalClassInEveryOtherPlaceIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class :final F; endclass\n"
+      "class :final FP #(int N = 1); endclass\n"
+      "class Open; endclass\n"
+      "package pk;\n"
+      "  class :final G; endclass\n"
+      "endpackage\n"
+      "class B1 extends Open; endclass\n"
+      "class B2 extends pk::G; endclass\n"
+      "class B3 extends FP #(3); endclass\n"
+      "program pr;\n"
+      "  class B4 extends F; endclass\n"
+      "  class B5 extends Open; endclass\n"
+      "endprogram\n"
+      "interface itf;\n"
+      "  class B6 extends F; endclass\n"
+      "  class B7 extends Open; endclass\n"
+      "endinterface\n"
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    class B8 extends F; endclass\n"
+      "    class B9 extends Open; endclass\n"
+      "  end\n"
+      "  F f;\n"
+      "  FP #(2) fp;\n"
+      "  initial begin f = new; fp = new; end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {8, 9, 11, 15, 20}) {
+    EXPECT_TRUE(ReportedError(diags, "cannot extend a class declared ':final'",
+                              kLine, "8.13"))
+        << kLine;
+  }
+  for (const int kLine : {7, 12, 16, 21, 25}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(InheritanceElaboration,
+     DISABLED_ExtendFinalClassThroughATypedefOrANestedSiblingIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class :final F; endclass\n"
+      "typedef F FT;\n"
+      "package pk;\n"
+      "  class :final G; endclass\n"
+      "  typedef G GT;\n"
+      "endpackage\n"
+      "class B1 extends FT; endclass\n"
+      "class B2 extends pk::GT; endclass\n"
+      "class Out;\n"
+      "  class :final NF; endclass\n"
+      "  class B3 extends NF; endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef F MT;\n"
+      "  class B4 extends MT; endclass\n"
+      "  class B5 extends Out; endclass\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {7, 8, 11, 15}) {
+    EXPECT_TRUE(ReportedError(diags, "cannot extend a class declared ':final'",
+                              kLine, "8.13"))
+        << kLine;
+  }
+  EXPECT_FALSE(ErrorOnLine(diags, 16));
+}
+
+TEST(InheritanceElaboration,
+     DISABLED_ALocalparamNamingAnInheritedParameterIsConstant) {
+  ElabFixture f;
+  ElabOk(
+      "class D;\n"
+      "  parameter int N = 5;\n"
+      "  localparam int M = 7;\n"
+      "  parameter logic [1:0][3:0] DQ = 8'h6c;\n"
+      "  typedef struct packed { logic [3:0] a; logic [3:0] b; } st;\n"
+      "  parameter st SP = '{4'h3, 4'h9};\n"
+      "endclass\n"
+      "class E extends D;\n"
+      "  localparam V1 = N + 1;\n"
+      "  localparam V2 = M;\n"
+      "  localparam V3 = DQ[1];\n"
+      "  localparam V4 = SP.b;\n"
+      "endclass\n"
+      "class F #(int P = 3) extends D;\n"
+      "endclass\n"
+      "class G extends F #(4);\n"
+      "  localparam V5 = P * 2;\n"
+      "endclass\n"
+      "class H extends G;\n"
+      "  localparam V6 = N + P + M;\n"
+      "endclass\n"
+      "interface class IA;\n"
+      "  parameter int IN = 5;\n"
+      "endclass\n"
+      "interface class IB extends IA;\n"
+      "  localparam V7 = IN + 1;\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {9, 10, 11, 12, 17, 20, 26}) {
+    EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), kLine)) << kLine;
+  }
+}
+
 }  // namespace
