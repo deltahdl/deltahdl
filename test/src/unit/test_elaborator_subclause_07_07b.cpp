@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -205,6 +209,175 @@ TEST(ArraySubroutineArgValidation, EnumElementTypesComparedByIdentity) {
                             "equivalent to that of formal 'a'",
                             9, "7.7"));
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 10u) << d.message;
+}
+
+TEST(ArraySubroutineArgValidation, ClauseFunActualsReportedAndAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  task fun(int a[3:1][3:1]); endtask\n"
+      "  int b1 [3:1][3:1]; int b2 [1:3][0:2]; logic b3 [3:1][3:1];\n"
+      "  event b4 [3:1][3:1]; int b5 [3:1]; int b6 [3:1][4:1];\n"
+      "  initial begin\n"
+      "    fun(b1);\n"
+      "    fun(b2);\n"
+      "    fun(b3);\n"
+      "    fun(b4);\n"
+      "    fun(b5);\n"
+      "    fun(b6);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, "element type of array argument 'b3'", 8, "7.7"));
+  EXPECT_TRUE(
+      ReportedError(diags, "element type of array argument 'b4'", 9, "7.7"));
+  EXPECT_TRUE(ReportedError(
+      diags, "array argument 'b5' has 1 unpacked dimension(s)", 10, "7.7"));
+  EXPECT_TRUE(ReportedError(
+      diags, "unpacked dimension 2 of array argument 'b6' has size 4", 11,
+      "7.7"));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+TEST(ArraySubroutineArgValidation,
+     InterfaceAndProgramSubroutinesCheckTheirActuals) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface I;\n"
+      "  function void f(int arr[4]); endfunction\n"
+      "  int b [5]; int c [4];\n"
+      "  initial begin f(b); f(c); end\n"
+      "endinterface\n"
+      "program P;\n"
+      "  function void f(int arr[4]); endfunction\n"
+      "  int b [5]; int c [4];\n"
+      "  initial begin f(b); f(c); end\n"
+      "endprogram\n"
+      "module t; I i(); P p(); endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {4u, 9u}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "unpacked dimension 1 of array argument 'b' has size 5", line,
+        "7.7"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(ArraySubroutineArgValidation,
+     DISABLED_ClassPackageAndUnitSubroutinesCheckTheirActuals) {
+  const char* const kSources[] = {
+      ("class C;\n"
+       "  static function void f(int arr[4]); endfunction\n"
+       "endclass\n"
+       "module t;\n"
+       "  int b [5]; int c [4];\n"
+       "  initial begin C::f(c); C::f(b); end\n"
+       "endmodule\n"),
+      ("class C;\n"
+       "  function void f(int arr[4]); endfunction\n"
+       "endclass\n"
+       "module t;\n"
+       "  int b [5]; int c [4]; C h = new;\n"
+       "  initial begin h.f(c); h.f(b); end\n"
+       "endmodule\n"),
+      ("class C;\n"
+       "  int b [5]; int c [4];\n"
+       "  function void f(int arr[4]); endfunction\n"
+       "  function void g(); f(c);\n"
+       "    f(b); endfunction\n"
+       "endclass\n"
+       "module t;\n"
+       "  initial begin end\n"
+       "endmodule\n"),
+      ("package p;\n"
+       "  function void f(int arr[4]); endfunction\n"
+       "endpackage\n"
+       "module t;\n"
+       "  int b [5]; int c [4];\n"
+       "  initial begin p::f(c); p::f(b); end\n"
+       "endmodule\n"),
+      ("function void f(int arr[4]); endfunction\n"
+       "module t;\n"
+       "  int b [5]; int c [4];\n"
+       "  initial begin\n"
+       "    f(c);\n"
+       "    f(b); end\n"
+       "endmodule\n"),
+  };
+  const uint32_t kLines[] = {6, 6, 5, 6, 6};
+  for (size_t i = 0; i < std::size(kSources); ++i) {
+    ElabFixture f;
+    ElaborateSrc(kSources[i], f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "unpacked dimension 1 of array argument 'b' has size 5",
+                      kLines[i], "7.7"))
+        << i;
+    EXPECT_EQ(f.diag.ErrorCount(), 1u) << i;
+  }
+}
+
+TEST(ArraySubroutineArgValidation,
+     DISABLED_CallsOutsideAProceduralBlockCheckTheirActuals) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  function int f(int arr[4]); return 0; endfunction\n"
+      "  int b [5]; int c [4];\n"
+      "  wire [31:0] w = f(b);\n"
+      "  int v = f(b);\n"
+      "  wire [31:0] x;\n"
+      "  assign x = f(b);\n"
+      "  if (1) begin : g\n"
+      "    initial void'(f(b));\n"
+      "  end\n"
+      "  if (1) begin : h\n"
+      "    function int k(int arr[4]); return 0; endfunction\n"
+      "    initial void'(k(b));\n"
+      "  end\n"
+      "  int u = f(c);\n"
+      "  assign x = k_ok(c);\n"
+      "  function int k_ok(int arr[4]); return 0; endfunction\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {4u, 5u, 7u, 9u, 13u}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "unpacked dimension 1 of array argument 'b' has size 5", line,
+        "7.7"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 5u);
+}
+
+TEST(ArraySubroutineArgValidation,
+     DynamicFormalTakesAnyOneDimensionalArrayOfItsElement) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  task t2(string arr[]); endtask\n"
+      "  string a [2][2]; int i [3]; string s [5:3]; string d []; "
+      "string q [$];\n"
+      "  initial begin\n"
+      "    t2(a);\n"
+      "    t2(i);\n"
+      "    t2(s); t2(d); t2(q);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags,
+      "array argument 'a' has 2 unpacked dimension(s) but formal 'arr' "
+      "has 1",
+      5, "7.7"));
+  EXPECT_TRUE(
+      ReportedError(diags, "element type of array argument 'i'", 6, "7.7"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace
