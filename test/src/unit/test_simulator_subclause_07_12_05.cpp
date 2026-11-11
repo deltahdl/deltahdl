@@ -347,4 +347,229 @@ TEST(ArrayMap, MapOverTheRowsOfA2DArray) {
   EXPECT_EQ(out, "'{3, 15}\n");
 }
 
+TEST(ArrayMap, MapCalledFromEveryKindOfScope) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package p;\n"
+      "  function automatic void twice(ref int a[$]);\n"
+      "    a = a.map with (item * 2);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int v[] = '{4, 5};\n"
+      "  int g[$];\n"
+      "  function void step();\n"
+      "    v = v.map with (item + item.index);\n"
+      "    g = v.map(e) with (e * e.index);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "interface ifc;\n"
+      "  int w[2] = '{7, 8};\n"
+      "  int s[$];\n"
+      "  initial begin\n"
+      "    #1 s = w.map with (item - 1);\n"
+      "    $display(\"%p\", s);\n"
+      "  end\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  int u[$] = '{9};\n"
+      "  initial begin\n"
+      "    #4 u = u.map with (item + 100);\n"
+      "    $display(\"%p\", u);\n"
+      "  end\n"
+      "endprogram\n"
+      "module t;\n"
+      "  import p::*;\n"
+      "  ifc i();\n"
+      "  pr pi();\n"
+      "  int q[$] = '{1, 2, 3};\n"
+      "  int d[] = '{1, 2, 3};\n"
+      "  int fq[2] = '{20, 30};\n"
+      "  int mq[$];\n"
+      "  C c;\n"
+      "  function automatic int total(int x[]);\n"
+      "    int y[$];\n"
+      "    y = x.map with (item * item);\n"
+      "    return y.sum();\n"
+      "  endfunction\n"
+      "  for (genvar k = 1; k < 2; k++) begin : gb\n"
+      "    initial begin\n"
+      "      #3 mq = fq.map with (item + k);\n"
+      "      $display(\"%p\", mq);\n"
+      "    end\n"
+      "  end\n"
+      "  initial begin\n"
+      "    twice(q);\n"
+      "    c = new;\n"
+      "    c.step();\n"
+      "    $display(\"%p %p %p %0d\", q, c.v, c.g, total(d));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{2, 4, 6} '{4, 6} '{0, 6} 14\n'{6, 7}\n'{21, 31}\n'{109}\n");
+}
+
+TEST(ArrayMap, DISABLED_MapResultAssignedToAFixedSizeArray) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int fq[2] = '{20, 30};\n"
+      "  int fz[2];\n"
+      "  int fb[5:7] = '{1, 2, 3};\n"
+      "  int fw[1:3];\n"
+      "  int A[] = '{4, 5};\n"
+      "  int fd[2];\n"
+      "  initial begin\n"
+      "    fz = fq.map with (item + 1);\n"
+      "    fw = fb.map(e) with (e * 10 + e.index);\n"
+      "    fd = A.map with (item - 1);\n"
+      "    $display(\"%p %p %p\", fz, fw, fd);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{21, 31} '{15, 26, 37} '{3, 4}\n");
+}
+
+TEST(ArrayMap, DISABLED_MapOverADescendingRangeKeepsElementPositions) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int fa[3:1] = '{30, 60, 90};\n"
+      "  int fb[5:7] = '{1, 2, 3};\n"
+      "  int r[$], s[$], u[$];\n"
+      "  initial begin\n"
+      "    r = fa.map with (item);\n"
+      "    s = fa.map with (item.index);\n"
+      "    u = fb.map(e) with (e.index);\n"
+      "    $display(\"%p %p %p\", r, s, u);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{30, 60, 90} '{3, 2, 1} '{5, 6, 7}\n");
+}
+
+TEST(ArrayMap, DISABLED_MapResultTakesTheSourceRange) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int fa[3:1] = '{30, 60, 90};\n"
+      "  int fb[5:7] = '{1, 2, 3};\n"
+      "  initial\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\",\n"
+      "             $left(fa.map with (item)), $right(fa.map with (item)),\n"
+      "             $size(fa.map with (item)), $left(fb.map with (item)),\n"
+      "             $right(fb.map with (item)), $size(fb.map with (item)));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 1 3 5 7 3\n");
+}
+
+TEST(ArrayMap, DISABLED_MapResultTakesTheSourceIndexType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int aa[byte];\n"
+      "  int yi[byte];\n"
+      "  int sa[string];\n"
+      "  int zi[string];\n"
+      "  initial begin\n"
+      "    aa[-1] = 1;\n"
+      "    sa[\"k\"] = 5;\n"
+      "    $display(\"%0d %0d\",\n"
+      "             $typename(aa.map(v) with (v)) == $typename(yi),\n"
+      "             $typename(sa.map(v) with (v)) == $typename(zi));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
+TEST(ArrayMap, DISABLED_MapElementTypeIsTheSelfDeterminedTypeOfTheWith) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int fz[3] = '{1, 2, 3};\n"
+      "  bit [3:0] w [3];\n"
+      "  initial\n"
+      "    $display(\"%0d %0d %0d\", $bits(fz.map with (item[3:0])),\n"
+      "             $bits(fz.map with (item > 1)),\n"
+      "             $typename(fz.map with (item[3:0])) == $typename(w));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "12 3 1\n");
+}
+
+TEST(ArrayMap, MapElementsAreSelfDeterminedNotWidenedByTheTarget) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  byte b[] = {8'h80, 8'h01};\n"
+      "  int A[] = {-1, 3};\n"
+      "  int q[$];\n"
+      "  real rq[$];\n"
+      "  string sq[$];\n"
+      "  initial begin\n"
+      "    q = b.map with (item + 8'd0);\n"
+      "    $display(\"%p\", q);\n"
+      "    q = b.map with (item + item);\n"
+      "    $display(\"%p\", q);\n"
+      "    q = A.map with (item[3:0]);\n"
+      "    $display(\"%p\", q);\n"
+      "    rq = A.map with (item * 0.5);\n"
+      "    $display(\"%p\", rq);\n"
+      "    sq = A.map with ($sformatf(\"<%0d>\", item));\n"
+      "    $display(\"%p\", sq);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{128, 1}\n'{0, 2}\n'{15, 3}\n'{-0.5, 1.5}\n"
+            "'{\"<-1>\", \"<3>\"}\n");
+}
+
+TEST(ArrayMap, DISABLED_MapAssignedBackToItsOwnPropertyThroughANamedIterator) {
+  SimFixture f;
+  auto out = RunCapture(
+      "class C;\n"
+      "  int v[] = '{4, 5};\n"
+      "  int r[$] = '{4, 5};\n"
+      "  function void step();\n"
+      "    v = v.map(e) with (e * 10);\n"
+      "    r = r.map(e) with (e + e.index);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.step();\n"
+      "    $display(\"%p %p\", c.v, c.r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "'{40, 50} '{4, 6}\n");
+}
+
+TEST(ArrayMap, MapWithoutAWithClauseIsReportedForEveryIndexedKind) {
+  SimFixture f;
+  RunForDiags(
+      "module m;\n"
+      "  int A[] = {1, 2};\n"
+      "  int fz[2] = '{1, 2};\n"
+      "  int q[$] = {3};\n"
+      "  int R[$];\n"
+      "  initial begin\n"
+      "    R = A.map;\n"
+      "    R = fz.map();\n"
+      "    R = q.map;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (int line : {7, 8, 9}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "array method 'map' requires a 'with'", line,
+                              "7.12.5"));
+  }
+}
+
 }  // namespace
