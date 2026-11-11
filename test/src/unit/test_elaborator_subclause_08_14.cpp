@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -107,6 +110,34 @@ TEST(OverriddenMemberElaboration, NonOverriddenMemberThroughBaseOk) {
              "    j = p.x;\n"
              "  end\n"
              "endmodule\n"));
+}
+
+TEST(OverriddenMemberElaboration,
+     ASubclassOnlyMemberThroughABaseHandleIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class P; int i; endclass\n"
+      "class L extends P; int nxt; function void f(); endfunction endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic L lp = new;\n"
+      "    automatic P p = lp;\n"
+      "    p.nxt = 1;\n"
+      "    p.f();\n"
+      "    lp.nxt = 2;\n"
+      "    lp.f();\n"
+      "    p.i = 3;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'P' has no member named 'nxt'", 7, "8.5"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'P' has no member named 'f'", 8, "8.6"));
+  for (const int kLine : {9, 10, 11}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace
