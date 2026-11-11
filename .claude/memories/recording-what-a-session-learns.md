@@ -9,7 +9,7 @@ metadata:
 
 Write it down in `.claude/memories/`, one fact per file, and add a line for it to `MEMORY.md`.
 
-**Why:** `.claude/memories/` is the whole of the notes — see [note-directories](note-directories.md). One fact per file is what makes a note retrievable: recall selects whole files, so a file carrying two facts is either pulled in when only one of them is wanted or missed when the other is.
+**Why:** `.claude/memories/` is the whole of the notes: one flat directory, tracked in git so the notes travel with the repository rather than staying under `~/.claude/projects/` on one machine. One fact per file is what makes a note retrievable: recall selects whole files, so a file carrying two facts is either pulled in when only one of them is wanted or missed when the other is.
 
 **How to apply:** Give the file front matter with `name`, a one-line `description`, and `metadata.type` of `user`, `feedback`, `project` or `reference`. A `feedback` or `project` memory follows its opening statement with **Why:** and **How to apply:** lines. Open the body with a top-level heading, per [markdown-top-level-heading](markdown-top-level-heading.md). Link a related memory with a Markdown link to its file, `[name](name.md)`, the slug as its text, and never with `[[name]]`: the notes are Markdown files read on GitHub and in a browser, where that form is plain text and leads nowhere. Link liberally, but only to a file that exists, so that every link opens one.
 

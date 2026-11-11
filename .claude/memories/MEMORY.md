@@ -11,11 +11,9 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
 - [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it chooses, with no upper limit, wherever in the repository they fall, every case of each one's rule passing; split by rule an issue that cannot land in one.
-- [Closing keywords fire on push](issue-closing-keywords-fire-on-push.md) — nine words close an issue from anywhere in a message; use them only in the finishing commit.
+- [Closing keywords](closing-keywords.md) — nine words close an issue from anywhere in a message; `Closes #N` on its own line per finished issue, `Refs #N` or `See #N` to mention.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
-- [One closing keyword per issue](one-closing-keyword-per-issue.md) — a keyword binds to one `#N`; repeat it on its own line per issue.
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.
-- [The form of an issue reference](closing-keyword-form.md) — write `Closes #N` to close, `Refs #N` or `See #N` to mention.
 - [No CI-skip directives](no-ci-skip-in-commit-messages.md) — never suppress a run from a commit message; the `on:` triggers already decide.
 - [The length of a commit subject](commit-subject-length.md) — a short subject naming the change, the detail in an unwrapped body.
 - [Sharing code a change mirrors](sharing-code-a-change-mirrors.md) — share two bodies or tests a change makes equal before pushing; CPD refuses 100 identical tokens.
@@ -86,10 +84,8 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run.
 - [A push that starts no run](a-push-that-starts-no-run.md) — a pushed commit with no check suite gets its run from `gh workflow run deltahdl.yml --ref main`.
 - [A push starts a run per workflow](a-push-starts-a-run-per-workflow.md) — one commit can start several runs and `--limit 1` picks one; watch every run the commit lists.
-- [Watching a run in the background](watching-a-run-in-the-background.md) — a background shell or a Monitor with `--interval 60`, never a foreground `gh run watch`.
 - [Force-cancelling a hung run](force-cancelling-a-hung-run.md) — a hung job ignores a plain cancel; `gh run cancel --force`, then `gh run rerun --failed`.
-- [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute runs with `run_in_background: true`.
-- [Waiting while a CI run is in progress](waiting-while-a-ci-run-is-in-progress.md) — only wait: no diagnosis, edits or commits until it lands.
+- [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute, a CI watch included, runs with `run_in_background: true`; `gh run watch` takes `--interval 60`.
 - [Waiting while anything runs in the background](waiting-while-anything-runs-in-the-background.md) — a background command is its turn's last call; until its notification, nothing but waiting, for the issue in hand or any other.
 - [Fixing a red run after a push](fixing-a-red-run.md) — fix your push's red run, caused or inherited, in a push of its own first; red only on `assert-coverage` holds nothing up.
 - [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read a gate's limit from its tracked config or workflow, not a tool default.
@@ -140,5 +136,4 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## The notes themselves
 
-- [Where the notes live](note-directories.md) — `.claude/memories/`, one flat directory.
-- [Recording what a session learns](recording-what-a-session-learns.md) — one indivisible fact per file, front matter, a line here, Markdown links `[name](name.md)` between files and never `[[name]]`, and no history: the reason, never when or after what.
+- [Recording what a session learns](recording-what-a-session-learns.md) — `.claude/memories/`, one flat directory, one indivisible fact per file, front matter, a line here, Markdown links `[name](name.md)` between files and never `[[name]]`, and no history: the reason, never when or after what.

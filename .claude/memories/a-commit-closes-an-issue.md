@@ -21,4 +21,4 @@ Two kinds of commit close nothing:
 
 Something found and fixed on the spot along the way rides in a commit that closes an issue.
 
-**How to apply:** Before starting an issue's work, check that every open case of its rule can land in one commit, and split the issue by rule when they cannot. Write `Closes #N` on its own line for each issue the commit finishes, per [closing-keyword-form](closing-keyword-form.md) and [one-closing-keyword-per-issue](one-closing-keyword-per-issue.md), and `Refs #N` only for another issue it touches without finishing. After the run, [confirming-a-push-closed-its-issues](confirming-a-push-closed-its-issues.md).
+**How to apply:** Before starting an issue's work, check that every open case of its rule can land in one commit, and split the issue by rule when they cannot. Write `Closes #N` on its own line for each issue the commit finishes, per [closing-keywords](closing-keywords.md), and `Refs #N` only for another issue it touches without finishing. After the run, [confirming-a-push-closed-its-issues](confirming-a-push-closed-its-issues.md).

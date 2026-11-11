@@ -12,4 +12,4 @@ metadata:
 
 `gh run view <id> --log-failed` can end in a stream CANCEL error, and `gh run view --job <id> --log-failed` can write nothing. When that happens, list the failed jobs with `gh run view <id> --json jobs --jq '.jobs[]|select(.conclusion=="failure")|.databaseId'`. Then fetch each one with `gh api --allow-escape-sequences repos/deltahdl/deltahdl/actions/jobs/<job id>/logs`, piped through `sed 's/\x1b\[[0-9;]*m//g'`. Without the flag, `gh api` refuses the body: the log holds terminal colour codes.
 
-Pairs with [reading-a-ci-run](reading-a-ci-run.md) and [watching-a-run-in-the-background](watching-a-run-in-the-background.md).
+Pairs with [reading-a-ci-run](reading-a-ci-run.md) and [long-running-commands-in-the-background](long-running-commands-in-the-background.md).

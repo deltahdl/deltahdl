@@ -22,5 +22,5 @@ polls until its timeout while the run it was meant to watch has long passed.
 command so it calls `git rev-parse` itself, as
 `sha=$(git rev-parse HEAD) && until … --commit "$sha" …`, never with a SHA
 typed out, so that no copied SHA can be wrong. The watcher
-itself is described in [watching-a-run-in-the-background](watching-a-run-in-the-background.md) and the reading
+itself is described in [long-running-commands-in-the-background](long-running-commands-in-the-background.md) and the reading
 of its result in [reading-a-ci-run](reading-a-ci-run.md).

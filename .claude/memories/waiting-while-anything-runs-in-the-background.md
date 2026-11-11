@@ -16,5 +16,6 @@ While any command runs in the background, whether a CI watch, a build, a test ru
 - Start the background command as the last tool call of the turn, with no other call beside it in that message, then end the turn.
 - When a scheduled reminder fires during the wait, acknowledge it in a line and wait on; act on it once the command has finished.
 - When the user writes during the wait, answer from what is already known, and do the work their message asks for once the command has finished, unless they say to do it now.
+- A CI run counts while it is in progress, of any workflow. When a later push will cancel it, wait for the new run rather than working under the old one.
 - Never leave two commands running side by side to fill the time; when a step needs two results, put both in one background command.
-- See [waiting-while-a-ci-run-is-in-progress](waiting-while-a-ci-run-is-in-progress.md), [long-running-commands-in-the-background](long-running-commands-in-the-background.md) and [verifying-through-ci](verifying-through-ci.md).
+- See [long-running-commands-in-the-background](long-running-commands-in-the-background.md) and [verifying-through-ci](verifying-through-ci.md).

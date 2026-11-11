@@ -9,6 +9,6 @@ metadata:
 
 GitHub can push a commit to `main` without acting on any of its `Closes #N` lines. A commit naming 64 issues in a 103 KB message closed none of them, while one naming 19 in a 27 KB message closed all of its issues. Whether the count or the size is at fault is not known.
 
-**Why:** An issue left open after its fix landed looks unsolved, so a later loop takes it up again and works on code that already satisfies it ([issue-closing-keywords-fire-on-push](issue-closing-keywords-fire-on-push.md)).
+**Why:** An issue left open after its fix landed looks unsolved, so a later loop takes it up again and works on code that already satisfies it ([closing-keywords](closing-keywords.md)).
 
 **How to apply:** Once a push's runs are clean, check that every issue its message closes is closed. Close any still open with `gh issue close N --reason completed`, commenting which commit solved it. Keep a message that closes several issues to one paragraph per issue rather than a subject that joins dozens of clauses.
