@@ -581,4 +581,276 @@ TEST(VirtualMethodElaboration, AnOverrideIsJudgedAgainstItsOwnScopesBase) {
                             6, "8.20"));
 }
 
+TEST(VirtualMethodElaboration, OverrideSpecifierRulesHoldInEveryPlace) {
+  ElabFixture f;
+  ElabOk(
+      "package pk;\n"
+      "  class B; virtual task t(); endtask function void n(); endfunction "
+      "function :final void q(); endfunction endclass\n"
+      "  class D extends B;\n"
+      "    task :initial t(); endtask\n"
+      "    function :extends void n(); endfunction\n"
+      "    function void q(); endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "virtual class VB;\n"
+      "  pure virtual task pt();\n"
+      "  virtual function void v(); endfunction\n"
+      "  function :final void fin(); endfunction\n"
+      "  virtual function :initial void fresh(); endfunction\n"
+      "  function void plain(); endfunction\n"
+      "endclass\n"
+      "class M1 extends VB;\n"
+      "  task pt(); endtask\n"
+      "  function void plain(); endfunction\n"
+      "endclass\n"
+      "class M2 extends M1;\n"
+      "  function void fin(); endfunction\n"
+      "  function :extends void v(); endfunction\n"
+      "  function :extends void plain(); endfunction\n"
+      "  function :extends void nothing(); endfunction\n"
+      "  task :extends pt(); endtask\n"
+      "endclass\n"
+      "program pr;\n"
+      "  class P extends VB;\n"
+      "    task :initial pt(); endtask\n"
+      "    function :initial void plain(); endfunction\n"
+      "  endclass\n"
+      "endprogram\n"
+      "interface ifc;\n"
+      "  class I extends VB;\n"
+      "    task pt(); endtask\n"
+      "    virtual function void fin(); endfunction\n"
+      "    function :initial :final void plain(); endfunction\n"
+      "  endclass\n"
+      "endinterface\n"
+      "module m;\n"
+      "  class K extends VB;\n"
+      "    task pt(); endtask\n"
+      "    function :extends :final void v(); endfunction\n"
+      "  endclass\n"
+      "  class K2 extends K;\n"
+      "    function void v(); endfunction\n"
+      "  endclass\n"
+      "  pr p(); ifc i();\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {6, 21, 36, 46}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "cannot override a method declared ':final'", kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {5, 23, 24}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        "method with ':extends' does not override a virtual base class method",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {4, 29}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        "method with ':initial' shall not override a virtual base class method",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {13, 17, 18, 22, 25, 30, 37, 42}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(VirtualMethodElaboration, TaskAndPlaceOverridesMatchTheirBaseSignature) {
+  ElabFixture f;
+  ElabOk(
+      "package pk;\n"
+      "  class B;\n"
+      "    virtual task t1(int a); endtask\n"
+      "    virtual task t2(int a); endtask\n"
+      "    virtual task t3(input int a); endtask\n"
+      "    virtual task t4(int a = 1); endtask\n"
+      "    virtual task t5(int a, int b); endtask\n"
+      "    virtual task t6(int a = 1); endtask\n"
+      "  endclass\n"
+      "  class D extends B;\n"
+      "    task t1(byte a); endtask\n"
+      "    task t2(int b); endtask\n"
+      "    task t3(output int a); endtask\n"
+      "    task t4(int a); endtask\n"
+      "    task t5(int a); endtask\n"
+      "    task t6(int a = 2); endtask\n"
+      "  endclass\n"
+      "endpackage\n"
+      "program pr;\n"
+      "  class B; virtual function int f(ref int a); return 0; endfunction "
+      "endclass\n"
+      "  class D extends B; function int f(inout int a); return 0; endfunction "
+      "endclass\n"
+      "  class E extends B; function int f(ref int a); return 1; endfunction "
+      "endclass\n"
+      "endprogram\n"
+      "interface ifc;\n"
+      "  class B; virtual function int f(int a); return 0; endfunction "
+      "endclass\n"
+      "  class D extends B; function byte f(int a); return 0; endfunction "
+      "endclass\n"
+      "endinterface\n"
+      "module m; pr p(); ifc i(); endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {11}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override argument 'a' has mismatched type",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {12}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        "virtual method override argument name 'b' does not match base 'a'",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {13, 21}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override argument 'a' has mismatched direction",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {14}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        "virtual method override argument 'a': presence of default must match",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {15}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override has different number of arguments",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {26}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override has mismatched return type", kLine,
+        "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {16, 22}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(VirtualMethodElaboration,
+     DISABLED_OverrideWidthsNamingParametersAreCompared) {
+  ElabFixture f;
+  ElabOk(
+      "module m #(int W = 4);\n"
+      "  localparam int L = 3;\n"
+      "  class B;\n"
+      "    virtual function logic [W-1:0] r(); return 0; endfunction\n"
+      "    virtual function void a(logic [L:0] x); endfunction\n"
+      "    virtual function void u(int x [W]); endfunction\n"
+      "  endclass\n"
+      "  class D extends B;\n"
+      "    virtual function logic [W:0] r(); return 0; endfunction\n"
+      "    virtual function void a(logic [L+1:0] x); endfunction\n"
+      "    virtual function void u(int x [W+1]); endfunction\n"
+      "  endclass\n"
+      "  class E extends B;\n"
+      "    virtual function logic [W-1:0] r(); return 0; endfunction\n"
+      "    virtual function void a(logic [3:0] x); endfunction\n"
+      "    virtual function void u(int x [4]); endfunction\n"
+      "  endclass\n"
+      "  class PB #(int N = 8);\n"
+      "    virtual function logic [N-1:0] g(); return 0; endfunction\n"
+      "  endclass\n"
+      "  class PD extends PB #(8);\n"
+      "    virtual function logic [6:0] g(); return 0; endfunction\n"
+      "  endclass\n"
+      "  class PE extends PB #(8);\n"
+      "    virtual function logic [7:0] g(); return 0; endfunction\n"
+      "  endclass\n"
+      "  for (genvar i = 2; i < 3; i++) begin : gl\n"
+      "    class GB; virtual function logic [i:0] h(); return 0; endfunction "
+      "endclass\n"
+      "    class GD extends GB; virtual function logic [i+1:0] h(); return 0; "
+      "endfunction endclass\n"
+      "    class GE extends GB; virtual function logic [2:0] h(); return 0; "
+      "endfunction endclass\n"
+      "  end\n"
+      "  virtual class VB; pure virtual function logic [W-1:0] p(); endclass\n"
+      "  class VD extends VB; virtual function logic [W:0] p(); return 0; "
+      "endfunction endclass\n"
+      "  interface class IC; pure virtual function logic [W-1:0] q(); "
+      "endclass\n"
+      "  class ID implements IC; virtual function logic [W:0] q(); return 0; "
+      "endfunction endclass\n"
+      "  class IE implements IC; virtual function logic [3:0] q(); return 0; "
+      "endfunction endclass\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {9, 22, 29, 33}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override has mismatched return type", kLine,
+        "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {10, 11}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override argument 'x' has mismatched type",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {35}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "method 'q' does not match signature of pure virtual method 'q'",
+        kLine, "8.26.6.1"))
+        << kLine;
+  }
+  for (const int kLine : {14, 15, 16, 25, 30, 36}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(VirtualMethodElaboration, DISABLED_OverrideUnpackedDimensionsAreCompared) {
+  ElabFixture f;
+  ElabOk(
+      "typedef int A4[4];\n"
+      "typedef int A5[5];\n"
+      "class B;\n"
+      "  virtual function A4 r(); return '{default:0}; endfunction\n"
+      "  virtual function void u(int x [4]); endfunction\n"
+      "  virtual function void d(int x []); endfunction\n"
+      "  virtual function void k(int x [int]); endfunction\n"
+      "  virtual function void s(int x [4]); endfunction\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  virtual function A5 r(); return '{default:0}; endfunction\n"
+      "  virtual function void u(int x [0:4]); endfunction\n"
+      "  virtual function void d(int x [$]); endfunction\n"
+      "  virtual function void k(int x [string]); endfunction\n"
+      "  virtual function void s(int x [0:3]); endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {11}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override has mismatched return type", kLine,
+        "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {12, 13, 14}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "virtual method override argument 'x' has mismatched type",
+        kLine, "8.20"))
+        << kLine;
+  }
+  for (const int kLine : {15}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
 }  // namespace

@@ -540,4 +540,49 @@ TEST(ClassSim, GrandchildVirtualInitialMethodThroughBaseAndMidHandles) {
             123u);
 }
 
+TEST(ClassSim, ExtendsMakesAMethodVirtualAndInitialDoesNot) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class A; virtual function int f(); return 1; endfunction\n"
+      "  virtual task t(output int r); r = 1; endtask endclass\n"
+      "class B extends A; function :extends int f(); return 2; endfunction\n"
+      "  task :extends t(output int r); r = 2; endtask endclass\n"
+      "class C extends B; function int f(); return 3; endfunction\n"
+      "  task t(output int r); r = 3; endtask endclass\n"
+      "class A2; function int f(); return 1; endfunction endclass\n"
+      "class B2 extends A2; function :initial int f(); return 2; endfunction "
+      "endclass\n"
+      "class C2 extends B2; function int f(); return 3; endfunction endclass\n"
+      "class B3 extends A; extern function :extends int f(); endclass\n"
+      "function int B3::f(); return 4; endfunction\n"
+      "class C3 extends B3; function int f(); return 5; endfunction endclass\n"
+      "class B4 extends A; function :extends :final int f(); return 6; "
+      "endfunction endclass\n"
+      "module m;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8;\n"
+      "  B b; C c = new; A a; B2 b2; C2 c2 = new; B3 b3; C3 c3 = new; B4 b4 = "
+      "new;\n"
+      "  initial begin\n"
+      "    b = c; r1 = b.f();\n"
+      "    a = c; r2 = a.f();\n"
+      "    b2 = c2; r3 = b2.f();\n"
+      "    b.t(r4);\n"
+      "    a.t(r5);\n"
+      "    b3 = c3; r6 = b3.f();\n"
+      "    a = c3; r7 = a.f();\n"
+      "    a = b4; r8 = a.f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 3u},
+                    {"r2", 3u},
+                    {"r3", 2u},
+                    {"r4", 3u},
+                    {"r5", 3u},
+                    {"r6", 5u},
+                    {"r7", 5u},
+                    {"r8", 6u}});
+}
+
 }  // namespace
