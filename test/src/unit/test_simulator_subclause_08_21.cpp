@@ -172,4 +172,68 @@ TEST(AbstractClassSimulation, ConstructAbstractClassNames8_21) {
                             "8.21"));
 }
 
+const char* const kEmptyBodySrc =
+    "class K; endclass\n"
+    "class B;\n"
+    "  virtual function integer send(bit [31:0] data); endfunction\n"
+    "  virtual function logic [7:0] l(); endfunction\n"
+    "  virtual function int i(); endfunction\n"
+    "  virtual function bit [3:0] b4(); endfunction\n"
+    "  virtual function string s(); endfunction\n"
+    "  virtual function K k(); endfunction\n"
+    "  function integer nv(); endfunction\n"
+    "  static function integer st(); endfunction\n"
+    "  function integer dl(); int q; endfunction\n"
+    "  function integer g(bit a); if (a) g = 5; endfunction\n"
+    "endclass\n"
+    "function integer mf(); endfunction\n"
+    "module m;\n"
+    "  B b = new;\n"
+    "  integer z;\n"
+    "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;\n"
+    "  initial begin\n"
+    "    r1 = (b.send(0) === 'x);\n"
+    "    r2 = (b.l() === 8'bx);\n"
+    "    r3 = b.i() + 7;\n"
+    "    r4 = b.b4() + 7;\n"
+    "    r5 = (b.s() == \"\");\n"
+    "    r6 = (b.k() == null);\n"
+    "    r7 = (b.nv() === 'x);\n"
+    "    r8 = (B::st() === 'x);\n"
+    "    r9 = (mf() === 'x);\n"
+    "    r10 = (b.dl() === 'x);\n"
+    "    r11 = b.g(1);\n"
+    "    r12 = (b.g(0) === 'x);\n"
+    "    r13 = (b.send(1) === 'x);\n"
+    "    r14 = (z === 'x);\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(AbstractClassSimulation,
+     EmptyBodyOfATwoStateStringOrClassFunctionGivesItsDefault) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kEmptyBodySrc, f);
+  LowerRunAndCheck(f, design,
+                   {{"r3", 7u},
+                    {"r4", 7u},
+                    {"r5", 1u},
+                    {"r6", 1u},
+                    {"r11", 5u},
+                    {"r14", 1u}});
+}
+
+TEST(AbstractClassSimulation, DISABLED_EmptyBodyOfAFourStateFunctionGivesX) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kEmptyBodySrc, f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 1u},
+                    {"r2", 1u},
+                    {"r7", 1u},
+                    {"r8", 1u},
+                    {"r9", 1u},
+                    {"r10", 1u},
+                    {"r12", 1u},
+                    {"r13", 1u}});
+}
+
 }  // namespace
