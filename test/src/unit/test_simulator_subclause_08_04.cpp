@@ -790,4 +790,97 @@ TEST(ClassSim, NewThroughAVariableIndexedElementIsStoredInItsObject) {
             9u);
 }
 
+TEST(ClassSim, VirtualMethodsCalledThroughANullHandleAreReportedAndRunGoesOn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class B;\n"
+      "  virtual function int vf(); return 1; endfunction\n"
+      "  virtual task vt(); endtask\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  virtual function int vf(); return 2; endfunction\n"
+      "endclass\n"
+      "virtual class A; pure virtual function int pf(); endclass\n"
+      "interface class I; pure virtual function int itf(); endclass\n"
+      "module m;\n"
+      "  int r, done;\n"
+      "  B c, b; A a; I ii;\n"
+      "  initial begin\n"
+      "    r = c.vf();\n"
+      "    c.vt();\n"
+      "    r = b.vf();\n"
+      "    r = a.pf();\n"
+      "    r = ii.itf();\n"
+      "    done = 1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  const struct {
+    uint32_t line;
+    const char* message;
+  } kReports[] = {
+      {14, "method 'vf' called through the null handle 'c'"},
+      {15, "method 'vt' called through the null handle 'c'"},
+      {16, "method 'vf' called through the null handle 'b'"},
+      {17, "method 'pf' called through the null handle 'a'"},
+      {18, "method 'itf' called through the null handle 'ii'"},
+  };
+  for (const auto& report : kReports) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), report.message, report.line, "8.4"))
+        << report.line;
+  }
+  EXPECT_EQ(f.ctx.FindVariable("done")->value.ToUint64(), 1u);
+}
+
+TEST(ClassSim, PropertyReachedThroughANullHandleLetsRunGoOnAndChangesNoObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int v = 5;\n"
+      "endclass\n"
+      "class O;\n"
+      "  O peer;\n"
+      "  int v = 4;\n"
+      "  function int rd(); return peer.v; endfunction\n"
+      "  function void wr(); peer.v = 6; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C c, d;\n"
+      "  O o;\n"
+      "  int r, a1, a2, a3, a4, w1, w2, w3, w4, rc, rd2, ro;\n"
+      "  task t(); r = c.v; a2 = 1; c.v = 2; w2 = 1; endtask\n"
+      "  function void f(); r = c.v; a3 = 1; c.v = 3; w3 = 1; endfunction\n"
+      "  initial begin\n"
+      "    d = new;\n"
+      "    r = c.v;\n"
+      "    a1 = 1;\n"
+      "    c.v = 1;\n"
+      "    w1 = 1;\n"
+      "    t();\n"
+      "    f();\n"
+      "    o = new;\n"
+      "    r = o.rd();\n"
+      "    a4 = 1;\n"
+      "    o.wr();\n"
+      "    w4 = 1;\n"
+      "    rd2 = d.v;\n"
+      "    ro = o.v;\n"
+      "    c = new;\n"
+      "    rc = c.v;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  for (const char* name : {"a1", "a2", "a3", "a4", "w1", "w2", "w3", "w4"}) {
+    EXPECT_EQ(f.ctx.FindVariable(name)->value.ToUint64(), 1u) << name;
+  }
+  EXPECT_EQ(f.ctx.FindVariable("rc")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("rd2")->value.ToUint64(), 5u);
+  EXPECT_EQ(f.ctx.FindVariable("ro")->value.ToUint64(), 4u);
+}
+
 }  // namespace
