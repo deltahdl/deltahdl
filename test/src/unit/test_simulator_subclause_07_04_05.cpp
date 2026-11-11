@@ -706,4 +706,210 @@ TEST(ArrayIndexingAndSlicing, InvalidIndexOfVariableSizeArrayReadsAStructure) {
   EXPECT_EQ(out, "0 x 5\n0 x 5\n0 x 5\n");
 }
 
+TEST(ArrayIndexingAndSlicing,
+     EnumerationAndNonIntegralElementsReadTheirTableValuesAtAnInvalidIndex) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "interface I; endinterface\n"
+                "interface class IC; endclass\n"
+                "class C; endclass\n"
+                "module top;\n"
+                "  typedef enum logic [1:0] {LA, LB} le_t;\n"
+                "  typedef enum bit [1:0] {BA, BB} be_t;\n"
+                "  typedef enum {IA = 5, IB} ie_t;\n"
+                "  le_t le [2];\n"
+                "  be_t be [2];\n"
+                "  ie_t ie [2];\n"
+                "  real r [2];\n"
+                "  shortreal sr [2];\n"
+                "  string s [2];\n"
+                "  C c [2];\n"
+                "  IC ic [2];\n"
+                "  event e [2];\n"
+                "  chandle ch [2];\n"
+                "  virtual I vi [2];\n"
+                "  int da [2][];\n"
+                "  int q [2][$];\n"
+                "  int aa [2][int];\n"
+                "  int i3 = 3;\n"
+                "  initial begin\n"
+                "    foreach (le[i]) begin\n"
+                "      le[i] = LB;\n"
+                "      be[i] = BB;\n"
+                "      ie[i] = IB;\n"
+                "      r[i] = 1.5;\n"
+                "      sr[i] = 2.5;\n"
+                "      s[i] = \"hi\";\n"
+                "      c[i] = new;\n"
+                "      da[i] = new[2];\n"
+                "      q[i].push_back(1);\n"
+                "      aa[i][4] = 1;\n"
+                "    end\n"
+                "    $display(\"%b %b %0d\", le[i3], be[i3], ie[i3]);\n"
+                "    $display(\"%0f %0f \\\"%s\\\"\", r[i3], sr[i3], s[i3]);\n"
+                "    $display(\"%0d %0d %0d %0d %0d\", c[i3] == null, ic[i3] "
+                "== null,\n"
+                "             e[i3] == null, ch[i3] == null, vi[i3] == null);\n"
+                "    $display(\"%0d %0d %0d\", da[i3].size(), q[i3].size(), "
+                "aa[i3].num());\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "xx 00 0\n"
+            "0.000000 0.000000 \"\"\n"
+            "1 1 1 1 1\n"
+            "0 0 0\n");
+}
+
+TEST(ArrayIndexingAndSlicing,
+     ZIndexAndVariableSizeOutOfBoundsReadTheirTableValues) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int ia [4];\n"
+                       "  logic [7:0] la [4];\n"
+                       "  int dyn [];\n"
+                       "  int qq [$];\n"
+                       "  logic [7:0] ldyn [];\n"
+                       "  initial begin\n"
+                       "    ia = '{1, 2, 3, 4};\n"
+                       "    la = '{1, 2, 3, 4};\n"
+                       "    $display(\"%0d %h %0d %h\", ia['z], la['z], "
+                       "ia[2'b1z], la[2'b1z]);\n"
+                       "    dyn = '{7, 8};\n"
+                       "    qq = '{7, 8};\n"
+                       "    ldyn = '{7, 8};\n"
+                       "    $display(\"%0d %0d %0d %0d %h\", dyn[2], qq[2], "
+                       "dyn[-1], qq['x], ldyn[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 xx 0 xx\n"
+            "0 0 0 0 xx\n");
+}
+
+TEST(ArrayIndexingAndSlicing,
+     DISABLED_FixedSizeArrayElementReadsAnArrayOfItsElementValues) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  logic [3:0] fa [2][3];\n"
+                       "  bit [3:0] fb [2][3];\n"
+                       "  logic [3:0] t [3];\n"
+                       "  bit [3:0] u [3];\n"
+                       "  int i3 = 3;\n"
+                       "  initial begin\n"
+                       "    fa[0] = '{1, 2, 3};\n"
+                       "    fb[0] = '{1, 2, 3};\n"
+                       "    t = '{4'h5, 4'h5, 4'h5};\n"
+                       "    u = '{4'h5, 4'h5, 4'h5};\n"
+                       "    t = fa[i3];\n"
+                       "    u = fb[i3];\n"
+                       "    $display(\"%b %b %b %b %b %b\", t[0], t[1], t[2], "
+                       "u[0], u[1], u[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "xxxx xxxx xxxx 0000 0000 0000\n");
+}
+
+TEST(ArrayIndexingAndSlicing,
+     TwoStateParameterElementAtAnInvalidIndexFoldsToZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  parameter int A [2] = '{1, 2};\n"
+                       "  parameter logic [3:0] L [2] = '{4'h1, 4'h2};\n"
+                       "  typedef struct { int arr [3]; } s_t;\n"
+                       "  parameter s_t P = '{arr: '{1, 2, 3}};\n"
+                       "  parameter int M [2][3] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+                       "  localparam int a2 = A[2];\n"
+                       "  localparam int p3 = P.arr[3];\n"
+                       "  localparam int m14 = M[1][4];\n"
+                       "  initial $display(\"%0d %0d %0d\", a2, p3, m14);\n"
+                       "endmodule\n",
+                       f),
+            "0 0 0\n");
+}
+
+TEST(ArrayIndexingAndSlicing,
+     DISABLED_ParameterElementAtAnXIndexOrOfFourStateTypeFoldsToItsTableValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  parameter int A [2] = '{1, 2};\n"
+                       "  parameter logic [3:0] L [2] = '{4'h1, 4'h2};\n"
+                       "  typedef struct { int arr [3]; } s_t;\n"
+                       "  parameter s_t P = '{arr: '{1, 2, 3}};\n"
+                       "  parameter int M [2][3] = '{'{1, 2, 3}, '{4, 5, 6}};\n"
+                       "  localparam int a2 = A[2];\n"
+                       "  localparam int ax = A[1'bx];\n"
+                       "  localparam logic [3:0] l5 = L[5];\n"
+                       "  logic [a2 + 3:0] w;\n"
+                       "  initial $display(\"%0d %b %0d\", ax, l5, $bits(w));\n"
+                       "endmodule\n",
+                       f),
+            "0 xxxx 4\n");
+}
+
+TEST(ArrayIndexingAndSlicing,
+     WritesAtAZIndexAQueueEndANonblockingWriteAndAMemberSelectDoNothing) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  typedef struct packed { logic [3:0] f; logic [3:0] g; } ps_t;\n"
+          "  int a [4];\n"
+          "  int d [];\n"
+          "  int q [$];\n"
+          "  ps_t sa [4];\n"
+          "  logic [7:0] la [4];\n"
+          "  int i10 = 10;\n"
+          "  initial begin\n"
+          "    a = '{1, 2, 3, 4};\n"
+          "    a['z] = 9;\n"
+          "    a[2'b1z] = 9;\n"
+          "    $display(\"%p\", a);\n"
+          "    d = '{1, 2, 3};\n"
+          "    d['x] = 9;\n"
+          "    d[-1] = 9;\n"
+          "    $display(\"%0d %p\", d.size(), d);\n"
+          "    q = '{1, 2, 3};\n"
+          "    q[$+2] = 9;\n"
+          "    q['x] = 9;\n"
+          "    $display(\"%0d %p\", q.size(), q);\n"
+          "    q[$+1] = 4;\n"
+          "    $display(\"%0d %p\", q.size(), q);\n"
+          "    la = '{1, 2, 3, 4};\n"
+          "    a[10] <= 9;\n"
+          "    la[i10] <= 8'hff;\n"
+          "    #1 $display(\"%p %p\", a, la);\n"
+          "    foreach (sa[i]) sa[i] = 8'h11;\n"
+          "    sa[i10].f = 4'hf;\n"
+          "    sa[10][3] = 1'b1;\n"
+          "    la[i10][3] = 1'b1;\n"
+          "    $display(\"%p %p\", sa, la);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "'{1, 2, 3, 4}\n"
+      "3 '{1, 2, 3}\n"
+      "3 '{1, 2, 3}\n"
+      "4 '{1, 2, 3, 4}\n"
+      "'{1, 2, 3, 4} '{1, 2, 3, 4}\n"
+      "'{'{f:1, g:1}, '{f:1, g:1}, '{f:1, g:1}, '{f:1, g:1}} '{1, 2, 3, 4}\n");
+}
+
+TEST(ArrayIndexingAndSlicing,
+     DISABLED_DynamicArrayWriteOnePastTheEndDoesNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int d [];\n"
+                       "  initial begin\n"
+                       "    d = '{1, 2, 3};\n"
+                       "    d[d.size()] = 9;\n"
+                       "    d[5] = 9;\n"
+                       "    $display(\"%0d %p\", d.size(), d);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 '{1, 2, 3}\n");
+}
+
 }  // namespace
