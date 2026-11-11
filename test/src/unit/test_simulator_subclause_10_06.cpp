@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -147,6 +149,74 @@ TEST(ProceduralContinuousAssignSim, ForceAndAssignTakeTheTargetsWidth) {
   EXPECT_EQ(RunAndGet(src, "w"), 0x0100u);
   EXPECT_EQ(RunAndGet(src, "v"), 0x0100u);
   EXPECT_EQ(RunAndGet(src, "hi") >> 4, 0xFu);
+}
+
+TEST(ProceduralContinuousAssignSim, AssignAndForcePatchAnAndGateIntoAnOrGate) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a, b, c, d;\n"
+                       "  wire e;\n"
+                       "  and and1 (e, a, b, c);\n"
+                       "  initial begin\n"
+                       "    $monitor(\"%0d d=%b,e=%b\", $stime, d, e);\n"
+                       "    assign d = a & b & c;\n"
+                       "    a = 1; b = 0; c = 1;\n"
+                       "    #10;\n"
+                       "    force d = (a | b | c);\n"
+                       "    force e = (a | b | c);\n"
+                       "    #10;\n"
+                       "    release d;\n"
+                       "    release e;\n"
+                       "    #10 $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f)
+                .find("0 d=0,e=0\n10 d=1,e=1\n20 d=0,e=0\n"),
+            0u);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ProceduralContinuousAssignSim, AReleasedNetTakesItsDriversValueAtOnce) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic x, y;\n"
+                       "  wire n;\n"
+                       "  assign n = x;\n"
+                       "  initial begin\n"
+                       "    x = 0; y = 1;\n"
+                       "    #1 force n = y;\n"
+                       "    #1 x = 1; y = 0;\n"
+                       "    #1 $display(\"%b\", n);\n"
+                       "    release n;\n"
+                       "    $display(\"%b\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ProceduralContinuousAssignSim,
+     InterfaceAndProgramProceduresAssignAndForce) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I; logic v;\n"
+                       "  initial begin\n"
+                       "    v = 0; #1 force v = 1; #1 v = 0;\n"
+                       "    #1 $display(\"I %b\", v);\n"
+                       "    release v; v = 0; #1 $display(\"I %b\", v);\n"
+                       "  end\n"
+                       "endinterface\n"
+                       "program p; logic w;\n"
+                       "  initial begin\n"
+                       "    assign w = 1; #1 w = 0; $display(\"P %b\", w);\n"
+                       "    deassign w; w = 0; $display(\"P %b\", w);\n"
+                       "    #10;\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module t; I u(); p q(); endmodule\n",
+                       f),
+            "P 1\nP 0\nI 1\nI 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
