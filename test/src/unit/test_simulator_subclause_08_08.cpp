@@ -269,4 +269,122 @@ TEST(TypedConstructorCallSim, ParameterizedTypedConstructorWithArgs) {
             10u);
 }
 
+TEST(TypedConstructorCallSim, TypedConstructorCallRunsInEachPlace) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 1; endclass\n"
+      "class D extends C;\n"
+      "  function new(int v = 7); x = v; endfunction\n"
+      "endclass\n"
+      "class H;\n"
+      "  C hc = D::new(3);\n"
+      "  function C mk(); C c; c = D::new(4); return c; endfunction\n"
+      "endclass\n"
+      "package k;\n"
+      "  class PC; int x; endclass\n"
+      "  class PD extends PC; function new(); x = 11; endfunction endclass\n"
+      "  function int pf(); PC c; c = PD::new; return c.x; endfunction\n"
+      "endpackage\n"
+      "function int uf(); C c; c = D::new(5); return c.x; endfunction\n"
+      "interface ifc; C c = D::new(6); endinterface\n"
+      "module t;\n"
+      "  ifc i();\n"
+      "  H h = new;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  if (1) begin : g\n"
+      "    C gc = D::new(9);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    automatic C m = h.mk();\n"
+      "    r1 = h.hc.x;\n"
+      "    r2 = m.x;\n"
+      "    r3 = k::pf();\n"
+      "    r4 = uf();\n"
+      "    r5 = i.c.x;\n"
+      "    r6 = g.gc.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 3u},
+                    {"r2", 4u},
+                    {"r3", 11u},
+                    {"r4", 5u},
+                    {"r5", 6u},
+                    {"r6", 9u}});
+}
+
+TEST(TypedConstructorCallSim,
+     DISABLED_TypedConstructorOfASpecializationConstructsThatSpecialization) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class E #(type T = int);\n"
+      "  T y;\n"
+      "  function new(T v); y = v; endfunction\n"
+      "  function int w(); return $bits(y); endfunction\n"
+      "endclass\n"
+      "class F #(int N = 4);\n"
+      "  bit [N-1:0] y;\n"
+      "  function new(int v); y = v; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  E #(byte) b, c;\n"
+      "  F #(3) f1;\n"
+      "  int r1, r2, r3, r4, r5;\n"
+      "  initial begin\n"
+      "    b = new(300);\n"
+      "    c = E#(byte)::new(300);\n"
+      "    f1 = F#(3)::new(13);\n"
+      "    r1 = b.y;\n"
+      "    r2 = c.y;\n"
+      "    r3 = c.w();\n"
+      "    r4 = f1.y;\n"
+      "    c = E#(.T(byte))::new(.v(301));\n"
+      "    r5 = c.y;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r1", 44u}, {"r2", 44u}, {"r3", 8u}, {"r4", 5u}, {"r5", 45u}});
+}
+
+TEST(TypedConstructorCallSim,
+     DISABLED_TypedConstructorWithoutParenthesesTakesTheDefaultArguments) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 1; endclass\n"
+      "class D extends C;\n"
+      "  int y = 3;\n"
+      "  function new(int v = 7); x = v; endfunction\n"
+      "endclass\n"
+      "class H;\n"
+      "  int x = 2;\n"
+      "  function new(int v = 6); x = v; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C m = D::new;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  initial begin\n"
+      "    automatic C n = D::new;\n"
+      "    automatic C n2 = D::new();\n"
+      "    C a;\n"
+      "    H h;\n"
+      "    a = D::new;\n"
+      "    h = H::new;\n"
+      "    r1 = m.x;\n"
+      "    r2 = n.x;\n"
+      "    r3 = a.x;\n"
+      "    r4 = h.x;\n"
+      "    r5 = n2.x;\n"
+      "    a = D::new();\n"
+      "    r6 = a.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r1", 7u}, {"r2", 7u}, {"r3", 7u}, {"r4", 6u}, {"r5", 7u}, {"r6", 7u}});
+}
+
 }  // namespace
