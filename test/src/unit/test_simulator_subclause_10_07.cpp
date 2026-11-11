@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
@@ -765,6 +766,44 @@ TEST(AssignmentExtensionTruncationSim,
   ASSERT_NE(x, nullptr);
 
   EXPECT_EQ(x->value.ToUint64(), 0xFBu);
+}
+
+TEST(AssignmentExtensionTruncationSim,
+     TheClausesTruncationExamplesGiveTheirValues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  logic [5:0] a1; logic signed [4:0] b1;\n"
+                 "  logic [0:5] a2; logic signed [0:4] b2, c2;\n"
+                 "  logic [7:0] a3; logic signed [7:0] b3;\n"
+                 "  logic signed [5:0] c3, d3;\n"
+                 "  initial begin\n"
+                 "    a1 = 8'hff; b1 = 8'hff;\n"
+                 "    a2 = 8'sh8f; b2 = 8'sh8f; c2 = -113;\n"
+                 "    a3 = 8'hff; c3 = a3; b3 = -113; d3 = b3;\n"
+                 "    $display(\"%h %h %h %h %0d %h %h\", a1, b1, a2, b2, c2, "
+                 "c3, d3);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "3f 1f 0f 0f 15 3f 0f\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentExtensionTruncationSim,
+     AnUnknownTopBitIsZeroPaddedUnsignedAndReplicatedSigned) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] u; logic [7:0] w;\n"
+                       "  logic signed [3:0] s; logic signed [7:0] ws;\n"
+                       "  initial begin\n"
+                       "    u = 4'bx101; w = u; s = 4'bz101; ws = s;\n"
+                       "    $display(\"%b %b\", w, ws);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0000x101 zzzzz101\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
