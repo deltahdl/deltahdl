@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <initializer_list>
+#include <string>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -409,6 +411,58 @@ TEST(ThisElaboration, ParameterThroughThisInAStaticMethodIsReported) {
                             "method",
                             2, "8.10"));
   EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 3));
+}
+
+TEST(ThisElaboration, DISABLED_ThisNamingNoMemberIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A;\n"
+      "  int x;\n"
+      "  function new(); this.cnew = 1; endfunction\n"
+      "  function void f(); this.nosuch = 0; endfunction\n"
+      "  function void g(); x = this.nope; endfunction\n"
+      "  function void h(); this.nf(); endfunction\n"
+      "  task t(); this.tq = 1; endtask\n"
+      "  function void ok(); this.x = 1; x = this.x; endfunction\n"
+      "endclass\n"
+      "package p;\n"
+      "  class PA;\n"
+      "    int x;\n"
+      "    function void f(); this.y = 1; endfunction\n"
+      "    function void ok(); this.x = 1; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class MA;\n"
+      "    int x;\n"
+      "    function void f(); this.y = 1; endfunction\n"
+      "    function void ok(); this.x = 1; endfunction\n"
+      "    class NA;\n"
+      "      function void f(); this.x = 1; endfunction\n"
+      "    endclass\n"
+      "  endclass\n"
+      "  A a;\n"
+      "  initial a = new;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (auto [line, member] :
+       std::initializer_list<std::pair<int, const char*>>{{3, "cnew"},
+                                                          {4, "nosuch"},
+                                                          {5, "nope"},
+                                                          {6, "nf"},
+                                                          {7, "tq"},
+                                                          {13, "y"},
+                                                          {20, "y"},
+                                                          {23, "x"}}) {
+    EXPECT_TRUE(ReportedError(
+        diags, std::string("has no member named '") + member + "'", line,
+        "8.11"))
+        << line;
+  }
+  for (const int kLine : {8, 14, 21}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

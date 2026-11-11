@@ -680,4 +680,219 @@ TEST(ClassScopeTypedefSim, PropertyOfBaseClassStructureTypedefSelectsMembers) {
             "3 5 64\n");
 }
 
+const char* const kNestedStaticsSrc =
+    "class Outer;\n"
+    "  int outerProp;\n"
+    "  local int outerLocalProp;\n"
+    "  protected int outerProtProp;\n"
+    "  static int outerStaticProp;\n"
+    "  static local int outerLocalStaticProp;\n"
+    "  static int sp;\n"
+    "  parameter int P = 7;\n"
+    "  localparam int LP = 9;\n"
+    "  local function int lf(); return 3; endfunction\n"
+    "  protected function int pf(); return 4; endfunction\n"
+    "  static local function int slf(); return 5; endfunction\n"
+    "  static function int sf(); return 8; endfunction\n"
+    "  function int locals();\n"
+    "    return outerLocalStaticProp * 100 + outerLocalProp * 10 + "
+    "outerProtProp;\n"
+    "  endfunction\n"
+    "  class Inner;\n"
+    "    int i1, i2, i3, i4;\n"
+    "    function void innerMethod(Outer h);\n"
+    "      outerStaticProp = 1;\n"
+    "      outerLocalStaticProp = 2;\n"
+    "      sp = 2;\n"
+    "      h.outerProp = 3;\n"
+    "      h.outerLocalProp = 4;\n"
+    "      h.outerProtProp = 5;\n"
+    "      i1 = h.lf() * 10 + h.pf();\n"
+    "      i2 = slf();\n"
+    "      i3 = P + LP;\n"
+    "      i4 = sf();\n"
+    "    endfunction\n"
+    "    class Deep;\n"
+    "      function void d(); outerLocalStaticProp = 6; sp = 6; endfunction\n"
+    "      function int g(); return sf() + slf(); endfunction\n"
+    "    endclass\n"
+    "  endclass\n"
+    "endclass\n"
+    "module top;\n"
+    "  Outer o = new;\n"
+    "  Outer::Inner in = new;\n"
+    "  Outer::Inner::Deep dp = new;\n"
+    "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11;\n"
+    "  initial begin\n"
+    "    in.innerMethod(o);\n"
+    "    r1 = Outer::outerStaticProp;\n"
+    "    r2 = o.outerProp;\n"
+    "    r3 = o.locals();\n"
+    "    r4 = in.i1;\n"
+    "    r5 = in.i2;\n"
+    "    r6 = in.i3;\n"
+    "    r8 = Outer::sp;\n"
+    "    r9 = in.i4;\n"
+    "    dp.d();\n"
+    "    r7 = o.locals();\n"
+    "    r10 = Outer::sp;\n"
+    "    r11 = dp.g();\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(ClassScopeResolutionSim, NestedClassWritesAndReadsTheContainingClass) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kNestedStaticsSrc, f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 1u},
+                    {"r2", 3u},
+                    {"r3", 245u},
+                    {"r4", 34u},
+                    {"r6", 16u},
+                    {"r8", 2u}});
+}
+
+TEST(ClassScopeResolutionSim,
+     DISABLED_NestedClassReachesTheContainingClassesStaticsUnqualified) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kNestedStaticsSrc, f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r5", 5u}, {"r7", 645u}, {"r9", 8u}, {"r10", 6u}, {"r11", 13u}});
+}
+
+TEST(ClassScopeResolutionSim, ModuleParameterFoldsAModuleClassesParameter) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pk;\n"
+      "  class PC; parameter int P = 5; typedef enum {X, Y, Z} e_t; endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class MC; parameter int P = 4; typedef enum {X, Y} e_t; endclass\n"
+      "  parameter int MP = MC::P + MC::Y;\n"
+      "  localparam int ML = MC::P * 10 + MC::Y;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    r1 = MP; r2 = ML;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 5u}, {"r2", 41u}});
+}
+
+TEST(ClassScopeResolutionSim,
+     DISABLED_ParameterFoldsAClassParameterFromEveryPlace) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class D; parameter int Q = E2::P; endclass\n"
+      "class E2; parameter int P = 6; endclass\n"
+      "class C; parameter int P = 3; typedef enum {X, Y} e_t; endclass\n"
+      "parameter int UP = C::P + C::Y;\n"
+      "package pk;\n"
+      "  class PC; parameter int P = 5; typedef enum {X, Y, Z} e_t; endclass\n"
+      "  parameter int KP = PC::P + PC::Z;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pk::*;\n"
+      "  localparam int PP = pk::PC::P + pk::PC::Z;\n"
+      "  localparam int IP = PC::P * 10 + PC::Z;\n"
+      "  localparam int DQ = D::Q;\n"
+      "  if (1) begin : g\n"
+      "    class GC; parameter int P = 8; typedef enum {X, Y} e_t; endclass\n"
+      "    localparam int GP = GC::P + GC::Y;\n"
+      "  end\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  initial begin\n"
+      "    r1 = UP;\n"
+      "    r2 = pk::KP;\n"
+      "    r3 = PP;\n"
+      "    r4 = IP;\n"
+      "    r5 = DQ;\n"
+      "    r6 = g.GP;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 4u},
+                    {"r2", 7u},
+                    {"r3", 7u},
+                    {"r4", 52u},
+                    {"r5", 6u},
+                    {"r6", 9u}});
+}
+
+const char* const kPackageClassTypeSrc =
+    "package p;\n"
+    "  class C; typedef byte b; endclass\n"
+    "endpackage\n"
+    "package q;\n"
+    "  class C #(int W = 1); typedef int U; parameter type T = int; endclass\n"
+    "endpackage\n"
+    "package rp;\n"
+    "  p::C::b a;\n"
+    "  typedef p::C::b tb;\n"
+    "  tb b;\n"
+    "  int pw;\n"
+    "endpackage\n"
+    "typedef p::C::b ub;\n"
+    "class Q; typedef p::C::b qb; qb m; p::C::b n; endclass\n"
+    "module n #(type V = p::C::b) (); V z; endmodule\n"
+    "interface ifc; p::C::b a; typedef p::C::b tb; tb b; endinterface\n"
+    "program pr;\n"
+    "  p::C::b a;\n"
+    "  typedef p::C::b tb;\n"
+    "  tb b;\n"
+    "  initial begin rp::pw = $bits(a) * 100 + $bits(b); #5; end\n"
+    "endprogram\n"
+    "function int uf(); p::C::b a; typedef p::C::b tb; tb b; return $bits(a) * "
+    "100 + $bits(b); endfunction\n"
+    "module top;\n"
+    "  p::C::b y;\n"
+    "  typedef p::C::b tb;\n"
+    "  tb x;\n"
+    "  ub u;\n"
+    "  var type(p::C::b) w;\n"
+    "  localparam type LV = p::C::b;\n"
+    "  LV z;\n"
+    "  Q qq = new;\n"
+    "  n nn();\n"
+    "  ifc ii();\n"
+    "  pr pp();\n"
+    "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14;\n"
+    "  initial begin\n"
+    "    r1 = $bits(y); r2 = $bits(x); r3 = $bits(u); r4 = $bits(qq.m); r5 = "
+    "$bits(qq.n);\n"
+    "    r6 = $bits(w); r7 = $bits(z); r8 = $bits(nn.z); r9 = "
+    "$bits(q::C#(4)::U); r10 = $bits(q::C#(4)::T);\n"
+    "    r11 = $bits(ii.a) * 100 + $bits(ii.b); r13 = $bits(rp::a) * 100 + "
+    "$bits(rp::b); r14 = uf();\n"
+    "    #1 r12 = rp::pw;\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(ClassScopeResolutionSim, PackageClassTypeDeclaresAVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kPackageClassTypeSrc, f);
+  LowerRunAndCheck(f, design, {{"r1", 8u}});
+}
+
+TEST(ClassScopeResolutionSim, DISABLED_PackageClassTypeHasItsWidthEverywhere) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kPackageClassTypeSrc, f);
+  LowerRunAndCheck(f, design,
+                   {{"r2", 8u},
+                    {"r3", 8u},
+                    {"r4", 8u},
+                    {"r5", 8u},
+                    {"r6", 8u},
+                    {"r7", 8u},
+                    {"r8", 8u},
+                    {"r9", 32u},
+                    {"r10", 32u},
+                    {"r11", 808u},
+                    {"r12", 808u},
+                    {"r13", 808u},
+                    {"r14", 808u}});
+}
+
 }  // namespace
