@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -348,6 +351,155 @@ TEST(UnpackedArrayOperandElaboration, NetsAreNoArrays) {
       "an unpacked array is compared only with another unpacked array";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 7, "7.4.6"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kCompared, 8, "7.4.6"));
+}
+
+constexpr std::string_view kAssocSlice =
+    "slice is not allowed on an associative array";
+constexpr std::string_view kUnpackedOperand =
+    "an unpacked array is not an operand of this operator";
+constexpr std::string_view kUnpackedFromInteger = "unpacked array";
+
+TEST(ArrayOperationElaboration,
+     AssociativeArraySliceReportedInAProcedureBesideWholeAndElementUse) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  int aa [int];\n"
+      "  int bb [int];\n"
+      "  int sa [string];\n"
+      "  int s [2];\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    s = aa[1 +: 2];\n"
+      "    s = sa[\"a\" +: 2];\n"
+      "    s = aa[1:2];\n"
+      "    aa = bb;\n"
+      "    aa[1] = bb[2];\n"
+      "    if (aa == bb) x = 1;\n"
+      "    if (aa[1] != bb[1]) x = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8, 9, 10}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kAssocSlice, line, "7.4.6"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(ArrayOperationElaboration,
+     DISABLED_AssociativeArraySliceReportedInSubroutinesPackagesAndClasses) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  function automatic void pf();\n"
+      "    int aa [int];\n"
+      "    int s [2];\n"
+      "    s = aa[1:2];\n"
+      "    aa[1] = s[0];\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "class K;\n"
+      "  int aa [int];\n"
+      "  int s [2];\n"
+      "  function void m();\n"
+      "    s = aa[1 +: 2];\n"
+      "    s[0] = aa[1];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  int aa [string];\n"
+      "  int s [2];\n"
+      "  function automatic void f();\n"
+      "    s = aa[\"a\":\"b\"];\n"
+      "    s[1] = aa[\"a\"];\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5, 13, 21}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kAssocSlice, line, "7.4.6"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(
+    ArrayOperationElaboration,
+    DISABLED_UnpackedArrayAsAnIntegerOperandReportedInSubroutinesPackagesAndClasses) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  int pu [2];\n"
+      "  function automatic void pf();\n"
+      "    pu[0] = pu + 1;\n"
+      "    pu[1] = pu[0] + 1;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "class K;\n"
+      "  int ku [2];\n"
+      "  function void m();\n"
+      "    ku[0] = ku * 2;\n"
+      "    ku[1] = ku[0] * 2;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  int mu [2];\n"
+      "  logic [7:0] p;\n"
+      "  function automatic void f();\n"
+      "    mu[0] = mu - 1;\n"
+      "    p = p - 1;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4, 11, 19}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kUnpackedOperand, line, "7.4.6"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(
+    ArrayOperationElaboration,
+    DISABLED_IntegerAssignedToAnUnpackedArrayIsReportedWherePackedArraysAcceptIt) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  function automatic void pf();\n"
+      "    int fu [2];\n"
+      "    fu = 3;\n"
+      "    fu = '{default: 3};\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "class K;\n"
+      "  int ku [2];\n"
+      "  function void m();\n"
+      "    ku = 5;\n"
+      "    ku = '{5, 5};\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  int u [8];\n"
+      "  int v [2] = 7;\n"
+      "  int w [2] = '{7, 7};\n"
+      "  int q [$];\n"
+      "  int d [];\n"
+      "  logic [7:0] p;\n"
+      "  initial begin\n"
+      "    u = 8'b11111111;\n"
+      "    q = 5;\n"
+      "    d = 5;\n"
+      "    u = '{default: 3};\n"
+      "    p = 8'b11111111;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4, 11, 17, 23, 24, 25}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnpackedFromInteger, line,
+                              "7.4.6"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
 }  // namespace
