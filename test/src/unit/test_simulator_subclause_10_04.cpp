@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -260,6 +262,28 @@ TEST(ClassMethodAssignSim, AnUnpackedSliceAssignsFromAClassMethod) {
                       "endmodule\n",
                       "result"),
             0x70u);
+}
+
+TEST(ProceduralAssignSim, ProgramAndInterfaceProceduresAssignVariables) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface I;\n"
+                 "  logic [3:0] x;\n"
+                 "  initial begin x = 3; x <= 4; #1 $display(\"I %0d\", x); "
+                 "end\n"
+                 "endinterface\n"
+                 "program p;\n"
+                 "  logic [3:0] y;\n"
+                 "  initial begin y = 1; y <= 2; #2 $display(\"P %0d\", "
+                 "y); end\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  I u();\n"
+                 "  p pp();\n"
+                 "endmodule\n",
+                 f),
+      "I 4\nP 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

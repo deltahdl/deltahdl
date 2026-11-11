@@ -424,4 +424,141 @@ TEST(BlockingAssignSim, TaggedElementTargetIndexEvaluatedOnce) {
       234u);
 }
 
+TEST(BlockingAssignSim,
+     IntraAssignmentDelayWritesTheObjectTheHandleHoldsAfter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C; int x; endclass\n"
+                       "module t;\n"
+                       "  C h, h1, h2;\n"
+                       "  initial begin\n"
+                       "    h1 = new; h2 = new; h = h1;\n"
+                       "    fork h.x = #5 7; #2 h = h2; join\n"
+                       "    $display(\"%0d %0d\", h1.x, h2.x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BlockingAssignSim,
+     IntraAssignmentDelayWritesTheInstanceTheVirtualInterfaceHoldsAfter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I; logic s = 0; endinterface\n"
+                       "module t;\n"
+                       "  I i1(), i2();\n"
+                       "  virtual I v;\n"
+                       "  initial begin\n"
+                       "    v = i1;\n"
+                       "    fork v.s = #5 1; #2 v = i2; join\n"
+                       "    $display(\"%b %b\", i1.s, i2.s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BlockingAssignSim, IntraAssignmentEventEvaluatesEachLvalueWhenItFires) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C; int x; endclass\n"
+                       "interface I; logic s = 0; endinterface\n"
+                       "module t;\n"
+                       "  I i1(), i2();\n"
+                       "  virtual I v;\n"
+                       "  C h, h1, h2;\n"
+                       "  int arr[4]; int idx;\n"
+                       "  event e;\n"
+                       "  initial begin\n"
+                       "    h1 = new; h2 = new; h = h1; v = i1; idx = 0;\n"
+                       "    fork\n"
+                       "      arr[idx] = @(e) 99;\n"
+                       "      h.x = @(e) 7;\n"
+                       "      v.s = @(e) 1;\n"
+                       "      begin #2 idx = 2; h = h2; v = i2; #1 ->e; end\n"
+                       "    join\n"
+                       "    #1 $display(\"%0d %0d %0d %0d %b %b\", arr[0], "
+                       "arr[2], h1.x, h2.x,\n"
+                       "                i1.s, i2.s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 99 0 7 0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BlockingAssignSim,
+     IntraAssignmentDelayEvaluatesAPropertyOrFormalLvalueAfterTheDelay) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C; int x;\n"
+                 "  C h;\n"
+                 "  task automatic t1(C o);\n"
+                 "    h = o; fork h.x = #5 7; #2 h = this; join\n"
+                 "  endtask\n"
+                 "endclass\n"
+                 "interface I; logic s = 0; endinterface\n"
+                 "module t;\n"
+                 "  I i1(), i2();\n"
+                 "  C a, b; int arr[4];\n"
+                 "  task automatic tk(ref int r[4], input int k,\n"
+                 "                    input virtual I vv);\n"
+                 "    fork r[k] = #5 9; vv.s = #5 1; begin #2 k = 3; vv = i2; "
+                 "end join\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    a = new; b = new; b.t1(a);\n"
+                 "    tk(arr, 1, i1);\n"
+                 "    $display(\"%0d %0d %0d %0d %b %b\", a.x, b.x, arr[1], "
+                 "arr[3], i1.s,\n"
+                 "             i2.s);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 7 0 9 0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BlockingAssignSim, NewOfADynamicArrayAndOfAHandleReachedThroughAScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk; class P; int v = 5; endclass P ph; "
+                       "endpackage\n"
+                       "class C; int x = 3; static C sh; C h;\n"
+                       "  function void mk(); this.h = new; endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  C c; int d[];\n"
+                       "  initial begin\n"
+                       "    c = new; c.mk(); C::sh = new; pk::ph = new;\n"
+                       "    d = new[3]; d[2] = 4; d = new[5](d);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", c.h.x, C::sh.x, "
+                       "pk::ph.v,\n"
+                       "             d.size(), d[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 3 5 5 4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BlockingAssignSim, EveryAssignmentOperatorAndIncrementForm) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a; logic signed [7:0] s;\n"
+                       "  initial begin\n"
+                       "    a = 10; a += 3; a -= 1; a *= 2; a /= 4; a %= 4;\n"
+                       "    $display(\"%0d\", a);\n"
+                       "    a = 12; a &= 10; a |= 1; a ^= 3; a <<= 2; a >>= "
+                       "1;\n"
+                       "    $display(\"%0d\", a);\n"
+                       "    s = -8; s <<<= 1; $display(\"%0d\", s);\n"
+                       "    s >>>= 2; $display(\"%0d\", s);\n"
+                       "    a = 1; a++; ++a; a--; $display(\"%0d\", a);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2\n20\n-16\n-4\n2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

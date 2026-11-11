@@ -489,4 +489,55 @@ TEST(NonblockingAssignSim,
   EXPECT_EQ(RunAndGet(src, "a1"), 0u);
 }
 
+TEST(NonblockingAssignSim,
+     IntraAssignmentDelayWritesTheInstanceTheVirtualInterfaceHeldAtExecution) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I; logic s = 0; endinterface\n"
+                       "module t;\n"
+                       "  I i1(), i2();\n"
+                       "  virtual I v;\n"
+                       "  initial begin\n"
+                       "    v = i1;\n"
+                       "    v.s <= #5 1;\n"
+                       "    #2 v = i2;\n"
+                       "    #5 $display(\"%b %b\", i1.s, i2.s);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NonblockingAssignSim, IntraAssignmentDelaysOfBlockingAndNonblockingForms) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a, b, c, d, e, g;\n"
+                       "  initial begin a = #10 1; b = #2 0; c = #4 1; end\n"
+                       "  initial begin d <= #10 1; e <= #2 0; g <= #4 1; end\n"
+                       "  initial begin\n"
+                       "    #3 $display(\"%b%b%b %b%b%b\", a, b, c, d, e, g);\n"
+                       "    #2 $display(\"%b%b%b %b%b%b\", a, b, c, d, e, g);\n"
+                       "    #6 $display(\"%b%b%b %b%b%b\", a, b, c, d, e, g);\n"
+                       "    #2 $display(\"%b%b%b %b%b%b\", a, b, c, d, e, g);\n"
+                       "    #4 $display(\"%b%b%b %b%b%b\", a, b, c, d, e, g);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "xxx x0x\nxxx x01\n1xx 101\n10x 101\n101 101\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NonblockingAssignSim, EqualDelayUpdatesOfOneBlockLandInExecutionOrder) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a;\n"
+                       "  initial a = 1;\n"
+                       "  initial begin a <= #4 0; a <= #4 1; end\n"
+                       "  initial #5 $display(\"%b\", a);\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
