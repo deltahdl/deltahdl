@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -239,6 +241,180 @@ TEST(StructAssignmentValidation, UnitTypedefMemberDefaultMustBeConstant) {
       diags, "struct member default value must be a constant expression", 3,
       "7.2.2"));
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 4u) << d.message;
+}
+
+constexpr std::string_view kPacked =
+    "a member of a packed structure cannot carry a default value of its own";
+constexpr std::string_view kUnion =
+    "a member of an unpacked structure that contains a union cannot carry a "
+    "default value of its own";
+constexpr std::string_view kNotConstant =
+    "struct member default value must be a constant expression";
+
+TEST(StructAssignmentValidation,
+     NonConstantMemberDefaultReportedWhereverTheTypeIsDeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n"
+      "  int w;\n"
+      "  typedef struct { int a = w; } ib_t;\n"
+      "  typedef struct { int a = 3; } ig_t;\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  int z;\n"
+      "  typedef struct { int a = z; } z_t;\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  int q;\n"
+      "  typedef struct { int a = q; } q_t;\n"
+      "endchecker\n"
+      "module t;\n"
+      "  class C;\n"
+      "    int k;\n"
+      "    static int sk;\n"
+      "    typedef struct { int a = k; } cb_t;\n"
+      "    typedef struct { int a = sk; } cs_t;\n"
+      "    typedef struct { int a = 3; } cg_t;\n"
+      "  endclass\n"
+      "  function int cf(int x); return x * 2; endfunction\n"
+      "  struct { int a = $urandom; } fs;\n"
+      "  struct { int a = $clog2(8); int b = cf(3); } fk;\n"
+      "  for (genvar g = 0; g < 1; g++) begin : gb\n"
+      "    int y;\n"
+      "    typedef struct { int a = y; } y_t;\n"
+      "    typedef struct { int a = g; } g_t;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    struct { int a = fk.a; } bm;\n"
+      "  end\n"
+      "  i ii(); pr p();\n"
+      "  ck c();\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 3, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 8, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 12, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 18, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 19, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 23, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 27, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 31, "7.2.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 8u);
+}
+
+TEST(
+    StructAssignmentValidation,
+    DISABLED_NonConstantMemberDefaultReportedForPackageVariablesFunctionsAndSubroutineTypes) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  int v;\n"
+      "  typedef struct { int a = v; } pb_t;\n"
+      "  typedef struct { int a = 3; } pg_t;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int cnt;\n"
+      "  function int nc(); return cnt; endfunction\n"
+      "  struct { int a = nc(); } fb;\n"
+      "  task tk;\n"
+      "    typedef struct { int a = cnt; } m_t;\n"
+      "    typedef struct { int a = 4; } ok_t;\n"
+      "  endtask\n"
+      "  function void fn;\n"
+      "    typedef struct { int a = cnt; } m_t;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 3, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 9, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 11, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kNotConstant, 15, "7.2.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+TEST(StructAssignmentValidation,
+     PackedAndUnionMemberDefaultsReportedWhereverTheTypeIsDeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  typedef struct packed { int x = 1; } pk_t;\n"
+      "  typedef struct { union { int a; } u; int n = 1; } pu_t;\n"
+      "endpackage\n"
+      "interface i;\n"
+      "  typedef struct packed { int x = 1; } k_t;\n"
+      "  typedef struct { union { int a; } u; int n = 1; } u_t;\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  typedef struct packed { int x = 1; } k_t;\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  typedef struct packed { int x = 1; } k_t;\n"
+      "endchecker\n"
+      "module t;\n"
+      "  class C;\n"
+      "    typedef struct packed { int x = 1; } ck_t;\n"
+      "    typedef struct { union { int a; } u; int n = 1; } cu_t;\n"
+      "  endclass\n"
+      "  typedef struct { union packed { int a; bit [31:0] b; } u; int n = 1; "
+      "} a_t;\n"
+      "  typedef struct { union tagged { int a; void v; } u; int n = 1; } "
+      "b_t;\n"
+      "  typedef struct { union packed { int a; bit [31:0] b; } u; int n; } "
+      "ok_t;\n"
+      "  for (genvar g = 0; g < 1; g++) begin : gb\n"
+      "    typedef struct packed { int x = 1; } k_t;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    struct packed { int x = 1; } bk;\n"
+      "  end\n"
+      "  i ii(); pr p();\n"
+      "  ck c();\n"
+      "endmodule\n"
+      "typedef struct packed { int x = 1; } uk_t;\n"
+      "typedef struct { union { int a; } u; int n = 1; } uu_t;\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, kPacked, 2, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 3, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 6, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 7, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 10, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 13, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 17, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 18, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 20, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 21, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 24, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 27, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 32, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 33, "7.2.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 14u);
+}
+
+TEST(StructAssignmentValidation,
+     DISABLED_PackedAndUnionMemberDefaultsReportedInsideTasksAndFunctions) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  task tk;\n"
+      "    typedef struct packed { int x = 1; } k_t;\n"
+      "    typedef struct { union { int a; } u; int n = 1; } u_t;\n"
+      "    typedef struct { int n = 1; } ok_t;\n"
+      "  endtask\n"
+      "  function void fn;\n"
+      "    typedef struct packed { int x = 1; } k_t;\n"
+      "    typedef struct { union { int a; } u; int n = 1; } u_t;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, kPacked, 3, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 4, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kPacked, 8, "7.2.2"));
+  EXPECT_TRUE(ReportedError(diags, kUnion, 9, "7.2.2"));
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
 }  // namespace

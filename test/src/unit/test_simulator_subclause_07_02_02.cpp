@@ -166,4 +166,110 @@ TEST(StructDefaultSim, MemberDefaultsReachEveryKindOfVariable) {
   EXPECT_EQ(RunAndGet(src, "im"), 711u);
 }
 
+TEST(StructAssignmentSimulation,
+     StructPassedToAndFromFunctionsAndMethodsAsWhole) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef struct { int a; int b[2]; } s_t;\n"
+          "  function s_t mk(input s_t x); mk = x; mk.a = x.a + 1; "
+          "endfunction\n"
+          "  function automatic void inc(inout s_t x); x.a++; endfunction\n"
+          "  function automatic void dbl(ref s_t x); x.b[1] *= 2; endfunction\n"
+          "  class C; function s_t pass(s_t x); return x; endfunction "
+          "endclass\n"
+          "  s_t s, r;\n"
+          "  C h;\n"
+          "  initial begin\n"
+          "    s = '{1, '{2, 3}};\n"
+          "    r = mk(s);\n"
+          "    inc(r);\n"
+          "    dbl(r);\n"
+          "    h = new;\n"
+          "    r = h.pass(r);\n"
+          "    $display(\"%0d %0d %0d %0d\", r.a, r.b[0], r.b[1], s.a);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "3 2 6 1\n");
+}
+
+TEST(StructAssignmentSimulation, ClauseExampleDefaultsAndTheirSuppression) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  localparam int constant = 4;\n"
+                       "  typedef struct {\n"
+                       "    int addr = 1 + constant;\n"
+                       "    int crc;\n"
+                       "    byte data [4] = '{4{1}};\n"
+                       "  } packet1;\n"
+                       "  packet1 p1;\n"
+                       "  packet1 pi = '{1, 2, '{2, 3, 4, 5}};\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d "
+                       "%0d\", p1.addr, p1.crc,\n"
+                       "                   p1.data[0], p1.data[3], pi.addr, "
+                       "pi.crc, pi.data[0],\n"
+                       "                   pi.data[3]);\n"
+                       "endmodule\n",
+                       f),
+            "5 0 1 1 1 2 2 5\n");
+}
+
+TEST(StructAssignmentSimulation,
+     ExplicitInitializerIgnoresDefaultsInEveryKindOfVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct { int a = 5; int b = 6; } d_t;\n"
+                       "  class C; d_t p = '{1, 2}; d_t q; endclass\n"
+                       "  C h;\n"
+                       "  d_t g;\n"
+                       "  initial begin\n"
+                       "    automatic d_t l = '{3, 4};\n"
+                       "    automatic d_t m = l;\n"
+                       "    h = new;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
+                       "h.p.a, h.p.b, l.a, l.b, m.a,\n"
+                       "             m.b, h.q.a, g.b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 2 3 4 3 4 5 6\n");
+}
+
+TEST(StructAssignmentSimulation, NetWithoutNettypeIgnoresMemberDefaults) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef struct { logic [7:0] a = 8'hFF; logic [7:0] b; } t_t;\n"
+          "  wire t_t w;\n"
+          "  wire t_t d;\n"
+          "  t_t v;\n"
+          "  assign d = '{8'h01, 8'h02};\n"
+          "  initial begin\n"
+          "    $display(\"%h %h\", w.a, w.b);\n"
+          "    #1 $display(\"%h %h %h %h %h %h\", w.a, w.b, d.a, d.b, v.a, "
+          "v.b);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "zz zz\nzz zz 01 02 ff xx\n");
+}
+
+TEST(StructAssignmentSimulation,
+     DISABLED_NetOfAUserDefinedNettypeKeepsMemberDefaults) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef struct { logic [7:0] a = 8'hFF; logic [7:0] b; } t_t;\n"
+          "  nettype t_t nt;\n"
+          "  nt n;\n"
+          "  initial #1 $display(\"%h %h\", n.a, n.b);\n"
+          "endmodule\n",
+          f),
+      "ff xx\n");
+}
+
 }  // namespace
