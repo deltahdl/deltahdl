@@ -197,4 +197,81 @@ TEST(FineGrainProcessControlElaboration, ModuleStateVariableNamesTheEnum) {
   EXPECT_EQ(ms->enum_type_name, "process::state");
 }
 
+TEST(FineGrainProcessControlElaboration, ProcessNewInAClassMethodError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  process q;\n"
+             "  function void make();\n"
+             "    q = new;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct a process object with 'new'", 4,
+                            "9.7"));
+}
+
+TEST(FineGrainProcessControlElaboration,
+     DISABLED_ProcessNewInAClassPropertyInitializerError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  process p = new;\n"
+             "  process jobs[] = new [2];\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c;\n"
+             "endmodule\n",
+             f));
+  const char* const kMessage = "cannot construct a process object with 'new'";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 2, "9.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 3, "9.7"));
+}
+
+TEST(FineGrainProcessControlElaboration, ExtendProcessInAPackageOrModuleError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package pk;\n"
+             "  class P extends std::process;\n"
+             "  endclass\n"
+             "endpackage\n"
+             "module m;\n"
+             "  class M extends process;\n"
+             "  endclass\n"
+             "  class H;\n"
+             "    process p;\n"
+             "  endclass\n"
+             "endmodule\n",
+             f));
+  const char* const kMessage = "cannot extend a class declared ':final'";
+  for (const int kLine : {2, 6}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "8.13"))
+        << kLine;
+  }
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "8.13"));
+}
+
+TEST(FineGrainProcessControlElaboration,
+     DISABLED_AwaitCalledFromAFunctionError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module m;\n"
+             "  function void wait_for(process p);\n"
+             "    p.await();\n"
+             "  endfunction\n"
+             "  task automatic wait_in_task(process p);\n"
+             "    p.await();\n"
+             "  endtask\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function cannot enable a task", 3, "13.4"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "function cannot enable a task", 6, "13.4"));
+}
+
 }  // namespace
