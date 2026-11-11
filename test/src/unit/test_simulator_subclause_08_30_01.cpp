@@ -208,4 +208,167 @@ TEST(ClassSim, ModuleWeakReferenceGetAnswersTheModulesOwnHandle) {
             11u);
 }
 
+TEST(ClassSim,
+     WeakReferenceToASpecializationInterfaceClassOrWeakReferenceRuns) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C #(int N = 1); int x = N; endclass\n"
+      "typedef C #(4) c4_t;\n"
+      "interface class I; pure virtual function int g(); endclass\n"
+      "class K implements I; virtual function int g(); return 3; endfunction "
+      "endclass\n"
+      "class D; int x = 7; endclass\n"
+      "module m;\n"
+      "  weak_reference #(C #(4)) w1;\n"
+      "  weak_reference #(c4_t) w2;\n"
+      "  weak_reference #(I) w3;\n"
+      "  weak_reference #(weak_reference #(D)) w4;\n"
+      "  C #(4) c;\n"
+      "  K k;\n"
+      "  D d;\n"
+      "  weak_reference #(D) wd;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    w1 = new(c);\n"
+      "    w2 = new(c);\n"
+      "    k = new;\n"
+      "    w3 = new(k);\n"
+      "    d = new;\n"
+      "    wd = new(d);\n"
+      "    w4 = new(wd);\n"
+      "    r1 = w1.get().x;\n"
+      "    r2 = w2.get().x;\n"
+      "    r3 = w3.get().g();\n"
+      "    r4 = (w4.get() == wd);\n"
+      "    $display(\"%0d %0d %0d %0d\", r1, r2, r3, r4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "4 4 3 1\n");
+}
+
+TEST(ClassSim, DISABLED_UserClassNamedWeakReferenceInAModuleShadowsTheBuiltIn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "module m;\n"
+      "  class weak_reference #(type T = int); T v; function new(T a); v = a; "
+      "endfunction endclass\n"
+      "  C h;\n"
+      "  weak_reference #(int) w = new(5);\n"
+      "  std::weak_reference #(C) s;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    s = new(h);\n"
+      "    r1 = w.v;\n"
+      "    r2 = (s.get() == h);\n"
+      "    $display(\"%0d %0d\", r1, r2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "5 1\n");
+}
+
+TEST(
+    ClassSim,
+    DISABLED_UserClassNamedWeakReferenceImportedFromAPackageShadowsTheBuiltIn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "package p;\n"
+      "  class weak_reference #(type T = int); T v; function new(T a); v = a; "
+      "endfunction endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import p::weak_reference;\n"
+      "  C h;\n"
+      "  weak_reference #(int) w = new(5);\n"
+      "  std::weak_reference #(C) s;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    s = new(h);\n"
+      "    $display(\"%0d %0d\", w.v, s.get() == h);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "5 1\n");
+}
+
+TEST(ClassSim, DISABLED_UserClassNamedWeakReferenceNamedThroughItsPackage) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package p;\n"
+      "  class weak_reference #(type T = int); T v; function new(T a); v = a; "
+      "endfunction endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  p::weak_reference #(int) w = new(6);\n"
+      "  initial $display(\"%0d\", w.v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "6\n");
+}
+
+TEST(
+    ClassSim,
+    DISABLED_UserClassNamedWeakReferenceInTheCompilationUnitShadowsTheBuiltIn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C; int x = 7; endclass\n"
+      "class weak_reference #(type T = int); T v; function new(T a); v = a; "
+      "endfunction endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  weak_reference #(int) w = new(5);\n"
+      "  std::weak_reference #(C) s;\n"
+      "  initial begin\n"
+      "    h = new;\n"
+      "    s = new(h);\n"
+      "    $display(\"%0d %0d\", w.v, s.get() == h);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "5 1\n");
+}
+
+TEST(ClassSim,
+     DISABLED_UserClassNamedWeakReferenceInAnInterfaceShadowsTheBuiltIn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc;\n"
+      "  class weak_reference #(type T = int); T v; function new(T a); v = a; "
+      "endfunction endclass\n"
+      "  weak_reference #(int) w = new(5);\n"
+      "endinterface\n"
+      "module m;\n"
+      "  ifc i ();\n"
+      "  initial #1 $display(\"%0d\", i.w.v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "5\n");
+}
+
+TEST(ClassSim,
+     DISABLED_UserClassNamedWeakReferenceInAProgramShadowsTheBuiltIn) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "program prg;\n"
+      "  class weak_reference #(type T = int); T v; function new(T a); v = a; "
+      "endfunction endclass\n"
+      "  weak_reference #(int) w = new(6);\n"
+      "  initial $display(\"%0d\", w.v);\n"
+      "endprogram\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "6\n");
+}
+
 }  // namespace

@@ -141,4 +141,39 @@ TEST(ClassSim, WeakRefGetIdDerivedHandleSameThroughBaseAndDerivedSpec) {
       1u);
 }
 
+TEST(ClassSim, WeakRefGetIdIsSixtyFourBitsAndIndexesAnAssociativeArray) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class B; int x = 7; endclass\n"
+      "module m;\n"
+      "  B b;\n"
+      "  int aa[longint];\n"
+      "  int r1, r3;\n"
+      "  initial begin\n"
+      "    b = new;\n"
+      "    r1 = $bits(weak_reference #(B)::get_id(b));\n"
+      "    aa[weak_reference #(B)::get_id(b)] = 1;\n"
+      "    r3 = aa.exists(weak_reference #(B)::get_id(b));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 64u}, {"r3", 1u}});
+}
+
+TEST(ClassSim, DISABLED_WeakRefGetIdComparesAsSigned) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class B; int x = 7; endclass\n"
+      "module m;\n"
+      "  B b;\n"
+      "  int r2;\n"
+      "  initial begin\n"
+      "    b = new;\n"
+      "    r2 = (weak_reference #(B)::get_id(b) > -1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r2", 1u}});
+}
+
 }  // namespace
