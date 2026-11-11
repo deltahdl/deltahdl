@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 
 using namespace delta;
 
@@ -232,6 +233,35 @@ TEST(ScopedArrayMemberElement, ReadThroughAWildcardImport) {
                        "endmodule\n",
                        f),
             "20 21\n");
+}
+
+TEST(StructureMemberKinds,
+     DISABLED_ClassHandleMemberOfAnUnpackedStructureHoldsItsHandle) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "typedef struct { int i; C h; } st;\n"
+      "typedef struct { C h; int i; } st0;\n"
+      "module m;\n"
+      "  st s;\n"
+      "  st0 s0;\n"
+      "  C o, l;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    s.h = o;\n"
+      "    l = s.h;\n"
+      "    if (l != null) r1 = l.x;\n"
+      "    s0.h = o;\n"
+      "    l = s0.h;\n"
+      "    if (l != null) r2 = l.x;\n"
+      "    s.h = new;\n"
+      "    l = s.h;\n"
+      "    if (l != null) r3 = l.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 7u}, {"r3", 7u}});
 }
 
 }  // namespace

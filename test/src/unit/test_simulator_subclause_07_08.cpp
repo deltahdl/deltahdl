@@ -613,4 +613,50 @@ TEST(AssociativeArraySim, ClauseDeclarationsHoldTheirEntries) {
       "woke\n2 3 01abcd\n");
 }
 
+TEST(AssocArraySimulation,
+     DISABLED_ClassHandleInANestedAssociativeArrayIsConstructedAndReadInPlace) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "module m;\n"
+      "  C m2[string][int];\n"
+      "  C o, l;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    m2[\"k\"][0] = new;\n"
+      "    l = m2[\"k\"][0];\n"
+      "    if (l != null) r1 = l.x;\n"
+      "    o = new;\n"
+      "    m2[\"j\"][1] = o;\n"
+      "    l = m2[\"j\"][1];\n"
+      "    if (l != null) r2 = l.x;\n"
+      "    r3 = m2[\"j\"][1].x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 7u}, {"r3", 7u}});
+}
+
+TEST(AssocArraySimulation,
+     ClassHandleInASingleLevelArrayAndAnIntInANestedOneAreHeld) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "module m;\n"
+      "  C m1[int];\n"
+      "  int i2[string][int];\n"
+      "  C l;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    m1[0] = new;\n"
+      "    l = m1[0];\n"
+      "    if (l != null) r1 = l.x;\n"
+      "    i2[\"k\"][0] = 5;\n"
+      "    r2 = i2[\"k\"][0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 5u}});
+}
+
 }  // namespace

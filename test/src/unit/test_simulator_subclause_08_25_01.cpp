@@ -679,4 +679,50 @@ TEST(ParameterizedScopeResolutionSim,
                     {"r15", 6u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     DISABLED_MemberIsReachedThroughASpecializationsStaticHandle) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "class S #(int N = 1); static C s; endclass\n"
+      "module m;\n"
+      "  C o;\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    S#(2)::s = o;\n"
+      "    r1 = S#(2)::s.x;\n"
+      "    S#(2)::s.x = 9;\n"
+      "    r2 = o.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 9u}});
+}
+
+TEST(ParameterizedScopeResolutionSim,
+     SpecializationsStaticHandleCopiedToALocalReachesItsObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "class S #(int N = 1); static C s; endclass\n"
+      "class T; static C s; endclass\n"
+      "module m;\n"
+      "  C o, l;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    S#(2)::s = o;\n"
+      "    l = S#(2)::s;\n"
+      "    r1 = l.x;\n"
+      "    T::s = o;\n"
+      "    r2 = T::s.x;\n"
+      "    T::s.x = 9;\n"
+      "    r3 = o.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 7u}, {"r3", 9u}});
+}
+
 }  // namespace

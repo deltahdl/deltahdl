@@ -699,4 +699,58 @@ TEST(ClassConstructorSim, NewArgumentsReadTheCallersObject) {
             34u);
 }
 
+TEST(ClassConstructorSim, DISABLED_NewAssignedToAPackageClassVariableIsHeld) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "package P;\n"
+      "  C h;\n"
+      "  C g = new;\n"
+      "  C k;\n"
+      "  C n;\n"
+      "  function void mk(); k = new; endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import P::n;\n"
+      "  C l;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    P::h = new;\n"
+      "    l = P::h;\n"
+      "    if (l != null) r1 = l.x;\n"
+      "    l = P::g;\n"
+      "    if (l != null) r2 = l.x;\n"
+      "    P::mk();\n"
+      "    l = P::k;\n"
+      "    if (l != null) r3 = l.x;\n"
+      "    n = new;\n"
+      "    l = P::n;\n"
+      "    if (l != null) r4 = l.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 7u}, {"r3", 7u}, {"r4", 7u}});
+}
+
+TEST(ClassConstructorSim, ExistingHandleAssignedToAPackageClassVariableIsHeld) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "package P;\n"
+      "  C h;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  C o, l;\n"
+      "  int r1;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    P::h = o;\n"
+      "    l = P::h;\n"
+      "    if (l != null) r1 = l.x;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}});
+}
+
 }  // namespace

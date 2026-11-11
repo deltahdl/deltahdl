@@ -155,4 +155,49 @@ TEST(ClassSim, WeakRefGetReturnsReferentWhenGcSparesReachable) {
   EXPECT_EQ(retrieved, obj);
 }
 
+TEST(ClassSim, DISABLED_GetThroughAWeakReferenceArrayElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "module m;\n"
+      "  C o;\n"
+      "  weak_reference #(C) t;\n"
+      "  weak_reference #(C) wa[2];\n"
+      "  weak_reference #(C) wq[$];\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    t = new(o);\n"
+      "    wa[0] = t;\n"
+      "    wq.push_back(t);\n"
+      "    r1 = (wa[0].get() == o);\n"
+      "    r2 = (wq[0].get() == o);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 1u}});
+}
+
+TEST(ClassSim, GetThroughAWeakReferenceCopiedFromAnArrayElement) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C; int x = 7; endclass\n"
+      "module m;\n"
+      "  C o;\n"
+      "  weak_reference #(C) t, u;\n"
+      "  weak_reference #(C) wa[2];\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    o = new;\n"
+      "    t = new(o);\n"
+      "    wa[0] = t;\n"
+      "    u = wa[0];\n"
+      "    r1 = (t.get() == o);\n"
+      "    r2 = (u.get() == o);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 1u}});
+}
+
 }  // namespace
