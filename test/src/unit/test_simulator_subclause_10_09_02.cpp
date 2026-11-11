@@ -567,4 +567,21 @@ TEST(StructPatternSim, AKeyedPatternSetsAProceduralVariableByItsKeys) {
   EXPECT_EQ(out, "706 302 904 501 403\n208\n");
 }
 
+TEST(StructPatternSim, ATopLevelMemberKeyLeavesANestedNamesakeToTheDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef struct { int x; struct { int x; int y; } s; } "
+                 "st;\n"
+                 "  st v;\n"
+                 "  initial begin\n"
+                 "    v = '{x: 5, default: 9};\n"
+                 "    $display(\"%0d %0d %0d\", v.x, v.s.x, v.s.y);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "5 9 9\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

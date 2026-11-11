@@ -277,4 +277,28 @@ TEST(ArrayPatternElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(ArrayPatternElaboration, DISABLED_TypeParameterPatternItemCountChecked) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef int pair_t [2];\n"
+      "module t #(parameter type T = pair_t);\n"
+      "  int x [2];\n"
+      "  initial x = T'{1, 2, 3};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "assignment pattern has 3 elements, but array "
+                            "dimension requires 2",
+                            4, "10.9.1"));
+}
+
+TEST(ArrayPatternElaboration, TypeParameterPatternOfTheRightCountAccepted) {
+  EXPECT_TRUE(
+      ElabOk("typedef int pair_t [2];\n"
+             "module t #(parameter type T = pair_t);\n"
+             "  int x [2];\n"
+             "  initial x = T'{1, 2};\n"
+             "endmodule\n"));
+}
+
 }  // namespace

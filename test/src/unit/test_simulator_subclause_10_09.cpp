@@ -381,4 +381,120 @@ TEST(AssignmentPatternSim, TypedStructurePatternIsPackedWhereverWritten) {
   EXPECT_EQ(out, "0304 0304\n2 0102 0304\n");
 }
 
+TEST(AssignmentPatternSim, TypeParameterPatternTakesTheParametersType) {
+  struct Case {
+    const char* src;
+    const char* expected;
+  };
+  for (const auto& [src, expected] :
+       {Case{"typedef int pair_t [2];\n"
+             "module t #(parameter type T = pair_t);\n"
+             "  int x [2] = '{7, 8};\n"
+             "  initial $display(\"%b %b\", T'{7, 8} == x, T'{7, 9} == x);\n"
+             "endmodule\n",
+             "1 0\n"},
+        Case{"typedef struct { int a; int b; } st;\n"
+             "module t #(parameter type T = st);\n"
+             "  st s;\n"
+             "  initial begin\n"
+             "    s = T'{a: 1, b: 2};\n"
+             "    $display(\"%0d %0d %0d\", s.a, s.b, T'{a: 3, b: 4}.b);\n"
+             "  end\n"
+             "endmodule\n",
+             "1 2 4\n"},
+        Case{"typedef struct packed { logic [3:0] a, b; } st;\n"
+             "typedef struct packed { logic [7:0] a, b; } st2;\n"
+             "module m #(parameter type T = st);\n"
+             "  initial $display(\"%0d %h\", $bits(T'{1, 2}), T'{1, 2});\n"
+             "endmodule\n"
+             "module t; m #(.T(st2)) u(); endmodule\n",
+             "16 0102\n"},
+        Case{"typedef byte pair_t [2];\n"
+             "module t #(parameter type T = pair_t);\n"
+             "  byte a, b; byte r [2] = '{5, 6};\n"
+             "  initial begin T'{a, b} = r; $display(\"%0d %0d\", a, b); "
+             "end\n"
+             "endmodule\n",
+             "5 6\n"},
+        Case{"class C #(type T = logic [1:0][7:0]);\n"
+             "  function logic [15:0] f();\n"
+             "    return T'{8'h12, 8'h34};\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module t;\n"
+             "  C #() c;\n"
+             "  initial begin c = new; $display(\"%h\", c.f()); end\n"
+             "endmodule\n",
+             "1234\n"}}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(src, f), expected) << src;
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
+}
+
+TEST(AssignmentPatternSim, DISABLED_SelfDeterminedPatternTakesThePrefixesType) {
+  struct Case {
+    const char* src;
+    const char* expected;
+  };
+  for (const auto& [src, expected] :
+       {Case{"module t;\n"
+             "  typedef logic [1:0][3:0] T2;\n"
+             "  logic [1:0][3:0] v;\n"
+             "  initial $display(\"%h %h %0d\", type(v)'{1, 2},\n"
+             "                   type(T2)'{1, 2}, $bits(type(v)'{1, 2}));\n"
+             "endmodule\n",
+             "12 12 8\n"},
+        Case{"module t;\n"
+             "  typedef struct packed { logic [3:0] a, b; } st;\n"
+             "  st x;\n"
+             "  logic [15:0] c;\n"
+             "  initial begin\n"
+             "    c = {st'{1, 2}, type(x)'{3, 4}};\n"
+             "    $display(\"%h %b\", c, type(x)'{3, 4} == 8'h34);\n"
+             "  end\n"
+             "endmodule\n",
+             "1234 1\n"},
+        Case{"module t;\n"
+             "  typedef struct packed { logic [3:0] a, b; } st;\n"
+             "  parameter type T = st;\n"
+             "  localparam type L = st;\n"
+             "  initial $display(\"%h %h\", T'{1, 2}, L'{3, 4});\n"
+             "endmodule\n",
+             "12 34\n"},
+        Case{"package p;\n"
+             "  parameter type PT = logic [1:0][3:0];\n"
+             "endpackage\n"
+             "module t;\n"
+             "  initial $display(\"%h\", p::PT'{4'h5, 4'h6});\n"
+             "endmodule\n",
+             "56\n"},
+        Case{"class C;\n"
+             "  logic [1:0][3:0] v;\n"
+             "  function void f(); $display(\"%h\", type(v)'{4'h3, 4'h4}); "
+             "endfunction\n"
+             "endclass\n"
+             "module t;\n"
+             "  C c;\n"
+             "  initial begin c = new; c.f(); end\n"
+             "endmodule\n",
+             "34\n"},
+        Case{"interface I #(parameter type T = logic [1:0][3:0]);\n"
+             "  localparam type L = logic [1:0][3:0];\n"
+             "  initial $display(\"%h %h\", T'{1, 2}, L'{3, 4});\n"
+             "endinterface\n"
+             "module t; I i(); endmodule\n",
+             "12 34\n"},
+        Case{"program P #(parameter type T = logic [1:0][3:0]);\n"
+             "  localparam type L = logic [1:0][3:0];\n"
+             "  initial $display(\"%h %h\", T'{1, 2}, L'{3, 4});\n"
+             "endprogram\n"
+             "module t; P p(); endmodule\n",
+             "12 34\n"}}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(src, f), expected) << src;
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
+}
+
 }  // namespace
