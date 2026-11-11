@@ -490,4 +490,60 @@ TEST(AssocIndexTypeValidation, TypeRefIndexOnVariablePortIsResolved) {
   EXPECT_FALSE(ReportedError(diags, kMessage, 2, "7.8.5"));
 }
 
+TEST(UserDefinedIndexAssocArrayElaboration,
+     RealtimeAndAggregatesHoldingARealAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef realtime rt_t;\n"
+      "  typedef struct {shortreal r;} ss_t; typedef struct {realtime r;} "
+      "st_t;\n"
+      "  typedef union {real r; int i;} uu_t; typedef union tagged {real r; "
+      "int i;} ut_t;\n"
+      "  typedef struct {real r [2];} sa_t; typedef struct {real r [];} sd_t; "
+      "typedef struct {real r [$];} sq_t;\n"
+      "  typedef real ra_t [2]; typedef real rd_t []; typedef real rq_t [$]; "
+      "typedef real rx_t [int];\n"
+      "  int a1 [realtime];\n"
+      "  int a2 [rt_t];\n"
+      "  int a3 [ss_t];\n"
+      "  int a4 [st_t];\n"
+      "  int a5 [uu_t];\n"
+      "  int a6 [ut_t];\n"
+      "  int a7 [sa_t];\n"
+      "  int a8 [sd_t];\n"
+      "  int a9 [sq_t];\n"
+      "  int b1 [ra_t];\n"
+      "  int b2 [rd_t];\n"
+      "  int b3 [rq_t];\n"
+      "  int b4 [rx_t];\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line = 7; line <= 19; ++line) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "real or shortreal type shall not be used as an "
+                              "associative array index type",
+                              line, "7.8.5"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 13u);
+}
+
+TEST(UserDefinedIndexAssocArrayElaboration,
+     ClassWithARealPropertyAndArraysOfIntAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; real r; endclass\n"
+      "module t;\n"
+      "  typedef int id_t []; typedef int iq_t [$]; typedef int if_t [2]; "
+      "typedef int ix_t [int];\n"
+      "  typedef union {int a; byte b;} un_t;\n"
+      "  int a [C]; int b [id_t]; int c [iq_t]; int d [if_t]; int e [ix_t]; "
+      "int g [un_t];\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

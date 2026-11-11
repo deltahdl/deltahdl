@@ -589,4 +589,28 @@ TEST(AssocArraySimulation, ElementsThatAreFixedSizeArraysKeepTheirValues) {
             "'{0:'{'{0, 0, 0}, '{0, 0, 9}}}\n");
 }
 
+TEST(AssociativeArraySim, ClauseDeclarationsHoldTheirEntries) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class myClass; endclass\n"
+                 "module t;\n"
+                 "  integer i_array [*]; bit [20:0] array_b [string];\n"
+                 "  event ev_array [myClass]; myClass c;\n"
+                 "  initial begin\n"
+                 "    i_array[40'h1_0000_0000] = 3; i_array[3] = 4;\n"
+                 "    array_b[\"a_string_literal_key_longer_than_32_chars\"] = "
+                 "21'h1abcd;\n"
+                 "    c = new;\n"
+                 "    fork begin @(ev_array[c]); $display(\"woke\"); end "
+                 "join_none\n"
+                 "    #1 -> ev_array[c]; #1;\n"
+                 "    $display(\"%0d %0d %h\", i_array.num(), "
+                 "i_array[40'h1_0000_0000], "
+                 "array_b[\"a_string_literal_key_longer_than_32_chars\"]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "woke\n2 3 01abcd\n");
+}
+
 }  // namespace
