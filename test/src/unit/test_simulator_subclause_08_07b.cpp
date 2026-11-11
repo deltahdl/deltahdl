@@ -438,4 +438,30 @@ TEST(ClassConstructorSim, PropertyReadThroughANullStructureMemberLetsRunGoOn) {
             7u);
 }
 
+TEST(ClassConstructorSim, NewTakesRefInoutAndDefaultArgumentsLikeAnyCall) {
+  EXPECT_EQ(
+      RunAndGet("class C;\n"
+                "  int v, w; time t;\n"
+                "  function new(ref int r, inout int io, input time tm = 7,\n"
+                "               input int dflt = 9);\n"
+                "    v = r; r = r + 1; io = io * 2; t = tm; w = dflt;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  int a = 4, b = 5;\n"
+                "  longint r1, r2;\n"
+                "  C c;\n"
+                "  initial begin\n"
+                "    #3 c = new(a, b, $time);\n"
+                "    r1 = c.v * 10000 + a * 1000 + b * 10 + c.t;\n"
+                "    r1 = r1 * 10 + c.w;\n"
+                "    c = new(a, b);\n"
+                "    r2 = c.v * 10000 + a * 1000 + b * 10 + c.t;\n"
+                "    r2 = r2 * 1000000 + r1;\n"
+                "  end\n"
+                "endmodule\n",
+                "r2"),
+      56207451039ull);
+}
+
 }  // namespace

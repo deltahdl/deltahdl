@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -166,6 +169,129 @@ TEST(ClassConstructorElaboration, ConstructorWithEventControlError) {
       f.diag.Diagnostics(),
       "time-controlling statement is not allowed inside a function", 5,
       "13.4"));
+}
+
+TEST(ClassConstructorElaboration, ConstructorStatementThatCanBlockIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x; event a, b, e;\n"
+      "  function new();\n"
+      "    wait (x == 1);\n"
+      "    fork x = 1; join\n"
+      "    fork x = 2; join_any\n"
+      "    wait_order (a, b);\n"
+      "    fork #1 x = 3; join_none\n"
+      "    -> e;\n"
+      "    x = f();\n"
+      "    return;\n"
+      "  endfunction\n"
+      "  function int f(); return 2; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  class M;\n"
+      "    int x, y;\n"
+      "    function new(); @(y) x = 1; endfunction\n"
+      "  endclass\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  for (const uint32_t kLine : {4u, 7u, 18u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "time-controlling statement is not allowed inside a function", kLine,
+        "13.4"))
+        << kLine;
+  }
+  for (const uint32_t kLine : {5u, 6u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "only fork/join_none is permitted inside a "
+                              "function",
+                              kLine, "13.4"))
+        << kLine;
+  }
+  for (const uint32_t kLine : {8u, 9u, 10u, 11u}) {
+    EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), kLine)) << kLine;
+  }
+}
+
+TEST(ClassConstructorElaboration,
+     DISABLED_ConstructorOfAPackageClassThatCanBlockIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "package k;\n"
+      "  class P;\n"
+      "    int x, y;\n"
+      "    function new();\n"
+      "      #1 x = 1;\n"
+      "      @(y) x = 2;\n"
+      "      fork #1 x = 3; join_none\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  for (const uint32_t kLine : {5u, 6u}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "time-controlling statement is not allowed inside a function", kLine,
+        "13.4"))
+        << kLine;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 7));
+}
+
+TEST(ClassConstructorElaboration, DISABLED_ConstructorEnablingATaskIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  task t(); endtask\n"
+      "  function new();\n"
+      "    t();\n"
+      "    this.t();\n"
+      "    fork t(); join_none\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  class M;\n"
+      "    task kt(); endtask\n"
+      "    function new(); kt(); endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  for (const uint32_t kLine : {4u, 5u, 12u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "function cannot enable a task", kLine, "13.4"))
+        << kLine;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 6));
+}
+
+TEST(ClassConstructorElaboration,
+     DISABLED_ConstructorReturningAValueIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x;\n"
+      "  function new(int a);\n"
+      "    if (a) return;\n"
+      "    return 5;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "package k;\n"
+      "  class P; function new(); return 1; endfunction endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class M; function new(); return 2; endfunction endclass\n"
+      "endmodule\n",
+      f);
+  for (const uint32_t kLine : {5u, 9u, 12u}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), "returns a value", kLine, "8.7"))
+        << kLine;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 4));
 }
 
 }  // namespace

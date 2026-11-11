@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -259,6 +262,47 @@ TEST(ClassConstructorParsing, ConstructorWithoutAReturnTypeIsAccepted) {
       "function C C::make(); return null; endfunction\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ClassConstructorParsing, StaticOrVirtualPrototypeOfNewIsReported) {
+  auto r = Parse(
+      "class C;\n"
+      "  extern static function new();\n"
+      "endclass\n"
+      "class D;\n"
+      "  extern virtual function new();\n"
+      "endclass\n"
+      "virtual class E;\n"
+      "  pure virtual function new();\n"
+      "endclass\n"
+      "class G;\n"
+      "  extern protected function new();\n"
+      "endclass\n"
+      "function G::new(); endfunction\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "'new' is declared static here, which a constructor never is", 2,
+      "8.7"));
+  for (const uint32_t kLine : {5u, 8u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "'new' is declared virtual here, which a constructor never is",
+        kLine, "8.7"))
+        << kLine;
+  }
+  for (const uint32_t kLine : {11u, 13u}) {
+    EXPECT_FALSE(ErrorOnLine(r.diags, kLine)) << kLine;
+  }
+}
+
+TEST(ClassConstructorParsing, ConstructorDeclaredAsATaskIsReported) {
+  auto r = Parse(
+      "class F;\n"
+      "  task new(); endtask\n"
+      "endclass\n"
+      "class H;\n"
+      "  function new(); endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ErrorOnLine(r.diags, 2));
+  EXPECT_FALSE(ErrorOnLine(r.diags, 5));
 }
 
 }  // namespace
