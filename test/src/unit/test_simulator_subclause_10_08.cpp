@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -333,6 +336,112 @@ TEST(AssignmentLikeContextSim, PatternOverridesStructureParameter) {
   auto* kept = f.ctx.FindVariable("d.q");
   ASSERT_NE(kept, nullptr);
   EXPECT_EQ(kept->value.ToUint64(), 0x1122u);
+}
+
+TEST(AssignmentLikeContextSim, ClassScopeOverrideTruncatesAndTypesAPattern) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C #(parameter logic [7:0] P = 0); endclass\n"
+                       "class C2 #(parameter int P[2] = '{0, 0}); endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%h %0d\", C#(9'h1FF)::P,\n"
+                       "                   C2#('{1, 2})::P[1]);\n"
+                       "endmodule\n",
+                       f),
+            "ff 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentLikeContextSim,
+     ClassParameterValueAndOverrideTakeTheDeclaredType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class K #(parameter logic signed [7:0] P = 4'sb1000,\n"
+                       "          parameter logic [3:0] R = 8'hAB);\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial $display(\"%h %h %h %h\", K#()::P, K#()::R,\n"
+                       "                   K#(12'hABC)::P, K#(.R(2'b11))::R);\n"
+                       "endmodule\n",
+                       f),
+            "f8 b bc 3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentLikeContextSim, InterfaceParameterValueAndOverrideTakeTheType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I #(parameter logic [3:0] P = 8'hAB,\n"
+                       "             parameter int Q[2] = '{3, 4});\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  I u1(); I #(.P(9'h1F7), .Q('{5, 6})) u2();\n"
+                       "  initial $display(\"%h %0d %h %0d\", u1.P, u1.Q[1], "
+                       "u2.P, u2.Q[1]);\n"
+                       "endmodule\n",
+                       f),
+            "b 4 7 6\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentLikeContextSim, ProgramParameterValueAndOverrideTakeTheType) {
+  for (const auto& [instance, expected] :
+       {std::pair{"  pr q();\n", "d 8\n"},
+        std::pair{"  pr #(.P(12'h0E9), .Q('{1, 9})) q();\n", "9 9\n"}}) {
+    const std::string kSrc =
+        std::string(
+            "program pr #(parameter logic [3:0] P = 8'hCD,\n"
+            "             parameter int Q[2] = '{7, 8});\n"
+            "  initial $display(\"%h %0d\", P, Q[1]);\n"
+            "endprogram\n"
+            "module t;\n") +
+        instance + "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), expected) << kSrc;
+    EXPECT_FALSE(f.diag.HasErrors()) << kSrc;
+  }
+}
+
+TEST(AssignmentLikeContextSim,
+     InterfaceAndProgramPortConnectionsTruncateAndExtend) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface J(input logic [3:0] a, output logic [7:0] b);\n"
+                 "  assign b = {4'hF, a};\n"
+                 "endinterface\n"
+                 "program pp(input logic [3:0] a, output logic [7:0] y);\n"
+                 "  assign y = {a, a};\n"
+                 "  initial #2 $display(\"%h\", a);\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  logic [3:0] w4; logic [15:0] w16;\n"
+                 "  J j(.a(8'hAB), .b(w4));\n"
+                 "  pp p(.a(8'hCD), .y(w16));\n"
+                 "  initial #1 $display(\"%h %h %h\", j.a, w4, w16);\n"
+                 "endmodule\n",
+                 f),
+      "b b 00dd\nd\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentLikeContextSim,
+     DISABLED_PatternConnectedToAnUnpackedArrayInputPort) {
+  constexpr const char* kReadThroughTheInstance =
+      "  initial #1 $display(\"%0d\", u.arr[1]);\n";
+  for (const auto& [declaration, reader] :
+       {std::pair{"module s(input var int arr[2]); endmodule\n",
+                  kReadThroughTheInstance},
+        std::pair{"interface s(input var int arr[2]); endinterface\n",
+                  kReadThroughTheInstance},
+        std::pair{"program s(input var int arr[2]);\n"
+                  "  initial #1 $display(\"%0d\", arr[1]);\n"
+                  "endprogram\n",
+                  ""}}) {
+    const std::string kSrc = std::string(declaration) +
+                             "module t;\n"
+                             "  s u(.arr('{1, 2}));\n" +
+                             reader + "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), "2\n") << kSrc;
+    EXPECT_FALSE(f.diag.HasErrors()) << kSrc;
+  }
 }
 
 }  // namespace

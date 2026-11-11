@@ -462,4 +462,19 @@ TEST(AssignmentPatternParsing, PatternInPortConcatenationRejected) {
       1, "10.9"));
 }
 
+TEST(AssignmentPatternParsing,
+     PatternInAnInterfaceOrProgramPortExpressionRejected) {
+  auto r = Parse(
+      "interface i(.p('{a, b}));\n"
+      "  input logic a, b;\n"
+      "endinterface\n"
+      "program q(.p('{a, b}));\n"
+      "  input logic a, b;\n"
+      "endprogram\n");
+  constexpr std::string_view kMessage =
+      "an assignment pattern cannot be written in a port expression";
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 1, "10.9"));
+  EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "10.9"));
+}
+
 }  // namespace

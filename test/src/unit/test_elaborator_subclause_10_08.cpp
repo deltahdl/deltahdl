@@ -287,4 +287,58 @@ TEST(AssignmentLikeContext, PatternClassParameterValues) {
                             7, "23.10.2"));
 }
 
+TEST(AssignmentLikeContext, PatternOnAnInterfaceOrProgramInoutPortIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface J(inout wire [1:0] w); endinterface\n"
+      "program pp(inout wire [1:0] w); endprogram\n"
+      "module t;\n"
+      "  J j(.w('{1'b1, 1'b0}));\n"
+      "  pp p(.w('{1'b1, 1'b0}));\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "an assignment pattern cannot be connected to this port";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "10.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "10.8"));
+}
+
+TEST(AssignmentLikeContext, NetOnAnInterfaceOrProgramInoutPortIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface J(inout wire [1:0] w); endinterface\n"
+      "program pp(inout wire [1:0] w); endprogram\n"
+      "module t;\n"
+      "  wire [1:0] n1, n2;\n"
+      "  J j(.w(n1));\n"
+      "  pp p(.w(n2));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AssignmentLikeContext,
+     DISABLED_PatternValueOfAnUntypedParameterIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  parameter P = '{1, 2};\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an assignment pattern cannot be the value of a "
+                            "parameter with no explicit type",
+                            2, "10.8"));
+}
+
+TEST(AssignmentLikeContext, PatternValueOfATypedParameterIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  parameter int P[2] = '{1, 2};\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
