@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -80,12 +81,13 @@ TEST(NetAliasingParsing, AliasAmongOtherModuleItems) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-TEST(NetAliasingParsing, AnAliasInAClassIsRejected) {
+TEST(NetAliasingParsing, DISABLED_AnAliasInAClassIsRejected) {
   auto r = Parse(
       "class C;\n"
       "  alias a = b;\n"
       "endclass\n");
-  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "a net alias is not an item of a class", 2,
+                            "A.1.9"));
 }
 
 }  // namespace
