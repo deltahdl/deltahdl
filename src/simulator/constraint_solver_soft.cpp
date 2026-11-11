@@ -125,7 +125,7 @@ bool ConstraintSolver::SolveBySoftPriority(
   for (auto it = soft.rbegin(); it != soft.rend(); ++it) {
     if (disabled_soft_.count(*it)) continue;
     dropped_soft_.erase(*it);
-    if (!SolveIterative(extra, true)) {
+    if (HonoredBoundsConflict(extra) || !SolveIterative(extra, true)) {
       if (guard_error_) return false;
       dropped_soft_.insert(*it);
     }

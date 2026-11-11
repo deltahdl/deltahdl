@@ -281,6 +281,7 @@ class ConstraintSolver {
                            bool include_soft);
 
   bool SolveBySoftPriority(const std::vector<ConstraintExpr>& extra);
+  bool HonoredBoundsConflict(const std::vector<ConstraintExpr>& extra) const;
 
   void ComputeDisabledSoft(const std::vector<ConstraintExpr>& extra);
 

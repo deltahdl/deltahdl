@@ -104,4 +104,77 @@ TEST(SoftConstraintPrioritiesRun, TheContainerAndTheLaterHandleOutrank) {
   EXPECT_EQ(out, "1 2 2\n");
 }
 
+TEST(SoftConstraintPrioritiesRun, MixedSignRelationKeptBesideALaterEquality) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class M;\n"
+      "  rand int x;\n"
+      "  rand bit [7:0] y;\n"
+      "  constraint c { x inside {[-1:4]}; soft x > y; soft y == 200; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok = 0, neg = 0, two = 0;\n"
+      "  initial begin\n"
+      "    static M m = new;\n"
+      "    repeat (8) begin\n"
+      "      if (m.randomize()) ok++;\n"
+      "      if (m.x == -1) neg++;\n"
+      "      if (m.y == 200) two++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d %0d\", ok, neg, two);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 8 8\n");
+}
+
+TEST(SoftConstraintPrioritiesRun,
+     RelationsWithoutAPlainVariableSideResolveByPriority) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class R;\n"
+      "  rand int x, y;\n"
+      "  constraint c { x inside {[0:9]}; y inside {[0:9]}; soft x < y + 1; "
+      "soft x + y == 3; soft x == 2; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok = 0, hit = 0;\n"
+      "  initial begin\n"
+      "    static R r = new;\n"
+      "    repeat (8) begin\n"
+      "      if (r.randomize()) ok++;\n"
+      "      if (r.x == 2 && r.y == 1) hit++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", ok, hit);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 8\n");
+}
+
+TEST(SoftConstraintPrioritiesRun,
+     RelationToAVariableWithRandModeOffKeepsItsSoftConstraints) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Q;\n"
+      "  rand int x, y;\n"
+      "  constraint c { x inside {[0:9]}; soft x < y; soft x > 3; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  int ok = 0, hit = 0;\n"
+      "  initial begin\n"
+      "    static Q q = new;\n"
+      "    q.y.rand_mode(0);\n"
+      "    q.y = 5;\n"
+      "    repeat (8) begin\n"
+      "      if (q.randomize()) ok++;\n"
+      "      if (q.x == 4 && q.y == 5) hit++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", ok, hit);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8 8\n");
+}
+
 }  // namespace

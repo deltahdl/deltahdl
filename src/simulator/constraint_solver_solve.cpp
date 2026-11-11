@@ -210,7 +210,9 @@ bool ConstraintSolver::SolveWith(
   ComputeDisabledSoft(inline_constraints);
 
   dropped_soft_.clear();
-  bool solved = SolveIterative(inline_constraints, true);
+  guard_error_ = false;
+  bool solved = !HonoredBoundsConflict(inline_constraints) &&
+                SolveIterative(inline_constraints, true);
 
   if (!solved && !guard_error_) {
     solved = SolveBySoftPriority(inline_constraints);

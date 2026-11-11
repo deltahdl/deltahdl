@@ -209,7 +209,107 @@ bool DrawInInterval(const PropagationSet& set, const std::string& name,
   return true;
 }
 
+void KeepSameSignednessBounds(
+    const std::unordered_map<std::string, RandVariable>& dom,
+    std::vector<BinaryBound>& binary) {
+  auto mixed = [&dom](const BinaryBound& b) {
+    auto first = dom.find(b.var);
+    auto second = dom.find(b.other);
+    return first == dom.end() || second == dom.end() ||
+           first->second.is_signed != second->second.is_signed;
+  };
+  binary.erase(std::remove_if(binary.begin(), binary.end(), mixed),
+               binary.end());
+}
+
+void CollectExactBounds(
+    const ConstraintExpr& c,
+    const std::function<bool(const ConstraintExpr&)>& honored,
+    PropagationSet& out) {
+  if (c.kind == ConstraintKind::kSoft) {
+    if (honored(c)) CollectExactBounds(*c.inner, honored, out);
+    return;
+  }
+  if (c.kind == ConstraintKind::kCustom) {
+    if (c.derive_fn && !c.co_var_name.empty()) {
+      out.binary.push_back({c.var_name, c.derive_cmp, c.co_var_name});
+      out.binary.push_back(
+          {c.co_var_name, MirrorComparisonKind(c.derive_cmp), c.var_name});
+    }
+    return;
+  }
+  if (c.kind == ConstraintKind::kEqual ||
+      c.kind == ConstraintKind::kSetMembership || IsComparison(c.kind)) {
+    out.unary.push_back(&c);
+  }
+}
+
+bool NarrowToMembers(const PropagationSet& set, const std::string& name,
+                     RandVariable& interval) {
+  std::vector<int64_t> members;
+  bool constrained = false;
+  for (const auto* c : set.unary) {
+    if (c->kind != ConstraintKind::kSetMembership || c->var_name != name)
+      continue;
+    if (!constrained) {
+      members = c->set_values;
+      constrained = true;
+      continue;
+    }
+    auto absent = [c](int64_t v) {
+      return std::find(c->set_values.begin(), c->set_values.end(), v) ==
+             c->set_values.end();
+    };
+    members.erase(std::remove_if(members.begin(), members.end(), absent),
+                  members.end());
+  }
+  if (!constrained) return true;
+  bool admitted = false;
+  int64_t lo = 0;
+  int64_t hi = 0;
+  for (int64_t v : members) {
+    if (interval.DomainLess(v, interval.min_val) ||
+        interval.DomainLess(interval.max_val, v)) {
+      continue;
+    }
+    lo = admitted ? interval.DomainMin(lo, v) : v;
+    hi = admitted ? interval.DomainMax(hi, v) : v;
+    admitted = true;
+  }
+  interval.min_val = lo;
+  interval.max_val = hi;
+  return admitted;
+}
+
+bool AnyDomainEmpty(const PropagationSet& set,
+                    std::unordered_map<std::string, RandVariable>& dom) {
+  for (auto& [name, interval] : dom) {
+    if (interval.DomainLess(interval.max_val, interval.min_val) ||
+        !NarrowToMembers(set, name, interval)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 }  // namespace
+
+bool ConstraintSolver::HonoredBoundsConflict(
+    const std::vector<ConstraintExpr>& extra) const {
+  auto honored = [this](const ConstraintExpr& c) { return SoftHonored(c); };
+  PropagationSet set;
+  for (const auto& block : blocks_) {
+    if (!block.enabled) continue;
+    for (const auto& c : block.constraints) CollectExactBounds(c, honored, set);
+  }
+  for (const auto& c : extra) CollectExactBounds(c, honored, set);
+  std::unordered_map<std::string, RandVariable> dom =
+      Intervals(set, variables_, {});
+  KeepSameSignednessBounds(dom, set.binary);
+  if (AnyDomainEmpty(set, dom)) return true;
+  PropagateIntervals(set, dom);
+  return AnyDomainEmpty(set, dom);
+}
 
 ConstraintKind MirrorComparisonKind(ConstraintKind kind) {
   switch (kind) {
