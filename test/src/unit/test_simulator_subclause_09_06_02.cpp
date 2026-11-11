@@ -849,4 +849,29 @@ TEST(DisableStatementExecution, DisablingAClassTasksFinishedBlockEndsNothing) {
             "after at 1\n");
 }
 
+TEST(DisableStatementExecution,
+     DisablingARunningAlwaysRestartsItAsAMonostable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic q = 0;\n"
+                       "  event retrig;\n"
+                       "  always begin : monostable\n"
+                       "    #250 q = 0;\n"
+                       "  end\n"
+                       "  always @retrig begin\n"
+                       "    disable monostable;\n"
+                       "    q = 1;\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #10 -> retrig;\n"
+                       "    #200 -> retrig;\n"
+                       "    #200 $display(\"%0d\", q);\n"
+                       "    #100 $display(\"%0d\", q);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n0\n$finish at time 510\n");
+}
+
 }  // namespace
