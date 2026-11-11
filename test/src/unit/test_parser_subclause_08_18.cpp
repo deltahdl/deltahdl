@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_class.h"
@@ -309,6 +311,86 @@ TEST(DataHidingParsing, PureVirtualLocalMethodPrototype) {
   auto* m = r.cu->classes[0]->members[0];
   EXPECT_TRUE(m->is_virtual);
   EXPECT_TRUE(m->is_local);
+}
+
+TEST(DataHidingParsing,
+     DISABLED_RepeatedOrConflictingModifierIsReportedUnderTheHidingRule) {
+  auto r = Parse(
+      "package pk;\n"
+      "  class P; local local int a; endclass\n"
+      "endpackage\n"
+      "class C;\n"
+      "  protected local int b;\n"
+      "  local protected function void f(); endfunction\n"
+      "  virtual virtual task t(); endtask\n"
+      "  const const int c = 1;\n"
+      "  extern local local function void g();\n"
+      "  protected protected function new(); endfunction\n"
+      "  pure virtual local local function void h();\n"
+      "  local const local int d = 2;\n"
+      "  protected virtual protected function void k(); endfunction\n"
+      "endclass\n"
+      "program pg;\n"
+      "  class G; virtual local virtual function void f(); endfunction "
+      "endclass\n"
+      "endprogram\n"
+      "interface ifc;\n"
+      "  class I; const protected const int e = 3; endclass\n"
+      "endinterface\n"
+      "module m;\n"
+      "  class M; local protected task t(); endtask endclass\n"
+      "endmodule\n");
+  const char* const kBoth = "cannot combine 'local' and 'protected' qualifiers";
+  for (const int kLine : {5, 6, 22}) {
+    EXPECT_TRUE(ReportedError(r.diags, kBoth, kLine, "8.18")) << kLine;
+  }
+  for (const int kLine : {2, 9, 11, 12}) {
+    EXPECT_TRUE(
+        ReportedError(r.diags, "duplicate 'local' qualifier", kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {10, 13}) {
+    EXPECT_TRUE(ReportedError(r.diags, "duplicate 'protected' qualifier", kLine,
+                              "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {7, 16}) {
+    EXPECT_TRUE(
+        ReportedError(r.diags, "duplicate 'virtual' qualifier", kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {8, 19}) {
+    EXPECT_TRUE(
+        ReportedError(r.diags, "duplicate 'const' qualifier", kLine, "8.18"))
+        << kLine;
+  }
+}
+
+TEST(DataHidingParsing, ModifiersInAnyOrderOnceEachAreAccepted) {
+  EXPECT_TRUE(
+      ParseOk("package pk;\n"
+              "  class P; const local int a = 1; local const int b = 2; "
+              "endclass\n"
+              "endpackage\n"
+              "virtual class C;\n"
+              "  virtual protected function void a(); endfunction\n"
+              "  protected virtual function void b(); endfunction\n"
+              "  local static int e;\n"
+              "  static local int f;\n"
+              "  extern protected virtual function void g();\n"
+              "  virtual local task t(); endtask\n"
+              "  pure virtual protected function void h();\n"
+              "endclass\n"
+              "program pg;\n"
+              "  class G; local virtual function void f(); endfunction "
+              "endclass\n"
+              "endprogram\n"
+              "interface ifc;\n"
+              "  class I; protected const int e = 3; endclass\n"
+              "endinterface\n"
+              "module m;\n"
+              "  class M; protected function new(); endfunction endclass\n"
+              "endmodule\n"));
 }
 
 }  // namespace

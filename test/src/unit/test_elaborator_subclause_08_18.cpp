@@ -740,4 +740,131 @@ TEST(DataHidingElaboration, ALocalOrProtectedConstructorIsReachedFromInside) {
   EXPECT_FALSE(ReportedError(diags, "cannot access", 3, "8.18"));
 }
 
+TEST(DataHidingElaboration,
+     DISABLED_AccessFromAPackageOrAGenerateBlockIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  local int s;\n"
+      "  protected int g;\n"
+      "  int pub;\n"
+      "endclass\n"
+      "package pk;\n"
+      "  class K; local int s; protected int g; int pub; endclass\n"
+      "  class J;\n"
+      "    K k;\n"
+      "    function int f(); return k.s; endfunction\n"
+      "    function int g2(); return k.g; endfunction\n"
+      "    function int h(); return k.pub; endfunction\n"
+      "  endclass\n"
+      "  function automatic int pf(K h); return h.s; endfunction\n"
+      "  function automatic int pg(K h); return h.pub; endfunction\n"
+      "  K kk = new;\n"
+      "  int y = kk.s;\n"
+      "  int z = kk.pub;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  C h; int x;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : gl\n"
+      "    initial x = h.s;\n"
+      "    initial x = h.pub;\n"
+      "  end\n"
+      "  if (1) begin : gb\n"
+      "    always_comb x = h.g;\n"
+      "  end\n"
+      "  case (1) 1: begin : gc initial x = h.s; end endcase\n"
+      "  initial x = pk::pf(pk::kk) + pk::pg(pk::kk) + pk::y + pk::z;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {10, 14, 17, 23, 29}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "cannot access local member from outside its "
+                              "class",
+                              kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {11, 27}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "cannot access protected member from outside its "
+                              "class hierarchy",
+                              kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {12, 15, 18, 24, 30}) {
+    EXPECT_FALSE(ReportedError(diags, "cannot access", kLine, "8.18")) << kLine;
+  }
+}
+
+TEST(DataHidingElaboration, AccessFromEveryOtherPlaceIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  local int s;\n"
+      "  protected int g;\n"
+      "  int pub;\n"
+      "  local function int lf(); return 1; endfunction\n"
+      "  local task lt(); endtask\n"
+      "  protected task pt(); endtask\n"
+      "  function int uses(); return lf() + s; endfunction\n"
+      "endclass\n"
+      "class D extends C;\n"
+      "  function int a(); return lf(); endfunction\n"
+      "  task b(); lt(); endtask\n"
+      "  task c(); pt(); endtask\n"
+      "  task e(); super.lt(); endtask\n"
+      "  function int k(); return uses() + pub + g; endfunction\n"
+      "endclass\n"
+      "function automatic int uf(C h); return h.s; endfunction\n"
+      "function automatic int ug(C h); return h.pub; endfunction\n"
+      "program pr;\n"
+      "  C h; int x;\n"
+      "  initial x = h.s;\n"
+      "  initial x = h.pub;\n"
+      "endprogram\n"
+      "interface ifc;\n"
+      "  C h; int x;\n"
+      "  function automatic int f(); return h.g; endfunction\n"
+      "  initial x = h.pub;\n"
+      "endinterface\n"
+      "checker ck(logic clk);\n"
+      "  C h = new;\n"
+      "  int x, y;\n"
+      "  always_ff @(posedge clk) x <= h.s;\n"
+      "  function automatic int cf(); return h.g; endfunction\n"
+      "  always_ff @(posedge clk) y <= h.pub;\n"
+      "endchecker\n"
+      "module m;\n"
+      "  C h; D dd; int x; logic clk;\n"
+      "  task automatic t(); x = h.s; endtask\n"
+      "  final x = h.g;\n"
+      "  initial begin\n"
+      "    h.pt();\n"
+      "    x = dd.g;\n"
+      "    x = dd.pub;\n"
+      "    dd.lt();\n"
+      "  end\n"
+      "  pr p(); ifc i(); ck c1(clk);\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {11, 12, 14, 17, 21, 32, 38, 44}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "cannot access local member from outside its "
+                              "class",
+                              kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {26, 33, 39, 41, 42}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "cannot access protected member from outside its "
+                              "class hierarchy",
+                              kLine, "8.18"))
+        << kLine;
+  }
+  for (const int kLine : {8, 13, 15, 18, 22, 27, 34, 43}) {
+    EXPECT_FALSE(ReportedError(diags, "cannot access", kLine, "8.18")) << kLine;
+  }
+}
+
 }  // namespace

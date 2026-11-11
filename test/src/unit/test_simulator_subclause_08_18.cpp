@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -195,6 +196,35 @@ TEST(DataHidingSimulation, UnqualifiedVirtualCallDispatchesOnObjectType) {
                       "endmodule\n",
                       "result"),
             7u);
+}
+
+TEST(DataHidingSimulation, ClassParametersAreReadFromOutside) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(int N = 4);\n"
+      "  localparam int M = N * 3;\n"
+      "endclass\n"
+      "class D;\n"
+      "  parameter int P = 5;\n"
+      "  localparam int Q = 6;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C #(7) c = new;\n"
+      "  D d = new;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  initial begin\n"
+      "    r1 = c.N; r2 = c.M; r3 = C#(9)::N; r4 = C#(9)::M;\n"
+      "    r5 = d.P + D::Q; r6 = d.Q;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 7u},
+                    {"r2", 21u},
+                    {"r3", 9u},
+                    {"r4", 27u},
+                    {"r5", 11u},
+                    {"r6", 6u}});
 }
 
 }  // namespace
