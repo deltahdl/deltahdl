@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
 
 #include "elaborator/type_eval.h"
 #include "fixture_elaborator.h"
@@ -456,6 +458,222 @@ TEST(TaggedUnionValidation, UnknownTagInARandsequenceCodeBlock_Rejected) {
       "        main : { u = tagged Bogus 1; };\n"
       "      endsequence\n"
       "    end");
+}
+
+constexpr std::string_view kNotPacked =
+    "type of member 'a' is not allowed in a packed union";
+constexpr std::string_view kUnpackedArray =
+    "unpacked array member 'a' is not allowed in a packed union";
+constexpr std::string_view kDynamicMember =
+    "dynamic array, associative array or queue member 'd' can only be used in "
+    "tagged unions";
+
+TEST(TaggedUnionValidation,
+     NonPackedMemberOfAPackedTaggedUnionReportedWhereverDeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef union tagged packed { real a; bit [7:0] b; } cu0_t;\n"
+      "typedef union tagged packed { chandle a; bit [7:0] b; } cu1_t;\n"
+      "typedef union tagged packed { bit [7:0] a; bit [15:0] b; void c; } "
+      "cu2_t;\n"
+      "package pk;\n"
+      "  typedef union tagged packed { real a; bit [7:0] b; } pk0_t;\n"
+      "  typedef union tagged packed { chandle a; bit [7:0] b; } pk1_t;\n"
+      "  typedef union tagged packed { bit [7:0] a; bit [15:0] b; void c; } "
+      "pk2_t;\n"
+      "endpackage\n"
+      "interface ifc;\n"
+      "  union tagged packed { real a; bit [7:0] b; } i0;\n"
+      "  union tagged packed { chandle a; bit [7:0] b; } i1;\n"
+      "  union tagged packed { bit [7:0] a; bit [15:0] b; void c; } i2;\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  union tagged packed { real a; bit [7:0] b; } p0;\n"
+      "  union tagged packed { chandle a; bit [7:0] b; } p1;\n"
+      "  union tagged packed { bit [7:0] a; bit [15:0] b; void c; } p2;\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  union tagged packed { real a; bit [7:0] b; } c0;\n"
+      "  union tagged packed { chandle a; bit [7:0] b; } c1;\n"
+      "  union tagged packed { bit [7:0] a; bit [15:0] b; void c; } c2;\n"
+      "endchecker\n"
+      "class K;\n"
+      "  union tagged packed { real a; bit [7:0] b; } k0;\n"
+      "  union tagged packed { chandle a; bit [7:0] b; } k1;\n"
+      "  union tagged packed { bit [7:0] a; bit [15:0] b; void c; } k2;\n"
+      "endclass\n"
+      "module top;\n"
+      "  ifc ii(); pr p(); ck c();\n"
+      "  if (1) begin : g\n"
+      "    union tagged packed { real a; bit [7:0] b; } g0;\n"
+      "    union tagged packed { chandle a; bit [7:0] b; } g1;\n"
+      "    union tagged packed { bit [7:0] a; bit [15:0] b; void c; } g2;\n"
+      "  end\n"
+      "  function automatic void f;\n"
+      "    union tagged packed { real a; bit [7:0] b; } f0;\n"
+      "    union tagged packed { chandle a; bit [7:0] b; } f1;\n"
+      "    union tagged packed { bit [7:0] a; bit [15:0] b; void c; } f2;\n"
+      "  endfunction\n"
+      "  task automatic t;\n"
+      "    union tagged packed { real a; bit [7:0] b; } t0;\n"
+      "    union tagged packed { chandle a; bit [7:0] b; } t1;\n"
+      "    union tagged packed { bit [7:0] a; bit [15:0] b; void c; } t2;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    union tagged packed { real a; bit [7:0] b; } b0;\n"
+      "    union tagged packed { chandle a; bit [7:0] b; } b1;\n"
+      "    union tagged packed { bit [7:0] a; bit [15:0] b; void c; } b2;\n"
+      "  end\n"
+      "  cu0_t x0; cu1_t x1; cu2_t x2;\n"
+      "  pk::pk0_t y0; pk::pk1_t y1; pk::pk2_t y2;\n"
+      "  union tagged packed { real a; bit [7:0] b; } m0;\n"
+      "  union tagged packed { chandle a; bit [7:0] b; } m1;\n"
+      "  union tagged packed { bit [7:0] a; bit [15:0] b; void c; } m2;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {1,  2,  5,  6,  10, 11, 15, 16, 20, 21, 25,
+                        26, 32, 33, 37, 38, 42, 43, 47, 48, 53, 54}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNotPacked, line, "7.2.1"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 22u);
+}
+
+TEST(TaggedUnionValidation,
+     DISABLED_TypedefOfADynamicMemberReportedWhereverDeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef int da_t [];\n"
+      "typedef int q_t [$];\n"
+      "typedef int aa_t [string];\n"
+      "typedef union { da_t d; int i; } cu0_t;\n"
+      "typedef union { q_t d; int i; } cu1_t;\n"
+      "typedef union { aa_t d; int i; } cu2_t;\n"
+      "typedef union tagged { da_t d; q_t q; aa_t m; int i; } cu3_t;\n"
+      "package pk;\n"
+      "  typedef union { da_t d; int i; } pk0_t;\n"
+      "  typedef union { q_t d; int i; } pk1_t;\n"
+      "  typedef union { aa_t d; int i; } pk2_t;\n"
+      "  typedef union tagged { da_t d; q_t q; aa_t m; int i; } pk3_t;\n"
+      "endpackage\n"
+      "interface ifc;\n"
+      "  union { da_t d; int i; } i0;\n"
+      "  union { q_t d; int i; } i1;\n"
+      "  union { aa_t d; int i; } i2;\n"
+      "  union tagged { da_t d; q_t q; aa_t m; int i; } i3;\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  union { da_t d; int i; } p0;\n"
+      "  union { q_t d; int i; } p1;\n"
+      "  union { aa_t d; int i; } p2;\n"
+      "  union tagged { da_t d; q_t q; aa_t m; int i; } p3;\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  union { da_t d; int i; } c0;\n"
+      "  union { q_t d; int i; } c1;\n"
+      "  union { aa_t d; int i; } c2;\n"
+      "  union tagged { da_t d; q_t q; aa_t m; int i; } c3;\n"
+      "endchecker\n"
+      "class K;\n"
+      "  union { da_t d; int i; } k0;\n"
+      "  union { q_t d; int i; } k1;\n"
+      "  union { aa_t d; int i; } k2;\n"
+      "  union tagged { da_t d; q_t q; aa_t m; int i; } k3;\n"
+      "endclass\n"
+      "module top;\n"
+      "  ifc ii(); pr p(); ck c();\n"
+      "  if (1) begin : g\n"
+      "    union { da_t d; int i; } g0;\n"
+      "    union { q_t d; int i; } g1;\n"
+      "    union { aa_t d; int i; } g2;\n"
+      "    union tagged { da_t d; q_t q; aa_t m; int i; } g3;\n"
+      "  end\n"
+      "  function automatic void f;\n"
+      "    union { da_t d; int i; } f0;\n"
+      "    union { q_t d; int i; } f1;\n"
+      "    union { aa_t d; int i; } f2;\n"
+      "    union tagged { da_t d; q_t q; aa_t m; int i; } f3;\n"
+      "  endfunction\n"
+      "  task automatic t;\n"
+      "    union { da_t d; int i; } t0;\n"
+      "    union { q_t d; int i; } t1;\n"
+      "    union { aa_t d; int i; } t2;\n"
+      "    union tagged { da_t d; q_t q; aa_t m; int i; } t3;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    union { da_t d; int i; } b0;\n"
+      "    union { q_t d; int i; } b1;\n"
+      "    union { aa_t d; int i; } b2;\n"
+      "    union tagged { da_t d; q_t q; aa_t m; int i; } b3;\n"
+      "  end\n"
+      "  cu0_t x0; cu1_t x1; cu2_t x2; cu3_t x3;\n"
+      "  pk::pk0_t y0; pk::pk1_t y1; pk::pk2_t y2; pk::pk3_t y3;\n"
+      "  union { da_t d; int i; } m0;\n"
+      "  union { q_t d; int i; } m1;\n"
+      "  union { aa_t d; int i; } m2;\n"
+      "  union tagged { da_t d; q_t q; aa_t m; int i; } m3;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line :
+       {4,  5,  6,  9,  10, 11, 15, 16, 17, 21, 22, 23, 27, 28, 29, 33, 34,
+        35, 41, 42, 43, 47, 48, 49, 53, 54, 55, 59, 60, 61, 66, 67, 68}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kDynamicMember, line, "7.3.2"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 33u);
+}
+
+TEST(TaggedUnionValidation,
+     EveryNonPackedMemberKindOfAPackedTaggedUnionReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; endinterface\n"
+      "typedef struct { bit [7:0] x; } us_t;\n"
+      "module top;\n"
+      "  union tagged packed { real a; bit [7:0] b; } h1;\n"
+      "  union tagged packed { shortreal a; bit [7:0] b; } h2;\n"
+      "  union tagged packed { chandle a; bit [7:0] b; } h3;\n"
+      "  union tagged packed { event a; bit [7:0] b; } h4;\n"
+      "  union tagged packed { string a; bit [7:0] b; } h5;\n"
+      "  union tagged packed { us_t a; bit [7:0] b; } h6;\n"
+      "  union tagged packed { virtual ifc a; bit [7:0] b; } h7;\n"
+      "  union tagged packed { bit [7:0] a [2]; bit [7:0] b; } h8;\n"
+      "  union tagged packed { bit [7:0] a []; bit [7:0] b; } h9;\n"
+      "  union tagged packed { bit [7:0] a [$]; bit [7:0] b; } h10;\n"
+      "  union tagged packed { bit [7:0] a [int]; bit [7:0] b; } h11;\n"
+      "  union tagged packed { bit [7:0] a; struct packed { bit x; } b; void "
+      "c; } ok;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line = 4; line <= 10; ++line) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNotPacked, line, "7.2.1"))
+        << line;
+  }
+  for (uint32_t line = 11; line <= 14; ++line) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kUnpackedArray, line, "7.2.1"))
+        << line;
+  }
+}
+
+TEST(TaggedUnionValidation,
+     DISABLED_ClassHandleMemberOfAPackedTaggedUnionReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C; endclass\n"
+      "typedef C ct_t;\n"
+      "module top;\n"
+      "  union tagged packed { C a; bit [7:0] b; } h1;\n"
+      "  union tagged packed { ct_t a; bit [7:0] b; } h2;\n"
+      "  union tagged { C a; bit [7:0] b; } ok;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {4, 5}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNotPacked, line, "7.2.1"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace

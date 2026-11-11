@@ -376,4 +376,94 @@ TEST(TaggedUnionSimulation,
       "1 1 1 1\n1 1 1 1\n");
 }
 
+constexpr char kPackedInstr[] =
+    "  typedef union tagged packed {\n"
+    "    struct packed { bit [4:0] reg1, reg2, regd; } Add;\n"
+    "    union tagged packed {\n"
+    "      bit [9:0] JmpU;\n"
+    "      struct packed { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+    "    } Jmp;\n"
+    "  } Instr;\n"
+    "  typedef union tagged packed { void Invalid; int Valid; } VInt;\n";
+
+TEST(TaggedUnionSimulation, PackedInstrAndVIntAreTagPlusWidestMember) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string("module t;\n") + kPackedInstr +
+                           "  initial $display(\"%0d %0d\", $bits(Instr), "
+                           "$bits(VInt));\n"
+                           "endmodule\n",
+                       f),
+            "16 33\n");
+}
+
+TEST(TaggedUnionSimulation, AddInstructionHasTagZeroAboveItsRegisters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string("module t;\n") + kPackedInstr +
+                           "  Instr i;\n"
+                           "  bit [15:0] w;\n"
+                           "  initial begin\n"
+                           "    i = tagged Add '{5'd1, 5'd2, 5'd3};\n"
+                           "    w = 16'(i);\n"
+                           "    $display(\"%b %b\", w[15], w[14:0]);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "0 000010001000011\n");
+}
+
+TEST(TaggedUnionSimulation, DISABLED_JumpInstructionsCarryOuterAndInnerTags) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string("module t;\n") + kPackedInstr +
+                           "  Instr i;\n"
+                           "  bit [15:0] w;\n"
+                           "  initial begin\n"
+                           "    i = tagged Jmp (tagged JmpU 10'h155);\n"
+                           "    w = 16'(i);\n"
+                           "    $display(\"%b %b %h\", w[15], w[12], w[9:0]);\n"
+                           "    i = tagged Jmp (tagged JmpC '{2'b10, "
+                           "10'h2AA});\n"
+                           "    w = 16'(i);\n"
+                           "    $display(\"%b %b %b %h\", w[15], w[12], "
+                           "w[11:10], w[9:0]);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "1 0 155\n1 1 10 2aa\n");
+}
+
+TEST(TaggedUnionSimulation, DISABLED_PackedVIntCarriesItsTagAtTheMsb) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string("module t;\n") + kPackedInstr +
+                           "  VInt v;\n"
+                           "  bit [32:0] w;\n"
+                           "  initial begin\n"
+                           "    v = tagged Valid 5;\n"
+                           "    w = 33'(v);\n"
+                           "    $display(\"%h\", w);\n"
+                           "    v = tagged Invalid;\n"
+                           "    w = 33'(v);\n"
+                           "    $display(\"%b\", w[32]);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "100000005\n0\n");
+}
+
+TEST(TaggedUnionSimulation, DISABLED_PackedTagReadsTheSameEveryWay) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  union tagged packed { bit [6:0] v1; bit [6:0] v2; } "
+                       "u;\n"
+                       "  bit [7:0] a, c;\n"
+                       "  initial begin\n"
+                       "    u = tagged v2 (10);\n"
+                       "    a = u;\n"
+                       "    c = 8'(u);\n"
+                       "    $display(\"%b %b %b %b\", u, a, c, u[7]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "10001010 10001010 10001010 1\n");
+}
+
 }  // namespace
