@@ -1,11 +1,25 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <initializer_list>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+constexpr const char* kTypeViaHandle = "via class handle";
+
+bool ErrorOnLine(const std::vector<Diagnostic>& diags, uint32_t line) {
+  for (const auto& d : diags) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line) return true;
+  }
+  return false;
+}
 
 TEST(ObjectPropertyElaboration, ClassWithPropertiesElaborates) {
   EXPECT_TRUE(
@@ -312,6 +326,207 @@ TEST(ObjectPropertyElaboration, SelectsFromNoHandleAreUnchecked) {
              "  string s = \"ab\";\n"
              "  initial $display(top.u.v, s.len());\n"
              "endmodule\n"));
+}
+
+TEST(ObjectPropertyElaboration,
+     TypeReachedThroughAHandleIsReportedInEachPlace) {
+  ElabFixture f;
+  ElabOk(
+      "class V #(parameter int W = 7, type T = int);\n"
+      "  typedef byte b_t;\n"
+      "  function void m(V #(3) o);\n"
+      "    $display((o.T)'(3));\n"
+      "  endfunction\n"
+      "endclass\n"
+      "function automatic void uf(V #(3) v);\n"
+      "  $display((v.T)'(3));\n"
+      "endfunction\n"
+      "interface i;\n"
+      "  V #(3) v;\n"
+      "  initial $display((v.T)'(3));\n"
+      "endinterface\n"
+      "program p;\n"
+      "  V #(3) v;\n"
+      "  initial $display((v.T)'(3));\n"
+      "endprogram\n"
+      "module t;\n"
+      "  i ui();\n"
+      "  p up();\n"
+      "  V #(3) v = new;\n"
+      "  task tk;\n"
+      "    $display((v.T)'(3));\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    $display(V#(3)::T'(3));\n"
+      "    $display(V#(3)::b_t'(3));\n"
+      "  end\n"
+      "endmodule\n"
+      "package k;\n"
+      "  function automatic void f(V #(3) v);\n"
+      "    $display((v.T)'(3));\n"
+      "  endfunction\n"
+      "endpackage\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const uint32_t kLine : {4u, 8u, 12u, 16u, 23u, 32u}) {
+    EXPECT_TRUE(ReportedError(diags, kTypeViaHandle, kLine, "8.5"));
+  }
+  for (const uint32_t kLine : {26u, 27u}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(ObjectPropertyElaboration,
+     DISABLED_TypedefInheritedTypeOrPackageClassTypeViaHandle) {
+  ElabFixture f;
+  ElabOk(
+      "class V #(parameter int W = 7, type T = int);\n"
+      "  typedef byte b_t;\n"
+      "endclass\n"
+      "class D extends V #(4);\n"
+      "endclass\n"
+      "package k;\n"
+      "  class PV #(type T = int); endclass\n"
+      "  function automatic void f(PV v);\n"
+      "    $display((v.T)'(3));\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  V #(3) v = new;\n"
+      "  D d = new;\n"
+      "  k::PV pv = new;\n"
+      "  initial begin\n"
+      "    $display((v.b_t)'(3));\n"
+      "    $display((d.T)'(3));\n"
+      "    $display((pv.T)'(3));\n"
+      "    $display(D::b_t'(3));\n"
+      "  end\n"
+      "  if (1) begin : gb\n"
+      "    V #(3) g;\n"
+      "    initial $display((g.T)'(3));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const uint32_t kLine : {9u, 17u, 18u, 19u, 24u}) {
+    EXPECT_TRUE(ReportedError(diags, kTypeViaHandle, kLine, "8.5"));
+  }
+  EXPECT_FALSE(ErrorOnLine(diags, 20));
+}
+
+TEST(ObjectPropertyElaboration, ParameterReadThroughAHandleIsNotConstant) {
+  ElabFixture f;
+  ElabOk(
+      "class V #(parameter int W = 7);\n"
+      "  localparam int L = 5;\n"
+      "endclass\n"
+      "interface i;\n"
+      "  V #(3) v;\n"
+      "  localparam int A = v.W;\n"
+      "  localparam int B = V#(3)::W;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  V #(3) v;\n"
+      "  localparam int A = v.L;\n"
+      "  localparam int B = V#(3)::L;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  i ui();\n"
+      "  p up();\n"
+      "  V #(3) v = new;\n"
+      "  localparam int A = v.W;\n"
+      "  localparam int B = V#(3)::W;\n"
+      "  logic [31:0] bus, s;\n"
+      "  initial begin\n"
+      "    s = {v.W{1'b1}};\n"
+      "    s = bus[0 +: v.L];\n"
+      "    s = {V#(3)::W{1'b1}};\n"
+      "    s = bus[0 +: V#(3)::L];\n"
+      "  end\n"
+      "  if (v.W > 2) begin : g1\n"
+      "  end\n"
+      "  if (V#(3)::W > 2) begin : g2\n"
+      "    localparam int C = v.L;\n"
+      "    localparam int D = V#(3)::L;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "parameter 'A' value", 6, "6.20.2"));
+  EXPECT_TRUE(ReportedError(diags, "parameter 'A' value", 11, "6.20.2"));
+  EXPECT_TRUE(ReportedError(diags, "parameter 'A' value", 18, "6.20.2"));
+  EXPECT_TRUE(ReportedError(
+      diags, "replication multiplier shall be a constant expression", 22,
+      "11.4.12.1"));
+  EXPECT_TRUE(ReportedError(
+      diags, "indexed part-select width must be a constant expression", 23,
+      "11.5.1"));
+  EXPECT_TRUE(ReportedError(diags, "generate-if condition is not constant", 27,
+                            "27.5"));
+  EXPECT_TRUE(ReportedError(diags, "parameter 'C' value", 30, "6.20.2"));
+  for (const uint32_t kLine : {7u, 12u, 19u, 24u, 25u, 29u, 31u}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(ObjectPropertyElaboration,
+     DISABLED_ParameterReadThroughAHandleIsNotConstantInSubroutinesAndBlocks) {
+  ElabFixture f;
+  ElabOk(
+      "class V #(parameter int W = 7);\n"
+      "  localparam int L = 5;\n"
+      "endclass\n"
+      "class U;\n"
+      "  function void m(V #(3) o);\n"
+      "    localparam int A = o.W;\n"
+      "    localparam int B = V#(3)::W;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "package k;\n"
+      "  function automatic void f(V #(3) o);\n"
+      "    localparam int A = o.L;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "function automatic void uf(V #(3) o);\n"
+      "  localparam int A = o.W;\n"
+      "endfunction\n"
+      "module t;\n"
+      "  V #(3) v = new;\n"
+      "  task tk;\n"
+      "    localparam int A = v.L;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    localparam int A = v.W;\n"
+      "    localparam int B = V#(3)::L;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const uint32_t kLine : {6u, 12u, 16u, 21u, 24u}) {
+    EXPECT_TRUE(ReportedError(diags, "parameter 'A' value", kLine, "6.20.2"));
+  }
+  for (const uint32_t kLine : {7u, 25u}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(ObjectPropertyElaboration,
+     DISABLED_ParameterReadThroughAHandleInAnInstanceOverrideIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class V #(parameter int W = 7);\n"
+      "endclass\n"
+      "module sub #(parameter int P = 1);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  V #(3) v = new;\n"
+      "  sub #(.P(v.W)) u1();\n"
+      "  sub #(V#(3)::W) u2();\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "not a constant expression", 7, "23.10.2"));
+  EXPECT_FALSE(ErrorOnLine(diags, 8));
 }
 
 }  // namespace
