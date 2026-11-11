@@ -10,7 +10,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
-- [A commit closes at least one issue](a-commit-closes-an-issue.md) — any number, wherever in the repository they fall, every case of each one's rule passing; split by rule an issue that cannot land in one.
+- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it chooses, with no upper limit, wherever in the repository they fall, every case of each one's rule passing; split by rule an issue that cannot land in one.
 - [Closing keywords fire on push](issue-closing-keywords-fire-on-push.md) — nine words close an issue from anywhere in a message; use them only in the finishing commit.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
 - [One closing keyword per issue](one-closing-keyword-per-issue.md) — a keyword binds to one `#N`; repeat it on its own line per issue.
