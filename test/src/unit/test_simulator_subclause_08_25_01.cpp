@@ -564,4 +564,119 @@ TEST(ParameterizedScopeResolutionSim,
             3333u);
 }
 
+TEST(ParameterizedScopeResolutionSim, LocalParameterReadThroughAHandle) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(int p = 1);\n"
+      "  parameter int q = 5;\n"
+      "endclass\n"
+      "module top;\n"
+      "  typedef C T;\n"
+      "  T obj = new();\n"
+      "  int u = obj.q;\n"
+      "  int r1;\n"
+      "  initial r1 = u;\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 5u}});
+}
+
+TEST(ParameterizedScopeResolutionSim,
+     SpecializationParameterIsReadWhereNoConstantIsAsked) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Z #(int P); parameter int K = 2; localparam int N = P * 2; "
+      "endclass\n"
+      "class ZD #(int P = 1); parameter int K = 2; localparam int N = P * 2; "
+      "endclass\n"
+      "module child #(parameter int Q = 0);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  localparam int B1 = Z#(3)::K;\n"
+      "  localparam int B2 = ZD#(3)::N;\n"
+      "  logic [Z#(3)::P:0] v;\n"
+      "  if (Z#(3)::P == 3) begin : g\n"
+      "    localparam int G = 1;\n"
+      "  end\n"
+      "  child #(.Q(Z#(3)::N)) c();\n"
+      "  int x = 3;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  initial begin\n"
+      "    r1 = B1; r2 = B2; r3 = $bits(v); r4 = g.G; r5 = c.Q;\n"
+      "    case (x) Z#(3)::P: r6 = 1; default: r6 = 9; endcase\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design,
+      {{"r1", 2u}, {"r2", 6u}, {"r3", 4u}, {"r4", 1u}, {"r5", 6u}, {"r6", 1u}});
+}
+
+TEST(ParameterizedScopeResolutionSim,
+     DISABLED_SpecializationParameterWithoutDefaultIsAConstantEverywhere) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Z #(int P); parameter int K = 2; localparam int N = P * 2; "
+      "endclass\n"
+      "class VN #(int a, int size); localparam int N = size * 2 + a; endclass\n"
+      "class TD #(type T = int, int size = 1); parameter int K = 2; localparam "
+      "int N = size * 2; endclass\n"
+      "class TN #(type T, int size); parameter int K = 2; localparam int N = "
+      "size * 2; endclass\n"
+      "localparam int U1 = Z#(3)::N;\n"
+      "package pk;\n"
+      "  class PZ #(int P); localparam int N = P * 2; endclass\n"
+      "  localparam int P1 = PZ#(3)::N;\n"
+      "endpackage\n"
+      "class HC;\n"
+      "  localparam int H1 = Z#(3)::N;\n"
+      "endclass\n"
+      "interface ifc;\n"
+      "  localparam int I1 = Z#(3)::N;\n"
+      "endinterface\n"
+      "module sub #(parameter int PV = Z#(3)::P);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  sub s();\n"
+      "  localparam int A1 = Z#(3)::P;\n"
+      "  localparam int A2 = Z#(3)::N;\n"
+      "  localparam int A3 = Z#(.P(5))::N;\n"
+      "  localparam int A4 = VN#(1, 4)::N;\n"
+      "  localparam int A5 = TD#(byte, 4)::K;\n"
+      "  localparam int A6 = TD#(byte, 4)::N;\n"
+      "  localparam int A7 = TN#(byte, 4)::K;\n"
+      "  localparam int A8 = TN#(byte, 4)::N;\n"
+      "  localparam int A9 = TN#(byte, 4)::size;\n"
+      "  if (1) begin : g\n"
+      "    localparam int G1 = Z#(3)::N;\n"
+      "  end\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, "
+      "r15;\n"
+      "  initial begin\n"
+      "    r1 = A1; r2 = A2; r3 = A3; r4 = A4; r5 = A5; r6 = A6; r7 = A7; r8 = "
+      "A8; r9 = A9;\n"
+      "    r10 = U1; r11 = pk::P1; r12 = HC::H1; r13 = i.I1; r14 = s.PV; r15 = "
+      "g.G1;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 3u},
+                    {"r2", 6u},
+                    {"r3", 10u},
+                    {"r4", 9u},
+                    {"r5", 2u},
+                    {"r6", 8u},
+                    {"r7", 2u},
+                    {"r8", 8u},
+                    {"r9", 4u},
+                    {"r10", 6u},
+                    {"r11", 6u},
+                    {"r12", 6u},
+                    {"r13", 6u},
+                    {"r14", 3u},
+                    {"r15", 6u}});
+}
+
 }  // namespace

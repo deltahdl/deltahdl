@@ -542,4 +542,111 @@ TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
   }
 }
 
+const char* const kNonMatchingSpecializationSrc =
+    "class vector #(int size = 1); bit [size-1:0] a; endclass\n"
+    "class stack #(type T = int); T items[$]; endclass\n"
+    "class vb #(type VT = int, VT p = 1); endclass\n"
+    "class dv extends vector #(4); endclass\n"
+    "typedef int myint;\n"
+    "function vector #(5) ret5(vector #(4) h); return h; endfunction\n"
+    "function vector #(4) ret4(vector #(4) h); return h; endfunction\n"
+    "function void take5(vector #(5) h); endfunction\n"
+    "function void take4(vector #(4) h); endfunction\n"
+    "module top;\n"
+    "  vector #(4) a;\n"
+    "  vector #(5) b;\n"
+    "  vector #(2+2) c;\n"
+    "  vector d0;\n"
+    "  vector #(1) d;\n"
+    "  stack #(int) s;\n"
+    "  stack #(integer) t;\n"
+    "  stack #(int) u;\n"
+    "  stack #(myint) w;\n"
+    "  stack #(bit [7:0]) x;\n"
+    "  stack #(bit [8:1]) y;\n"
+    "  stack #(byte) bb;\n"
+    "  stack #(bit signed [7:0]) bs;\n"
+    "  vb #(shortint, 1) v1;\n"
+    "  vb #(int, 1) v2;\n"
+    "  vb #(int, 1) v3;\n"
+    "  dv e;\n"
+    "  initial begin\n"
+    "    b = a;\n"
+    "    c = a;\n"
+    "    d = d0;\n"
+    "    t = s;\n"
+    "    u = s;\n"
+    "    w = s;\n"
+    "    y = x;\n"
+    "    bs = bb;\n"
+    "    v2 = v1;\n"
+    "    v3 = v2;\n"
+    "    take5(a);\n"
+    "    take4(a);\n"
+    "    a = e;\n"
+    "    b = e;\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(ParameterizedClassElaboration,
+     MatchingSpecializationsAssignWithoutReport) {
+  ElabFixture f;
+  ElaborateSrc(kNonMatchingSpecializationSrc, f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {7, 30, 31, 33, 34, 36, 38, 40, 41}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(ParameterizedClassElaboration,
+     DISABLED_NonMatchingSpecializationsAreDistinctTypes) {
+  ElabFixture f;
+  ElaborateSrc(kNonMatchingSpecializationSrc, f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {29, 32, 35, 37, 42}) {
+    EXPECT_TRUE(ReportedError(diags, "requires assignment compatible types",
+                              kLine, "8.4"))
+        << kLine;
+  }
+  for (const int kLine : {39}) {
+    EXPECT_TRUE(ReportedError(diags, "assignment compatible", kLine, "13.5"))
+        << kLine;
+  }
+  for (const int kLine : {6}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "is not assignment-compatible with the function's return type",
+        kLine, "12.8"))
+        << kLine;
+  }
+}
+
+TEST(ParameterizedClassElaboration,
+     SpecializationOfAModulesClassDiffersPerInstanceButNotFromAPackage) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  class PCl #(int n = 1); endclass\n"
+      "endpackage\n"
+      "module sub;\n"
+      "  class C #(int n = 1); endclass\n"
+      "  C #(4) h;\n"
+      "  pk::PCl #(4) ph;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub u1();\n"
+      "  sub u2();\n"
+      "  initial begin\n"
+      "    u2.h = u1.h;\n"
+      "    u2.ph = u1.ph;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "'u2.h' and 'u1.h' have types the instances 'u2' "
+                            "and 'u1' each declare for themselves",
+                            13, "6.22"));
+  EXPECT_FALSE(ErrorOnLine(diags, 14));
+}
+
 }  // namespace

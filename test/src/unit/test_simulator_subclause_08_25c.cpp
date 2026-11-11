@@ -622,4 +622,121 @@ TEST(ClassSpecializationSim, OverriddenDefaultsReshapeRangesAndDimensions) {
   EXPECT_FALSE(f.has_errors);
 }
 
+const char* const kHeaderDefaultNamingAnEarlierParameterSrc =
+    "class C #(parameter int A = 3, parameter int B = A * 2);\n"
+    "  localparam int N = A + 1;\n"
+    "endclass\n"
+    "class D #(parameter logic [3:0] L = 4'b1x1x,\n"
+    "          parameter bit [3:0] W = L,\n"
+    "          parameter logic [3:0] M = L);\n"
+    "endclass\n"
+    "class RC #(parameter real X = 1.5, parameter real Y = X * 2);\n"
+    "endclass\n"
+    "module top;\n"
+    "  int r1, r2, r3, r4, r5, r6;\n"
+    "  logic [3:0] w1, w2, m1, m2;\n"
+    "  real y1, y2;\n"
+    "  initial begin\n"
+    "    r1 = C#(5)::B;\n"
+    "    r2 = C#()::B;\n"
+    "    r3 = C#(.A(5))::B;\n"
+    "    r4 = C#(5)::N;\n"
+    "    w1 = D#(4'bz1z1)::W;\n"
+    "    w2 = D#()::W;\n"
+    "    m1 = D#(4'bz1z1)::M;\n"
+    "    m2 = D#()::M;\n"
+    "    y1 = RC#(2.5)::Y;\n"
+    "    y2 = RC#()::Y;\n"
+    "    r5 = (m1 === 4'bz1z1) && (m2 === 4'b1x1x);\n"
+    "    r6 = (y1 == 5.0) * 10 + (y2 == 3.0);\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(ClassSim, BodyParameterOfASpecializationReadsItsHeaderValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kHeaderDefaultNamingAnEarlierParameterSrc, f);
+  LowerRunAndCheck(f, design, {{"r4", 6u}});
+}
+
+TEST(ClassSim, DISABLED_HeaderDefaultNamingAnEarlierParameterReadsItsValue) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kHeaderDefaultNamingAnEarlierParameterSrc, f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 10u},
+                    {"r2", 6u},
+                    {"r3", 10u},
+                    {"w1", 5u},
+                    {"w2", 10u},
+                    {"r5", 1u},
+                    {"r6", 11u}});
+}
+
+TEST(ClassSim, SpecializationTypedefOfAnIntegralActualHasItsWidth) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class PC #(type T = int); typedef T X; endclass\n"
+      "module top;\n"
+      "  PC#(byte)::X v2;\n"
+      "  int r1;\n"
+      "  initial r1 = $bits(v2);\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 8u}});
+}
+
+TEST(ClassSim, DISABLED_SpecializationTypedefKeepsTheActualsDimensions) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "typedef int UQ[$];\n"
+      "typedef byte UA[3];\n"
+      "class PC #(type T = int); typedef T X; endclass\n"
+      "package pk;\n"
+      "  typedef int PQ[$];\n"
+      "  class KC #(type T = int); typedef T X; endclass\n"
+      "  PC#(UQ)::X pv;\n"
+      "endpackage\n"
+      "PC#(UQ)::X uv;\n"
+      "interface ifc;\n"
+      "  PC#(UQ)::X iv;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  ifc ii();\n"
+      "  PC#(UQ)::X v1;\n"
+      "  PC#(byte)::X v2;\n"
+      "  PC#(UA)::X v3;\n"
+      "  typedef PC#(UQ)::X TQ;\n"
+      "  TQ v4;\n"
+      "  PC#(.T(UQ))::X v6;\n"
+      "  pk::KC#(pk::PQ)::X v7;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11, r12;\n"
+      "  initial begin\n"
+      "    PC#(UQ)::X v5;\n"
+      "    v1.push_back(1); r1 = v1.size();\n"
+      "    v4.push_back(1); r2 = v4.size();\n"
+      "    v5.push_back(1); r3 = v5.size();\n"
+      "    pk::pv.push_back(1); r4 = pk::pv.size();\n"
+      "    uv.push_back(1); r5 = uv.size();\n"
+      "    ii.iv.push_back(1); r6 = ii.iv.size();\n"
+      "    r7 = $size(v3);\n"
+      "    r8 = $bits(PC#(byte)::X);\n"
+      "    r9 = $bits(v2);\n"
+      "    v6.push_back(1); r10 = v6.size();\n"
+      "    v7.push_back(1); r11 = v7.size();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 1u},
+                    {"r2", 1u},
+                    {"r3", 1u},
+                    {"r4", 1u},
+                    {"r5", 1u},
+                    {"r6", 1u},
+                    {"r7", 3u},
+                    {"r8", 8u},
+                    {"r9", 8u},
+                    {"r10", 1u},
+                    {"r11", 1u}});
+}
+
 }  // namespace

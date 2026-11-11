@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -415,6 +417,50 @@ TEST(SubroutineCallElaboration, NetAsOutputOrInoutActualError) {
                             "net 'wv' cannot be the actual of inout argument "
                             "'io'",
                             9, "13.5"));
+}
+
+TEST(SubroutineCallElaboration,
+     DISABLED_ClassHandleActualOfAnUnrelatedClassIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class B; endclass\n"
+      "class DA extends A; endclass\n"
+      "function void fb(B x); endfunction\n"
+      "task tb(input B x); endtask\n"
+      "function void ob(output B x); x = null; endfunction\n"
+      "function automatic void rb(ref B x); endfunction\n"
+      "function void fa(A x); endfunction\n"
+      "function void fd(DA x); endfunction\n"
+      "function automatic void ra(ref A x); endfunction\n"
+      "module m;\n"
+      "  A a;\n"
+      "  B b;\n"
+      "  DA da;\n"
+      "  initial begin\n"
+      "    fb(a);\n"
+      "    tb(a);\n"
+      "    ob(a);\n"
+      "    rb(a);\n"
+      "    fa(da);\n"
+      "    fd(a);\n"
+      "    ra(da);\n"
+      "    fa(a);\n"
+      "    fb(b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {16, 17, 18, 21}) {
+    EXPECT_TRUE(ReportedError(diags, "assignment compatible", kLine, "13.5"))
+        << kLine;
+  }
+  for (const int kLine : {19, 22}) {
+    EXPECT_TRUE(ReportedError(diags, "equivalent", kLine, "13.5.2")) << kLine;
+  }
+  for (const int kLine : {20, 23, 24}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

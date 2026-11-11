@@ -423,4 +423,31 @@ TEST(ParameterizedScopeResolutionElaboration,
   EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 3u);
 }
 
+TEST(ParameterizedScopeResolutionElaboration,
+     LocalParameterThroughAHandleIsReadButIsNoConstant) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C #(int p = 1);\n"
+      "  parameter int q = 5;\n"
+      "endclass\n"
+      "module top;\n"
+      "  typedef C T;\n"
+      "  T obj = new();\n"
+      "  int u = obj.q;\n"
+      "  bit arr[obj.q];\n"
+      "  localparam int LQ = obj.q;\n"
+      "  int r1;\n"
+      "  initial r1 = u;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "the range of 'arr' contains a hierarchical reference", 8,
+      "11.2.1"));
+  EXPECT_TRUE(ReportedError(
+      diags, "parameter 'LQ' value contains a hierarchical reference", 9,
+      "6.20.2"));
+  EXPECT_FALSE(ErrorOnLine(diags, 7));
+}
+
 }  // namespace
