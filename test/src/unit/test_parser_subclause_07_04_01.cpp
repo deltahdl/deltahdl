@@ -107,4 +107,14 @@ TEST(PackedArrayParsing, EnumDimsAfterTheBodyKeepTheBaseTypesOwn) {
   EXPECT_EQ(e.enum_array_dims[0].first->int_val, 2u);
 }
 
+TEST(PackedArrayParsing, VirtualInterfaceTakesNoPackedDimension) {
+  auto r = Parse(
+      "interface I; endinterface\n"
+      "module m;\n"
+      "  virtual I v;\n"
+      "  virtual I [1:0] w;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got '['", 4, "6.8"));
+}
+
 }  // namespace
