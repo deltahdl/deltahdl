@@ -597,4 +597,127 @@ TEST(StaticClassPropertySim, StaticArrayPropertyTakesPatternInitializer) {
   EXPECT_EQ(out, "3 10 7 2 6 10\n");
 }
 
+TEST(StaticClassPropertySim, StaticInitializerRunsOnceHoweverManyObjects) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int calls;\n"
+      "  function int tick(); calls++; return calls; endfunction\n"
+      "  class C; static int s = tick(); endclass\n"
+      "  class D extends C; endclass\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    C a, b, c;\n"
+      "    D d, e;\n"
+      "    a = new; b = new; c = new; d = new; e = new;\n"
+      "    r1 = calls;\n"
+      "    r2 = C::s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 1u}});
+}
+
+TEST(StaticClassPropertySim, StaticInitializerRunsWithNoObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int calls;\n"
+      "  function int tick(); calls++; return calls; endfunction\n"
+      "  class C; static int s = tick(); endclass\n"
+      "  int r1, r2;\n"
+      "  initial #1 begin\n"
+      "    r1 = calls;\n"
+      "    r2 = C::s;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 1u}});
+}
+
+TEST(StaticClassPropertySim,
+     EachStaticInitializerRunsOnceAndAnInstanceOnePerObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  int calls;\n"
+      "  function int tick(); calls++; return calls; endfunction\n"
+      "  class C;\n"
+      "    static int s = tick();\n"
+      "    static int s2 = tick();\n"
+      "    int n = tick();\n"
+      "  endclass\n"
+      "  int r1, r2;\n"
+      "  initial begin\n"
+      "    C a, b, c;\n"
+      "    #1 r1 = calls;\n"
+      "    a = new; b = new; c = new;\n"
+      "    r2 = calls;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 2u}, {"r2", 5u}});
+}
+
+TEST(StaticClassPropertySim, EachSpecializationInitializesItsOwnStaticOnce) {
+  EXPECT_EQ(
+      RunAndGet("module t;\n"
+                "  int calls;\n"
+                "  function int tick(); calls++; return calls; endfunction\n"
+                "  class P #(int W = 1);\n"
+                "    static int s = tick() * 10 + W;\n"
+                "  endclass\n"
+                "  int r;\n"
+                "  initial begin\n"
+                "    P #(1) a, b;\n"
+                "    P #(2) c;\n"
+                "    a = new; b = new; c = new;\n"
+                "    r = calls * 1000 + P#(1)::s % 10 * 100 +\n"
+                "        P#(2)::s % 10 * 10 + (P#(1)::s / 10 != "
+                "P#(2)::s / 10);\n"
+                "  end\n"
+                "endmodule\n",
+                "r"),
+      2121u);
+}
+
+TEST(StaticClassPropertySim,
+     DISABLED_StaticPropertyThroughANullHandleIsTheSharedVariable) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Packet; static int fileID = 7; int n; endclass\n"
+      "class DP extends Packet; endclass\n"
+      "class O; Packet p; endclass\n"
+      "module t;\n"
+      "  function int f(Packet q); return q.fileID; endfunction\n"
+      "  int r1, r2, r3, r4, r5, r6, r7;\n"
+      "  initial begin\n"
+      "    Packet p, arr[2];\n"
+      "    O o;\n"
+      "    DP d;\n"
+      "    r1 = p.fileID;\n"
+      "    p.fileID = 9;\n"
+      "    r2 = Packet::fileID;\n"
+      "    p = new;\n"
+      "    p = null;\n"
+      "    p.fileID = 10;\n"
+      "    r3 = p.fileID;\n"
+      "    r4 = arr[1].fileID;\n"
+      "    o = new;\n"
+      "    r5 = o.p.fileID;\n"
+      "    r6 = f(null);\n"
+      "    r7 = d.fileID;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 7u},
+                    {"r2", 9u},
+                    {"r3", 10u},
+                    {"r4", 10u},
+                    {"r5", 10u},
+                    {"r6", 10u},
+                    {"r7", 10u}});
+}
+
 }  // namespace
