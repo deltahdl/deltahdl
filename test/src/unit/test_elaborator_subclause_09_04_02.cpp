@@ -318,4 +318,21 @@ TEST(EventControlElaboration,
       "event expression references non-singular variable 'arr'", 6, "9.4.2"));
 }
 
+TEST(EventControlElaboration,
+     DISABLED_AClassTaskCalledInAnEventExpressionRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class P;\n"
+      "  task t(); endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  P p = new;\n"
+      "  initial @(p.t()) ;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "task 't' cannot be called in an event expression",
+                            6, "9.4.2"));
+}
+
 }  // namespace

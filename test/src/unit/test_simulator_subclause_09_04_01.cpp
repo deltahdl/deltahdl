@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -262,6 +263,21 @@ TEST(DelayControlSim, DelayExpressionReevaluatedAtEachExecution) {
   lowerer.Lower(design);
   f.scheduler.Run();
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 10u);
+}
+
+TEST(DelayControlSim, AMinTypMaxDelayTakesTheTypicalValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic x = 0;\n"
+                       "  initial #(1:2:3) x = 1;\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%0d\", x);\n"
+                       "    #1 $display(\"%0d\", x);\n"
+                       "    #1 $display(\"%0d\", x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n1\n1\n");
 }
 
 }  // namespace

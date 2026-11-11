@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -577,6 +579,60 @@ TEST(IntraAssignTimingSimulation, ANegativeNonblockingDelayNeverUpdates) {
                        "endmodule\n",
                        f),
             "x=xx arr=0\n");
+}
+
+TEST(IntraAssignTimingSimulation, ForkedIntraAssignmentDelaysSwapValues) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] a, b;\n"
+                       "  initial begin\n"
+                       "    a = 1;\n"
+                       "    b = 2;\n"
+                       "    fork\n"
+                       "      a = #5 b;\n"
+                       "      b = #5 a;\n"
+                       "    join\n"
+                       "    $display(\"%0d %0d %0t\", a, b, $time);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 1 5\n");
+}
+
+TEST(IntraAssignTimingSimulation, ForkedIntraAssignmentEventsShiftValues) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] a = 1, b = 2, c = 3;\n"
+                       "  initial begin\n"
+                       "    fork\n"
+                       "      a = @(posedge clk) b;\n"
+                       "      b = @(posedge clk) c;\n"
+                       "    join\n"
+                       "    $display(\"%0d %0d %0t\", a, b, $time);\n"
+                       "  end\n"
+                       "  initial #5 clk = 1;\n"
+                       "endmodule\n",
+                       f),
+            "2 3 5\n");
+}
+
+TEST(IntraAssignTimingSimulation, RepeatCountsEitherEdgeOfAnEdgeEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic p = 0;\n"
+                       "  logic [7:0] a = 0, d = 7;\n"
+                       "  initial a <= repeat (3) @(edge p) d;\n"
+                       "  initial begin\n"
+                       "    #1 p = 1;\n"
+                       "    #1 p = 0;\n"
+                       "    #1 $display(\"%0d\", a);\n"
+                       "    p = 1;\n"
+                       "    #1 $display(\"%0d\", a);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n7\n");
 }
 
 }  // namespace

@@ -251,4 +251,25 @@ TEST(ImplicitSensitivitySim, TwoDimensionalVariableIndexReadWakes) {
             "n=6\n");
 }
 
+TEST(ImplicitSensitivitySim, ANestedStarWaitsOnlyOnItsOwnStatement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic a = 0, b = 0, c = 0, d = 0, x;\n"
+                       "  always @* begin\n"
+                       "    x = a ^ b;\n"
+                       "    $display(\"outer %0t\", $time);\n"
+                       "    @* x = c ^ d;\n"
+                       "    $display(\"inner %0t\", $time);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #1 c = 1;\n"
+                       "    #1 a = 1;\n"
+                       "    #1 d = 1;\n"
+                       "    #1 b = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "outer 1\ninner 3\nouter 4\n");
+}
+
 }  // namespace
