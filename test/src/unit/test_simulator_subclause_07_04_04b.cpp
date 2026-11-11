@@ -523,4 +523,346 @@ TEST(PackedParameterSelectSim, SelectsOfOuterParametersSizeAClassProperty) {
             "7 11 12 12 7 3 7\n11 7 22\n");
 }
 
+TEST(MultidimensionalArraySimulation, SectionDeclarationsOrderTheirDimensions) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [3:0] [7:0] joe [1:10];\n"
+                 "  bit [1:10] v1 [1:5];\n"
+                 "  bit v2 [1:5] [1:10];\n"
+                 "  bit [1:5] [1:10] v3;\n"
+                 "  bit [1:5] [1:6] v4 [1:7] [1:8];\n"
+                 "  typedef bit [1:5] bsix;\n"
+                 "  bsix [1:10] v5;\n"
+                 "  bit [7:0] [31:0] v7 [1:5] [1:10], v8 [0:255];\n"
+                 "  initial begin\n"
+                 "    joe[8] = 32'h01020304;\n"
+                 "    joe[9] = joe[8] + 1;\n"
+                 "    joe[6] = 32'hAABBCCDD;\n"
+                 "    joe[7] = 0;\n"
+                 "    joe[7][3:2] = joe[6][1:0];\n"
+                 "    $display(\"%h %h\", joe[9], joe[7]);\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d\", $size(v1, 1), "
+                 "$size(v1, 2),\n"
+                 "             $size(v2, 1), $size(v2, 2), $size(v3, 1), "
+                 "$size(v3, 2));\n"
+                 "    $display(\"%0d %0d %0d %0d\", $size(v4, 1), $size(v4, "
+                 "2), $size(v4, 3),\n"
+                 "             $size(v4, 4));\n"
+                 "    $display(\"%0d %0d\", $size(v5, 1), $size(v5, 2));\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d\", $size(v7, 1), "
+                 "$size(v7, 2),\n"
+                 "             $size(v7, 3), $size(v7, 4), $size(v8, 1), "
+                 "$size(v8, 2));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "01020305 ccdd0000\n"
+      "5 10 5 10 5 10\n"
+      "7 8 5 6\n"
+      "10 5\n"
+      "5 10 8 32 256 8\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_UnpackedDimensionsStagedThroughATypedefFollowTheVariablesOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef bit [1:5] bsix;\n"
+                       "typedef bsix mem_type [0:3];\n"
+                       "mem_type cba [0:7];\n"
+                       "package pk;\n"
+                       "  mem_type pba [0:7];\n"
+                       "endpackage\n"
+                       "class K;\n"
+                       "  mem_type kba [0:7];\n"
+                       "endclass\n"
+                       "module top;\n"
+                       "  mem_type ba [0:7];\n"
+                       "  K k;\n"
+                       "  function automatic void f();\n"
+                       "    mem_type lba [0:7];\n"
+                       "    lba[7][3] = 5'h1f;\n"
+                       "    $display(\"%0d %0d %0d %h\", $dimensions(lba), "
+                       "$size(lba, 2), $size(lba[0]), lba[7][3]);\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    k = new;\n"
+                       "    $display(\"%0d %0d %0d\", $dimensions(ba), "
+                       "$size(ba, 2), $size(ba[0]));\n"
+                       "    $display(\"%0d %0d %0d\", $dimensions(cba), "
+                       "$size(cba, 2), $size(cba[0]));\n"
+                       "    $display(\"%0d %0d %0d\", $dimensions(pk::pba), "
+                       "$size(pk::pba, 2), $size(pk::pba[0]));\n"
+                       "    $display(\"%0d %0d %0d\", $dimensions(k.kba), "
+                       "$size(k.kba, 2), $size(k.kba[0]));\n"
+                       "    f();\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 4 4\n"
+            "3 4 4\n"
+            "3 4 4\n"
+            "3 4 4\n"
+            "3 4 4 1f\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     SubarraysOfTwoDimensionsWholeArraysAndOtherShapesAreAssigned) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  int A[2][3][4], B[2][3][4], C[5][4];\n"
+          "  initial begin\n"
+          "    foreach (A[i, j, k]) A[i][j][k] = -1;\n"
+          "    foreach (B[i, j, k]) B[i][j][k] = i * 100 + j * 10 + k + 1;\n"
+          "    foreach (C[i, j]) C[i][j] = 1000 + i * 10 + j;\n"
+          "    A[1] = B[0];\n"
+          "    $display(\"%0d %0d %0d %0d\", A[1][0][0], A[1][2][3], "
+          "A[0][0][0],\n"
+          "             A[0][2][3]);\n"
+          "    A = B;\n"
+          "    $display(\"%0d %0d %0d\", A[0][2][1], A[1][1][3], A == B);\n"
+          "    A[0][1] = C[4];\n"
+          "    $display(\"%0d %0d %0d %0d\", A[0][1][0], A[0][1][3], "
+          "A[0][0][0],\n"
+          "             A[0][2][0]);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 24 -1 -1\n"
+      "22 114 1\n"
+      "1040 1043 1 21\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_SubarrayIsPassedToAnArrayFormal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  int B[2][3][4];\n"
+          "  int D[3][4];\n"
+          "  function automatic int sum(int x [3][4]);\n"
+          "    int s = 0;\n"
+          "    foreach (x[i, j]) s += x[i][j];\n"
+          "    return s;\n"
+          "  endfunction\n"
+          "  initial begin\n"
+          "    foreach (B[i, j, k]) B[i][j][k] = i * 100 + j * 10 + k + 1;\n"
+          "    D = B[1];\n"
+          "    $display(\"%0d %0d\", sum(D), sum(B[1]));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1350 1350\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     PackedArrayOfPackedStructSelectsInUnitPackageAndSubroutine) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef struct packed { logic [3:0] hi; logic [3:0] lo; } ps_t;\n"
+          "typedef logic [3:0] nib_t;\n"
+          "ps_t [1:0] cv = 16'h1234;\n"
+          "package pk;\n"
+          "  ps_t [1:0] pv = 16'h1234;\n"
+          "endpackage\n"
+          "module top;\n"
+          "  nib_t [1:0] n = 8'h6C;\n"
+          "  function automatic void f();\n"
+          "    ps_t [1:0] lv = 16'h1234;\n"
+          "    $display(\"%h %h %h %h\", lv[1], lv[1].lo, lv[0].hi, lv[1:0]);\n"
+          "    lv[0].hi = 4'hF;\n"
+          "    lv[1] = 8'h56;\n"
+          "    $display(\"%h\", lv);\n"
+          "  endfunction\n"
+          "  initial begin\n"
+          "    $display(\"%h %h %h %h\", cv[1], cv[1].lo, cv[0].hi, cv[1:0]);\n"
+          "    $display(\"%h %h %h %h\", pk::pv[1], pk::pv[1].lo, "
+          "pk::pv[0].hi,\n"
+          "             pk::pv[1:0]);\n"
+          "    f();\n"
+          "    cv[0].hi = 4'hF;\n"
+          "    cv[1] = 8'h56;\n"
+          "    pk::pv[0].hi = 4'hF;\n"
+          "    pk::pv[1] = 8'h56;\n"
+          "    $display(\"%h %h %h\", cv, pk::pv, n[1]);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "12 2 3 1234\n"
+      "12 2 3 1234\n"
+      "12 2 3 1234\n"
+      "56f4\n"
+      "56f4 56f4 6\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_PackedArrayOfPackedStructSelectsInAModuleAndAClass) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef struct packed { logic [3:0] hi; logic [3:0] lo; } ps_t;\n"
+          "class K;\n"
+          "  ps_t [1:0] kv = 16'h1234;\n"
+          "endclass\n"
+          "module top;\n"
+          "  ps_t [1:0] v = 16'h1234;\n"
+          "  K k;\n"
+          "  initial begin\n"
+          "    k = new;\n"
+          "    $display(\"%h %h %h %h\", v[1], v[1].lo, v[0].hi, v[1:0]);\n"
+          "    $display(\"%h %h %h %h\", k.kv[1], k.kv[1].lo, k.kv[0].hi, "
+          "k.kv[1:0]);\n"
+          "    v[0].hi = 4'hF;\n"
+          "    v[1] = 8'h56;\n"
+          "    k.kv[0].hi = 4'hF;\n"
+          "    k.kv[1] = 8'h56;\n"
+          "    $display(\"%h %h\", v, k.kv);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "12 2 3 1234\n"
+      "12 2 3 1234\n"
+      "56f4 56f4\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_PackedArrayMembersOfAnUnpackedStructAreWrittenThroughSelects) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef struct packed { logic [3:0] hi; logic [3:0] lo; } ps_t;\n"
+          "typedef struct { logic [1:0][3:0] q; ps_t [1:0] pa; } us_t;\n"
+          "module top;\n"
+          "  us_t s;\n"
+          "  initial begin\n"
+          "    s.q = 8'h6C;\n"
+          "    s.q[0] = 4'h3;\n"
+          "    s.pa = 16'h1234;\n"
+          "    s.pa[1].lo = 4'h9;\n"
+          "    s.pa[0] = 8'hAB;\n"
+          "    $display(\"%h %h\", s.q, s.pa);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "63 19ab\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_FixedArrayOfVariableSizeArraysInBlocksAndSubroutines) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  typedef int q_t [$];\n"
+          "  int dyn [];\n"
+          "  function automatic void f();\n"
+          "    int d1 [3][];\n"
+          "    int d2 [3][$];\n"
+          "    int d3 [3][string];\n"
+          "    int d4 [3][int];\n"
+          "    int d5 [3][$][2];\n"
+          "    int d6 [3][][2];\n"
+          "    q_t d7 [3];\n"
+          "    var type(dyn) d8 [3];\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", $size(d1), "
+          "$size(d2),\n"
+          "             $size(d3), $size(d4), $size(d5), $size(d6), "
+          "$size(d7),\n"
+          "             $size(d8));\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", d1[0].size(), "
+          "d2[0].size(),\n"
+          "             d3[0].num(), d4[0].num(), d5[0].size(), d6[0].size(),\n"
+          "             d7[0].size(), d8[0].size());\n"
+          "    d2[1].push_back(7);\n"
+          "    d3[2][\"k\"] = 4;\n"
+          "    d4[1][9] = 5;\n"
+          "    d7[2].push_back(6);\n"
+          "    $display(\"%0d %0d %0d %0d\", d2[1][0], d3[2][\"k\"], d4[1][9], "
+          "d7[2][0]);\n"
+          "  endfunction\n"
+          "  task automatic t();\n"
+          "    int d2 [3][$];\n"
+          "    int d3 [3][string];\n"
+          "    $display(\"%0d %0d %0d\", $size(d2), $size(d3), d3[0].num());\n"
+          "    d2[1].push_back(7);\n"
+          "    d3[2][\"k\"] = 4;\n"
+          "    $display(\"%0d %0d\", d2[1][0], d3[2][\"k\"]);\n"
+          "  endtask\n"
+          "  initial begin\n"
+          "    int d1 [3][];\n"
+          "    int d2 [3][$];\n"
+          "    int d3 [3][string];\n"
+          "    $display(\"%0d %0d %0d %0d\", $size(d1), $size(d2), $size(d3), "
+          "d1[0].size());\n"
+          "    d2[1].push_back(7);\n"
+          "    d3[2][\"k\"] = 4;\n"
+          "    $display(\"%0d %0d\", d2[1][0], d3[2][\"k\"]);\n"
+          "    f();\n"
+          "    t();\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "3 3 3 0\n"
+      "7 4\n"
+      "3 3 3 3 3 3 3 3\n"
+      "0 0 0 0 0 0 0 0\n"
+      "7 4 5 6\n"
+      "3 3 0\n"
+      "7 4\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_ModuleArraysOfAssociativeArraysKeepTheirEntries) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int ma [2][string];\n"
+                       "  int mi [3][int];\n"
+                       "  int dm [][string];\n"
+                       "  int da [][int];\n"
+                       "  initial begin\n"
+                       "    ma[1][\"k\"] = 4;\n"
+                       "    $display(\"%0d %0d %0d\", ma[1][\"k\"], "
+                       "ma[1].num(), ma[1].exists(\"k\"));\n"
+                       "    mi[1][9] = 5;\n"
+                       "    $display(\"%0d %0d\", mi[1][9], mi[1].num());\n"
+                       "    dm = new[2];\n"
+                       "    dm[1][\"k\"] = 4;\n"
+                       "    da = new[2];\n"
+                       "    da[1][9] = 5;\n"
+                       "    $display(\"%0d %0d\", dm[1][\"k\"], da[1][9]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 1 1\n"
+            "5 1\n"
+            "4 5\n");
+}
+
+TEST(MultidimensionalArraySimulation,
+     DISABLED_SubarraysAreComparedElementByElement) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  int A[2][3][4], B[2][3][4];\n"
+          "  int X[3][4], Y[3][4];\n"
+          "  initial begin\n"
+          "    foreach (B[i, j, k]) B[i][j][k] = i * 100 + j * 10 + k + 1;\n"
+          "    A = B;\n"
+          "    foreach (X[i, j]) X[i][j] = i + j;\n"
+          "    Y = X;\n"
+          "    Y[2][3] = 99;\n"
+          "    $display(\"%0d %0d %0d %0d\", A[1] == B[1], A[0] == B[1],\n"
+          "             A[0][1] == B[1][1], A[0][1][2] == B[1][1][2]);\n"
+          "    $display(\"%0d %0d %0d\", X == Y, A == B, A[0] != B[1]);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 0 0 0\n0 1 1\n");
+}
+
 }  // namespace
