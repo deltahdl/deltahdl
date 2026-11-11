@@ -260,4 +260,21 @@ TEST(ArrayPatternElaboration, TypedPatternWithClassScopedPrefixMatchingOk) {
              "endmodule\n"));
 }
 
+TEST(ArrayPatternElaboration,
+     DISABLED_ArrayItemForAnElementOfArrayTypeIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int a_t [2];\n"
+      "  a_t q [$]; a_t f2 [2]; a_t b, c;\n"
+      "  a_t d [2] = '{b, c};\n"
+      "  initial begin\n"
+      "    q = '{b, c};\n"
+      "    f2 = '{b, c};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

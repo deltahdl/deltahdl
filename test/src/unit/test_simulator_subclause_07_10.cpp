@@ -651,4 +651,101 @@ TEST(QueueSim, ABlockQueueOfArraysHoldsItsElements) {
   EXPECT_EQ(out, "3 1 7 5 2\n");
 }
 
+TEST(QueueAccess, DISABLED_QueueOfTypedefArraysPushesInsertsAndPops) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef int a_t [2];\n"
+                 "  a_t q [$]; a_t b = '{1, 2}, c = '{3, 4}, d = '{5, 6}, "
+                 "r;\n"
+                 "  initial begin\n"
+                 "    q.push_back(b); q.push_front(c); q.insert(1, d);\n"
+                 "    $display(\"%0d %0d %0d %0d\", q.size(), q[0][0], "
+                 "q[1][1], q[2][0]);\n"
+                 "    r = q.pop_front(); $display(\"%0d %0d\", r[0], "
+                 "r[1]);\n"
+                 "    r = q.pop_back(); $display(\"%0d %0d\", r[0], "
+                 "r[1]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "3 3 6 1\n3 4\n1 2\n");
+}
+
+TEST(QueueAccess, DISABLED_QueueOfArraysPopsWholeArrays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int q [$][2]; int b [2] = '{1, 2}, c [2] = '{3, 4}, "
+                       "r [2];\n"
+                       "  initial begin\n"
+                       "    q.push_back(b); q.push_front(c);\n"
+                       "    r = q.pop_front(); $display(\"%0d %0d\", r[0], "
+                       "r[1]);\n"
+                       "    r = q.pop_back(); $display(\"%0d %0d %0d\", r[0], "
+                       "r[1], q.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 4\n1 2 0\n");
+}
+
+TEST(QueueAccess, DISABLED_QueueOfTypedefArraysFromAConcatenation) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef int a_t [2];\n"
+                       "  a_t q [$]; a_t b = '{1, 2}, c = '{3, 4};\n"
+                       "  initial begin\n"
+                       "    q = {b, c};\n"
+                       "    $display(\"%0d %0d %0d\", q.size(), q[0][1], "
+                       "q[1][0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 2 3\n");
+}
+
+TEST(QueueAccess, QueuesOfStructuresAndUnionsPushAndPop) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {int x; byte y;} s_t;\n"
+                       "  typedef union {int i; bit [31:0] b;} u_t;\n"
+                       "  s_t sq [$]; s_t sv; u_t uq [$]; u_t uv;\n"
+                       "  initial begin\n"
+                       "    sv.x = 7; sv.y = 8; sq.push_back(sv); sv.x = 1;\n"
+                       "    sq.push_front(sv); sv = sq.pop_back();\n"
+                       "    $display(\"%0d %0d %0d\", sv.x, sv.y, sq[0].x);\n"
+                       "    uv.i = 9; uq.push_back(uv); uv = uq.pop_front();\n"
+                       "    $display(\"%0d %0d\", uv.i, uq.size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "7 8 1\n9 0\n");
+}
+
+TEST(QueueAccess, ClauseDeclarationsAndQueueOperatorRules) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  byte q1 [$]; string names [$] = {\"Bob\"};\n"
+          "  integer Q [$] = {3, 2, 7}; bit q2 [$:255];\n"
+          "  int A [$] = {10, 20, 30, 40}; int R [$]; int a, b; integer xi;\n"
+          "  initial begin\n"
+          "    $display(\"%0d %0d %0d %0d\", q1.size(), names.size(), Q[2], "
+          "q2.size());\n"
+          "    a = 2; b = 1; R = A[a:b]; $display(\"%0d\", R.size());\n"
+          "    R = A[1:1]; $display(\"%0d %0d\", R.size(), R[0]);\n"
+          "    R = A[5:5]; $display(\"%0d\", R.size());\n"
+          "    R = A[-1:-1]; $display(\"%0d\", R.size());\n"
+          "    xi = 'x; R = A[1:xi]; $display(\"%0d\", R.size());\n"
+          "    xi = 'z; R = A[xi:2]; $display(\"%0d\", R.size());\n"
+          "    R = A[-2:1]; $display(\"%0d %0d\", R.size(), R[0]);\n"
+          "    R = A[2:9]; $display(\"%0d %0d\", R.size(), R[$]);\n"
+          "    a = 0; b = 3; R = A[a+1:b]; $display(\"%0d\", R.size());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "0 1 7 0\n0\n1 20\n0\n0\n0\n0\n2 10\n2 40\n3\n");
+}
+
 }  // namespace
