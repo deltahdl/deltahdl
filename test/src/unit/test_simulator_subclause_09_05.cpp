@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <utility>
 
 #include "common/types.h"
@@ -291,6 +292,39 @@ TEST(Process, NestedForkSpawnsThreadPerStatement) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 2u}, {"c", 3u}});
+}
+
+TEST(Process, ProceduresInterleaveAndABlockedOneHoldsNoOtherBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  event never;\n"
+                 "  logic d = 0, q, y;\n"
+                 "  initial begin\n"
+                 "    $display(\"a %0t\", $time);\n"
+                 "    #2 $display(\"a %0t\", $time);\n"
+                 "    @(never);\n"
+                 "    $display(\"a woke\");\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    #1 $display(\"b %0t\", $time);\n"
+                 "    #2 $display(\"b %0t\", $time);\n"
+                 "    #2 d = 1;\n"
+                 "  end\n"
+                 "  always begin\n"
+                 "    #4 $display(\"w %0t\", $time);\n"
+                 "    @(never);\n"
+                 "  end\n"
+                 "  always_ff @(posedge d) q <= d;\n"
+                 "  always_comb y = d;\n"
+                 "  always @(q) $display(\"q %0t %0d %0d\", $time, q, y);\n"
+                 "  initial fork\n"
+                 "    begin #6 $display(\"x %0t\", $time); end\n"
+                 "    begin @(never); $display(\"z woke\"); end\n"
+                 "  join_none\n"
+                 "endmodule\n",
+                 f),
+      "a 0\nb 1\na 2\nb 3\nw 4\nq 5 1 1\nx 6\n");
 }
 
 }  // namespace
