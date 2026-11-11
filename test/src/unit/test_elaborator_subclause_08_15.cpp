@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -562,6 +564,176 @@ TEST(SuperElaboration, SuperInAModuleClassWithNoBaseIsAnError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'super' shall only be used in a derived class", 4,
                             "8.15"));
+}
+
+TEST(SuperElaboration, SuperValueParamInAMethodArrayDimensionIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class B #(int P = 4);\n"
+      "  localparam int LP = 5;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  localparam int OWN = 3;\n"
+      "  task t();\n"
+      "    int a[super.P];\n"
+      "    int b[OWN];\n"
+      "  endtask\n"
+      "  function new();\n"
+      "    int c[super.LP];\n"
+      "    int d[OWN];\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; D d; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "expression using 'super' to access base class "
+                            "value parameter 'P' is not a constant expression",
+                            7, "8.15"));
+  EXPECT_TRUE(
+      ReportedError(diags,
+                    "expression using 'super' to access base class local value "
+                    "parameter 'LP' is not a constant expression",
+                    11, "8.15"));
+  for (const int kLine : {8, 12}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(SuperElaboration,
+     DISABLED_SuperValueParamInAnyConstantContextOfAMethodIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class B #(int P = 4);\n"
+      "  localparam int LP = 5;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  localparam int OWN = 3;\n"
+      "  function int f();\n"
+      "    localparam int X = super.P;\n"
+      "    localparam int Y = OWN;\n"
+      "    bit [super.LP-1:0] pk;\n"
+      "    bit [OWN-1:0] pk2;\n"
+      "    B #(super.P) h;\n"
+      "    B #(OWN) h2;\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; D d; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {7, 11}) {
+    EXPECT_TRUE(
+        ReportedError(diags,
+                      "expression using 'super' to access base class "
+                      "value parameter 'P' is not a constant expression",
+                      kLine, "8.15"))
+        << kLine;
+  }
+  EXPECT_TRUE(
+      ReportedError(diags,
+                    "expression using 'super' to access base class local value "
+                    "parameter 'LP' is not a constant expression",
+                    9, "8.15"));
+  for (const int kLine : {8, 10, 12}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(SuperElaboration, SuperNewAfterAStatementIsReportedInEveryPlace) {
+  ElabFixture f;
+  ElabOk(
+      "class A; function new(); endfunction endclass\n"
+      "class C extends A;\n"
+      "  int y;\n"
+      "  function new(); int k; super.new(); y = k; endfunction\n"
+      "endclass\n"
+      "class D extends A;\n"
+      "  int y;\n"
+      "  function new(); y = 1; super.new(); endfunction\n"
+      "endclass\n"
+      "class E extends A;\n"
+      "  int y;\n"
+      "  extern function new();\n"
+      "endclass\n"
+      "function E::new(); y = 2; super.new(); endfunction\n"
+      "class F extends A;\n"
+      "  function new(); for (int i = 0; i < 1; i++) super.new(); "
+      "endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  class H extends A; int y; function new(); y = 1; super.new(); "
+      "endfunction endclass\n"
+      "endmodule\n"
+      "package p;\n"
+      "  class I extends A; int y; function new(); y = 1; super.new(); "
+      "endfunction endclass\n"
+      "endpackage\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {8, 14, 16, 19, 22}) {
+    EXPECT_TRUE(
+        ReportedError(diags,
+                      "super.new() does not open the constructor, and no "
+                      "executable statement may come before it",
+                      kLine, "8.17"))
+        << kLine;
+  }
+  EXPECT_FALSE(ErrorOnLine(diags, 4));
+}
+
+TEST(SuperElaboration, DISABLED_ASecondSuperNewCallIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class A; function new(); endfunction endclass\n"
+      "class G extends A;\n"
+      "  function new();\n"
+      "    super.new();\n"
+      "    super.new();\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; G g; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "super.new() does not open the constructor, and no "
+                            "executable statement may come before it",
+                            5, "8.17"));
+  EXPECT_FALSE(ErrorOnLine(diags, 4));
+}
+
+TEST(SuperElaboration, DISABLED_SuperNamingAMemberTheBaseLacksIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class A #(int P = 2);\n"
+      "  int count;\n"
+      "  function void f(); endfunction\n"
+      "endclass\n"
+      "class B extends A;\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "  int y;\n"
+      "  function void g();\n"
+      "    y = super.count;\n"
+      "    super.f();\n"
+      "    y = super.nothere;\n"
+      "    super.nofn();\n"
+      "    y = super.y;\n"
+      "    y = super.P;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; C c; endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "class 'B' has no member named 'nothere'",
+                            12, "8.15"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'B' has no member named 'nofn'", 13, "8.15"));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'B' has no member named 'y'", 14, "8.15"));
+  for (const int kLine : {10, 11, 15}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

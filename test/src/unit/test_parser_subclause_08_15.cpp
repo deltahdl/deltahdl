@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -86,6 +88,38 @@ TEST(SuperParsing, SuperPropertyAssignment) {
               "    super.x = 5;\n"
               "  endfunction\n"
               "endclass\n"));
+}
+
+TEST(SuperParsing, SuperSuperIsReportedInEveryUse) {
+  auto r = Parse(
+      "class A #(int P = 2);\n"
+      "  int count;\n"
+      "  function void f(); endfunction\n"
+      "  function new(); endfunction\n"
+      "endclass\n"
+      "class B extends A;\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "  int y;\n"
+      "  function new();\n"
+      "    super.super.new();\n"
+      "  endfunction\n"
+      "  function void g();\n"
+      "    super.super.count = 1;\n"
+      "    super.super.f();\n"
+      "    y = super.super.P;\n"
+      "    y = super.count;\n"
+      "    super.f();\n"
+      "  endfunction\n"
+      "endclass\n");
+  for (const int kLine : {11, 14, 15, 16}) {
+    EXPECT_TRUE(
+        ReportedError(r.diags, "'super.super' is not allowed", kLine, "8.15"))
+        << kLine;
+  }
+  for (const int kLine : {17, 18}) {
+    EXPECT_FALSE(ErrorOnLine(r.diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace
