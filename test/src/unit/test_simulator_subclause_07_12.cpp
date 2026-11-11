@@ -264,4 +264,21 @@ TEST(ArrayMethodsSim, MethodResultElementKeepsItsSign) {
   EXPECT_EQ(out, "-3 1\n");
 }
 
+TEST(ArrayMethodSim, ClauseExamplesSelectAfterTheCallOrTheWithClause) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string SA [10]; int uv, IA [int], qi [$];\n"
+                       "  initial begin\n"
+                       "    foreach (SA[i]) SA[i] = (i < 4) ? \"a\" : \"b\";\n"
+                       "    IA[1] = 7; IA[2] = 3; IA[3] = 9; IA[4] = 7;\n"
+                       "    uv = SA.unique().size();\n"
+                       "    qi = IA.find(x) with (x > 5).unique;\n"
+                       "    $display(\"%0d %0d %0d\", uv, qi.size(), "
+                       "IA.find(x) with (x > 5).size());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 2 3\n");
+}
+
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -217,6 +219,52 @@ TEST(ArrayMethodValidation, MissingWithClauseReportedAtElaboration) {
   EXPECT_TRUE(ReportedError(diags, "iterator argument without 'with' clause", 9,
                             "7.12"));
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 10u) << d.message;
+}
+
+TEST(ArrayMethodElaboration,
+     IteratorArgumentWithoutWithReportedForEveryMethodKind) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int a [3]; int b []; int s;\n"
+      "  initial begin\n"
+      "    s = a.sum(x);\n"
+      "    b = a.map(z);\n"
+      "    a.sort(w);\n"
+      "    s = a.sum(v) with (v + 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {4u, 5u, 6u}) {
+    EXPECT_TRUE(ReportedError(diags, "iterator argument without 'with' clause",
+                              line, "7.12"))
+        << line;
+  }
+  EXPECT_FALSE(ReportedError(diags, "iterator argument without 'with' clause",
+                             7, "7.12"));
+}
+
+TEST(ArrayMethodElaboration,
+     DISABLED_IteratorArgumentWithoutWithReportedInSubroutinesAndMethods) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class K;\n"
+      "  int a [3];\n"
+      "  function int f(); return a.sum(x); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int a [3];\n"
+      "  function int g(); return a.product(y); endfunction\n"
+      "  task tk; a.sort(w); endtask\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {3u, 7u, 8u}) {
+    EXPECT_TRUE(ReportedError(diags, "iterator argument without 'with' clause",
+                              line, "7.12"))
+        << line;
+  }
 }
 
 }  // namespace
