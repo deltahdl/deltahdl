@@ -209,4 +209,69 @@ TEST(ArrayLocatorSubarray, LocatorsSearchTheElementsOfAClassPropertysSubarray) {
   EXPECT_EQ(out, "'{4} '{6, 9} '{1, 3} 3 9\n");
 }
 
+TEST(ArrayLocatorResults,
+     AssociativeLocatorsFollowTheKeyOrderAndIndexLocatorsReturnKeys) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  int aa[int];\n"
+      "  byte unsigned ba[byte unsigned];\n"
+      "  int q[$];\n"
+      "  byte unsigned bq[$];\n"
+      "  initial begin\n"
+      "    aa[30] = 5; aa[-2] = 7; aa[10] = 5; aa[4] = 1;\n"
+      "    ba[200] = 1; ba[7] = 2;\n"
+      "    q = aa.unique_index; q.sort; $display(\"%p\", q);\n"
+      "    q = aa.min; $display(\"%p\", q);\n"
+      "    q = aa.max; $display(\"%p\", q);\n"
+      "    q = aa.unique; q.sort; $display(\"%p\", q);\n"
+      "    q = aa.find_first_index with (item == 5); $display(\"%p\", q);\n"
+      "    q = aa.find_last_index with (item == 5); $display(\"%p\", q);\n"
+      "    q = aa.find_first with (item > 3); $display(\"%p\", q);\n"
+      "    q = aa.find_last with (item > 3); $display(\"%p\", q);\n"
+      "    q = aa.find with (item); $display(\"%p\", q);\n"
+      "    q = aa.find_index with (2.5 * item > 12.0); $display(\"%p\", q);\n"
+      "    bq = ba.find_index with (item > 0);\n"
+      "    $display(\"%0d %0d %0d\", bq.size(), bq[0], bq[1]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "'{-2, 4, 10}\n'{1}\n'{7}\n'{1, 5, 7}\n'{10}\n'{30}\n'{7}\n'{5}\n"
+            "'{7, 1, 5, 5}\n'{-2, 10, 30}\n2 7 200\n");
+}
+
+TEST(ArrayLocatorResults,
+     LocatorsOverAnEmptyArrayAndInsideAClassMethodReturnQueues) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  class C;\n"
+      "    int v[4] = '{4, 9, 4, 1};\n"
+      "    function int count();\n"
+      "      int r[$];\n"
+      "      r = v.unique_index;\n"
+      "      return r.size();\n"
+      "    endfunction\n"
+      "    function int last();\n"
+      "      int r[$];\n"
+      "      r = v.find_last_index with (item == 4);\n"
+      "      return r[0];\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  int e[], q[$];\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    q = e.min; $write(\"%0d \", q.size());\n"
+      "    q = e.max; $write(\"%0d \", q.size());\n"
+      "    q = e.unique_index; $write(\"%0d \", q.size());\n"
+      "    q = e.find_index with (item > 0); $write(\"%0d \", q.size());\n"
+      "    q = e.find_last with (1); $write(\"%0d \", q.size());\n"
+      "    $display(\"%0d %0d\", c.count(), c.last());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0 0 0 0 3 2\n");
+}
+
 }  // namespace
