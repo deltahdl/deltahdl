@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -384,6 +385,43 @@ TEST(InterfaceClassParamTypeConflict, DistinctParamNamesInsideAModuleOk) {
              "    pure virtual function void fc();\n"
              "  endclass\n"
              "endmodule\n"));
+}
+
+TEST(InterfaceClassParameterConflictElaboration,
+     NameInheritedTwiceMustBeOverridden) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class PutImp #(type T = logic); pure virtual function void "
+      "put(T a); endclass\n"
+      "interface class GetImp #(type T = logic); pure virtual function T "
+      "get(); endclass\n"
+      "interface class PutGetIntf #(type TYPE = logic) extends PutImp#(TYPE), "
+      "GetImp#(TYPE);\n"
+      "  typedef TYPE T;\n"
+      "endclass\n"
+      "interface class PutGetBad #(type TYPE = logic) extends PutImp#(TYPE), "
+      "GetImp#(TYPE);\n"
+      "endclass\n"
+      "interface class PA; parameter int Q = 1; endclass\n"
+      "interface class PB; parameter int Q = 1; endclass\n"
+      "interface class PAB extends PA, PB; endclass\n"
+      "interface class PABok extends PA, PB; parameter int Q = 2; endclass\n"
+      "interface class TA; typedef int tt; endclass\n"
+      "interface class TB; typedef int tt; endclass\n"
+      "interface class TAB extends TA, TB; endclass\n"
+      "class CTAB implements TA, TB; endclass\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {6, 10, 14}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        "is inherited from multiple interface classes and must be overridden",
+        kLine, "8.26.6.2"))
+        << kLine;
+  }
+  for (const int kLine : {3, 11, 15}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

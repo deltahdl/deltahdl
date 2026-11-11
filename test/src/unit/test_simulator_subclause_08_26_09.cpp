@@ -154,4 +154,41 @@ TEST(InterfaceClassPrePostRandomizeSim, PostRandomizeViaInterfaceHandle) {
             1u);
 }
 
+TEST(InterfaceClassRandomizeSim,
+     RandomizeAndInlineConstraintsThroughAnInterfaceHandle) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class IR; pure virtual function int get(); endclass\n"
+      "interface class IR2; pure virtual function int get2(); endclass\n"
+      "class CR implements IR, IR2;\n"
+      "  rand int v;\n"
+      "  int pre, post;\n"
+      "  constraint c { v inside {[1:5]}; }\n"
+      "  virtual function int get(); return v; endfunction\n"
+      "  virtual function int get2(); return pre * 10 + post; endfunction\n"
+      "  function void pre_randomize(); pre = pre + 1; endfunction\n"
+      "  function void post_randomize(); post = post + 1; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  int r1, r2, r3, r4, r5;\n"
+      "  IR ih;\n"
+      "  IR2 i2;\n"
+      "  int lim = 3;\n"
+      "  initial begin\n"
+      "    CR c;\n"
+      "    c = new;\n"
+      "    ih = c;\n"
+      "    i2 = c;\n"
+      "    r1 = ih.randomize();\n"
+      "    r2 = (ih.get() >= 1 && ih.get() <= 5);\n"
+      "    r3 = ih.randomize() with { lim > 2; };\n"
+      "    r4 = i2.get2();\n"
+      "    r5 = ih.randomize() with { lim > 5; };\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design, {{"r1", 1u}, {"r2", 1u}, {"r3", 1u}, {"r4", 22u}, {"r5", 0u}});
+}
+
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -338,6 +340,54 @@ TEST(InterfaceClassPartialImplementation, VirtualClassInsideAModuleOk) {
              "    pure virtual function bit funcB();\n"
              "  endclass\n"
              "endmodule\n"));
+}
+
+TEST(InterfaceClassPartialElaboration,
+     EachPrototypeIsImplementedOrRedeclaredPure) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IntfClass; pure virtual function bit funcA(); pure "
+      "virtual function bit funcB(); endclass\n"
+      "virtual class ClassA implements IntfClass;\n"
+      "  virtual function bit funcA(); return 1; endfunction\n"
+      "  pure virtual function bit funcB();\n"
+      "endclass\n"
+      "class ClassB extends ClassA;\n"
+      "  virtual function bit funcB(); return 1; endfunction\n"
+      "endclass\n"
+      "virtual class VNone implements IntfClass;\n"
+      "  virtual function bit funcA(); return 1; endfunction\n"
+      "endclass\n"
+      "virtual class VNoPure implements IntfClass;\n"
+      "  virtual function bit funcA(); return 1; endfunction\n"
+      "  virtual function bit funcB(); return 0; endfunction\n"
+      "endclass\n"
+      "virtual class VBase; pure virtual function bit funcB(); endclass\n"
+      "virtual class VInh extends VBase implements IntfClass;\n"
+      "  virtual function bit funcA(); return 1; endfunction\n"
+      "endclass\n"
+      "class CNotFull extends ClassA; endclass\n"
+      "module m;\n"
+      "  int r1;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {9}) {
+    EXPECT_TRUE(ReportedError(
+        diags,
+        "neither implements nor re-declares as pure virtual the method 'funcB'",
+        kLine, "8.26.7"))
+        << kLine;
+  }
+  for (const int kLine : {20}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "does not implement pure virtual method 'funcB' from interface",
+        kLine, "8.26"))
+        << kLine;
+  }
+  for (const int kLine : {2, 6, 12, 17}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

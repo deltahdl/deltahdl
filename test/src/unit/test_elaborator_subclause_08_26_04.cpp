@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -450,6 +452,54 @@ TEST(InterfaceClassTypeUsageRestrictions, ForwardTypedefThenDeclThenExtendsOk) {
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
+}
+
+TEST(InterfaceClassTypeUsageElaboration,
+     TypeParameterForwardTypedefAndLaterDeclarationAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class PutImp #(type PUT_T = logic); pure virtual function "
+      "void put(PUT_T a); endclass\n"
+      "class F1 #(type T = PutImp) implements T; endclass\n"
+      "virtual class F2 #(type T = PutImp) implements T; endclass\n"
+      "interface class F3 #(type T = PutImp) extends T; endclass\n"
+      "typedef interface class IntfD;\n"
+      "class ClassB implements IntfD #(bit);\n"
+      "  virtual function bit [1:0] funcD(); return 0; endfunction\n"
+      "endclass\n"
+      "interface class IE extends IntfD; endclass\n"
+      "interface class IntfD #(type T1 = logic);\n"
+      "  typedef T1 [1:0] T2;\n"
+      "  pure virtual function T2 funcD();\n"
+      "endclass : IntfD\n"
+      "class Later implements LaterI; virtual function void f(); endfunction "
+      "endclass\n"
+      "interface class LaterI; pure virtual function void f(); endclass\n"
+      "interface class LE extends LaterI2; endclass\n"
+      "interface class LaterI2; pure virtual function void f(); endclass\n"
+      "interface class Ok1; pure virtual function void f(); endclass\n"
+      "class Ok2 implements Ok1; virtual function void f(); endfunction "
+      "endclass\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {2, 3, 4}) {
+    EXPECT_TRUE(
+        ReportedError(diags, "names type parameter 'T'", kLine, "8.26.4"))
+        << kLine;
+  }
+  for (const int kLine : {6, 9}) {
+    EXPECT_TRUE(
+        ReportedError(diags, "only through a forward typedef", kLine, "8.26.4"))
+        << kLine;
+  }
+  for (const int kLine : {14, 16}) {
+    EXPECT_TRUE(
+        ReportedError(diags, "has to be declared ahead of", kLine, "8.26.4"))
+        << kLine;
+  }
+  for (const int kLine : {18, 19}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

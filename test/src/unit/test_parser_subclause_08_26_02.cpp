@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -122,6 +123,17 @@ TEST(ExtendsVsImplementsParsing, InterfaceClassNoExtends) {
   EXPECT_TRUE(cls->base_class.empty());
   EXPECT_TRUE(cls->extends_interfaces.empty());
   EXPECT_TRUE(cls->implements_types.empty());
+}
+
+TEST(InterfaceClassParsing, AClassExtendingTwoClassesIsRefused) {
+  auto r = Parse(
+      "class C; endclass\n"
+      "class D; endclass\n"
+      "class X extends C, D;\n"
+      "endclass\n");
+  const auto& diags = r.diags;
+  EXPECT_TRUE(
+      ReportedError(diags, "a class extends one class type", 3, "A.1.2"));
 }
 
 }  // namespace

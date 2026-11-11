@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -379,6 +380,55 @@ TEST(InterfaceClassImplements,
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
+}
+
+TEST(InterfaceClassExtendsImplementsElaboration,
+     EachForbiddenExtendsOrImplementsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class A; pure virtual function int fa(); endclass\n"
+      "interface class B; pure virtual function int fb(); endclass\n"
+      "class C; virtual function int fa(); return 1; endfunction endclass\n"
+      "virtual class VC; endclass\n"
+      "interface class X1 implements A; endclass\n"
+      "interface class X2 extends C; endclass\n"
+      "interface class X3 extends VC; endclass\n"
+      "class X4 extends A; endclass\n"
+      "class X5 implements C; endclass\n"
+      "class X6 implements VC; endclass\n"
+      "virtual class X7 extends A; endclass\n"
+      "interface class X8 extends A, B; endclass\n"
+      "class X9 extends C implements A, B; virtual function int fb(); return "
+      "2; endfunction endclass\n"
+      "virtual class X10 implements A, B; pure virtual function int fa(); pure "
+      "virtual function int fb(); endclass\n"
+      "interface class X11; endclass\n"
+      "class X12 implements X11; endclass\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {5}) {
+    EXPECT_TRUE(
+        ReportedError(diags, "shall not use 'implements'", kLine, "8.26.2"))
+        << kLine;
+  }
+  for (const int kLine : {6, 7}) {
+    EXPECT_TRUE(ReportedError(diags, "cannot extend non-interface class", kLine,
+                              "8.26.2"))
+        << kLine;
+  }
+  for (const int kLine : {8, 11}) {
+    EXPECT_TRUE(
+        ReportedError(diags, "cannot extend interface class", kLine, "8.26.2"))
+        << kLine;
+  }
+  for (const int kLine : {9, 10}) {
+    EXPECT_TRUE(ReportedError(diags, "cannot implement non-interface class",
+                              kLine, "8.26.2"))
+        << kLine;
+  }
+  for (const int kLine : {12, 13, 14, 16}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

@@ -312,4 +312,35 @@ TEST(InterfaceClassTypeAccess, SpecializedTypedefReturnTypeFollowsActual) {
       804u);
 }
 
+TEST(InterfaceClassTypeAccessSim, ScopedInterfaceMembersAndAnOwnParameterRead) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class IntfC;\n"
+      "  parameter int SIZE = 64;\n"
+      "  localparam int LP = 3;\n"
+      "  typedef enum {ONE, TWO, THREE} t1_t;\n"
+      "  pure virtual function t1_t funcC();\n"
+      "endclass\n"
+      "class ClassOk implements IntfC;\n"
+      "  int x = IntfC::SIZE;\n"
+      "  localparam int SIZE = 5;\n"
+      "  int w = SIZE;\n"
+      "  virtual function IntfC::t1_t funcC();\n"
+      "    IntfC::t1_t local_v;\n"
+      "    int y;\n"
+      "    y = IntfC::LP;\n"
+      "    return IntfC::ONE;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    ClassOk o; o = new;\n"
+      "    r1 = o.x; r2 = o.w; r3 = o.funcC();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 64u}, {"r2", 5u}, {"r3", 0u}});
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 
 using namespace delta;
@@ -191,6 +192,79 @@ TEST(InterfaceClassSyntax, SecondExtendsBaseWithTypeParams) {
   EXPECT_EQ(r.cu->classes[2]->base_class, "IA");
   ASSERT_EQ(r.cu->classes[2]->extends_interfaces.size(), 1u);
   EXPECT_EQ(r.cu->classes[2]->extends_interfaces[0].name, "IB");
+}
+
+TEST(InterfaceClassParsing, ExternPrototypeAndAMismatchedEndLabelAreRefused) {
+  auto r = Parse(
+      "interface class I1;\n"
+      "  int x;\n"
+      "endclass\n"
+      "interface class I2;\n"
+      "  function void f(); endfunction\n"
+      "endclass\n"
+      "interface class I3;\n"
+      "  virtual function void f(); endfunction\n"
+      "endclass\n"
+      "interface class I4;\n"
+      "  constraint c { 1; }\n"
+      "endclass\n"
+      "interface class I5;\n"
+      "  covergroup cg; endgroup\n"
+      "endclass\n"
+      "interface class I6;\n"
+      "  class N; endclass\n"
+      "endclass\n"
+      "interface class I7;\n"
+      "  interface class NI; endclass\n"
+      "endclass\n"
+      "interface class I8;\n"
+      "  static function void f(); endfunction\n"
+      "endclass\n"
+      "interface class I9;\n"
+      "  task t(); endtask\n"
+      "endclass\n"
+      "interface class I10;\n"
+      "  rand int r;\n"
+      "endclass\n"
+      "interface class I11;\n"
+      "  extern virtual function void f();\n"
+      "endclass\n"
+      "interface class OK;\n"
+      "  typedef int t_t;\n"
+      "  parameter int P = 1;\n"
+      "  localparam int L = 2;\n"
+      "  pure virtual function void f();\n"
+      "  pure virtual task t();\n"
+      "  ;\n"
+      "  (* a *) pure virtual function int g(int a = 3);\n"
+      "endclass : OK\n"
+      "class Holder;\n"
+      "  interface class HI; pure virtual function void f(); endclass\n"
+      "endclass\n"
+      "package pk;\n"
+      "  interface class PI; pure virtual function void f(); endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  interface class MI; pure virtual function void f(); endclass\n"
+      "endmodule\n"
+      "interface ifc;\n"
+      "  interface class FI; pure virtual function void f(); endclass\n"
+      "endinterface\n"
+      "program prg;\n"
+      "  interface class GI; pure virtual function void f(); endclass\n"
+      "endprogram\n"
+      "interface class I12;\n"
+      "  enum {A, B} e;\n"
+      "endclass\n"
+      "interface class I13 #(int Q = 1);\n"
+      "  pure virtual function void f();\n"
+      "endclass : I13x\n");
+  const auto& diags = r.diags;
+  EXPECT_TRUE(ReportedError(
+      diags, "'extern' is no qualifier of a method of an interface class", 32,
+      "A.1.9"));
+  EXPECT_TRUE(ReportedError(diags, "end label 'I13x' does not match 'I13'", 63,
+                            "9.3.4"));
 }
 
 }  // namespace

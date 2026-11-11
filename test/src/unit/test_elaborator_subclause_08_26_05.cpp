@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -375,6 +377,71 @@ TEST(InterfaceClassCastingAndRefAssignment,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot construct object of interface class", 7,
                             "8.26.5"));
+}
+
+TEST(InterfaceClassCastingElaboration, ConstructingAnInterfaceClassIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class PutImp #(type PUT_T = logic); pure virtual function "
+      "void put(PUT_T a); endclass\n"
+      "interface class A; endclass\n"
+      "module m;\n"
+      "  PutImp#(int) put_ref;\n"
+      "  A a;\n"
+      "  initial begin\n"
+      "    put_ref = new();\n"
+      "    a = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {7, 8}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "cannot construct object of interface class", kLine, "8.26.5"))
+        << kLine;
+  }
+}
+
+const char* const kInterfaceSpecializationAssignmentSrc =
+    "interface class PutImp #(type PUT_T = logic); pure virtual function void "
+    "put(PUT_T a); endclass\n"
+    "class CI implements PutImp#(int);\n"
+    "  virtual function void put(int a); endfunction\n"
+    "endclass\n"
+    "module m;\n"
+    "  CI ci;\n"
+    "  PutImp#(int) pi;\n"
+    "  PutImp#(byte) pb;\n"
+    "  PutImp pl;\n"
+    "  initial begin\n"
+    "    ci = new;\n"
+    "    pi = ci;\n"
+    "    pb = ci;\n"
+    "    pl = ci;\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(InterfaceClassCastingElaboration,
+     HandleAssignsToTheSpecializationItImplements) {
+  ElabFixture f;
+  ElaborateSrc(kInterfaceSpecializationAssignmentSrc, f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {12}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
+TEST(InterfaceClassCastingElaboration,
+     DISABLED_HandleAssignedToAnotherSpecializationIsReported) {
+  ElabFixture f;
+  ElaborateSrc(kInterfaceSpecializationAssignmentSrc, f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {13, 14}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "class handle assignment requires assignment compatible types",
+        kLine, "8.4"))
+        << kLine;
+  }
 }
 
 }  // namespace

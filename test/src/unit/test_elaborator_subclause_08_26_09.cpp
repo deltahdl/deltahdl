@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -424,6 +426,46 @@ TEST(InterfaceClassRandomize,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "is not legal on interface class handle", 8,
                             "8.26.9"));
+}
+
+TEST(InterfaceClassRandomizeElaboration,
+     ModeMethodsThroughAnInterfaceHandleAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IR; pure virtual function int get(); endclass\n"
+      "class CR implements IR;\n"
+      "  rand int v;\n"
+      "  virtual function int get(); return v; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  IR ih;\n"
+      "  initial begin\n"
+      "    CR c;\n"
+      "    c = new;\n"
+      "    ih = c;\n"
+      "    ih.rand_mode(0);\n"
+      "    ih.constraint_mode(0);\n"
+      "    void'(ih.randomize());\n"
+      "    c.rand_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {12}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "'rand_mode' is not legal on interface class handle", kLine,
+        "8.26.9"))
+        << kLine;
+  }
+  for (const int kLine : {13}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "'constraint_mode' is not legal on interface class handle",
+        kLine, "8.26.9"))
+        << kLine;
+  }
+  for (const int kLine : {14, 15}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace

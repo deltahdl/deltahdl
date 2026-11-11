@@ -385,4 +385,99 @@ TEST(InterfaceClassCastingAndRefAssignment, ConstructionRejectionNames8_26_5) {
                             "8.26.5"));
 }
 
+TEST(InterfaceClassCastingAndRefAssignment,
+     CastsBetweenUnparameterizedInterfacesAndClassesSucceed) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class P; pure virtual function void put(int a); endclass\n"
+      "interface class G; pure virtual function int get(); endclass\n"
+      "class F implements P, G;\n"
+      "  int v;\n"
+      "  virtual function void put(int a); v = a; endfunction\n"
+      "  virtual function int get(); return v; endfunction\n"
+      "endclass\n"
+      "class FS extends F; endclass\n"
+      "module m;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  F f;\n"
+      "  FS fs;\n"
+      "  P p;\n"
+      "  G g;\n"
+      "  initial begin\n"
+      "    f = new;\n"
+      "    p = f;\n"
+      "    r1 = $cast(g, p);\n"
+      "    r2 = $cast(p, f);\n"
+      "    fs = new;\n"
+      "    p = fs;\n"
+      "    r3 = $cast(g, p);\n"
+      "    r4 = $cast(f, p);\n"
+      "    r5 = $cast(g, fs);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design, {{"r1", 1u}, {"r2", 1u}, {"r3", 1u}, {"r4", 1u}, {"r5", 1u}});
+}
+
+const char* const kInterfaceSpecializationCastSrc =
+    "interface class PutImp #(type PUT_T = logic); pure virtual function void "
+    "put(PUT_T a); endclass\n"
+    "interface class GetImp #(type GET_T = logic); pure virtual function GET_T "
+    "get(); endclass\n"
+    "class Fifo #(type T = int) implements PutImp#(T), GetImp#(T);\n"
+    "  T q[$];\n"
+    "  virtual function void put(T a); q.push_back(a); endfunction\n"
+    "  virtual function T get(); return q.pop_front(); endfunction\n"
+    "endclass\n"
+    "class CI implements PutImp#(int), GetImp#(int);\n"
+    "  int q[$];\n"
+    "  virtual function void put(int a); q.push_back(a); endfunction\n"
+    "  virtual function int get(); return q.pop_front(); endfunction\n"
+    "endclass\n"
+    "class CD implements PutImp#(logic), GetImp#(logic);\n"
+    "  logic q[$];\n"
+    "  virtual function void put(logic a); q.push_back(a); endfunction\n"
+    "  virtual function logic get(); return q.pop_front(); endfunction\n"
+    "endclass\n"
+    "module m;\n"
+    "  int r1, r2, r3, r4, r5, r6, r7, r8;\n"
+    "  Fifo#(int) fo;\n"
+    "  CI ci;\n"
+    "  CD cd;\n"
+    "  PutImp#(int) pi;\n"
+    "  GetImp#(int) gi;\n"
+    "  PutImp#(logic) pd;\n"
+    "  GetImp#(logic) gd;\n"
+    "  GetImp#(byte) gb;\n"
+    "  initial begin\n"
+    "    ci = new; pi = ci;\n"
+    "    r1 = $cast(gi, pi);\n"
+    "    r2 = $cast(gi, ci);\n"
+    "    cd = new; pd = cd;\n"
+    "    r3 = $cast(gd, pd);\n"
+    "    r4 = $cast(gd, cd);\n"
+    "    fo = new; pi = fo;\n"
+    "    r5 = $cast(gi, pi);\n"
+    "    r6 = $cast(gi, fo);\n"
+    "    r7 = $cast(gb, fo);\n"
+    "    pi.put(9); r8 = fo.get();\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(InterfaceClassCastingAndRefAssignment,
+     CastToTheDefaultSpecializationOrUnparameterizedInterfaceSucceeds) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kInterfaceSpecializationCastSrc, f);
+  LowerRunAndCheck(f, design, {{"r3", 1u}, {"r4", 1u}, {"r7", 0u}, {"r8", 9u}});
+}
+
+TEST(
+    InterfaceClassCastingAndRefAssignment,
+    DISABLED_CastToAnInterfaceClassSpecializationFollowsWhatTheObjectImplements) {
+  SimFixture f;
+  auto* design = ElaborateSrc(kInterfaceSpecializationCastSrc, f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 1u}, {"r5", 1u}, {"r6", 1u}});
+}
+
 }  // namespace

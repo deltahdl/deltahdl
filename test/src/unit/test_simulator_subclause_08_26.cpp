@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -53,6 +54,36 @@ TEST(InterfaceClassSim, FifoAndStackOverAQueuePropertyThroughInterfaceHandles) {
                       "endmodule\n",
                       "out"),
             566u);
+}
+
+TEST(InterfaceClassSim, ImplementationIsImplicitOrInheritedFromAVirtualMethod) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "interface class A; pure virtual function int fa(); endclass\n"
+      "class Base implements A; virtual function int fa(); return 1; "
+      "endfunction endclass\n"
+      "class Sub extends Base; endclass\n"
+      "class BaseV; virtual function int fa(); return 6; endfunction endclass\n"
+      "class InhV extends BaseV implements A; endclass\n"
+      "class BaseNV; function int fa(); return 7; endfunction endclass\n"
+      "class InhNVFix extends BaseNV implements A; virtual function int fa(); "
+      "return 8; endfunction endclass\n"
+      "module m;\n"
+      "  A ah;\n"
+      "  Sub s;\n"
+      "  InhV iv;\n"
+      "  InhNVFix nf;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    s = new; iv = new; nf = new;\n"
+      "    ah = s; r1 = ah.fa();\n"
+      "    ah = iv; r2 = ah.fa();\n"
+      "    ah = nf; r3 = ah.fa();\n"
+      "    r4 = $cast(ah, s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 6u}, {"r3", 8u}, {"r4", 1u}});
 }
 
 }  // namespace
