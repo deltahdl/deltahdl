@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -254,6 +256,95 @@ TEST(AssocTraversalArgElaboration,
                             "assignment compatible with the index type of "
                             "associative array 'aa'",
                             7, "7.9.8"));
+}
+
+TEST(BuiltinMethodElaboration,
+     DISABLED_ArgumentNotCompatibleWithAClassEnumOrStructIndexIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Base; endclass\n"
+      "class Der extends Base; endclass\n"
+      "class U; endclass\n"
+      "module t;\n"
+      "  typedef enum {A, B} e_t; typedef enum {X, Y} f_t;\n"
+      "  typedef struct {int a;} s_t; typedef struct {int a;} r_t;\n"
+      "  int ac [Base]; int ae [e_t]; int ai [int]; int as [string]; "
+      "int au [s_t];\n"
+      "  U u; Der d; int i; string s; f_t f; e_t e; chandle ch; Base b; "
+      "r_t r;\n"
+      "  initial begin\n"
+      "    void'(ac.first(u));\n"
+      "    void'(ac.last(i));\n"
+      "    void'(ac.next(s));\n"
+      "    void'(ac.prev(d));\n"
+      "    void'(ae.first(f));\n"
+      "    void'(ae.last(s));\n"
+      "    void'(ai.next(e));\n"
+      "    void'(ai.prev(b));\n"
+      "    void'(as.first(ch));\n"
+      "    void'(au.last(i));\n"
+      "    void'(au.next(r));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line = 10; line <= 20; ++line) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "argument is not assignment compatible with the "
+                              "index type of associative array",
+                              line, "7.9.8"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 11u);
+}
+
+TEST(BuiltinMethodElaboration,
+     DISABLED_ArgumentCheckReachesPropertiesHandlesAndMembers) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class K;\n"
+      "  int aa [int]; string s;\n"
+      "  function void f(); void'(aa.first(s)); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  typedef struct {int m [int];} h_t;\n"
+      "  K o; h_t hv; string s;\n"
+      "  initial begin\n"
+      "    o = new; void'(o.aa.first(s));\n"
+      "    void'(hv.m.last(s));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {3u, 9u, 10u}) {
+    EXPECT_TRUE(ReportedError(diags,
+                              "argument is not assignment compatible with the "
+                              "index type of associative array",
+                              line, "7.9.8"))
+        << line;
+  }
+}
+
+TEST(BuiltinMethodElaboration,
+     CompatibleArgumentOnAClassEnumStructChandleOrEventIndexIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Base; endclass\n"
+      "class Der extends Base; endclass\n"
+      "module t;\n"
+      "  typedef enum {A, B} e_t; typedef struct packed {bit [3:0] h;} p_t;\n"
+      "  typedef struct {int a;} s_t;\n"
+      "  int ac [Base]; int ae [e_t]; int ap [p_t]; int au [s_t];\n"
+      "  int ach [chandle]; int aev [event]; int ad [Der];\n"
+      "  Base b; e_t e; int i; s_t sv; chandle ch; event ev;\n"
+      "  initial begin\n"
+      "    void'(ac.first(b)); void'(ae.first(e)); void'(ae.next(i));\n"
+      "    void'(ap.first(i)); void'(au.first(sv)); void'(ach.first(ch));\n"
+      "    void'(aev.first(ev)); void'(ad.first(b));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
