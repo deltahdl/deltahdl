@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -249,6 +250,194 @@ TEST(NetAliasingSimulation, APatternOperandJoinsItsItemsBitsInOrder) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "5 c 3 e\n");
+}
+
+TEST(NetAliasingSimulation, ATranReachesAcrossAnAliasOfBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire [3:0] a, b; wire c, e;\n"
+                       "  alias a[3:0] = {b[0], b[1], b[2], b[3]};\n"
+                       "  tran (b[0], c);\n"
+                       "  assign (pull0, pull1) c = 1'b1;\n"
+                       "  tran (b[1], e);\n"
+                       "  assign a[2] = 1'b0;\n"
+                       "  initial #1 $display(\"%v %v\", a[3], e);\n"
+                       "endmodule\n",
+                       f),
+            "Pu1 St0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, TwoBitAliasStatementsCarryBothWays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire [3:0] a, b, c;\n"
+                       "  alias {a[1:0]} = {b[1:0]};\n"
+                       "  alias {b[1:0]} = {c[1:0]};\n"
+                       "  assign c[0] = 1'b1;\n"
+                       "  assign a[1] = 1'b0;\n"
+                       "  initial #1 $display(\"%b %b\", a[0], c[1]);\n"
+                       "endmodule\n",
+                       f),
+            "1 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, AUdpOutputReachesAcrossAnAliasOfBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive inv(output o, input i);\n"
+                       "  table 0 : 1; 1 : 0; endtable\n"
+                       "endprimitive\n"
+                       "module t;\n"
+                       "  wire [1:0] a, b; reg r = 0, s = 1;\n"
+                       "  alias a[1:0] = {b[0], b[1]};\n"
+                       "  inv g(b[1], r);\n"
+                       "  inv h(a[1], s);\n"
+                       "  initial #1 $display(\"%v %v\", a[0], b[0]);\n"
+                       "endmodule\n",
+                       f),
+            "St1 St0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, PullAndSupplyNetsReachAcrossAnAliasOfBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  tri1 [1:0] a0, p1; tri0 [1:0] a1, p0;\n"
+                       "  supply1 [1:0] a2, s1; supply0 [1:0] a3, s0;\n"
+                       "  alias a0[1:0] = {p1[0], p1[1]};\n"
+                       "  alias a1 = {p0[1], p0[0]};\n"
+                       "  alias a2[1:0] = {s1[0], s1[1]};\n"
+                       "  alias a3 = s0;\n"
+                       "  initial #1 $display(\"%v %v %v %v\", a0[0], a1[1], "
+                       "a2[0], a3[1]);\n"
+                       "endmodule\n",
+                       f),
+            "Pu1 Pu0 Su1 Su0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, ATriregChargeReachesAcrossAnAliasOfBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  trireg [1:0] a, b; reg en = 1;\n"
+                       "  alias a[1:0] = {b[0], b[1]};\n"
+                       "  bufif1 (b[1], 1'b1, en);\n"
+                       "  initial begin #5 en = 0; #5 $display(\"%v\", a[0]); "
+                       "end\n"
+                       "endmodule\n",
+                       f),
+            "Me1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, ADelayedDriverLeavesXAcrossAnAliasOfBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire [1:0] a, b;\n"
+                       "  alias a[1:0] = {b[0], b[1]};\n"
+                       "  assign #5 b = 2'b11;\n"
+                       "  initial begin #1 $display(\"%v\", a[0]); #5 "
+                       "$display(\"%v\", a[0]); end\n"
+                       "endmodule\n",
+                       f),
+            "StX\nSt1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, ImplicitAliasNetsCarryEitherWay) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire a; alias a = b;\n"
+                       "  assign a = 1'b1;\n"
+                       "  wire c; alias c = d = e;\n"
+                       "  assign e = 1'b0;\n"
+                       "  initial #1 $display(\"%b %b %b\", b, c, d);\n"
+                       "endmodule\n",
+                       f),
+            "1 0 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation,
+     DISABLED_ImplicitNetsOfAConcatenationOperandJoinTheBits) {
+  for (const char* src : {"module t;\n"
+                          "  wire [1:0] a; alias a = {b, c};\n"
+                          "  assign a = 2'b10;\n"
+                          "  initial #1 $display(\"%b %b\", b, c);\n"
+                          "endmodule\n",
+                          "module t;\n"
+                          "  if (1) begin : g\n"
+                          "    wire [1:0] a; alias a = {b, c};\n"
+                          "    assign a = 2'b10;\n"
+                          "  end\n"
+                          "  initial #1 $display(\"%b %b\", g.b, g.c);\n"
+                          "endmodule\n",
+                          "interface I;\n"
+                          "  wire [1:0] a; alias a = {b, c};\n"
+                          "  assign a = 2'b10;\n"
+                          "endinterface\n"
+                          "module t;\n"
+                          "  I u();\n"
+                          "  initial #1 $display(\"%b %b\", u.b, u.c);\n"
+                          "endmodule\n"}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(src, f), "1 0\n") << src;
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
+}
+
+TEST(NetAliasingSimulation, AnInterfaceAliasJoinsEachInstancesNets) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface bus; wire a, b; alias a = b; endinterface\n"
+                       "module t;\n"
+                       "  bus u(); bus v();\n"
+                       "  assign u.a = 1'b1;\n"
+                       "  assign v.b = 1'b0;\n"
+                       "  initial #1 $display(\"%b %b %b %b\", u.a, u.b, v.a, "
+                       "v.b);\n"
+                       "endmodule\n",
+                       f),
+            "1 1 0 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation, AliasesInAnInterfacesGenerateBlocks) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface bus #(parameter N = 2);\n"
+                 "  wire a, b, c, d;\n"
+                 "  if (N > 1) begin : g alias a = b; end\n"
+                 "  for (genvar i = 0; i < 1; i++) begin : l alias c = d; "
+                 "end\n"
+                 "  assign b = 1; assign c = 0;\n"
+                 "endinterface\n"
+                 "module t; bus u(); initial #1 $display(\"%b %b\", u.a, "
+                 "u.d); endmodule\n",
+                 f),
+      "1 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingSimulation,
+     DISABLED_AnInterfaceAliasOfAPortNetReachesTheConnectedNet) {
+  for (const auto& [src, expected] :
+       {std::pair{"interface bus(inout wire p);\n"
+                  "  wire q; alias p = q; assign q = 1'b1;\n"
+                  "endinterface\n"
+                  "module t; wire n; bus u(n); initial #1 $display(\"%b\", "
+                  "n); endmodule\n",
+                  "1\n"},
+        std::pair{"interface bus(inout wire [1:0] p);\n"
+                  "  wire [1:0] q; alias p = q; assign q = 2'b10;\n"
+                  "endinterface\n"
+                  "module t; wire [1:0] n; bus u(n); initial #1 "
+                  "$display(\"%b\", n); endmodule\n",
+                  "10\n"}}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(src, f), expected) << src;
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
 }
 
 }  // namespace

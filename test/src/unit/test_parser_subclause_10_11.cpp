@@ -80,4 +80,12 @@ TEST(NetAliasingParsing, AliasAmongOtherModuleItems) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
 }
 
+TEST(NetAliasingParsing, AnAliasInAClassIsRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  alias a = b;\n"
+      "endclass\n");
+  EXPECT_TRUE(r.has_errors);
+}
+
 }  // namespace

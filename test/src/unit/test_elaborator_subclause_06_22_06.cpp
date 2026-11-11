@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -220,6 +221,43 @@ TEST(MatchingNettypes,
     ElabFixture f;
     ElaborateSrc(std::string(src), f);
     EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+TEST(MatchingNettypes, DISABLED_AliasOfANettypeNetAndAWireIsReported) {
+  for (const auto& [src, line] :
+       {std::pair{"module t;\n"
+                  "  nettype logic [3:0] n1_t;\n"
+                  "  n1_t a; wire [3:0] w;\n"
+                  "  alias a = w;\n"
+                  "endmodule\n",
+                  4},
+        std::pair{"module t;\n"
+                  "  nettype logic [3:0] n1_t;\n"
+                  "  n1_t a; wire [3:0] w;\n"
+                  "  alias a[1:0] = w[1:0];\n"
+                  "endmodule\n",
+                  4},
+        std::pair{"interface i;\n"
+                  "  nettype logic n1; nettype logic n3;\n"
+                  "  n1 a; n3 b;\n"
+                  "  alias a = b;\n"
+                  "endinterface\n"
+                  "module t; i u(); endmodule\n",
+                  4},
+        std::pair{"module t;\n"
+                  "  nettype logic [1:0] n1; nettype logic [1:0] n3;\n"
+                  "  if (1) begin : g\n"
+                  "    n1 a; n3 b;\n"
+                  "    alias a[0] = b[0];\n"
+                  "  end\n"
+                  "endmodule\n",
+                  5}}) {
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "different net types", line,
+                              "10.11"))
+        << src;
   }
 }
 

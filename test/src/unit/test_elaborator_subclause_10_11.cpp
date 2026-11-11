@@ -516,4 +516,67 @@ TEST(NetAliasingElaboration, TypedPatternOperandItemWidthMismatchIsError) {
                             4, "10.9"));
 }
 
+TEST(NetAliasingElaboration,
+     ImplicitAliasNetUnderDefaultNettypeNoneIsReported) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "`default_nettype none\n"
+      "module t; wire a; alias a = b; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit net 'b' forbidden by `default_nettype none", 2, "22.8"));
+}
+
+TEST(NetAliasingElaboration,
+     DeclaredAliasNetUnderDefaultNettypeNoneIsAccepted) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "`default_nettype none\n"
+      "module t; wire a, b; alias a = b; endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NetAliasingElaboration, ImplicitAliasNetTakesTheDefaultNettype) {
+  ElabFixture ok;
+  ElaborateWithPreprocessor(
+      "`default_nettype wand\n"
+      "module t; wand a; alias a = b; endmodule\n",
+      ok);
+  EXPECT_FALSE(ok.diag.HasErrors());
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "`default_nettype wand\n"
+      "module t; wor a; alias a = b; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'a' and 'b' are different net types", 2, "10.11"));
+}
+
+TEST(NetAliasingElaboration, ImplicitAliasNetIsAScalar) {
+  ElabFixture f;
+  ElaborateSrc("module t; wire [3:0] a; alias a = b; endmodule\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'a' has width 4 but 'b' has width 1", 1, "10.11"));
+}
+
+TEST(NetAliasingElaboration, AliasChecksReachAnInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus; logic v; wire w; wand x; wor y; wire s;\n"
+      "  alias v = w;\n"
+      "  alias x = y;\n"
+      "  alias s = s;\n"
+      "endinterface\n"
+      "module t; bus u(); endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'v' is a variable, not a net", 2, "10.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'x' and 'y' are different net types", 3, "10.11"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "net 's' aliased to itself",
+                            4, "10.11"));
+}
+
 }  // namespace
