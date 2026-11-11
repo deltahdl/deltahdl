@@ -305,4 +305,62 @@ TEST(PackedUnionSimulation, AnInPlaceUnionOfATypedefMemberTakesItsState) {
             "1x0z\n1000\n");
 }
 
+TEST(PackedUnionSimulation, SoftPackedUnionLaysOutNestedMembersRightJustified) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  typedef union soft packed {\n"
+                 "    struct packed { bit [4:0] valA, valB, valC; } D1;\n"
+                 "    struct packed {\n"
+                 "      bit [1:0] valX;\n"
+                 "      union soft { bit [9:0] F1; bit [7:0] F2; } valY;\n"
+                 "    } D2;\n"
+                 "  } Data_u;\n"
+                 "  Data_u d;\n"
+                 "  initial begin\n"
+                 "    $display(\"%0d %0d\", $bits(Data_u), $bits(d.D2));\n"
+                 "    d = 0; d.D2.valX = 2'b11; d.D2.valY.F1 = 10'h3FF;\n"
+                 "    $display(\"%b\", d);\n"
+                 "    d = 0; d.D2.valY.F2 = 8'hFF;\n"
+                 "    $display(\"%h\", d);\n"
+                 "    d = 0; d.D1.valA = 5'h1F;\n"
+                 "    $display(\"%b %b\", d.D2.valX, d.D2.valY.F1);\n"
+                 "    d = '1; d.D2.valY.F2 = 8'h00;\n"
+                 "    $display(\"%b\", d);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "15 12\n000111111111111\n00ff\n11 0000000000\n111111100000000\n");
+}
+
+TEST(PackedUnionSimulation, PackedUnionIsAVectorToBitwiseAndLogicalOperators) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  union packed { logic [7:0] a; logic [7:0] b; } u, w;\n"
+                 "  initial begin\n"
+                 "    u.a = 8'hF0; w.b = 8'h3C;\n"
+                 "    $display(\"%h %h %h %h %b %b %b %b\", u & w, u | w, "
+                 "u ^ w, ~u, !u, u && w, u == w, u[7:4] == 4'hF);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "30 fc cc 0f 0 1 0 1\n");
+}
+
+TEST(PackedUnionSimulation, SignednessOfAPackedUnionDecidesComparison) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  union packed signed { bit [7:0] a; bit [7:0] b; } s;\n"
+                 "  union packed { bit [7:0] a; bit [7:0] b; } u;\n"
+                 "  initial begin\n"
+                 "    s.a = 8'hFF; u.a = 8'hFF;\n"
+                 "    $display(\"%b %b %0d %0d\", s < 0, u < 0, s, u);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 0 -1 255\n");
+}
+
 }  // namespace
