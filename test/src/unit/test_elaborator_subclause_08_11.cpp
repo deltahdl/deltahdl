@@ -323,4 +323,92 @@ TEST(ThisElaboration, ThisInAnyOperandOfAnExpressionIsAnError) {
   }
 }
 
+constexpr const char* kNoObject =
+    "'this' has no object to refer to outside a non-static class method";
+
+TEST(ThisElaboration, ThisInAnInterfaceOrProgramIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  typedef type(this) self_t;\n"
+      "  function C self(); return this; endfunction\n"
+      "endclass\n"
+      "interface ifc; int v; initial v = this.v; endinterface\n"
+      "program pg; int v; initial v = this.v; endprogram\n"
+      "module t;\n"
+      "  ifc i();\n"
+      "  pg p();\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {5, 6}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoObject, kLine, "8.11"))
+        << kLine;
+  }
+  for (const int kLine : {2, 3}) {
+    EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), kLine)) << kLine;
+  }
+}
+
+TEST(ThisElaboration,
+     DISABLED_ThisInAGenerateBlockOrAPropertyInitializerIsAnError) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  int x = 3;\n"
+      "  int y = this.x;\n"
+      "  static int s = this.x;\n"
+      "  function int m(); return this.x; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  int g;\n"
+      "  if (1) begin : gb\n"
+      "    initial g = this.g;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {3, 4, 10}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoObject, kLine, "8.11"))
+        << kLine;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 5));
+}
+
+TEST(ThisElaboration, DISABLED_AssignmentToAParameterThroughThisIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int P = 3);\n"
+      "  localparam int L = 2;\n"
+      "  int x;\n"
+      "  function void w(); this.P = 4; endfunction\n"
+      "  function void w2(); this.L = 4; endfunction\n"
+      "  function void w3(); this.x = 4; endfunction\n"
+      "  function void w4(); P = 4; endfunction\n"
+      "endclass\n"
+      "module t; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            4, "6.20"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'L'",
+                            5, "6.20"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 6));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "assignment to constant 'P'",
+                            7, "6.20"));
+}
+
+TEST(ThisElaboration, ParameterThroughThisInAStaticMethodIsReported) {
+  ElabFixture f;
+  ElabOk(
+      "class C #(int P = 3);\n"
+      "  static function int s(); return this.P; endfunction\n"
+      "  function int m(); return this.P; endfunction\n"
+      "endclass\n"
+      "module t; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'this' and 'super' shall not be used in a static "
+                            "method",
+                            2, "8.10"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 3));
+}
+
 }  // namespace

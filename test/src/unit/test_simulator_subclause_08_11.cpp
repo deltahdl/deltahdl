@@ -374,4 +374,119 @@ TEST(ClassThisSim, AMemberOfAnElementOfAHandleArrayPropertyIsWrittenInAMethod) {
   EXPECT_EQ(out, "7 2\n7 5\n");
 }
 
+TEST(ThisSim, ThisReachesTheParametersOfTheObjectsSpecialization) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(int P = 3);\n"
+      "  localparam int L = P * 2;\n"
+      "  parameter int B = 5;\n"
+      "  rand int x;\n"
+      "  int t;\n"
+      "  constraint c { x == this.P; }\n"
+      "  function int gp(); return this.P; endfunction\n"
+      "  function int gl(); return this.L; endfunction\n"
+      "  function int gb(); return this.B; endfunction\n"
+      "  function int bare(); return P * 100 + L * 10 + B; endfunction\n"
+      "  task tk(); t = this.P + this.L; endtask\n"
+      "endclass\n"
+      "class D extends C #(4);\n"
+      "  function int dp(); return this.P * 10 + this.L; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C c3 = new;\n"
+      "  C #(7) c7 = new;\n"
+      "  D d = new;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8, r9, r10, r11;\n"
+      "  initial begin\n"
+      "    c3.tk(); c7.tk();\n"
+      "    void'(c7.randomize());\n"
+      "    r1 = c3.gp(); r2 = c7.gp(); r3 = c3.gl(); r4 = c7.gl();\n"
+      "    r5 = c3.gb(); r6 = c3.bare(); r7 = c7.bare();\n"
+      "    r8 = c3.t; r9 = c7.t; r10 = c7.x; r11 = d.dp();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 3u},
+                    {"r2", 7u},
+                    {"r3", 6u},
+                    {"r4", 14u},
+                    {"r5", 5u},
+                    {"r6", 365u},
+                    {"r7", 845u},
+                    {"r8", 9u},
+                    {"r9", 21u},
+                    {"r10", 7u},
+                    {"r11", 48u}});
+}
+
+TEST(ThisSim, ThisIsTheHandleOfTheObjectTheMethodWasCalledOn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  typedef type(this) self_t;\n"
+      "  int v;\n"
+      "  function C self(); return this; endfunction\n"
+      "  function bit same(C o); return o == this; endfunction\n"
+      "  function self_t me(); self_t m; m = this; return m; endfunction\n"
+      "endclass\n"
+      "class Reg;\n"
+      "  C items[$];\n"
+      "  function void add(C c); items.push_back(c); endfunction\n"
+      "endclass\n"
+      "class K extends C;\n"
+      "  function void join_reg(Reg g); g.add(this); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C a = new, b = new;\n"
+      "  K k = new;\n"
+      "  Reg g = new;\n"
+      "  int r1, r2, r3, r4, r5, r6;\n"
+      "  initial begin\n"
+      "    k.join_reg(g);\n"
+      "    k.v = 33;\n"
+      "    r1 = a.self() == a; r2 = a.self() == b;\n"
+      "    r3 = a.same(a); r4 = a.same(b);\n"
+      "    r5 = g.items[0].v; r6 = a.me() == a;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 1u},
+                    {"r2", 0u},
+                    {"r3", 1u},
+                    {"r4", 0u},
+                    {"r5", 33u},
+                    {"r6", 1u}});
+}
+
+TEST(ThisSim, DISABLED_ThisInAnInlineConstraintOfAMethodNamesTheObject) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  rand int r, q;\n"
+      "  function void rnd(); void'(randomize() with { r == 5; }); "
+      "endfunction\n"
+      "  function void rnd2();\n"
+      "    void'(this.randomize() with { this.q == 6; });\n"
+      "  endfunction\n"
+      "  function void rnd3();\n"
+      "    int ok;\n"
+      "    ok = randomize() with { this.r == 7; };\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C a = new, b = new, c = new;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    a.rnd(); b.rnd2(); c.rnd3();\n"
+      "    r1 = a.r; r2 = b.q; r3 = c.r;\n"
+      "    void'(a.randomize() with { q == 8; });\n"
+      "    r4 = a.q;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 5u}, {"r2", 6u}, {"r3", 7u}, {"r4", 8u}});
+}
+
 }  // namespace
