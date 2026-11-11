@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <format>
+#include <string_view>
 #include <utility>
 
 #include "elaborator/elaborator.h"
@@ -384,6 +385,108 @@ TEST(UnpackedArrayValidation, ConstantsInUnpackedDimsAreNotReported) {
         "7.4.2"))
         << dim.declared;
   }
+}
+
+constexpr std::string_view kXz =
+    "unpacked dimension range shall not contain x or z";
+constexpr std::string_view kSize =
+    "unpacked dimension size shall be a positive integer";
+
+TEST(UnpackedArrayValidation,
+     XzBoundAndNonPositiveSizeReportedInInterfaceProgramCheckerAndGenerate) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc;\n"
+      "  logic i1 [0:1'bx];\n"
+      "  logic i2 [0];\n"
+      "  logic i3 [4];\n"
+      "  logic i4 [3:0];\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  logic r1 [1'bx:0];\n"
+      "  logic r2 [-1];\n"
+      "  logic r3 [4];\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  logic k1 [2'bz1:0];\n"
+      "  logic k2 [0];\n"
+      "  logic k3 [4];\n"
+      "endchecker\n"
+      "module top;\n"
+      "  ifc ii();\n"
+      "  pr p();\n"
+      "  ck c();\n"
+      "  if (1) begin : g\n"
+      "    logic g1 [1'bx:0];\n"
+      "    logic g2 [0];\n"
+      "    logic g3 [4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2, 8, 13, 22}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXz, line, "7.4.2"))
+        << line;
+  }
+  for (uint32_t line : {3, 9, 14, 23}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kSize, line, "7.4.2"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 8u);
+}
+
+TEST(UnpackedArrayValidation,
+     DISABLED_XzBoundAndNonPositiveSizeReportedOutsideModuleScopes) {
+  ElabFixture f;
+  ElaborateSrc(
+      "logic cu1 [1'bx:0];\n"
+      "logic cu2 [0];\n"
+      "logic cu3 [4];\n"
+      "package pk;\n"
+      "  logic p1 [2'bz1:0];\n"
+      "  logic p2 [-1];\n"
+      "  logic p3 [3:0];\n"
+      "endpackage\n"
+      "class C;\n"
+      "  logic c1 [1'bx:0];\n"
+      "  static logic c2 [0];\n"
+      "  logic c3 [4];\n"
+      "endclass\n"
+      "typedef struct {\n"
+      "  logic s1 [1'bx:0];\n"
+      "  logic s2 [0];\n"
+      "  logic s3 [4];\n"
+      "} us_t;\n"
+      "module top;\n"
+      "  function automatic void f(input logic fa [0]);\n"
+      "    logic f1 [1'bx:0];\n"
+      "    logic f2 [-2];\n"
+      "    logic f3 [4];\n"
+      "  endfunction\n"
+      "  task automatic t;\n"
+      "    logic t1 [0:1'bz];\n"
+      "    logic t2 [0];\n"
+      "    logic t3 [4];\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    logic b1 [1'bx:0];\n"
+      "    logic b2 [0];\n"
+      "    logic b3 [4];\n"
+      "  end\n"
+      "  us_t s;\n"
+      "  typedef logic td1 [1'bx:0];\n"
+      "  typedef logic td2 [0];\n"
+      "  typedef logic td3 [4];\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {1, 5, 10, 15, 21, 26, 31, 36}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXz, line, "7.4.2"))
+        << line;
+  }
+  for (uint32_t line : {2, 6, 11, 16, 20, 22, 27, 32, 37}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kSize, line, "7.4.2"))
+        << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 17u);
 }
 
 }  // namespace

@@ -368,4 +368,102 @@ TEST(UnpackedArraySim, ANegativeBoundInAProceduralBlockIsSigned) {
   EXPECT_EQ(out, "7 9 4\n");
 }
 
+TEST(UnpackedArraySimulation,
+     ClassScopedSizeWithoutASpecializationAndTypeDimensionsKeepTheirMeaning) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class ZD #(int P = 1);\n"
+                 "  localparam int N = 2 * P;\n"
+                 "  localparam int K = 2;\n"
+                 "  typedef int idx_t;\n"
+                 "endclass\n"
+                 "class C;\n"
+                 "  localparam int K = 2;\n"
+                 "endclass\n"
+                 "module top;\n"
+                 "  int e [ZD#(3)::idx_t];\n"
+                 "  int g [C::K];\n"
+                 "  int h [0:ZD#(3)::N];\n"
+                 "  initial begin\n"
+                 "    e[5] = 1;\n"
+                 "    e[-9] = 2;\n"
+                 "    $display(\"%0d %0d %0d\", e.num(), $size(g), $size(h));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "2 2 7\n");
+}
+
+TEST(UnpackedArraySimulation,
+     DISABLED_ClassParameterBehindASpecializationSizesAFixedArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class ZD #(int P = 1);\n"
+                       "  localparam int N = 2 * P;\n"
+                       "  localparam int K = 2;\n"
+                       "  typedef int idx_t;\n"
+                       "endclass\n"
+                       "int cu [ZD#(3)::N];\n"
+                       "package pk;\n"
+                       "  int pa [ZD#(3)::N];\n"
+                       "endpackage\n"
+                       "interface ifc;\n"
+                       "  int ia [ZD#(3)::N];\n"
+                       "endinterface\n"
+                       "program pr;\n"
+                       "  int ra [ZD#(3)::N];\n"
+                       "  initial $display(\"%0d\", $size(ra));\n"
+                       "endprogram\n"
+                       "class H;\n"
+                       "  int p [ZD#(3)::N];\n"
+                       "endclass\n"
+                       "module top;\n"
+                       "  ifc ii();\n"
+                       "  pr pp();\n"
+                       "  int a [ZD#(3)::N];\n"
+                       "  int b [ZD#()::K];\n"
+                       "  int d [ZD#(.P(3))::N];\n"
+                       "  if (1) begin : gb\n"
+                       "    int ga [ZD#(3)::N];\n"
+                       "  end\n"
+                       "  function automatic int f(int x [ZD#(3)::N]);\n"
+                       "    int l [ZD#(3)::N];\n"
+                       "    return $size(l) * 10 + $size(x);\n"
+                       "  endfunction\n"
+                       "  H hh;\n"
+                       "  initial begin\n"
+                       "    automatic int bl [ZD#(3)::N];\n"
+                       "    int six [6];\n"
+                       "    hh = new;\n"
+                       "    $display(\"%0d %0d %0d %0d\", $size(a), $size(b), "
+                       "$size(d), $size(bl));\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", $size(cu), "
+                       "$size(pk::pa), $size(ii.ia),\n"
+                       "             $size(gb.ga), $size(hh.p));\n"
+                       "    $display(\"%0d\", f(six));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "6 2 6 6\n"
+            "6 6 6 6 6\n"
+            "66\n"
+            "6\n");
+}
+
+TEST(
+    UnpackedArraySimulation,
+    DISABLED_ExpressionOverAClassParameterBehindASpecializationSizesAFixedArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class ZD #(int P = 1);\n"
+                       "  localparam int N = 2 * P;\n"
+                       "  localparam int K = 2;\n"
+                       "  typedef int idx_t;\n"
+                       "endclass\n"
+                       "module top;\n"
+                       "  int c [ZD#(3)::N + 1];\n"
+                       "  initial $display(\"%0d\", $size(c));\n"
+                       "endmodule\n",
+                       f),
+            "7\n");
+}
+
 }  // namespace
