@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_type.h"
@@ -187,6 +189,48 @@ TEST(ChainedConstructorParsing, SuperNewDefaultStoresIdentifier) {
   ASSERT_NE(call_stmt->expr, nullptr);
   ASSERT_EQ(call_stmt->expr->args.size(), 1u);
   EXPECT_EQ(call_stmt->expr->args[0]->text, "default");
+}
+
+TEST(ChainedConstructorParsing, DuplicateDefaultIsReportedInEveryPlace) {
+  auto r = Parse(
+      "class CQ; function new(int x = 1); endfunction endclass\n"
+      "package pk;\n"
+      "  class P1 extends CQ;\n"
+      "    function new(default, int y, default); endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "class C1 extends CQ; function new(default, default); endfunction "
+      "endclass\n"
+      "class C2 extends CQ; function new(default, int y); endfunction "
+      "endclass\n"
+      "class E1 extends CQ; extern function new(default, int y, default); "
+      "endclass\n"
+      "function E1::new(default, int y, default); endfunction\n"
+      "program p;\n"
+      "  class G1 extends CQ;\n"
+      "    function new(int y, default, int z, default); endfunction\n"
+      "  endclass\n"
+      "endprogram\n"
+      "interface ifc;\n"
+      "  class I1 extends CQ; function new(default, default); endfunction "
+      "endclass\n"
+      "endinterface\n"
+      "module m;\n"
+      "  class M1 extends CQ; function new(default, default); endfunction "
+      "endclass\n"
+      "  class M2 extends CQ; function new(int y, default); endfunction "
+      "endclass\n"
+      "endmodule\n");
+  for (const int kLine : {4, 7, 9, 10, 13, 17, 20}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "'default' already appears earlier in this class "
+                              "constructor argument list",
+                              kLine, "8.17"))
+        << kLine;
+  }
+  for (const int kLine : {8, 21}) {
+    EXPECT_FALSE(ErrorOnLine(r.diags, kLine)) << kLine;
+  }
 }
 
 }  // namespace
