@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -347,6 +349,25 @@ TEST(ForkSim, BranchInASubmoduleReadsAndWritesTheInstancesVariables) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 7u);
+}
+
+TEST(ParallelBlockSimulation, ForkBlockItemsInitializeBeforeEachSpawn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial\n"
+                       "    for (int j = 1; j <= 3; ++j)\n"
+                       "      fork\n"
+                       "        automatic int k = j;\n"
+                       "        #k $write(\"%0d\", k);\n"
+                       "        begin\n"
+                       "          automatic int m = j;\n"
+                       "          $write(\"m%0d \", m);\n"
+                       "        end\n"
+                       "      join_none\n"
+                       "  initial #10 $display;\n"
+                       "endmodule\n",
+                       f),
+            "m4 m4 m4 123\n");
 }
 
 }  // namespace

@@ -636,7 +636,7 @@ TEST(ClockingBlockParse, ErrorMissingEndclocking) {
   EXPECT_TRUE(ReportedError(r.diags, "expected clocking direction", 4, "14.3"));
 }
 
-TEST(ClockingBlockParse, EndLabelMismatchAccepted) {
+TEST(ClockingBlockParse, EndLabelMismatchIsError) {
   auto r = Parse(
       "module m;\n"
       "  clocking cb @(posedge clk);\n"

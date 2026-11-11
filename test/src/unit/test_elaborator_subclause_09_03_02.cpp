@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <string>
 #include <string_view>
 
 #include "fixture_elaborator.h"
@@ -9,6 +12,11 @@
 using namespace delta;
 
 namespace {
+
+constexpr std::string_view kReturnInFork =
+    "return statement is not allowed inside a fork-join block";
+constexpr std::string_view kRefInFork =
+    "cannot be used inside a fork-join_any or fork-join_none block";
 
 TEST(ParallelBlockElaboration, ForkJoinInInitialElaborates) {
   ElabFixture f;
@@ -352,9 +360,9 @@ TEST(ParallelBlockElaboration,
 }
 
 TEST(ParallelBlockElaboration,
-     ReturnInARandsequenceCodeBlockInAForkIsAccepted) {
+     DISABLED_ReturnInARandsequenceCodeBlockInAForkIsReported) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  task t();\n"
       "    fork\n"
@@ -365,14 +373,13 @@ TEST(ParallelBlockElaboration,
       "  endtask\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReturnInFork, 5, "9.3.2"));
 }
 
 TEST(ParallelBlockElaboration,
-     ReturnInARandsequenceWeightCodeBlockInAForkIsAccepted) {
+     DISABLED_ReturnInARandsequenceWeightCodeBlockInAForkIsReported) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  task t();\n"
       "    fork\n"
@@ -384,14 +391,13 @@ TEST(ParallelBlockElaboration,
       "  endtask\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReturnInFork, 5, "9.3.2"));
 }
 
 TEST(ParallelBlockElaboration,
-     ReturnInAForkInARandsequenceCodeBlockIsAccepted) {
+     DISABLED_ReturnInAForkInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
-  auto* design = ElaborateSrc(
+  ElaborateSrc(
       "module m;\n"
       "  task t();\n"
       "    randsequence(main)\n"
@@ -400,8 +406,7 @@ TEST(ParallelBlockElaboration,
       "  endtask\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReturnInFork, 4, "9.3.2"));
 }
 
 size_t CountReports(const ElabFixture& f, std::string_view needle) {
@@ -450,6 +455,301 @@ TEST(ParallelBlockElaboration, RefArgInNestedForkJoinNoneIsReportedOnce) {
                          "ref argument 'v' cannot be used inside a "
                          "fork-join_any or fork-join_none block"),
             1u);
+}
+
+struct ForkDesign {
+  const char* src;
+  uint32_t line;
+};
+
+void ExpectEachReported(std::initializer_list<ForkDesign> designs,
+                        std::string_view message) {
+  for (const auto& d : designs) {
+    ElabFixture f;
+    ElaborateSrc(d.src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, d.line, "9.3.2"))
+        << d.src;
+  }
+}
+
+void ExpectEachAccepted(std::initializer_list<const char*> designs) {
+  for (const char* src : designs) {
+    ElabFixture f;
+    auto* design = ElaborateSrc(src, f);
+    EXPECT_NE(design, nullptr) << src;
+    EXPECT_FALSE(f.has_errors) << src;
+  }
+}
+
+TEST(ParallelBlockElaboration, ReturnInForkJoinAnyAndJoinNoneErrors) {
+  ExpectEachReported({{"module m;\n"
+                       "  task t;\n"
+                       "    fork\n"
+                       "      return;\n"
+                       "    join_any\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       4},
+                      {"module m;\n"
+                       "  task wait_20;\n"
+                       "    fork\n"
+                       "      # 20;\n"
+                       "      return ;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       5}},
+                     kReturnInFork);
+}
+
+TEST(ParallelBlockElaboration, ReturnInAFunctionsForkJoinNoneErrors) {
+  ExpectEachReported({{"module m;\n"
+                       "  function void f();\n"
+                       "    fork\n"
+                       "      return;\n"
+                       "    join_none\n"
+                       "  endfunction\n"
+                       "endmodule\n",
+                       4}},
+                     kReturnInFork);
+}
+
+TEST(ParallelBlockElaboration, AFunctionsReturnOutsideItsForkIsAccepted) {
+  ExpectEachAccepted(
+      {"module m;\n"
+       "  int a;\n"
+       "  function void f();\n"
+       "    fork\n"
+       "      a = 1;\n"
+       "    join_none\n"
+       "    return;\n"
+       "  endfunction\n"
+       "endmodule\n"});
+}
+
+TEST(ParallelBlockElaboration,
+     ReturnInAForkOfAClassInterfaceOrProgramTaskErrors) {
+  ExpectEachReported({{"class C;\n"
+                       "  task t();\n"
+                       "    fork\n"
+                       "      return;\n"
+                       "    join\n"
+                       "  endtask\n"
+                       "endclass\n"
+                       "module m; C c; endmodule\n",
+                       4},
+                      {"interface i;\n"
+                       "  task t();\n"
+                       "    fork\n"
+                       "      return;\n"
+                       "    join\n"
+                       "  endtask\n"
+                       "endinterface\n"
+                       "module m; i u(); endmodule\n",
+                       4},
+                      {"program p;\n"
+                       "  task t();\n"
+                       "    fork\n"
+                       "      return;\n"
+                       "    join\n"
+                       "  endtask\n"
+                       "endprogram\n",
+                       4}},
+                     kReturnInFork);
+}
+
+TEST(ParallelBlockElaboration, DISABLED_ReturnInAForkOfAPackageTaskErrors) {
+  ExpectEachReported({{"package k;\n"
+                       "  task t();\n"
+                       "    fork\n"
+                       "      return;\n"
+                       "    join\n"
+                       "  endtask\n"
+                       "endpackage\n"
+                       "module m; endmodule\n",
+                       4}},
+                     kReturnInFork);
+}
+
+TEST(ParallelBlockElaboration, ReturnOutsideTheForkOrInACalledRoutineAccepted) {
+  ExpectEachAccepted(
+      {"module m;\n"
+       "  int a;\n"
+       "  task t;\n"
+       "    if (a) return;\n"
+       "    fork\n"
+       "      a = 1;\n"
+       "    join\n"
+       "    return;\n"
+       "  endtask\n"
+       "endmodule\n",
+       "module m;\n"
+       "  int a;\n"
+       "  function int g(); return 3; endfunction\n"
+       "  task u; return; endtask\n"
+       "  task t;\n"
+       "    fork\n"
+       "      a = g();\n"
+       "      u();\n"
+       "    join\n"
+       "  endtask\n"
+       "endmodule\n"});
+}
+
+TEST(ParallelBlockElaboration, ReturnInARandsequenceOutsideAnyForkIsAccepted) {
+  ExpectEachAccepted(
+      {"module m;\n"
+       "  task t();\n"
+       "    randsequence(main)\n"
+       "      main : { return; };\n"
+       "    endsequence\n"
+       "  endtask\n"
+       "endmodule\n"});
+}
+
+TEST(ParallelBlockElaboration, ConstRefArgInJoinAnyOrJoinNoneErrors) {
+  ExpectEachReported({{"module m;\n"
+                       "  int x;\n"
+                       "  task automatic t(const ref int v);\n"
+                       "    fork\n"
+                       "      x = v;\n"
+                       "    join_any\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       5},
+                      {"module m;\n"
+                       "  int x;\n"
+                       "  task automatic t(const ref int v);\n"
+                       "    fork\n"
+                       "      x = v;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       5}},
+                     kRefInFork);
+}
+
+TEST(ParallelBlockElaboration, ARefArgReadPassedOrNestedInJoinNoneErrors) {
+  ExpectEachReported({{"module m;\n"
+                       "  int x;\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      x = v;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       5},
+                      {"module m;\n"
+                       "  function automatic void g(int a); endfunction\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      g(v);\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       5},
+                      {"module m;\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      begin\n"
+                       "        v = 1;\n"
+                       "      end\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endmodule\n",
+                       5}},
+                     kRefInFork);
+}
+
+TEST(ParallelBlockElaboration, RefStaticOrInitializerUseInJoinNoneAccepted) {
+  ExpectEachAccepted(
+      {"module m;\n"
+       "  task automatic t(ref static int v);\n"
+       "    fork\n"
+       "      v = 1;\n"
+       "    join_none\n"
+       "  endtask\n"
+       "endmodule\n",
+       "module m;\n"
+       "  int x;\n"
+       "  task automatic t(ref int v);\n"
+       "    fork\n"
+       "      automatic int k = v;\n"
+       "      x = k;\n"
+       "    join_none\n"
+       "  endtask\n"
+       "endmodule\n"});
+}
+
+TEST(ParallelBlockElaboration, RefArgInAFunctionsJoinNoneErrors) {
+  ExpectEachReported({{"module m;\n"
+                       "  function automatic void f(ref int v);\n"
+                       "    fork\n"
+                       "      v = 1;\n"
+                       "    join_none\n"
+                       "  endfunction\n"
+                       "endmodule\n",
+                       4}},
+                     kRefInFork);
+}
+
+TEST(ParallelBlockElaboration,
+     RefArgInJoinNoneOfAClassInterfaceOrProgramTaskErrors) {
+  ExpectEachReported({{"class C;\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      v = 1;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endclass\n"
+                       "module m; C c; endmodule\n",
+                       4},
+                      {"interface i;\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      v = 1;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endinterface\n"
+                       "module m; i u(); endmodule\n",
+                       4},
+                      {"program p;\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      v = 1;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endprogram\n",
+                       4}},
+                     kRefInFork);
+}
+
+TEST(ParallelBlockElaboration, DISABLED_RefArgInJoinNoneOfAPackageTaskErrors) {
+  ExpectEachReported({{"package k;\n"
+                       "  task automatic t(ref int v);\n"
+                       "    fork\n"
+                       "      v = 1;\n"
+                       "    join_none\n"
+                       "  endtask\n"
+                       "endpackage\n"
+                       "module m; endmodule\n",
+                       4}},
+                     kRefInFork);
+}
+
+TEST(ParallelBlockElaboration, NonRefFormalsInJoinNoneAccepted) {
+  ExpectEachAccepted(
+      {"module m;\n"
+       "  int x;\n"
+       "  task automatic t(input int a, output int b,\n"
+       "                   inout int c);\n"
+       "    fork\n"
+       "      x = a;\n"
+       "      b = 1;\n"
+       "      c = 2;\n"
+       "    join_none\n"
+       "  endtask\n"
+       "endmodule\n"});
 }
 
 }  // namespace

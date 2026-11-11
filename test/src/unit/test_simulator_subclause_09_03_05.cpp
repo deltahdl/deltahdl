@@ -244,4 +244,28 @@ TEST(StatementLabelSimulation, LabeledStatementDisabledFromAnotherProcess) {
             "after @2 v=0\n");
 }
 
+TEST(StatementLabelSimulation, ALabelNamesTheScopeAroundItsStatement) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int arr[2];\n"
+                 "  initial lp: for (int i = 0; i < 1; i++) begin : body\n"
+                 "    static int x = 1;\n"
+                 "    #10;\n"
+                 "  end\n"
+                 "  initial fe: foreach (arr[i]) begin : inner\n"
+                 "    static int y = 2;\n"
+                 "    #10;\n"
+                 "  end\n"
+                 "  initial pick: if (1) begin : b\n"
+                 "    static int z = 3;\n"
+                 "    #10;\n"
+                 "  end\n"
+                 "  initial #5 $display(\"%0d %0d %0d\", lp.body.x, "
+                 "fe.inner.y, pick.b.z);\n"
+                 "endmodule\n",
+                 f),
+      "1 2 3\n");
+}
+
 }  // namespace

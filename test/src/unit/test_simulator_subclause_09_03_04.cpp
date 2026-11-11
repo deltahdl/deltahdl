@@ -123,4 +123,68 @@ TEST(BlockNameSimulation, ANestedBlockDeclarationHidesTheOuterVariable) {
       "7\n5\n");
 }
 
+TEST(BlockNameSimulation, ParametersOfANamedBlockReadByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin : b1\n"
+                       "    parameter int P = 6;\n"
+                       "    localparam int L = 9;\n"
+                       "    #10;\n"
+                       "  end\n"
+                       "  initial #1 $display(\"%0d %0d\", b1.P, b1.L);\n"
+                       "endmodule\n",
+                       f),
+            "6 9\n");
+}
+
+TEST(BlockNameSimulation, NamedEventOfANamedBlockTriggeredByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin : b1\n"
+                       "    event ev;\n"
+                       "    #20;\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    @(b1.ev);\n"
+                       "    $display(\"woke %0t\", $time);\n"
+                       "  end\n"
+                       "  initial #7 -> b1.ev;\n"
+                       "endmodule\n",
+                       f),
+            "woke 7\n");
+}
+
+TEST(BlockNameSimulation, NamedForkVariableReadAndWrittenByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial fork : f1\n"
+                       "    static int x = 4;\n"
+                       "    #10 $display(\"in %0d\", x);\n"
+                       "  join\n"
+                       "  initial begin\n"
+                       "    #2 $display(\"%0d\", f1.x);\n"
+                       "    f1.x = 11;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4\nin 11\n");
+}
+
+TEST(BlockNameSimulation,
+     LabelledBlockVariableReadAndWrittenByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial lbl: begin\n"
+                       "    static int x = 3;\n"
+                       "    #10 $display(\"in %0d\", x);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%0d\", lbl.x);\n"
+                       "    t.lbl.x = 8;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3\nin 8\n");
+}
+
 }  // namespace

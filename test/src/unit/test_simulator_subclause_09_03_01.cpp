@@ -135,4 +135,22 @@ TEST(SequentialBlockSimulation, UnnamedBlockLocalOfASubmoduleHoldsItsWrites) {
       "top.u i=9 l=9 w=9 wb=6 c=BLUE\ntop.v i=9 l=9 w=9 wb=6 c=BLUE\n");
 }
 
+TEST(SequentialBlockSimulation,
+     UnnamedBlockVariableKeepsItsValueAcrossEntries) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int r;\n"
+                       "  initial begin\n"
+                       "    repeat (3) begin\n"
+                       "      static int c = 10;\n"
+                       "      c = c + 1;\n"
+                       "      r = c;\n"
+                       "    end\n"
+                       "    $display(\"%0d\", r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "13\n");
+}
+
 }  // namespace
