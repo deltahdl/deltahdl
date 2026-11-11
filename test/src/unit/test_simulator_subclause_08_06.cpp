@@ -589,4 +589,207 @@ TEST(ObjectMethodSim, ARecursiveEvaluationOfTheSameReceiverRunsItsOwnCall) {
       303u);
 }
 
+TEST(ObjectMethodSim, EachMethodCallReachesOnlyItsOwnObjectsProperties) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  int v;\n"
+      "  static int shared;\n"
+      "  function void set(int x); v = x; endfunction\n"
+      "  function int get(); return v; endfunction\n"
+      "  task bump(); v++; endtask\n"
+      "  function void twice(); bump(); bump(); endfunction\n"
+      "  function void copy_to(C o); o.v = v; endfunction\n"
+      "  function void tally(); shared++; endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C a = new, b = new, arr[2], h;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7;\n"
+      "  initial begin\n"
+      "    a.set(5); b.set(7);\n"
+      "    r1 = a.get() * 100 + b.get();\n"
+      "    a.bump();\n"
+      "    r2 = a.v * 100 + b.v;\n"
+      "    a.twice();\n"
+      "    r3 = a.v * 100 + b.v;\n"
+      "    a.copy_to(b);\n"
+      "    r4 = a.v * 100 + b.v;\n"
+      "    arr[0] = new; arr[1] = new;\n"
+      "    arr[0].set(1); arr[1].set(2);\n"
+      "    r5 = arr[0].get() * 100 + arr[1].get();\n"
+      "    a.tally(); b.tally(); arr[1].tally();\n"
+      "    r6 = a.shared * 10 + C::shared;\n"
+      "    h = a; h.set(9);\n"
+      "    r7 = a.get() * 100 + b.get();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 507u},
+                    {"r2", 607u},
+                    {"r3", 807u},
+                    {"r4", 808u},
+                    {"r5", 102u},
+                    {"r6", 33u},
+                    {"r7", 908u}});
+}
+
+TEST(ObjectMethodSim, BareMethodCallInsideAnotherMethodRunsOnTheSameObject) {
+  EXPECT_EQ(RunAndGet("class Packet;\n"
+                      "  integer status;\n"
+                      "  function integer current_status();\n"
+                      "    return status;\n"
+                      "  endfunction\n"
+                      "  function integer doubled();\n"
+                      "    return current_status() * 2;\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  Packet p = new, q = new;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    p.status = 3; q.status = 50;\n"
+                      "    r = p.doubled() * 1000 + q.doubled();\n"
+                      "  end\n"
+                      "endmodule\n",
+                      "r"),
+            6100u);
+}
+
+TEST(ObjectMethodSim, AModuleFunctionOfTheMethodsNameIsTheOneABareCallCalls) {
+  EXPECT_EQ(
+      RunAndGet("class Packet;\n"
+                "  integer status;\n"
+                "  function integer current_status();\n"
+                "    return status;\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  function integer current_status(Packet p);\n"
+                "    return p.status + 1;\n"
+                "  endfunction\n"
+                "  Packet p = new;\n"
+                "  int r;\n"
+                "  initial begin p.status = 4; r = current_status(p); end\n"
+                "endmodule\n",
+                "r"),
+      5u);
+}
+
+TEST(ObjectMethodSim, MethodCalledInAPackageUnitOrModuleSubroutine) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class Cnt;\n"
+      "  int v;\n"
+      "  function new(int s); v = s; endfunction\n"
+      "  function int inc(); v = v + 1; return v; endfunction\n"
+      "  task add(int d); v = v + d; endtask\n"
+      "endclass\n"
+      "package k;\n"
+      "  class PC;\n"
+      "    int v;\n"
+      "    function int inc(); v = v + 1; return v; endfunction\n"
+      "  endclass\n"
+      "  function int pf(PC c);\n"
+      "    int first;\n"
+      "    first = c.inc();\n"
+      "    return first * 10 + c.inc();\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "function int uf(Cnt c); c.add(10); return c.inc(); endfunction\n"
+      "module t;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  task tk(Cnt c); c.add(3); r3 = c.v; endtask\n"
+      "  function int fn(Cnt c); return c.inc() * 2; endfunction\n"
+      "  initial begin\n"
+      "    automatic Cnt c = new(0);\n"
+      "    automatic k::PC pc = new;\n"
+      "    r1 = k::pf(pc);\n"
+      "    r2 = uf(c);\n"
+      "    tk(c);\n"
+      "    r4 = fn(c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 12u}, {"r2", 11u}, {"r3", 14u}, {"r4", 30u}});
+}
+
+TEST(ObjectMethodSim, MethodLocalsAreFreshInEveryCallAndEveryThread) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class C;\n"
+      "  function int fact(int n);\n"
+      "    if (n <= 1) return 1;\n"
+      "    return n * fact(n - 1);\n"
+      "  endfunction\n"
+      "  function int fresh(); int x = 5; x++; return x; endfunction\n"
+      "  function automatic int expl(); int x; x++; return x; endfunction\n"
+      "  task automatic slow(int d, output int o);\n"
+      "    int x; x = d; #(d); o = x;\n"
+      "  endtask\n"
+      "  task slow2(int d, output int o); int x; x = d; #(d); o = x; endtask\n"
+      "endclass\n"
+      "module t;\n"
+      "  int r1, r2, r3, o1, o2, o3, o4;\n"
+      "  C c = new;\n"
+      "  initial begin\n"
+      "    r1 = c.fact(5);\n"
+      "    r2 = c.fresh() * 10 + c.fresh();\n"
+      "    r3 = c.expl() * 10 + c.expl();\n"
+      "    fork\n"
+      "      c.slow(5, o1); c.slow(2, o2); c.slow2(6, o3); c.slow2(3, o4);\n"
+      "    join\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 120u},
+                    {"r2", 66u},
+                    {"r3", 11u},
+                    {"o1", 5u},
+                    {"o2", 2u},
+                    {"o3", 6u},
+                    {"o4", 3u}});
+}
+
+TEST(ObjectMethodSim, MethodLocalsAreAutomaticInAStaticModuleOrPackage) {
+  EXPECT_EQ(
+      RunAndGet("package static k;\n"
+                "  class C;\n"
+                "    function int step(); int x; x++; return x; endfunction\n"
+                "  endclass\n"
+                "endpackage\n"
+                "module static t;\n"
+                "  class C;\n"
+                "    function int step(); int x; x++; return x; endfunction\n"
+                "  endclass\n"
+                "  C c = new;\n"
+                "  k::C kc = new;\n"
+                "  int r;\n"
+                "  initial\n"
+                "    r = c.step() * 1000 + c.step() * 100 +\n"
+                "        kc.step() * 10 + kc.step();\n"
+                "endmodule\n",
+                "r"),
+      1111u);
+}
+
+TEST(ObjectMethodSim, MethodLocalsAreAutomaticInAStaticProgram) {
+  EXPECT_EQ(
+      RunAndGet("program static p;\n"
+                "  class C;\n"
+                "    function int step(); int x; x++; return x; endfunction\n"
+                "  endclass\n"
+                "  C c = new;\n"
+                "  int r;\n"
+                "  initial r = c.step() * 10 + c.step();\n"
+                "endprogram\n"
+                "module t;\n"
+                "  p pr();\n"
+                "endmodule\n",
+                "pr.r"),
+      11u);
+}
+
 }  // namespace

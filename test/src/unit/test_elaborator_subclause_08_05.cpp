@@ -2,9 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
-#include <vector>
 
-#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -13,13 +11,6 @@ using namespace delta;
 namespace {
 
 constexpr const char* kTypeViaHandle = "via class handle";
-
-bool ErrorOnLine(const std::vector<Diagnostic>& diags, uint32_t line) {
-  for (const auto& d : diags) {
-    if (d.severity == DiagSeverity::kError && d.loc.line == line) return true;
-  }
-  return false;
-}
 
 TEST(ObjectPropertyElaboration, ClassWithPropertiesElaborates) {
   EXPECT_TRUE(

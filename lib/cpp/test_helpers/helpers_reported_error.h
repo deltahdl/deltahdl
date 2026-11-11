@@ -54,6 +54,15 @@ inline ::testing::AssertionResult ReportedError(
   return ReportedAt(diags, DiagSeverity::kError, message, line, subclause);
 }
 
+inline bool ErrorOnLine(const std::vector<Diagnostic>& diags, uint32_t line) {
+  for (const auto& diag : diags) {
+    if (diag.severity == DiagSeverity::kError && diag.loc.line == line) {
+      return true;
+    }
+  }
+  return false;
+}
+
 inline ::testing::AssertionResult ReportedWarning(
     const std::vector<Diagnostic>& diags, std::string_view message,
     uint32_t line, std::string_view subclause) {
