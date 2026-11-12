@@ -561,4 +561,77 @@ TEST(ClockingBlockElab, ClockingSignalOnAProceduralOnlyVariableError) {
                              "14.3"));
 }
 
+TEST(ClockingBlockElab, ADeclarationInAnUnnamedBlockIsNotReferenced) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic clk, a;\n"
+      "  default clocking @(posedge clk);\n"
+      "    input a;\n"
+      "    property pu; a; endproperty\n"
+      "    sequence su; a; endsequence\n"
+      "  endclocking\n"
+      "  assert property (pu);\n"
+      "  cover property (su);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'pu'", 8,
+                            "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'su'", 9,
+                            "23.9"));
+}
+
+TEST(ClockingBlockElab, ADeclarationInANamedBlockIsReachedThroughItsName) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic clk, a;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input a;\n"
+             "    property pn; a; endproperty\n"
+             "    sequence sn; a; endsequence\n"
+             "  endclocking\n"
+             "  assert property (cb.pn);\n"
+             "  cover property (cb.sn);\n"
+             "endmodule\n"));
+}
+
+TEST(ClockingBlockElab, DISABLED_AClockingSignalNamingNoNetOrVariableError) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("module s; endmodule\n"
+             "module m;\n"
+             "  parameter P = 1;\n"
+             "  localparam L = 2;\n"
+             "  typedef int T;\n"
+             "  function int fn(); return 1; endfunction\n"
+             "  s inst();\n"
+             "  genvar g;\n"
+             "  logic clk, v;\n"
+             "  wire w;\n"
+             "  event ev;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input P, L, T, fn, inst, g;\n"
+             "    input v, w, ev;\n"
+             "  endclocking\n"
+             "endmodule\n",
+             f));
+  for (std::string_view sig : {"P", "L", "T", "fn", "inst", "g"}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("clocking signal '{}' names no net or variable", sig), 12,
+        "14.3"))
+        << sig;
+  }
+  for (std::string_view sig : {"v", "w", "ev"}) {
+    EXPECT_FALSE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("clocking signal '{}' names no net or variable", sig), 12,
+        "14.3"))
+        << sig;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 6u);
+}
+
 }  // namespace

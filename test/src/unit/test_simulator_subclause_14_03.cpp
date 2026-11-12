@@ -460,4 +460,94 @@ TEST(ClockingBlockSim,
       f);
   EXPECT_EQ(out, "event 20\n$finish at time 25\n");
 }
+TEST(ClockingBlockSim,
+     WithoutSkewsInputsSampleOneStepBeforeAndOutputsDriveAtTheEdge) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  int d = 1, o = 0, to = -1;\n"
+                       "  always #10 clk = ~clk;\n"
+                       "  always @(posedge clk) d <= d + 1;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    input d;\n"
+                       "    output o;\n"
+                       "  endclocking\n"
+                       "  always @(o) to = $time;\n"
+                       "  initial begin\n"
+                       "    @(cb);\n"
+                       "    cb.o <= 5;\n"
+                       "    #1 $display(\"%0t d=%0d now %0d o=%0d at %0d\", "
+                       "$time, cb.d, d, o, to);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 d=1 now 2 o=5 at 10\n$finish at time 11\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ClockingBlockSim, TheClauseBusExampleSamplesAndDrivesAsItsSkewsSay) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mem;\n"
+                       "  logic enable = 0;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clock1 = 0;\n"
+                       "  logic data = 0, ready = 0, ack = 0;\n"
+                       "  logic [3:0] addr = 0;\n"
+                       "  mem mem1();\n"
+                       "  always #10 clock1 = ~clock1;\n"
+                       "  clocking bus @(posedge clock1);\n"
+                       "    default input #4 output #2;\n"
+                       "    input data, ready, enable = top.mem1.enable;\n"
+                       "    output negedge ack;\n"
+                       "    input #1step addr;\n"
+                       "  endclocking\n"
+                       "  int tack = -1;\n"
+                       "  always @(ack) tack = $time;\n"
+                       "  initial begin\n"
+                       "    #5 data = 1; ready = 1; mem1.enable = 1;\n"
+                       "    #2 addr = 7;\n"
+                       "    #1 data = 0;\n"
+                       "    @(bus);\n"
+                       "    $display(\"%0t data=%0d ready=%0d enable=%0d "
+                       "addr=%0d\", $time, bus.data, bus.ready, bus.enable, "
+                       "bus.addr);\n"
+                       "    bus.ack <= 1;\n"
+                       "    #30 $display(\"ack=%0d at %0d\", ack, tack);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "10 data=1 ready=1 enable=1 addr=7\nack=1 at 20\n"
+            "$finish at time 40\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ClockingBlockSim, AnInoutClockvarReadsAsAnInputAndWritesAsAnOutput) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] bv = 8'd3;\n"
+                       "  always #10 clk = ~clk;\n"
+                       "  initial #9 bv = 8'd4;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    default input #2 output #3;\n"
+                       "    inout bv;\n"
+                       "  endclocking\n"
+                       "  int tb = -1;\n"
+                       "  initial begin\n"
+                       "    @(cb);\n"
+                       "    #1 $display(\"%0t read %0d\", $time, cb.bv);\n"
+                       "    cb.bv <= 8'd40;\n"
+                       "    @(bv) tb = $time;\n"
+                       "    $display(\"bv=%0d at %0d\", bv, tb);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 read 3\nbv=40 at 33\n$finish at time 33\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
