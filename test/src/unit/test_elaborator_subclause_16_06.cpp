@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <initializer_list>
+#include <string>
+
 #include "elaborator/concurrent_assertion_expr.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -237,6 +241,183 @@ TEST(AssertionFunctionCalls, AnIncrementInAnAssertionExpressionIsReported) {
       "side effect";
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 4, "16.6"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.6"));
+}
+
+const char kNotIntegral[] =
+    "a concurrent assertion's expression shall be cast compatible with an "
+    "integral type";
+
+const char kTypes[] =
+    "interface ifc; logic s; endinterface\n"
+    "class L; local int x; endclass\n"
+    "class P; protected int x; endclass\n"
+    "class LD extends L; endclass\n"
+    "class PD extends P; endclass\n"
+    "class C; int x; endclass\n"
+    "class CB; int y; endclass\n"
+    "class CD extends CB; int z; endclass\n"
+    "class R; real x; endclass\n"
+    "class E; event e; endclass\n"
+    "class EC; endclass\n"
+    "typedef union {int i; byte b;} u_t;\n"
+    "typedef enum {RED, GREEN} color_t;\n";
+
+const char kDecls[] =
+    "  logic clk = 0, a = 1;\n"
+    "  event ev; virtual ifc vif;\n"
+    "  L lh; P ph; LD ldh; PD pdh; C ch; CD cdh; R rh; E eh; EC eh0;\n"
+    "  u_t u, u2; struct {int i; byte b;} us;\n"
+    "  real ra[2]; shortreal sa[2]; realtime ta[2]; int ia[2]; event ea[2];\n"
+    "  struct {real r;} rs; struct {int x;} is; struct {u_t m;} um;\n"
+    "  struct {union packed {int i; bit [31:0] b;} m;} pm;\n"
+    "  struct {event e;} es; struct {int q[$];} qs;\n"
+    "  real rq[$]; real rd[]; real raa[int]; int iq[$]; int id[]; int "
+    "iaa[int];\n"
+    "  int n; bit [7:0] b8; color_t c; struct packed {bit p; bit q;} ps;\n"
+    "  union packed {bit [1:0] w; bit [1:0] v;} pu; real r; shortreal sr;\n"
+    "  realtime rt; string str;\n"
+    "  function automatic u_t fu(); return u; endfunction\n";
+
+std::string TypeBench(const std::string& items,
+                      const std::string& outside = "") {
+  return std::string(kTypes) + outside + "module top;\n" + kDecls + "  " +
+         items + "\nendmodule\n";
+}
+
+std::string Replaced(std::string text, const std::string& with) {
+  for (size_t at = text.find("@@"); at != std::string::npos;
+       at = text.find("@@", at + with.size())) {
+    text.replace(at, 2, with);
+  }
+  return text;
+}
+
+void ExpectTypeReported(const std::string& items, const std::string& form,
+                        const std::string& outside = "") {
+  const std::string kMarked = TypeBench(items, outside);
+  const std::string kSrc = Replaced(kMarked, form);
+  ElabFixture f;
+  Elaborate(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNotIntegral,
+                            LineHolding(kMarked, "@@"), "16.6"))
+      << kSrc;
+}
+
+void ExpectTypeAccepted(const std::string& items,
+                        const std::string& outside = "") {
+  const std::string kSrc = TypeBench(items, outside);
+  ElabFixture f;
+  auto* design = Elaborate(kSrc, f);
+  ASSERT_NE(design, nullptr) << kSrc;
+  EXPECT_FALSE(f.has_errors) << kSrc;
+}
+
+const char kWhole[] = "assert property (@(posedge clk) @@);";
+
+void ExpectEachWholeReported(std::initializer_list<const char*> forms) {
+  for (const char* form : forms) ExpectTypeReported(kWhole, form);
+}
+
+void ExpectEachWholeAccepted(std::initializer_list<const char*> forms) {
+  for (const char* form : forms) ExpectTypeAccepted(Replaced(kWhole, form));
+}
+
+TEST(AssertionExpressionType, EveryIntegralOrRealOrStringWholeIsAccepted) {
+  ExpectEachWholeAccepted({"n", "b8", "c", "ps", "pu", "r", "sr", "rt", "str"});
+}
+
+TEST(AssertionExpressionType, EveryBitStreamAggregateWholeIsAccepted) {
+  ExpectEachWholeAccepted(
+      {"ia", "is", "iq", "id", "iaa", "qs", "us", "pm", "ch", "cdh", "eh0"});
+}
+
+TEST(AssertionExpressionType, TheNearestAllowedFormsAreAccepted) {
+  ExpectEachWholeAccepted({"ev.triggered", "ev == null", "u.i", "vif.s",
+                           "vif != null", "lh == null", "ea[0].triggered",
+                           "es.e.triggered", "a ? u.i : u2.i", "fu().i"});
+  ExpectTypeAccepted("assert property (@(ev) a);");
+}
+
+TEST(AssertionExpressionType, DISABLED_AnEventOrUnpackedUnionIsReported) {
+  ExpectEachWholeReported({"ev", "u"});
+}
+
+TEST(AssertionExpressionType, DISABLED_AVirtualInterfaceIsReported) {
+  ExpectEachWholeReported({"vif"});
+}
+
+TEST(AssertionExpressionType,
+     DISABLED_AHandleWithALocalOrProtectedMemberIsReported) {
+  ExpectEachWholeReported({"lh", "ph", "ldh", "pdh"});
+}
+
+TEST(AssertionExpressionType, DISABLED_AnAggregateOfANonBitStreamIsReported) {
+  ExpectEachWholeReported(
+      {"ra", "sa", "ta", "ea", "rs", "um", "es", "rq", "rd", "raa"});
+}
+
+TEST(AssertionExpressionType,
+     DISABLED_AHandleWithANonBitStreamMemberIsReported) {
+  ExpectEachWholeReported({"rh", "eh"});
+}
+
+TEST(AssertionExpressionType, DISABLED_AnOperatorOrCallResultIsReported) {
+  ExpectEachWholeReported({"a ? u : u2", "fu()"});
+}
+
+const char* const kPlaces[] = {
+    "assert property (@(posedge clk) @@);",
+    "assume property (@(posedge clk) @@);",
+    "cover property (@(posedge clk) @@);",
+    "restrict property (@(posedge clk) @@);",
+    "property pp; @(posedge clk) @@; endproperty\n  assert property (pp);",
+    "sequence sq; @(posedge clk) @@; endsequence\n  assert property (sq);",
+    "assert property (@(posedge clk) a ##1 @@);",
+    "assert property (@(posedge clk) a |-> @@);",
+    "assert property (@(posedge clk) disable iff (@@) a);",
+    "default disable iff (@@);\n  assert property (@(posedge clk) a);",
+    "always @(posedge clk) assert property (@@);",
+    "initial assert property (@(posedge clk) @@);",
+    "if (1) begin : g assert property (@(posedge clk) @@); end",
+};
+
+TEST(AssertionExpressionType, EveryPlaceAcceptsAnIntegralExpression) {
+  for (const char* place : kPlaces) ExpectTypeAccepted(Replaced(place, "a"));
+}
+
+TEST(AssertionExpressionType, DISABLED_EveryPlaceReportsAnExcludedType) {
+  for (const char* place : kPlaces) {
+    for (const char* form : {"ev", "u", "vif", "lh", "ra", "rh"}) {
+      ExpectTypeReported(place, form);
+    }
+  }
+}
+
+std::string Unit(const char* kind) {
+  return std::string(kind) + " u_unit(input logic clk);\n  u_t u;\n  " +
+         "assert property (@(posedge clk) @@);\nend" + kind + "\n";
+}
+
+TEST(AssertionExpressionType, DISABLED_EveryUnitReportsAnExcludedType) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectTypeReported("u_unit k(clk);", "u", Unit(kind));
+  }
+  ExpectTypeReported("assert property (pk::pkp(u, clk));", "x",
+                     "package pk;\n"
+                     "  property pkp(u_t x, logic c); @(posedge c) @@; "
+                     "endproperty\n"
+                     "endpackage\n");
+}
+
+TEST(AssertionExpressionType, EveryUnitAcceptsAnIntegralExpression) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectTypeAccepted("u_unit k(clk);", Replaced(Unit(kind), "u.i"));
+  }
+  ExpectTypeAccepted("assert property (pk::pkp(u, clk));",
+                     "package pk;\n"
+                     "  property pkp(u_t x, logic c); @(posedge c) x.i; "
+                     "endproperty\n"
+                     "endpackage\n");
 }
 
 }  // namespace
