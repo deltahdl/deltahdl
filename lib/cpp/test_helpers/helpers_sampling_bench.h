@@ -64,4 +64,25 @@ inline void ExpectEachAlwaysHolds(
   }
 }
 
+inline std::string LinesStartingWith(const std::string& out,
+                                     const std::string& prefix) {
+  std::istringstream lines(out);
+  std::string line;
+  std::string joined;
+  while (std::getline(lines, line)) {
+    if (line.rfind(prefix, 0) != 0) continue;
+    if (!joined.empty()) joined += ' ';
+    joined += line.substr(prefix.size());
+  }
+  return joined;
+}
+
+inline void ExpectLines(const std::string& src, const std::string& prefix,
+                        const std::string& expected) {
+  SimFixture f;
+  std::string out = RunCapture(src, f);
+  EXPECT_FALSE(f.diag.HasErrors()) << src;
+  EXPECT_EQ(LinesStartingWith(out, prefix), expected) << src << out;
+}
+
 }  // namespace delta
