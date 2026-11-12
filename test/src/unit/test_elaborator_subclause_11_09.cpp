@@ -275,4 +275,61 @@ TEST(ExpressionElaboration, TaggedMemberVariableValueCheckedAgainstMemberType) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
+TEST(ExpressionElaboration,
+     DISABLED_TaggedExpressionWithNoTypeFromItsContextReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef union tagged { int A; void B; } U;\n"
+      "module m;\n"
+      "  U u;\n"
+      "  int i;\n"
+      "  logic [63:0] c;\n"
+      "  parameter P = tagged A 1;\n"
+      "  initial begin\n"
+      "    $display(\"%p\", tagged A 1);\n"
+      "    i = $bits(tagged B);\n"
+      "    i = (tagged A 1) + 2;\n"
+      "    c = {tagged A 1};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' value is not a constant expression",
+                            6, "6.20.2"));
+  for (const int kLine : {8, 9, 10, 11}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the type of a tagged union expression shall be "
+                              "known from its context",
+                              kLine, "11.9"))
+        << kLine;
+  }
+}
+
+TEST(ExpressionElaboration, TaggedExpressionWhoseContextGivesItsTypeAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef union tagged { int A; void B; } U;\n"
+      "typedef union tagged { U In; int N; } W;\n"
+      "function automatic U mk(); return tagged A 5; endfunction\n"
+      "function automatic int g(U a); return 0; endfunction\n"
+      "class C; U p = tagged B; endclass\n"
+      "module m;\n"
+      "  U u = tagged A 1;\n"
+      "  W w;\n"
+      "  int i;\n"
+      "  bit s;\n"
+      "  localparam int P = 1;\n"
+      "  initial begin\n"
+      "    u = U'(tagged A 3);\n"
+      "    u = (tagged A 4);\n"
+      "    u = s ? tagged A 6 : tagged B;\n"
+      "    w = tagged In (tagged B);\n"
+      "    i = g(tagged A 7);\n"
+      "    i = $bits(U'(tagged B));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

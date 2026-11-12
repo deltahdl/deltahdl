@@ -584,4 +584,58 @@ TEST(StructPatternSim, ATopLevelMemberKeyLeavesANestedNamesakeToTheDefault) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(AssignmentPatternSim,
+     DISABLED_AnUntypedPatternFillsEveryFieldOfAStructureMember) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef struct { bit [4:0] reg1, reg2, regd; } S;\n"
+          "typedef struct packed { bit [4:0] reg1, reg2, regd; } P;\n"
+          "typedef struct { S a; int z; } T;\n"
+          "typedef struct { T b; } TT;\n"
+          "typedef union { P a; int z; } U;\n"
+          "typedef union tagged { P Add; int Other; } UT;\n"
+          "typedef union tagged packed { P Add; bit [14:0] Other; } UTP;\n"
+          "class C; T t; endclass\n"
+          "module m;\n"
+          "  T t, tn; TT tt; U u; UT ut; UTP up; S sa [2]; C h;\n"
+          "  initial begin\n"
+          "    t.a = '{19, 4, 3}; $write(\"%0d %0d %0d \", t.a.reg1, t.a.reg2, "
+          "t.a.regd);\n"
+          "    t.a = '{reg1:18, reg2:5, regd:2};\n"
+          "    $write(\"%0d %0d %0d \", t.a.reg1, t.a.reg2, t.a.regd);\n"
+          "    t.a = '{default:7}; $display(\"%0d %0d %0d\", t.a.reg1, "
+          "t.a.reg2, "
+          "t.a.regd);\n"
+          "    tt.b.a = '{19, 4, 3};\n"
+          "    $write(\"%0d %0d %0d \", tt.b.a.reg1, tt.b.a.reg2, "
+          "tt.b.a.regd);\n"
+          "    u.a = '{19, 4, 3}; $write(\"%0d %0d %0d \", u.a.reg1, u.a.reg2, "
+          "u.a.regd);\n"
+          "    ut = tagged Add 0; ut.Add = '{19, 4, 3};\n"
+          "    $write(\"%0d %0d %0d \", ut.Add.reg1, ut.Add.reg2, "
+          "ut.Add.regd);\n"
+          "    up = tagged Add 0; up.Add = '{19, 4, 3};\n"
+          "    $display(\"%0d %0d %0d\", up.Add.reg1, up.Add.reg2, "
+          "up.Add.regd);\n"
+          "    h = new; h.t.a = '{19, 4, 3};\n"
+          "    $write(\"%0d %0d %0d \", h.t.a.reg1, h.t.a.reg2, h.t.a.regd);\n"
+          "    tn.a <= '{19, 4, 3};\n"
+          "    #1 $display(\"%0d %0d %0d\", tn.a.reg1, tn.a.reg2, tn.a.regd);\n"
+          "    ut.Add = P'{17, 6, 1};\n"
+          "    $write(\"%0d %0d %0d \", ut.Add.reg1, ut.Add.reg2, "
+          "ut.Add.regd);\n"
+          "    t = '{'{16, 8, 4}, 5};\n"
+          "    $write(\"%0d %0d %0d %0d \", t.a.reg1, t.a.reg2, t.a.regd, "
+          "t.z);\n"
+          "    sa[1] = '{15, 9, 6};\n"
+          "    $display(\"%0d %0d %0d\", sa[1].reg1, sa[1].reg2, sa[1].regd);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "19 4 3 18 5 2 7 7 7\n19 4 3 19 4 3 19 4 3 19 4 3\n19 4 3 19 4 3\n"
+      "17 6 1 16 8 4 5 15 9 6\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

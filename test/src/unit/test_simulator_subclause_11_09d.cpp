@@ -170,4 +170,78 @@ TEST(TaggedUnionEval, AStringMemberOfAStructureReadAgainstTheTagIsEmpty) {
                             8, "11.9"));
 }
 
+TEST(TaggedUnionSim, TheInstrExampleBuildsReadsAndWritesItsMembers) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "typedef union tagged {\n"
+          "  struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+          "  union tagged {\n"
+          "    bit [9:0] JmpU;\n"
+          "    struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+          "  } Jmp;\n"
+          "} Instr;\n"
+          "typedef union tagged { void Invalid; int Valid; } VInt;\n"
+          "module m;\n"
+          "  Instr i1, i2;\n"
+          "  bit [4:0] e1 = 7, ed = 9, e2 = 11, x;\n"
+          "  bit e;\n"
+          "  VInt vi1, vi2;\n"
+          "  initial begin\n"
+          "    vi1 = tagged Valid (23+34); vi2 = tagged Invalid;\n"
+          "    $display(\"%0d\", vi1.Valid);\n"
+          "    e = 1;\n"
+          "    i1 = (e ? tagged Add '{e1, 4, ed}\n"
+          "            : tagged Add '{reg2:e2, regd:3, reg1:19});\n"
+          "    $display(\"%0d %0d %0d\", i1.Add.reg1, i1.Add.reg2, "
+          "i1.Add.regd);\n"
+          "    e = 0;\n"
+          "    i1 = (e ? tagged Add '{e1, 4, ed}\n"
+          "            : tagged Add '{reg2:e2, regd:3, reg1:19});\n"
+          "    $display(\"%0d %0d %0d\", i1.Add.reg1, i1.Add.reg2, "
+          "i1.Add.regd);\n"
+          "    x = i1.Add.reg1; i1.Add.reg2 = 4;\n"
+          "    $display(\"%0d %0d %0d %0d\", x, i1.Add.reg1, i1.Add.reg2, "
+          "i1.Add.regd);\n"
+          "    i1 = tagged Jmp (tagged JmpU 239);\n"
+          "    $display(\"%0d\", i1.Jmp.JmpU);\n"
+          "    i2 = tagged Jmp (tagged JmpC '{2, 83});\n"
+          "    $display(\"%0d %0d\", i2.Jmp.JmpC.cc, i2.Jmp.JmpC.addr);\n"
+          "    i2 = tagged Jmp (tagged JmpC '{cc:1, addr:84});\n"
+          "    $display(\"%0d %0d\", i2.Jmp.JmpC.cc, i2.Jmp.JmpC.addr);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "57\n7 4 9\n19 11 3\n19 19 4 3\n239\n2 83\n1 84\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(TaggedUnionSim, DISABLED_TheInstrExampleAssignsAWholeMemberFromAPattern) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("typedef union tagged {\n"
+                 "  struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                 "  union tagged {\n"
+                 "    bit [9:0] JmpU;\n"
+                 "    struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+                 "  } Jmp;\n"
+                 "} Instr;\n"
+                 "typedef union tagged { void Invalid; int Valid; } VInt;\n"
+                 "module m;\n"
+                 "  Instr i1, i2;\n"
+                 "  bit [4:0] e1 = 7, ed = 9, e2 = 11, x;\n"
+                 "  bit e;\n"
+                 "  VInt vi1, vi2;\n"
+                 "  initial begin\n"
+                 "    i1 = tagged Add '{1, 2, 3};\n"
+                 "    i1.Add = '{19, 4, 3};\n"
+                 "    $display(\"%0d %0d %0d\", i1.Add.reg1, i1.Add.reg2, "
+                 "i1.Add.regd);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "19 4 3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
