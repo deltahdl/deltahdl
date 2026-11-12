@@ -635,4 +635,33 @@ TEST(SemaphoreSim, ElementsOfContainersOfSemaphoresHoldTheirBuckets) {
   EXPECT_EQ(var->value.ToUint64(), 11011101u);
 }
 
+TEST(SemaphoreSim, ProgramAndPackageSemaphoresTakeKeyCountsFromExpressions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  semaphore ps = new(2);\n"
+                       "endpackage\n"
+                       "program tb;\n"
+                       "  semaphore s = new(1);\n"
+                       "  int n = 2;\n"
+                       "  initial begin\n"
+                       "    int a, b, c, d;\n"
+                       "    a = s.try_get(n);\n"
+                       "    s.put(n + 1);\n"
+                       "    b = s.try_get(n * 2);\n"
+                       "    c = s.try_get(n - 1);\n"
+                       "    s.put(n);\n"
+                       "    s.get(n);\n"
+                       "    d = pk::ps.try_get(3);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\", a, b, c, d, "
+                       "pk::ps.try_get(2));\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  tb t();\n"
+                       "endmodule\n",
+                       f),
+            "0 1 0 0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
