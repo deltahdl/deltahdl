@@ -550,4 +550,59 @@ TEST(ClockingBlockSim, AnInoutClockvarReadsAsAnInputAndWritesAsAnOutput) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+struct BidirectionalSample {
+  const char* items;
+  int change_at;
+  const char* expected;
+};
+
+std::string ReadAtTheThirdEdge(const BidirectionalSample& c) {
+  SimFixture f;
+  std::string out = RunCapture(std::string("module t;\n"
+                                           "  logic clk = 0;\n"
+                                           "  logic a = 0;\n"
+                                           "  always #5 clk = ~clk;\n"
+                                           "  clocking cb @(posedge clk);\n") +
+                                   c.items +
+                                   "  endclocking\n"
+                                   "  initial #" +
+                                   std::to_string(c.change_at) +
+                                   " a = 1;\n"
+                                   "  initial begin\n"
+                                   "    repeat (3) @(cb);\n"
+                                   "    $display(\"%0t %b\", $time, cb.a);\n"
+                                   "    $finish;\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                               f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return out;
+}
+
+TEST(ClockingBlockSim, AnInputWithAnUnskewedOutputSamplesByItsInputSkew) {
+  const BidirectionalSample kCases[] = {
+      {"    input #2 a;\n", 24, "25 0\n$finish at time 25\n"},
+      {"    input #2 output a;\n", 24, "25 0\n$finish at time 25\n"},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(ReadAtTheThirdEdge(c), c.expected) << c.items;
+  }
+}
+
+TEST(ClockingBlockSim, DISABLED_ABidirectionalClockvarSamplesByItsInputSkew) {
+  const BidirectionalSample kCases[] = {
+      {"    default input #2 output #0;\n    inout a;\n", 24,
+       "25 0\n$finish at time 25\n"},
+      {"    default input #2;\n    inout a;\n", 24,
+       "25 0\n$finish at time 25\n"},
+      {"    input #2 output #1 a;\n", 24, "25 0\n$finish at time 25\n"},
+      {"    input #2 output #0 a;\n", 24, "25 0\n$finish at time 25\n"},
+      {"    default input #1 output #4;\n    inout a;\n", 22,
+       "25 1\n$finish at time 25\n"},
+  };
+  for (const auto& c : kCases) {
+    EXPECT_EQ(ReadAtTheThirdEdge(c), c.expected) << c.items;
+  }
+}
+
 }  // namespace
