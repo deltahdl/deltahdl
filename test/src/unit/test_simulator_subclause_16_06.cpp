@@ -520,4 +520,99 @@ TEST(AssertionSampledOperand, AGenerateBlockReadsSampledValues) {
              kOneFailure);
 }
 
+const char kDisabledAtTheRise[] = "5 fail 15 fail 35 fail 45 fail";
+const char kFailing[] = "assert property (@(posedge clk) !a)";
+
+TEST(AssertionDisableCurrentValue, AFallingConditionLeavesTheAttemptEnabled) {
+  ExpectLive(
+      LiveVerdict("assert property (@(posedge clk) disable iff (en) !a)"),
+      "25 fail");
+}
+
+TEST(AssertionDisableCurrentValue, ANamedPropertysConditionReadsCurrentValues) {
+  ExpectLive(
+      "property p; @(posedge clk) disable iff (live) !a; endproperty\n  " +
+          LiveVerdict("assert property (p)"),
+      kDisabledAtTheRise);
+  ExpectLive(LiveVerdict("assert property (pq::pp(clk, live))"),
+             kDisabledAtTheRise,
+             "package pq;\n"
+             "  property pp(logic c, logic x); @(posedge c) disable iff (x) 0; "
+             "endproperty\n"
+             "endpackage\n");
+}
+
+TEST(AssertionDisableCurrentValue, ADefaultConditionReadsCurrentValues) {
+  ExpectLive("default disable iff (live);\n  " + LiveVerdict(kFailing),
+             kDisabledAtTheRise);
+}
+
+std::string DefaultUnit(const char* kind) {
+  const std::string kPorts = std::string(kind) == "checker"
+                                 ? "(logic clk, logic live)"
+                                 : "(input logic clk, input logic live)";
+  return std::string(kind) + " u_unit" + kPorts +
+         ";\n"
+         "  default disable iff (live);\n  " +
+         LiveVerdict("assert property (@(posedge clk) 0)") + "\nend" + kind +
+         "\n";
+}
+
+TEST(AssertionDisableCurrentValue,
+     EveryUnitsDefaultConditionReadsCurrentValues) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectLive("u_unit u(clk, live);", kDisabledAtTheRise, DefaultUnit(kind));
+  }
+  ExpectLive("if (1) begin : g\n    default disable iff (live);\n    " +
+                 LiveVerdict(kFailing) + "\n  end",
+             kDisabledAtTheRise);
+}
+
+TEST(AssertionDisableCurrentValue, AnInferredDisableFormalReadsCurrentValues) {
+  ExpectLive("default disable iff (live);\n  ck k(clk);", kDisabledAtTheRise,
+             "checker ck(logic clk, logic r = $inferred_disable);\n  " +
+                 LiveVerdict("assert property (@(posedge clk) disable iff (r) "
+                             "0)") +
+                 "\nendchecker\n");
+}
+
+TEST(AssertionDisableCurrentValue, ATriggeredConditionDisablesAtTheEndPoint) {
+  ExpectLive("sequence s; @(posedge clk) live; endsequence\n  " +
+                 LiveVerdict("assert property (@(posedge clk) disable iff "
+                             "(s.triggered) !a)"),
+             "5 fail 15 fail 25 fail 45 fail");
+}
+
+TEST(AssertionDisableCurrentValue, ALaterTickOfAnAttemptReadsCurrentValues) {
+  ExpectLive(LiveVerdict("assert property (@(posedge clk) disable iff (live) "
+                         "a |=> 0)"),
+             "15 fail 45 fail");
+}
+
+TEST(AssertionDisableCurrentValue, AProceduralAssertionReadsCurrentValues) {
+  ExpectLive("always @(posedge clk) " +
+                 LiveVerdict("assert property (disable iff (live) !a)"),
+             kDisabledAtTheRise);
+  ExpectLive("default disable iff (live);\n  always @(posedge clk) " +
+                 LiveVerdict("assert property (!a)"),
+             kDisabledAtTheRise);
+}
+
+TEST(AssertionDisableCurrentValue, AnAssumptionOrCoverReadsCurrentValues) {
+  ExpectLive(
+      LiveVerdict("assume property (@(posedge clk) disable iff (live) !a)"),
+      kDisabledAtTheRise);
+  ExpectLive(
+      "cover property (@(posedge clk) disable iff (live) a) "
+      "$display(\"V%0t\", $time);",
+      "5 15 35 45");
+}
+
+TEST(AssertionDisableCurrentValue, AnExpectReadsCurrentValues) {
+  ExpectLive("initial begin\n    #20 " +
+                 LiveVerdict("expect (@(posedge clk) disable iff (en) 0)") +
+                 "\n  end",
+             "25 fail");
+}
+
 }  // namespace

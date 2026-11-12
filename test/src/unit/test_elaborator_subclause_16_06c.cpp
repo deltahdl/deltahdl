@@ -104,12 +104,13 @@ std::string StateBench(const std::string& items,
          items + "\nendmodule\n";
 }
 
-int ReportsAt(const std::vector<Diagnostic>& diags, uint32_t line) {
+int ReportsAt(const std::vector<Diagnostic>& diags, const char* message,
+              const char* subclause, uint32_t line) {
   int count = 0;
   for (const auto& diag : diags) {
     if (diag.severity == DiagSeverity::kError &&
-        diag.message.find(kStateful) != std::string::npos &&
-        diag.loc.line == line && diag.subclause == "16.6") {
+        diag.message.find(message) != std::string::npos &&
+        diag.loc.line == line && diag.subclause == subclause) {
       ++count;
     }
   }
@@ -120,7 +121,9 @@ void ExpectStatefulOnce(const std::string& marked, const std::string& form) {
   const std::string kSrc = WithForm(marked, form);
   ElabFixture f;
   Elaborate(kSrc, f);
-  EXPECT_EQ(ReportsAt(f.diag.Diagnostics(), LineHolding(marked, "@@")), 1)
+  EXPECT_EQ(ReportsAt(f.diag.Diagnostics(), kStateful, "16.6",
+                      LineHolding(marked, "@@")),
+            1)
       << kSrc;
 }
 
@@ -303,6 +306,176 @@ TEST(AssertionFunctionState, DISABLED_ACheckerReportsASystemTaskCall) {
   ExpectStatefulOnce(
       StateBench("u_unit u(clk);", StateUnit("checker", "$display(\"c\");")),
       "ue(clk)");
+}
+
+const char kLocalInDisable[] =
+    "a disable condition may not reference a local variable";
+const char kMatchedOutside[] =
+    "matched may be used only in a sequence expression";
+
+std::string DisBench(const std::string& items,
+                     const std::string& outside = "") {
+  return outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1, r = 0;\n"
+         "  sequence s; @(posedge clk) a ##1 a; endsequence\n"
+         "  sequence rq(x); @(posedge clk) a ##1 x; endsequence\n"
+         "  " +
+         items + "\nendmodule\n";
+}
+
+void ExpectReportOnce(const char* message, const char* subclause,
+                      const std::string& marked, const std::string& form,
+                      uint32_t line) {
+  const std::string kSrc = WithForm(marked, form);
+  ElabFixture f;
+  Elaborate(kSrc, f);
+  EXPECT_EQ(ReportsAt(f.diag.Diagnostics(), message, subclause, line), 1)
+      << kSrc;
+}
+
+void ExpectMatchedOnce(const std::string& marked, const std::string& form) {
+  ExpectReportOnce(kMatchedOutside, "16.13.6", marked, form,
+                   LineHolding(marked, "@@"));
+}
+
+void ExpectLocalOnce(const std::string& marked, const std::string& form) {
+  ExpectReportOnce(kLocalInDisable, "16.6", marked, form,
+                   LineHolding(marked, "@@"));
+}
+
+const char* const kDisablePlaces[] = {
+    "assert property (@(posedge clk) disable iff (@@) a);",
+    "default disable iff (@@);\n  assert property (@(posedge clk) a);",
+    ("property pd; @(posedge clk) disable iff (@@) a; endproperty\n"
+     "  assert property (pd);"),
+    "cover sequence (@(posedge clk) disable iff (@@) a);",
+    "always @(posedge clk) assert property (disable iff (@@) a);",
+};
+
+TEST(DisableConditionReference, EveryPlaceAcceptsTriggered) {
+  for (const char* place : kDisablePlaces) {
+    for (const char* form : {"s.triggered", "r || s.triggered"}) {
+      ExpectAccepted(DisBench(place), form);
+    }
+  }
+}
+
+TEST(DisableConditionReference, DISABLED_EveryPlaceReportsMatchedOnce) {
+  for (const char* place : kDisablePlaces) {
+    for (const char* form : {"s.matched", "r || s.matched"}) {
+      ExpectMatchedOnce(DisBench(place), form);
+    }
+  }
+}
+
+TEST(DisableConditionReference, AMatchedInTheBodyIsAccepted) {
+  ExpectAccepted(
+      DisBench("assert property (@(posedge clk) disable iff (r) a ##1 @@);"),
+      "s.matched");
+}
+
+const char kLocalProperty[] =
+    "property pl; bit x;\n"
+    "    @(posedge clk) disable iff (@@) (a, x = 1) |=> x;\n"
+    "  endproperty\n"
+    "  assert property (pl);\n"
+    "  assume property (pl);\n"
+    "  cover property (pl);";
+
+TEST(DisableConditionReference, AModuleVariableBesideALocalIsAccepted) {
+  for (const char* form : {"r", "rq(a).triggered", "$countones(r) == 1"}) {
+    ExpectAccepted(DisBench(kLocalProperty), form);
+  }
+}
+
+TEST(DisableConditionReference, DISABLED_APropertysLocalIsReportedOnce) {
+  for (const char* form : {"x", "rq(x).triggered", "$countones(x) == 1"}) {
+    ExpectLocalOnce(DisBench(kLocalProperty), form);
+  }
+}
+
+const char kFormalProperty[] =
+    "property pf(@@ bit c); @(posedge clk) disable iff (c) a; endproperty\n"
+    "  assert property (pf(r));";
+
+TEST(DisableConditionReference, AnOrdinaryFormalIsAccepted) {
+  ExpectAccepted(DisBench(kFormalProperty), "");
+}
+
+TEST(DisableConditionReference, DISABLED_ALocalFormalIsReported) {
+  for (const char* form : {"local input", "local"}) {
+    ExpectLocalOnce(DisBench(kFormalProperty), form);
+  }
+}
+
+const char kNestedProperty[] =
+    "property pin(bit c); @(posedge clk) disable iff (c) a; endproperty\n"
+    "  property pout; bit y = 1; pin(@@); endproperty\n"
+    "  assert property (pout);";
+
+TEST(DisableConditionReference, AModuleActualToAnInnerDisableIsAccepted) {
+  ExpectAccepted(DisBench(kNestedProperty), "r");
+}
+
+TEST(DisableConditionReference, DISABLED_AnOuterLocalActualIsReported) {
+  ExpectLocalOnce(DisBench(kNestedProperty), "y");
+}
+
+std::string DisUnit(const char* kind) {
+  const std::string kPorts =
+      std::string(kind) == "checker" ? "(logic clk)" : "(input logic clk)";
+  return std::string(kind) + " u_unit" + kPorts +
+         ";\n"
+         "  logic a = 1, r = 0;\n"
+         "  sequence s; @(posedge clk) a ##1 a; endsequence\n"
+         "  default disable iff (@@);\n"
+         "  property pl; bit x;\n"
+         "    @(posedge clk) disable iff (@@) (a, x = 1) |=> x;\n"
+         "  endproperty\n"
+         "  assert property (pl);\n"
+         "  assert property (@(posedge clk) a);\n"
+         "end" +
+         kind + "\n";
+}
+
+const char kDisPackage[] =
+    "package pq;\n"
+    "  property pp(logic clk, logic r); bit x;\n"
+    "    @(posedge clk) disable iff (@@) (1, x = 1) |=> x;\n"
+    "  endproperty\n"
+    "endpackage\n";
+
+const char kDisGenerate[] =
+    "if (1) begin : g\n"
+    "    default disable iff (@@);\n"
+    "    assert property (@(posedge clk) a);\n"
+    "  end";
+
+TEST(DisableConditionReference, EveryUnitAcceptsAModuleVariable) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectAccepted(DisBench("u_unit u(clk);", DisUnit(kind)), "r");
+  }
+  ExpectAccepted(DisBench("assert property (pq::pp(clk, r));", kDisPackage),
+                 "r");
+  ExpectAccepted(DisBench(kDisGenerate), "s.triggered");
+}
+
+TEST(DisableConditionReference, DISABLED_EveryUnitReportsALocalOrMatched) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    const std::string kUnit = DisUnit(kind);
+    const std::size_t kDefault = kUnit.find("@@");
+    const std::string kWithLocal =
+        kUnit.substr(0, kDefault) + "r" + kUnit.substr(kDefault + 2);
+    ExpectLocalOnce(DisBench("u_unit u(clk);", kWithLocal), "x");
+    const std::size_t kInner = kUnit.rfind("@@");
+    const std::string kWithMatched =
+        kUnit.substr(0, kInner) + "r" + kUnit.substr(kInner + 2);
+    ExpectMatchedOnce(DisBench("u_unit u(clk);", kWithMatched), "s.matched");
+  }
+  ExpectLocalOnce(DisBench("assert property (pq::pp(clk, r));", kDisPackage),
+                  "x");
+  ExpectMatchedOnce(DisBench(kDisGenerate), "s.matched");
 }
 
 }  // namespace
