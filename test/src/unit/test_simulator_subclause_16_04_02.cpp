@@ -476,4 +476,221 @@ TEST(DeferredFlushPointsLive,
             "[1] INFO t.b1.a1 (<test>:13): Error on operation of type 0\n");
 }
 
+const char kSay[] =
+    "  function void say(input string s); $display(\"%0t %s\", $time, s); "
+    "endfunction\n";
+
+std::string AroundTheInitial(const std::string& items,
+                             const std::string& body) {
+  return std::string(
+             "module t;\n"
+             "  logic clk = 0, c = 1, d = 1, y, rdy = 0;\n"
+             "  event e, f;\n") +
+         kSay + items + "  initial begin : p\n" + body +
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string Captured(const std::string& src) {
+  SimFixture f;
+  std::string out = RunCapture(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return out;
+}
+
+struct Resume {
+  const char* items;
+  const char* body;
+};
+
+void ExpectFlushed(const Resume& r) {
+  EXPECT_EQ(Captured(AroundTheInitial(r.items, r.body)), "0 resumed\n")
+      << r.body;
+}
+
+TEST(DeferredFlushPointsLive, EveryEventControlFormResumesAtAFlushPoint) {
+  const Resume kCases[] = {
+      {"  initial #0 clk = 1;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    @(posedge clk);\n    say(\"resumed\");\n"},
+      {"  initial #0 -> e;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    @(e iff c);\n    say(\"resumed\");\n"},
+      {"  initial #0 -> f;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    @(e or f);\n    say(\"resumed\");\n"},
+      {"  clocking cb @(posedge clk); endclocking\n"
+       "  initial #0 clk = 1;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    @(cb);\n    say(\"resumed\");\n"},
+      {"  task automatic wait_e; @(e); endtask\n"
+       "  initial #0 -> e;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    wait_e();\n    say(\"resumed\");\n"},
+  };
+  for (const auto& r : kCases) ExpectFlushed(r);
+}
+
+TEST(DeferredFlushPointsLive, ASequenceEventResumeFlushesAFinalReport) {
+  ExpectFlushed(
+      {"  sequence s; @(posedge clk) 1; endsequence\n"
+       "  initial #0 clk = 1;\n",
+       "    assert final (0) else say(\"flushed\");\n"
+       "    @(s);\n    say(\"resumed\");\n"});
+}
+
+TEST(DeferredFlushPointsLive, AWaitResumeFlushesAFinalReport) {
+  ExpectFlushed({"  initial #0 rdy = 1;\n",
+                 "    assert final (0) else say(\"flushed\");\n"
+                 "    wait (rdy);\n    say(\"resumed\");\n"});
+}
+
+TEST(DeferredFlushPointsLive, AnInterfaceInitialBlockResumeFlushes) {
+  EXPECT_EQ(Captured(std::string("interface ifc;\n  event e;\n") + kSay +
+                     "  initial begin\n"
+                     "    assert #0 (0) else say(\"flushed\");\n"
+                     "    @(e);\n"
+                     "    say(\"resumed\");\n"
+                     "  end\n"
+                     "  initial #0 -> e;\n"
+                     "endinterface\n"
+                     "module t;\n  ifc i();\nendmodule\n"),
+            "0 resumed\n");
+}
+
+TEST(DeferredFlushPointsLive, AnAlwaysStarResumeFlushes) {
+  const std::string kHead =
+      std::string("module t;\n  int x;\n") + kSay +
+      "  always @* assert #0 (x != 1) else say(\"flushed\");\n"
+      "  initial begin\n"
+      "    #1 x = 1;\n";
+  EXPECT_EQ(Captured(kHead + "    #0 x = 2;\n  end\nendmodule\n"), "");
+  EXPECT_EQ(Captured(kHead + "  end\nendmodule\n"), "1 flushed\n");
+}
+
+TEST(DeferredFlushPointsLive,
+     DISABLED_ABlockingIntraAssignmentEventControlResumeFlushes) {
+  const Resume kCases[] = {
+      {"  initial #0 -> e;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    y = @(e) d;\n    say(\"resumed\");\n"},
+      {"  initial #0 -> e;\n",
+       "    assert final (0) else say(\"flushed\");\n"
+       "    y = @(e) d;\n    say(\"resumed\");\n"},
+      {"  initial #0 -> e;\n",
+       "    assert #0 (0) else say(\"flushed\");\n"
+       "    y = repeat (1) @(e) d;\n    say(\"resumed\");\n"},
+  };
+  for (const auto& r : kCases) ExpectFlushed(r);
+}
+
+std::string ProgramResumingAt(const std::string& suspend) {
+  return Captured(std::string("program p;\n"
+                              "  logic d = 1, y, started = 0;\n"
+                              "  event e;\n") +
+                  kSay +
+                  "  initial begin\n"
+                  "    assert #0 (0) else say(\"flushed\");\n"
+                  "    started = 1;\n    " +
+                  suspend +
+                  "\n    say(\"resumed\");\n"
+                  "  end\n"
+                  "  initial begin wait (started); -> e; end\n"
+                  "endprogram\n");
+}
+
+TEST(DeferredFlushPointsLive, DISABLED_AProgramsEventControlResumeFlushes) {
+  EXPECT_EQ(ProgramResumingAt("@(e);"), "0 resumed\n");
+}
+
+TEST(DeferredFlushPointsLive,
+     DISABLED_AProgramsIntraAssignmentEventControlResumeFlushes) {
+  EXPECT_EQ(ProgramResumingAt("y = @(e) d;"), "0 resumed\n");
+}
+
+TEST(DeferredFlushPointsLive,
+     DISABLED_AClassTasksIntraAssignmentEventControlResumeFlushes) {
+  EXPECT_EQ(Captured(std::string("class C;\n  event e;\n  logic y;\n") + kSay +
+                     "  task run;\n"
+                     "    assert #0 (0) else say(\"flushed\");\n"
+                     "    y = @(e) 1'b1;\n"
+                     "    say(\"resumed\");\n"
+                     "  endtask\n"
+                     "endclass\n"
+                     "module t;\n"
+                     "  C c = new;\n"
+                     "  initial c.run();\n"
+                     "  initial #0 -> c.e;\n"
+                     "endmodule\n"),
+            "0 resumed\n");
+}
+
+TEST(DeferredFlushPointsLive, DISABLED_AWaitForkResumeFlushes) {
+  for (const char* form : {"assert #0", "assert final"}) {
+    EXPECT_EQ(Captured(AroundTheInitial(
+                  "", std::string("    fork #0 say(\"child\"); join_none\n"
+                                  "    ") +
+                          form +
+                          " (0) else say(\"flushed\");\n"
+                          "    wait fork;\n    say(\"resumed\");\n")),
+              "0 child\n0 resumed\n")
+        << form;
+  }
+}
+
+TEST(DeferredFlushPointsLive, AShortCircuitedFunctionsReportIsFlushed) {
+  const std::string kHead = std::string(
+                                "module t;\n"
+                                "  logic a, b = 0, cc = 1;\n") +
+                            kSay +
+                            "  function bit fn(bit v);\n"
+                            "    p: assert #0 (v) say(\"p pass\");\n"
+                            "    else say(\"p fail\");\n"
+                            "    return v;\n"
+                            "  endfunction\n";
+  const std::string kChange = "  initial begin #0 b = 1; cc = 0; end\n";
+  EXPECT_EQ(Captured(kHead + "  always_comb a = b || fn(cc);\n" + kChange +
+                     "endmodule\n"),
+            "");
+  EXPECT_EQ(Captured(kHead + "  always_comb a = b | fn(cc);\n" + kChange +
+                     "endmodule\n"),
+            "0 p fail\n");
+  EXPECT_EQ(Captured(kHead + "  always_comb a = b || fn(cc);\nendmodule\n"),
+            "0 p pass\n");
+}
+
+TEST(DeferredFlushPointsLive, TheTimeDelayExampleReportsA3AndFlushesA4) {
+  EXPECT_EQ(Captured(std::string("module t;\n  logic a = 0, b = 0;\n") + kSay +
+                     "  always @(a or b) begin : b1\n"
+                     "    a3: assert #0 (a == b) say(\"a3 pass\");\n"
+                     "    else say($sformatf(\"a3 fail a=%0d b=%0d\", a, b));\n"
+                     "    #1;\n"
+                     "    a4: assert #0 (a == b) say(\"a4 pass\");\n"
+                     "    else say(\"a4 fail\");\n"
+                     "  end\n"
+                     "  initial begin\n"
+                     "    #2 a = 1;\n"
+                     "    #1;\n"
+                     "    #0 b = 1;\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "2 a3 fail a=1 b=0\n3 a3 pass\n4 a4 pass\n");
+}
+
+TEST(DeferredFlushPointsLive, AResumeWithoutAnEventOrWaitSuspensionReports) {
+  const Resume kCases[] = {
+      {"", "    wait fork;\n"}, {"", "    #0;\n"},
+      {"", "    y = #0 d;\n"},  {"  initial #0 -> e;\n", "    y <= @(e) d;\n"},
+      {"", "    y <= #0 d;\n"},
+  };
+  for (const auto& r : kCases) {
+    EXPECT_EQ(Captured(AroundTheInitial(
+                  r.items, std::string("    assert #0 (0) else "
+                                       "say(\"reported\");\n") +
+                               r.body + "    say(\"resumed\");\n")),
+              "0 resumed\n0 reported\n")
+        << r.body;
+  }
+}
+
 }  // namespace
