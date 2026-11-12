@@ -289,4 +289,67 @@ TEST(AggregateEqualityRun, NestedDynamicMembersAndUnknownBitsCompare) {
   EXPECT_EQ(out, "x 1\n1\n");
 }
 
+TEST(AggregateExpressionSim, AscendingSlicesCompareElementByElement) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int ua [4] = '{1, 2, 3, 4};\n"
+                 "  int ub [0:5] = '{9, 2, 3, 9, 1, 2};\n"
+                 "  initial $display(\"%b %b %b\", ua[1:2] == ub[1:2],\n"
+                 "                   ua[0:1] == ub[4:5], ua[2:3] != ub[1:2]);\n"
+                 "endmodule\n",
+                 f),
+      "1 1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AggregateExpressionSim,
+     DISABLED_ASliceComparesWithAWholeArrayOrATypedPattern) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef int i2_t [2];\n"
+          "  int ua [4] = '{1, 2, 3, 4};\n"
+          "  int v [2] = '{2, 3};\n"
+          "  int d [3:0] = '{4, 3, 2, 1};\n"
+          "  initial begin\n"
+          "    $display(\"%b %b %b %b\", ua[1:2] == v, v == ua[1:2],\n"
+          "             ua[1:2] === v, v !== ua[1:2]);\n"
+          "    $display(\"%b %b %b\", ua[1:2] != v,\n"
+          "             ua[1:2] == i2_t'{2, 3}, i2_t'{2, 3} == ua[1:2]);\n"
+          "    $display(\"%b\", d[2:1] == ua[1:2]);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 1 1 0\n0 1 1\n0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AggregateExpressionSim, AggregatesCompareInAClassInterfaceAndProgram) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class C;\n"
+                 "  typedef struct { int x; int y; } s_t;\n"
+                 "  s_t a = '{1, 2}, b = '{1, 2};\n"
+                 "  function bit eq(); return a == b; endfunction\n"
+                 "endclass\n"
+                 "interface I;\n"
+                 "  typedef struct { int x; } s_t;\n"
+                 "  s_t a = '{5}, b;\n"
+                 "  initial begin b = a; $display(\"I %b\", a == b); end\n"
+                 "endinterface\n"
+                 "program P;\n"
+                 "  int a [2] = '{1, 2}, b [2] = '{1, 3};\n"
+                 "  initial $display(\"P %b\", a != b);\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  I i(); P p(); C c;\n"
+                 "  initial begin c = new; $display(\"C %b\", c.eq()); end\n"
+                 "endmodule\n",
+                 f),
+      "C 1\nI 1\nP 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

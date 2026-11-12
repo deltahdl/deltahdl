@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string_view>
+#include <utility>
 
 #include "elaborator/const_eval.h"
 #include "elaborator/rtlir.h"
@@ -449,6 +450,72 @@ TEST(ConstantExpressionElaboration, HierarchicalReferenceInARangeIsReported) {
     EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), message, line, "11.2.1"))
         << line;
   }
+}
+
+TEST(ConstantExpressionElaboration, DISABLED_TypeNameAsAnOperandIsReported) {
+  for (const auto& [src, line] :
+       {std::pair{"module t #(parameter type T = logic [7:0]);\n"
+                  "  localparam int A = T + 1;\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t #(parameter type T = logic [7:0]);\n"
+                  "  logic [T:0] r;\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t #(parameter type T = logic [7:0]);\n"
+                  "  if (T) begin : g end\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t #(parameter type T = logic [7:0]);\n"
+                  "  int v;\n"
+                  "  initial v = T[1];\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"module t;\n"
+                  "  typedef logic [3:0] n_t;\n"
+                  "  localparam int B = n_t[1];\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"class C #(type T = int);\n"
+                  "  typedef int t;\n"
+                  "  function int f(); return t + T; endfunction\n"
+                  "endclass\n"
+                  "module m; endmodule\n",
+                  3},
+        std::pair{"package pk; typedef int t; endpackage\n"
+                  "module t;\n"
+                  "  localparam int A = pk::t + 1;\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"typedef int u_t;\n"
+                  "module t;\n"
+                  "  localparam int B = u_t[3:0];\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"class C; typedef int t; endclass\n"
+                  "module t;\n"
+                  "  localparam int D = C::t + 1;\n"
+                  "endmodule\n",
+                  3}}) {
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "names a type, not a value",
+                              line, "11.2"))
+        << src;
+  }
+}
+
+TEST(ConstantExpressionElaboration, TypeOperatorsOfATypeNameAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t #(parameter type T = logic [7:0]);\n"
+      "  localparam int B = $bits(T);\n"
+      "  localparam int V = T'(5);\n"
+      "  localparam bit E = type(T) == type(logic [7:0]);\n"
+      "  localparam string N = $typename(T);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

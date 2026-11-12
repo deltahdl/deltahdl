@@ -371,4 +371,29 @@ TEST(UtilitySystemTaskTest, TypenameOfAnExpressionOverAnUnknownNameFallsBack) {
   EXPECT_EQ(DecodeAsciiBytes(result), "logic");
 }
 
+TEST(TypenameSim,
+     DISABLED_AModuleInterfaceOrProgramTypeParameterNamesItsBoundType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I #(parameter type T = int);\n"
+                       "  initial #1 $display(\"I %s\", $typename(T));\n"
+                       "endinterface\n"
+                       "program P #(parameter type T = shortint);\n"
+                       "  initial #3 $display(\"P %s\", $typename(T));\n"
+                       "endprogram\n"
+                       "module m #(parameter type T = logic [7:0]);\n"
+                       "  parameter type B = shortint;\n"
+                       "  localparam type L = byte;\n"
+                       "  initial #2 $display(\"m %s %s %s\", $typename(T), "
+                       "$typename(B), $typename(L));\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  I #(.T(bit [3:0])) i(); P p(); m u();\n"
+                       "  m #(.T(int)) v();\n"
+                       "endmodule\n",
+                       f),
+            "I bit[3:0]\nm logic[7:0] shortint byte\nm int shortint byte\nP "
+            "shortint\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
