@@ -371,4 +371,96 @@ TEST(SelectElaboration, SelectsInsideGenerateBlocksAreChecked) {
              "endmodule\n"));
 }
 
+TEST(ParameterOverSelectElaboration,
+     DISABLED_ASelectPastAModuleParametersPackedDimensionsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  localparam logic SP = 1;\n"
+      "  localparam int I = 7;\n"
+      "  localparam logic [3:0] W = 5;\n"
+      "  localparam logic [1:0][3:0] Q = 8'h5a;\n"
+      "  typedef struct packed { logic [3:0] m; } s_t;\n"
+      "  localparam s_t P = 5;\n"
+      "  localparam logic A1 = SP[0];\n"
+      "  localparam logic A2 = SP[0:0];\n"
+      "  localparam logic A3 = I[2][0];\n"
+      "  localparam logic A4 = W[1][0];\n"
+      "  localparam logic A5 = Q[1][2][0];\n"
+      "  localparam logic A6 = P.m[1][0];\n"
+      "  logic [W[1][0]:0] r;\n"
+      "  if (Q[1][2][0]) begin : g end\n"
+      "  logic o;\n"
+      "  initial o = SP[0] | I[2][0];\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {8, 9, 10, 11, 12, 13, 14, 15, 17}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "bit-select or part-select of a scalar is illegal", kLine, "11.5.1"))
+        << kLine;
+  }
+}
+
+TEST(ParameterOverSelectElaboration,
+     DISABLED_ASelectPastAPackageUnitOrClassParametersDimensionsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk; localparam logic KS = 1; localparam logic [3:0] KV = 5; "
+      "endpackage\n"
+      "localparam logic US = 1;\n"
+      "localparam logic [3:0] UV = 5;\n"
+      "class K #(parameter logic CP = 1, parameter logic [3:0] CV = 5);\n"
+      "  localparam logic CS = 1;\n"
+      "  function int f(); return CS[0] + CP[0] + CV[1][0]; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam logic A1 = pk::KS[0];\n"
+      "  localparam logic A2 = pk::KV[1][0];\n"
+      "  localparam logic A3 = US[0];\n"
+      "  localparam logic A4 = UV[1][0];\n"
+      "  K #(1, 5) h;\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {6, 9, 10, 11, 12}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "bit-select or part-select of a scalar is illegal", kLine, "11.5.1"))
+        << kLine;
+  }
+}
+
+TEST(ParameterOverSelectElaboration,
+     SelectsWithinAParametersPackedDimensionsAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk; localparam logic [3:0] KV = 5; endpackage\n"
+      "localparam logic [3:0] UV = 5;\n"
+      "class K #(parameter logic [3:0] CV = 5);\n"
+      "  localparam logic [3:0] CW = 5;\n"
+      "  function int f(); return CW[0] + CV[1]; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  localparam int I = 7;\n"
+      "  localparam logic [3:0] W = 5;\n"
+      "  localparam logic [1:0][3:0] Q = 8'h5a;\n"
+      "  typedef struct packed { logic [3:0] m; } s_t;\n"
+      "  localparam s_t P = 5;\n"
+      "  localparam logic A1 = I[2];\n"
+      "  localparam logic A2 = W[1];\n"
+      "  localparam logic A3 = Q[1][2];\n"
+      "  localparam logic [3:0] A4 = Q[1];\n"
+      "  localparam logic A5 = P.m[1];\n"
+      "  localparam logic A6 = pk::KV[1];\n"
+      "  localparam logic A7 = UV[1];\n"
+      "  logic [W[2]:0] r;\n"
+      "  if (Q[1][3]) begin : g end\n"
+      "  logic o;\n"
+      "  initial o = I[2] | W[0];\n"
+      "  K #(5) h;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
