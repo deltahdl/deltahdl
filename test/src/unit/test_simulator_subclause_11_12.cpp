@@ -793,4 +793,149 @@ TEST(LetSim, ACompilationUnitLetsTypeReferenceFormalCastsItsActual) {
             "-1\n");
 }
 
+TEST(LetExamplesSim, TheMultExampleSizesItsProductByItsOperandsBits) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  let mult(x, y) = ($bits(x) + $bits(y))'(x * y);\n"
+          "  logic [3:0] a = 15;\n"
+          "  logic [1:0] b = 3;\n"
+          "  initial $display(\"%0d %0d\", mult(a, b), $bits(mult(a, b)));\n"
+          "endmodule\n",
+          f),
+      "45 6\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExamplesSim, TheAtLeastTwoExampleAssertsWithAndWithoutItsDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  let at_least_two(sig, rst = 1'b0) = rst || ($countones(sig) >= "
+          "2);\n"
+          "  logic [15:0] sig1 = 16'h0101;\n"
+          "  logic [3:0] sig2 = 4'b1110;\n"
+          "  initial begin\n"
+          "    #1;\n"
+          "    q1: assert (at_least_two(sig1)) $display(\"q1 pass\");\n"
+          "    else $display(\"q1 fail\");\n"
+          "    q2: assert (at_least_two(~sig2)) $display(\"q2 pass\");\n"
+          "    else $display(\"q2 fail\");\n"
+          "    q3: assert (at_least_two(~sig2, 1)) $display(\"q3 pass\");\n"
+          "    else $display(\"q3 fail\");\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "q1 pass\nq2 fail\nq3 pass\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExamplesSim, AShortcutForAHierarchicalSubexpressionIsPassedToATask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module u;\n"
+                "  logic [31:0] base = 100, displ = 7;\n"
+                "endmodule\n"
+                "module b;\n"
+                "  u unit1();\n"
+                "  u unit2();\n"
+                "endmodule\n"
+                "module top;\n"
+                "  b block1();\n"
+                "  task write_value(input logic [31:0] ad, input logic [31:0] "
+                "value);\n"
+                "    $display(\"%0d %0d\", ad, value);\n"
+                "  endtask\n"
+                "  let addr = top.block1.unit1.base + top.block1.unit2.displ;\n"
+                "  initial #1 write_value(addr, 0);\n"
+                "endmodule\n",
+                f),
+            "107 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExamplesSim, TheFormalsAndTheDefaultOfTheEqExampleAreSubstituted) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  logic clk = 0, a = 1, b = 1;\n"
+                       "  logic p = 1, q = 0, r = 1;\n"
+                       "  let eq(x, y = b) = x == y;\n"
+                       "  let tmp = a && b;\n"
+                       "  initial #5 clk = 1;\n"
+                       "  a1: assert property (@(posedge clk) eq(p,q)) else "
+                       "$display(\"a1 fail %0t\", $time);\n"
+                       "  always_comb begin\n"
+                       "    a2: assert (eq(r)) $display(\"a2 pass\");\n"
+                       "    a3: assert (tmp) $display(\"a3 pass\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "a2 pass\na3 pass\na1 fail 5\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExamplesSim, LetsOfAnInterfaceAProgramAndACheckerExpandThere) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I;\n"
+                       "  int a = 4;\n"
+                       "  let dbl(x) = x * 2;\n"
+                       "  int r;\n"
+                       "  initial #1 r = dbl(a);\n"
+                       "endinterface\n"
+                       "program p;\n"
+                       "  int b = 5;\n"
+                       "  let tri3(x) = x * 3;\n"
+                       "  initial #4 $display(\"P %0d\", tri3(b));\n"
+                       "endprogram\n"
+                       "checker c(logic s, logic clk);\n"
+                       "  let inv(x) = !x;\n"
+                       "  a: assert property (@(posedge clk) inv(s))\n"
+                       "    $display(\"C pass %0t\", $time);\n"
+                       "  else $display(\"C fail %0t\", $time);\n"
+                       "endchecker\n"
+                       "module m;\n"
+                       "  logic s = 0, clk = 0;\n"
+                       "  I i();\n"
+                       "  p pp();\n"
+                       "  c ci(s, clk);\n"
+                       "  initial begin\n"
+                       "    #2 clk = 1;\n"
+                       "    #1 $display(\"I %0d\", i.r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "C pass 2\nI 8\nP 15\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExamplesSim, DISABLED_ANameANestedScopeDeclaresHidesALetDeclaredLater) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int k = 1;\n"
+                       "  task t(input int k2);\n"
+                       "    int addr;\n"
+                       "    addr = k2;\n"
+                       "    $display(\"%0d\", addr);\n"
+                       "  endtask\n"
+                       "  function int f(int addr);\n"
+                       "    return addr * 10;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    int addr;\n"
+                       "    addr = 5;\n"
+                       "    $display(\"%0d\", addr);\n"
+                       "  end\n"
+                       "  let addr = k + 1;\n"
+                       "  initial #1 begin\n"
+                       "    t(addr);\n"
+                       "    $display(\"%0d\", f(addr));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5\n2\n20\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

@@ -252,4 +252,258 @@ TEST(LetElaboration, AScopedCallIsNoHierarchicalReference) {
                             "11.12"));
 }
 
+TEST(LetExpandedBodyElaboration,
+     DISABLED_AnInstanceSelectingABitOfARealActualIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  real r = 1.5;\n"
+      "  logic o;\n"
+      "  let sel(x) = x[0];\n"
+      "  initial o = sel(r);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 5,
+                            "6.12"));
+}
+
+TEST(LetExpandedBodyElaboration,
+     AnInstanceSelectingABitOfAVectorActualIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic [3:0] v = 5;\n"
+      "  logic o;\n"
+      "  let sel(x) = x[0];\n"
+      "  initial o = sel(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExpandedBodyElaboration,
+     DISABLED_AnInstanceAddingToAHandleAChandleOrAnUnpackedArrayIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "endclass\n"
+      "module m;\n"
+      "  C h;\n"
+      "  chandle ch;\n"
+      "  int a[2];\n"
+      "  int i;\n"
+      "  let inc(x) = x + 1;\n"
+      "  initial begin\n"
+      "    i = inc(h);\n"
+      "    i = inc(ch);\n"
+      "    i = inc(a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on class object handles",
+                            10, "8.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "operator is not allowed on chandle", 11, "6.14"));
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "an unpacked array is not an operand of this operator", 12, "7.4.6"));
+}
+
+TEST(LetExpandedBodyElaboration, AnInstanceAddingToAnIntActualIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int n = 3, i;\n"
+      "  let inc(x) = x + 1;\n"
+      "  initial i = inc(n);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExpandedBodyElaboration,
+     DISABLED_AnInstanceCallingAMethodItsActualLacksIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int n = 3, i;\n"
+      "  let size_of(x) = x.size();\n"
+      "  initial i = size_of(n);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'size' is not a built-in method of the integral or real value 'n'", 4,
+      "23.7"));
+}
+
+TEST(LetExpandedBodyElaboration,
+     AnInstanceCallingAMethodItsActualHasIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$], i;\n"
+      "  let size_of(x) = x.size();\n"
+      "  initial i = size_of(q);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExpandedBodyElaboration,
+     DISABLED_AnInstanceAssigningToANetActualIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  wire w;\n"
+      "  int i;\n"
+      "  let set(x) = (x = 1);\n"
+      "  initial i = set(w);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "net 'w' cannot be the target of a procedural assignment", 5, "10.4"));
+}
+
+TEST(
+    LetExpandedBodyElaboration,
+    DISABLED_AnInstanceAssigningToAVariableActualInAProceduralStatementIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int v, i;\n"
+      "  let set(x) = (x = 1);\n"
+      "  initial i = set(v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetExpandedBodyElaboration,
+     DISABLED_AForbiddenExpansionIsReportedWhereverTheInstanceAndTheLetStand) {
+  ElabFixture f;
+  ElaborateSrc(
+      "let usel(x) = x[0];\n"
+      "package pk;\n"
+      "  let psel(x) = x[0];\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pk::*;\n"
+      "  real r = 1.5;\n"
+      "  logic clk, o;\n"
+      "  wire w;\n"
+      "  let sel(x) = x[0];\n"
+      "  assign w = sel(r);\n"
+      "  always @(posedge clk) assert property (sel(r));\n"
+      "  initial begin\n"
+      "    let bsel(x) = x[0];\n"
+      "    assert (sel(r));\n"
+      "    o = psel(r);\n"
+      "    o = bsel(r);\n"
+      "    o = usel(r);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 11,
+                            "6.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 12,
+                            "6.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 15,
+                            "6.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 16,
+                            "6.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 17,
+                            "6.12"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bit-select of a real variable is illegal", 18,
+                            "6.12"));
+}
+
+TEST(LetExpandedBodyElaboration,
+     AnAllowedExpansionIsAcceptedWhereverTheInstanceAndTheLetStand) {
+  ElabFixture f;
+  ElaborateSrc(
+      "let usel(x) = x[0];\n"
+      "package pk;\n"
+      "  let psel(x) = x[0];\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pk::*;\n"
+      "  logic [3:0] v = 5;\n"
+      "  logic clk, o;\n"
+      "  wire w;\n"
+      "  let sel(x) = x[0];\n"
+      "  assign w = sel(v);\n"
+      "  always @(posedge clk) assert property (sel(v));\n"
+      "  initial begin\n"
+      "    let bsel(x) = x[0];\n"
+      "    assert (sel(v));\n"
+      "    o = psel(v);\n"
+      "    o = bsel(v);\n"
+      "    o = usel(v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetPlacesElaboration, ALetDeclaredInAClockingBlockIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    let nota = !a;\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetPlacesElaboration, TheTypedFormalsOfTheTogglesExampleAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clock);\n"
+      "  logic [15:0] a, b;\n"
+      "  logic c, d;\n"
+      "  typedef bit [15:0] bits;\n"
+      "  let ones_match(bits x, y) = x == y;\n"
+      "  let same(logic x, y) = x === y;\n"
+      "  always_comb a1: assert (ones_match(a, b));\n"
+      "  property toggles(bit x, y);\n"
+      "    same(x, y) |=> !same(x, y);\n"
+      "  endproperty\n"
+      "  a2: assert property (@(posedge clock) toggles(c, d));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(LetPlacesElaboration,
+     AnExplicitlyClockedPastAndASampledAreAcceptedInAlwaysComb) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clock);\n"
+      "  logic a;\n"
+      "  let p1(x) = $past(x);\n"
+      "  let p2(x) = $past(x,,,@(posedge clock));\n"
+      "  let s(x) = $sampled(x);\n"
+      "  always_comb begin\n"
+      "    a2: assert (p2(a));\n"
+      "    a3: assert (s(a));\n"
+      "  end\n"
+      "  a4: assert property (@(posedge clock) p1(a));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
