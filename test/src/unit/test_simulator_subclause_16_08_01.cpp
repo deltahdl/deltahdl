@@ -236,6 +236,43 @@ TEST(TypedSequenceFormals, AnActualBuiltWithOrOrAndIsOneSequence) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
+TEST(TypedSequenceFormals, ABooleanActualMatchesInsideTheBodyAroundIt) {
+  SimFixture f;
+  auto* hits = RunAndFindVar(
+      SequenceTickSource("framed(te2)", DriveTicks({{1}, {2}, {2}}),
+                         "  sequence framed(sequence q);\n"
+                         "    te1 ##1 q;\n"
+                         "  endsequence\n"),
+      f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 15u);
+}
+
+void ExpectConvertedOnce(const std::string& formal, const std::string& body,
+                         const std::string& actual) {
+  SimFixture f;
+  auto* hits =
+      RunAndFindVar(TypedSource("  sequence sc(" + formal + ");\n    " + body +
+                                ";\n"
+                                "  endsequence\n"
+                                "  sequence rule;\n"
+                                "    @(posedge clk) v[1] ##0 sc(" +
+                                actual + ");\n  endsequence\n"),
+                    f, "hits");
+  ASSERT_NE(hits, nullptr);
+  EXPECT_EQ(hits->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 15u);
+}
+
+TEST(TypedSequenceFormals, ARealActualRoundsToAnIntegralFormal) {
+  ExpectConvertedOnce("int k", "k == 3", "2.6");
+}
+
+TEST(TypedSequenceFormals, DISABLED_AnIntegralActualBecomesARealFormal) {
+  ExpectConvertedOnce("real h", "h / 4 == 0.5", "2");
+}
+
 TEST(TypedSequenceFormals, AListOfNamesIsTheSequenceItReadsAs) {
   const std::string kPrelude =
       "  function void note;\n"
