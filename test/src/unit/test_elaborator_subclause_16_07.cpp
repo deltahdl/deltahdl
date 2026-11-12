@@ -437,4 +437,157 @@ TEST(CycleDelayNonNegative, DISABLED_EveryUnitReportsANegativeDelay) {
   ExpectNegativeReported(DelayBench(kDelayGenerate), "a ##NEG b");
 }
 
+int InvertedReports(const std::vector<Diagnostic>& diags, uint32_t line) {
+  int count = 0;
+  for (const auto& diag : diags) {
+    if (diag.severity == DiagSeverity::kError && diag.loc.line == line &&
+        diag.subclause == "16.7" &&
+        (diag.message.find("at least the lower") != std::string::npos ||
+         diag.message.find("no less than its minimum") != std::string::npos)) {
+      ++count;
+    }
+  }
+  return count;
+}
+
+void ExpectInvertedOnce(const std::string& marked, const std::string& form,
+                        std::string_view at = "@@") {
+  const std::string kSrc = Placed(marked, form);
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(kSrc, f);
+  EXPECT_EQ(InvertedReports(f.diag.Diagnostics(), LineHolding(marked, at)), 1)
+      << kSrc;
+}
+
+const char* const kRangePlaces[] = {
+    "assert property (@(posedge clk) @@);",
+    "sequence sd; @(posedge clk) @@; endsequence\n  cover property (sd);",
+    "property pd; @(posedge clk) @@; endproperty\n  assert property (pd);",
+    "assume property (@(posedge clk) @@);",
+    "cover property (@(posedge clk) @@);",
+    "restrict property (@(posedge clk) @@);",
+    "always @(posedge clk) assert property (@@);",
+    "initial expect (@(posedge clk) @@);",
+};
+
+TEST(CycleDelayRangeOrder, EveryPlaceAcceptsAnOrderedRange) {
+  for (const char* place : kRangePlaces) {
+    for (const char* form :
+         {"a ##[1:5] b", "a ##[3:3] b", "a ##[3:$] b", "a ##[*] b", "a ##[+] b",
+          "a ##[(1):(5)] b", "a ##[8'h1:8'h5] b", "a ##[2:1_0] b", "##[2:4] b",
+          "a ##[P:P+2] b"}) {
+      ExpectDelayAccepted(DelayBench(place), form);
+    }
+  }
+}
+
+TEST(CycleDelayRangeOrder, EveryPlaceReportsAnInvertedParameterRange) {
+  for (const char* place : kRangePlaces) {
+    for (const char* form : {"a ##[P+2:P] b", "a ##[P:1] b"}) {
+      ExpectInvertedOnce(DelayBench(place), form);
+    }
+  }
+}
+
+TEST(CycleDelayRangeOrder, DISABLED_EveryPlaceReportsAnInvertedLiteralRange) {
+  for (const char* place : kRangePlaces) {
+    for (const char* form :
+         {"a ##[5:1] b", "##[4:2] b", "a ##[(5):(1)] b", "a ##[8'h5:8'h1] b",
+          "a ##[3'd5:3'd1] b", "a ##[1_0:2] b"}) {
+      ExpectInvertedOnce(DelayBench(place), form);
+    }
+  }
+}
+
+TEST(CycleDelayRangeOrder, ASequenceDeclarationReportsAPlainLiteralRange) {
+  ExpectInvertedOnce(DelayBench(kRangePlaces[1]), "a ##[5:1] b");
+  ExpectInvertedOnce(DelayBench(kRangePlaces[1]), "##[4:2] b");
+}
+
+const char* const kImplicationPlaces[] = {
+    "assert property (@(posedge clk) @@);",
+    "property pd; @(posedge clk) @@; endproperty\n  assert property (pd);",
+};
+
+TEST(CycleDelayRangeOrder, AConsequentsOrderedRangeIsAccepted) {
+  for (const char* place : kImplicationPlaces) {
+    ExpectDelayAccepted(DelayBench(place), "a |-> ##[2:4] b");
+  }
+}
+
+TEST(CycleDelayRangeOrder, DISABLED_AConsequentsInvertedRangeIsReported) {
+  for (const char* place : kImplicationPlaces) {
+    ExpectInvertedOnce(DelayBench(place), "a |-> ##[4:2] b");
+  }
+}
+
+TEST(CycleDelayRangeOrder, EveryUnitsSequenceDeclarationReportsAnInversion) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectDelayAccepted(DelayBench("u_unit u(clk);", DelayUnit(kind, "@@")),
+                        "a ##[1:5] b");
+    ExpectInvertedOnce(DelayBench("u_unit u(clk);", DelayUnit(kind, "@@")),
+                       "a ##[5:1] b");
+  }
+  ExpectInvertedOnce(DelayBench("cover property (pk::ps);", kNegativePackage),
+                     "pa ##[5:1] pa");
+  ExpectInvertedOnce(DelayBench("cover property (us);", kNegativeUnitScope),
+                     "ua ##[5:1] ua");
+  ExpectInvertedOnce(DelayBench(kNegativeGenerate), "a ##[5:1] b");
+}
+
+TEST(CycleDelayRangeOrder, DISABLED_AUnitsAssertionOrGenerateParameterInverts) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectInvertedOnce(DelayBench("u_unit u(clk);", DelayUnit(kind)),
+                       "a ##[5:1] b");
+  }
+  ExpectInvertedOnce(DelayBench(kDelayGenerate), "a ##[5:1] b");
+  ExpectInvertedOnce(DelayBench(kNegativeGenerate), "a ##[P:1] b");
+}
+
+TEST(CycleDelayRangeOrder, AnInterfaceOrProgramReportsAnInvertedParameter) {
+  for (const char* kind : {"interface", "program"}) {
+    ExpectDelayAccepted(DelayBench("u_unit u(clk);", DelayUnit(kind)),
+                        "a ##[1:P] b");
+    ExpectInvertedOnce(DelayBench("u_unit u(clk);", DelayUnit(kind)),
+                       "a ##[P:1] b");
+  }
+}
+
+const char kSequenceFormal[] =
+    "sequence sf(int d); @(posedge clk) a ##[5:d] b; endsequence\n"
+    "  cover property (sf(@@));";
+
+TEST(CycleDelayRangeOrder, ASequenceFormalIsCheckedPerInstance) {
+  ExpectInvertedOnce(DelayBench(kSequenceFormal), "2", "##[5:d]");
+  ExpectDelayAccepted(DelayBench(kSequenceFormal), "9");
+}
+
+const char kPropertyFormal[] =
+    "property qf(int d); @(posedge clk) a ##[d:1] b; endproperty\n"
+    "  assert property (qf(@@));";
+
+TEST(CycleDelayRangeOrder, APropertyFormalWithAnOrderedActualIsAccepted) {
+  ExpectDelayAccepted(DelayBench(kPropertyFormal), "0");
+}
+
+TEST(CycleDelayRangeOrder, DISABLED_APropertyFormalIsCheckedPerInstance) {
+  ExpectInvertedOnce(DelayBench(kPropertyFormal), "3", "##[d:1]");
+}
+
+const char kDefaultedFormal[] =
+    "sequence tf(int d = 1); @(posedge clk) a ##[5:d] b; endsequence\n"
+    "  @@";
+
+TEST(CycleDelayRangeOrder, AnUninstancedDefaultIsNotChecked) {
+  ExpectDelayAccepted(DelayBench(kDefaultedFormal), "");
+}
+
+TEST(CycleDelayRangeOrder, DISABLED_ADefaultIsCheckedOnlyWhereItIsUsed) {
+  ExpectDelayAccepted(DelayBench(kDefaultedFormal), "cover property (tf(9));");
+  ExpectInvertedOnce(DelayBench(kDefaultedFormal), "cover property (tf(2));",
+                     "##[5:d]");
+  ExpectInvertedOnce(DelayBench(kDefaultedFormal), "cover property (tf());",
+                     "##[5:d]");
+}
+
 }  // namespace
