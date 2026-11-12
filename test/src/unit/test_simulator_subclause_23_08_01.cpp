@@ -277,4 +277,33 @@ TEST(TaskAndFunctionNameResolutionSimulation,
             "unit.f\n");
 }
 
+TEST(TaskAndFunctionNameResolutionSimulation,
+     DISABLED_ABareCallFindsTheModulesSubroutineAheadOfAGenerateBlocks) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  function int g(int a); return a * 2; endfunction\n"
+                 "  task t(output int y); y = 1; endtask\n"
+                 "  int r1, r2, r3, r4;\n"
+                 "  if (1) begin : gb\n"
+                 "    function int g(int a); return a + 100; "
+                 "endfunction\n"
+                 "    task t(output int y); y = 2; endtask\n"
+                 "    int q1, q2;\n"
+                 "    initial begin q1 = g(1); t(q2); end\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    r1 = g(21);\n"
+                 "    t(r2);\n"
+                 "    r3 = gb.g(1);\n"
+                 "    gb.t(r4);\n"
+                 "    #1 $display(\"%0d %0d %0d %0d %0d %0d\", r1, r2, r3, "
+                 "r4, gb.q1, gb.q2);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "42 1 101 2 101 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

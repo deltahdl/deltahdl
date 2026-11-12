@@ -384,4 +384,161 @@ TEST(FunctionLifetimeSim, AProgramFunctionIsStaticUnlessTheProgramIsAutomatic) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+TEST(FunctionLifetimeSim, TheFactorialExampleDisplaysItsResults) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module tryfact;\n"
+                       "  function automatic integer factorial "
+                       "(input [31:0] operand);\n"
+                       "    if (operand >= 2)\n"
+                       "      factorial = factorial (operand - 1) * operand;\n"
+                       "    else\n"
+                       "      factorial = 1;\n"
+                       "  endfunction: factorial\n"
+                       "  integer result;\n"
+                       "  initial begin\n"
+                       "    for (int n = 0; n <= 7; n++) begin\n"
+                       "      result = factorial(n);\n"
+                       "      $display(\"%0d factorial=%0d\", n, result);\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule: tryfact\n",
+                       f),
+            "0 factorial=1\n1 factorial=1\n2 factorial=2\n3 factorial=6\n"
+            "4 factorial=24\n5 factorial=120\n6 factorial=720\n"
+            "7 factorial=5040\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionLifetimeSim, OnlyAStaticFunctionKeepsItsImplicitVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  function int st();\n"
+                       "    st = st + 1;\n"
+                       "  endfunction\n"
+                       "  function automatic int au();\n"
+                       "    au = au + 1;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", st(), st(), "
+                       "au(), au());\n"
+                       "endmodule\n",
+                       f),
+            "1 2 1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionLifetimeSim, AClassMethodIsAutomaticWhetherOrNotItIsStatic) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  function int f();\n"
+                       "    int x;\n"
+                       "    x++;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "  static function int s();\n"
+                       "    int y;\n"
+                       "    y++;\n"
+                       "    return y;\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module m;\n"
+                       "  C c = new;\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", c.f(), c.f(), "
+                       "C::s(), C::s());\n"
+                       "endmodule\n",
+                       f),
+            "1 1 1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionLifetimeSim,
+     AFunctionDeclaredStaticInAnAutomaticScopeKeepsItsLocal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package automatic p;\n"
+                       "  function static int k();\n"
+                       "    int x;\n"
+                       "    x++;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module automatic m;\n"
+                       "  function static int g();\n"
+                       "    int x;\n"
+                       "    x++;\n"
+                       "    return x;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", g(), g(), "
+                       "p::k(), p::k());\n"
+                       "endmodule\n",
+                       f),
+            "1 2 1 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionLifetimeSim, AnAutomaticFunctionIsCalledThroughAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c;\n"
+                       "  function automatic int f(int n);\n"
+                       "    return n <= 1 ? 1 : n * f(n - 1);\n"
+                       "  endfunction\n"
+                       "endmodule\n"
+                       "interface i;\n"
+                       "  function automatic int g(int n);\n"
+                       "    return n + 1;\n"
+                       "  endfunction\n"
+                       "endinterface\n"
+                       "module m;\n"
+                       "  c u();\n"
+                       "  i v();\n"
+                       "  initial $display(\"%0d %0d %0d\", u.f(4), v.g(1), "
+                       "m.u.f(3));\n"
+                       "endmodule\n",
+                       f),
+            "24 2 6\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionLifetimeSim, AStaticFunctionsLocalIsReadThroughAPathInEveryScope) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module c;\n"
+                 "  function int g();\n"
+                 "    int x;\n"
+                 "    x = 9;\n"
+                 "    return x;\n"
+                 "  endfunction\n"
+                 "endmodule\n"
+                 "interface i;\n"
+                 "  function int g();\n"
+                 "    int x;\n"
+                 "    x = 5;\n"
+                 "    return x;\n"
+                 "  endfunction\n"
+                 "endinterface\n"
+                 "module m;\n"
+                 "  c u();\n"
+                 "  i v();\n"
+                 "  function int g(int a);\n"
+                 "    int x;\n"
+                 "    x = a * 2;\n"
+                 "    return x;\n"
+                 "  endfunction\n"
+                 "  if (1) begin : gb\n"
+                 "    function int h();\n"
+                 "      int x;\n"
+                 "      x = 4;\n"
+                 "      return x;\n"
+                 "    endfunction\n"
+                 "  end\n"
+                 "  int r;\n"
+                 "  initial begin\n"
+                 "    r = g(21) + u.g() + v.g() + gb.h();\n"
+                 "    $display(\"%0d %0d %0d %0d %0d\", g.x, m.g.x, u.g.x, "
+                 "v.g.x, gb.h.x);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "42 42 9 5 4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
