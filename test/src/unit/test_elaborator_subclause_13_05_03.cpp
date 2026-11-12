@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -184,6 +187,53 @@ TEST(DefaultArgumentElaboration,
                             "13.5.3"));
   EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 5));
   EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 7));
+}
+
+TEST(DefaultArgumentElaboration,
+     DISABLED_APositionalScopedCallOmittingAFormalWithoutADefault) {
+  const std::string kSrc =
+      "package q;\n"
+      "  function automatic int get(int k, int d = 1); return k; endfunction\n"
+      "endpackage\n"
+      "interface bus;\n"
+      "  function automatic int get(int k, int d = 1); return k; endfunction\n"
+      "endinterface\n"
+      "class K;\n"
+      "  function int get(int k, int d = 1); return k; endfunction\n"
+      "  static function int sget(int k, int d = 1); return k; endfunction\n"
+      "  task put(int k, int d = 1); endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  K h = new();\n"
+      "  bus b();\n"
+      "  int y;\n"
+      "  initial begin\n"
+      "    y = h.get();\n"
+      "    y = h.get(, 3);\n"
+      "    y = K::sget();\n"
+      "    h.put();\n"
+      "    y = q::get();\n"
+      "    y = b.get();\n"
+      "    y = h.get(2) + q::get(2) + b.get(2);\n"
+      "  end\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  for (const auto& [text, callee] :
+       {std::pair<const char*, const char*>{"h.get();", "get"},
+        {"h.get(, 3);", "get"},
+        {"K::sget();", "sget"},
+        {"h.put();", "put"},
+        {"q::get();", "get"},
+        {"b.get();", "get"}}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("missing argument 'k' in call to '") + callee + "'",
+        LineHolding(kSrc, text), "13.5.3"))
+        << text;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(),
+                           LineHolding(kSrc, "h.get(2) + q::get(2)")));
 }
 
 }  // namespace

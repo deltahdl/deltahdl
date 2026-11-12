@@ -145,4 +145,19 @@ TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
       ReportedError(r.diags, "expected '.', got integer literal", 6, "13.5.4"));
 }
 
+TEST(TaskAndFunctionParsing, PositionalAfterNamedIsAnErrorInATaskOrMethodCall) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t(int j = 1, string s = \"no\"); endtask\n"
+      "  initial begin\n"
+      "    t(.s(\"yes\"), 2);\n"
+      "    c.me(.a(1), 3);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '.', got integer literal", 4, "13.5.4"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '.', got integer literal", 5, "13.5.4"));
+}
+
 }  // namespace

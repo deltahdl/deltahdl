@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <string>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -648,6 +649,51 @@ TEST(SubroutineCallElaboration,
 TEST(SubroutineCallElaboration,
      DISABLED_ALiteralOutputActualIsReportedInAPackageTheUnitOrAnotherScope) {
   ExpectLiteralOutputReported(kUnreportedLiteralOutputCalls);
+}
+
+TEST(SubroutineCallElaboration,
+     DISABLED_AScopedCallWithTooManyArgumentsIsReported) {
+  const std::string kSrc =
+      "package pk;\n"
+      "  function automatic int one(int a); return a; endfunction\n"
+      "endpackage\n"
+      "interface io;\n"
+      "  function automatic int one(int a); return a; endfunction\n"
+      "endinterface\n"
+      "class W;\n"
+      "  function int one(int a); return a; endfunction\n"
+      "  static function int sone(int a); return a; endfunction\n"
+      "  task tone(int a); endtask\n"
+      "endclass\n"
+      "module m;\n"
+      "  W w = new();\n"
+      "  io p();\n"
+      "  int z;\n"
+      "  initial begin\n"
+      "    z = w.one(1, 2);\n"
+      "    z = W::sone(1, 2);\n"
+      "    w.tone(1, 2);\n"
+      "    z = pk::one(1, 2);\n"
+      "    z = p.one(1, 2);\n"
+      "    z = w.one(1) + W::sone(1) + pk::one(1) + p.one(1);\n"
+      "  end\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  for (const auto& [text, callee] :
+       {std::pair<const char*, const char*>{"w.one(1, 2);", "one"},
+        {"W::sone(1, 2);", "sone"},
+        {"w.tone(1, 2);", "tone"},
+        {"pk::one(1, 2);", "one"},
+        {"p.one(1, 2);", "one"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("too many arguments to '") + callee +
+                                  "': expected 1, got 2",
+                              LineHolding(kSrc, text), "13.5"))
+        << text;
+  }
+  EXPECT_FALSE(
+      ErrorOnLine(f.diag.Diagnostics(), LineHolding(kSrc, "w.one(1) + W")));
 }
 
 }  // namespace

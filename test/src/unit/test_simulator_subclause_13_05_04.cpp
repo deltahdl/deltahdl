@@ -123,4 +123,64 @@ TEST(SubroutineCallSim, NamedArgBindsStringOperand) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
+TEST(SubroutineCallSim, TheClauseFunExampleBindsEachCallAsItsPositionalForm) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  function int fun( int j = 1, string s = \"no\" );\n"
+                       "    $display(\"%0d %s\", j, s);\n"
+                       "    return j;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    void'(fun( .j(2), .s(\"yes\") ));\n"
+                       "    void'(fun( .s(\"yes\") ));\n"
+                       "    void'(fun( , \"yes\" ));\n"
+                       "    void'(fun( .j(2) ));\n"
+                       "    void'(fun( .s(\"yes\"), .j(2) ));\n"
+                       "    void'(fun( .s(), .j() ));\n"
+                       "    void'(fun( 2 ));\n"
+                       "    void'(fun( ));\n"
+                       "    void'(fun(2, .s(\"yes\")));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 yes\n1 yes\n1 yes\n2 no\n2 yes\n1 no\n2 no\n1 no\n2 yes\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SubroutineCallSim, NamedBindingReachesTasksMethodsAndPackageFunctions) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  function automatic int pf(int a, int b = 4);\n"
+                 "    return a * 10 + b;\n"
+                 "  endfunction\n"
+                 "endpackage\n"
+                 "class C;\n"
+                 "  function int me(int a, int b = 5);\n"
+                 "    return a * 10 + b;\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "interface ifc;\n"
+                 "  function automatic int iff_(int a, int b = 6);\n"
+                 "    return a * 10 + b;\n"
+                 "  endfunction\n"
+                 "endinterface\n"
+                 "module m;\n"
+                 "  C c = new();\n"
+                 "  ifc i();\n"
+                 "  task automatic t(int a, output int o, input int b = 3);\n"
+                 "    o = a * 10 + b;\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    int o;\n"
+                 "    t(.o(o), .a(1));\n"
+                 "    #1 $display(\"%0d %0d %0d %0d\", o, pk::pf(.b(7), "
+                 ".a(2)), c.me(.a(3)), i.iff_(.b(8), .a(4)));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "13 27 35 48\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
