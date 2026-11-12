@@ -199,4 +199,109 @@ TEST(ConcurrentAssertionStatements, AStatementReadsThroughAnInterfacePort) {
   EXPECT_EQ(out, "p=9 f=1 p2=9 f2=1\n");
 }
 
+struct AssertOffResult {
+  std::string out;
+  bool has_errors;
+};
+
+AssertOffResult RunAssertOffCase(const std::string& name) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module sub(input logic clk, input logic a);\n"
+      "  a1: assert property (@(posedge clk) a)\n"
+      "    else $display(\"%m failed\");\n"
+      "  if (1) begin : gen\n"
+      "    g1: assert property (@(posedge clk) a)\n"
+      "      else $display(\"%m failed\");\n"
+      "  end\n"
+      "  always @(posedge clk) begin : proc\n"
+      "    p1: assert property (a) else $display(\"%m failed\");\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic clk = 0;\n"
+      "  logic a = 1;\n"
+      "  always #5 clk = ~clk;\n"
+      "  sub u(clk, a);\n"
+      "  initial begin\n"
+      "    $assertoff(0, " +
+          name +
+          ");\n"
+          "    #10 a = 0;\n"
+          "    #10 a = 1;\n"
+          "    #20 $finish;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  return {out, f.diag.HasErrors()};
+}
+
+void ExpectOnlyTheNamedStatementIsOff(const std::string& name,
+                                      const std::string& off) {
+  auto r = RunAssertOffCase(name);
+  EXPECT_FALSE(r.has_errors) << name;
+  for (const char* label : {"t.u.a1", "t.u.gen.g1", "t.u.proc.p1"}) {
+    std::string line = std::string(label) + " failed\n";
+    if (off == label) {
+      EXPECT_EQ(r.out.find(line), std::string::npos) << name;
+    } else {
+      EXPECT_NE(r.out.find(line), std::string::npos) << name;
+    }
+  }
+}
+
+TEST(ConcurrentAssertionStatements, AHierarchicalNameReachesANamedStatement) {
+  ExpectOnlyTheNamedStatementIsOff("t.u.a1", "t.u.a1");
+  ExpectOnlyTheNamedStatementIsOff("t.u.gen.g1", "t.u.gen.g1");
+  ExpectOnlyTheNamedStatementIsOff("u.gen.g1", "t.u.gen.g1");
+  ExpectOnlyTheNamedStatementIsOff("t.u.proc.p1", "t.u.proc.p1");
+  ExpectOnlyTheNamedStatementIsOff("u.proc.p1", "t.u.proc.p1");
+}
+
+TEST(ConcurrentAssertionStatements,
+     DISABLED_ARelativeNameReachesAStatementOfAnInstanceWithNoBlock) {
+  for (const char* off : {"a1", "m1"}) {
+    SimFixture f;
+    std::string out = RunCapture(
+        "module sub(input logic clk, input logic a);\n"
+        "  a1: assert property (@(posedge clk) a)\n"
+        "    else $display(\"%m failed\");\n"
+        "  m1: assume property (@(posedge clk) a)\n"
+        "    else $display(\"%m failed\");\n"
+        "endmodule\n"
+        "module t;\n"
+        "  logic clk = 0;\n"
+        "  logic a = 1;\n"
+        "  always #5 clk = ~clk;\n"
+        "  sub u(clk, a);\n"
+        "  initial begin\n"
+        "    $assertoff(0, u." +
+            std::string(off) +
+            ");\n"
+            "    #10 a = 0;\n"
+            "    #10 a = 1;\n"
+            "    #20 $finish;\n"
+            "  end\n"
+            "endmodule\n",
+        f);
+    EXPECT_FALSE(f.diag.HasErrors()) << off;
+    std::string on = std::string(off) == "a1" ? "m1" : "a1";
+    EXPECT_EQ(out, "t.u." + on + " failed\n$finish at time 40\n") << off;
+  }
+}
+
+TEST(ConcurrentAssertionStatements,
+     ARelativeNameReachesAStatementOfAnInstance) {
+  ExpectOnlyTheNamedStatementIsOff("u.a1", "t.u.a1");
+}
+
+TEST(ConcurrentAssertionStatements, ASimpleNameReachesAStatementInItsScope) {
+  EXPECT_EQ(RunAssertions("  m_off: assert property (@(posedge clk) a)\n"
+                          "    else $display(\"%m failed\");\n"
+                          "  m_on: assert property (@(posedge clk) a)\n"
+                          "    else $display(\"%m failed\");\n"
+                          "  initial $assertoff(0, m_off);\n"),
+            "t.m_on failed\n$finish at time 40\n");
+}
+
 }  // namespace
