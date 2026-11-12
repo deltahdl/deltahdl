@@ -485,4 +485,201 @@ TEST(ParameterizedSubroutineSim, SpecializationArgFromLocalparam) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
+TEST(ParameterizedSubroutineSim,
+     DISABLED_TheEncoderDecoderExampleDisplaysItsResults) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("virtual class C#(parameter DECODE_W, "
+                 "parameter ENCODE_W = $clog2(DECODE_W));\n"
+                 "  static function logic [ENCODE_W-1:0] ENCODER_f\n"
+                 "      (input logic [DECODE_W-1:0] DecodeIn);\n"
+                 "    ENCODER_f = '0;\n"
+                 "    for (int i=0; i<DECODE_W; i++) begin\n"
+                 "      if (DecodeIn[i]) begin\n"
+                 "        ENCODER_f = i[ENCODE_W-1:0];\n"
+                 "        break;\n"
+                 "      end\n"
+                 "    end\n"
+                 "  endfunction\n"
+                 "  static function logic [DECODE_W-1:0] DECODER_f\n"
+                 "      (input logic [ENCODE_W-1:0] EncodeIn);\n"
+                 "    DECODER_f = '0;\n"
+                 "    DECODER_f[EncodeIn] = 1'b1;\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module top ();\n"
+                 "  logic [7:0] encoder_in;\n"
+                 "  logic [2:0] encoder_out;\n"
+                 "  logic [1:0] decoder_in;\n"
+                 "  logic [3:0] decoder_out;\n"
+                 "  assign encoder_in = 8'b0100_0000;\n"
+                 "  assign decoder_in = 2'b11;\n"
+                 "  assign encoder_out = C#(8)::ENCODER_f(encoder_in);\n"
+                 "  assign decoder_out = C#(4)::DECODER_f(decoder_in);\n"
+                 "  initial begin\n"
+                 "    #50;\n"
+                 "    $display(\"Encoder input = %b Encoder output = %b\\n\",\n"
+                 "      encoder_in, encoder_out );\n"
+                 "    $display(\"Decoder input = %b Decoder output = %b\\n\",\n"
+                 "      decoder_in, decoder_out );\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "Encoder input = 01000000 Encoder output = 110\n\n"
+      "Decoder input = 11 Decoder output = 1000\n\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim, EachSpecializationSizesTheArgumentItTakes) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("virtual class C#(parameter W = 8);\n"
+                 "  static function int keep(input logic [W-1:0] x);\n"
+                 "    return x;\n"
+                 "  endfunction\n"
+                 "  static task put(input logic [W-1:0] x, "
+                 "output int y);\n"
+                 "    y = x;\n"
+                 "  endtask\n"
+                 "endclass\n"
+                 "module m;\n"
+                 "  int r1, r2;\n"
+                 "  initial begin\n"
+                 "    C#(4)::put(9'h1ff, r1);\n"
+                 "    C#(6)::put(9'h1ff, r2);\n"
+                 "    $display(\"%0d %0d %0d %0d\", C#(4)::keep(9'h1ff),\n"
+                 "             C#(8)::keep(9'h1ff), r1, r2);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "15 255 15 63\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim,
+     DISABLED_ATypeParameterSetsTheTypeASubroutineReturns) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("virtual class C#(type T = int);\n"
+                 "  static function T conv(input int x);\n"
+                 "    return T'(x);\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module m;\n"
+                 "  initial $display(\"%0d %0d %0d\", C#(byte)::conv(300),\n"
+                 "                   C#(shortint)::conv(70000), "
+                 "C#()::conv(70000));\n"
+                 "endmodule\n",
+                 f),
+      "44 4464 70000\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim,
+     DISABLED_AnEmptySpecializationTakesEveryDefault) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("virtual class C#(parameter A = 6, "
+                       "parameter B = A * 2);\n"
+                       "  static function int sum; return A + B; endfunction\n"
+                       "endclass\n"
+                       "module m;\n"
+                       "  initial $display(\"%0d %0d\", C#()::sum(), "
+                       "C#(1)::sum());\n"
+                       "endmodule\n",
+                       f),
+            "18 3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim, AParameterizedSubroutineIsDeclaredInAPackage) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n"
+                 "  virtual class C#(parameter W = 1);\n"
+                 "    static function int scale(int x); return x * W; "
+                 "endfunction\n"
+                 "  endclass\n"
+                 "  function int twice_five; return C#(2)::scale(5); "
+                 "endfunction\n"
+                 "endpackage\n"
+                 "module m;\n"
+                 "  import p::*;\n"
+                 "  initial $display(\"%0d %0d %0d\", p::C#(3)::scale(5),\n"
+                 "                   C#(4)::scale(5), twice_five());\n"
+                 "endmodule\n",
+                 f),
+      "15 20 10\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim,
+     AParameterizedSubroutineIsCalledFromEveryScope) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("virtual class C#(parameter W = 1);\n"
+                 "  static function int scale(int x); return x * W; "
+                 "endfunction\n"
+                 "endclass\n"
+                 "class K;\n"
+                 "  function int run(int x); return C#(5)::scale(x); "
+                 "endfunction\n"
+                 "endclass\n"
+                 "interface i;\n"
+                 "  int r;\n"
+                 "  initial r = C#(6)::scale(2);\n"
+                 "endinterface\n"
+                 "module m;\n"
+                 "  function int fn(int x); return C#(7)::scale(x); "
+                 "endfunction\n"
+                 "  task tk(output int y); y = C#(8)::scale(2); endtask\n"
+                 "  K k = new;\n"
+                 "  i u();\n"
+                 "  int a, g;\n"
+                 "  if (1) begin : gb\n"
+                 "    int r;\n"
+                 "    initial r = C#(9)::scale(2);\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    tk(a);\n"
+                 "    #1 $display(\"%0d %0d %0d %0d %0d\", k.run(2), u.r, "
+                 "fn(2), a, gb.r);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "10 12 14 16 18\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim, AParameterizedSubroutineIsCalledInAProgram) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program q;\n"
+                       "  virtual class C#(parameter W = 1);\n"
+                       "    static function int scale(int x); return x * W; "
+                       "endfunction\n"
+                       "  endclass\n"
+                       "  initial $display(\"%0d\", C#(11)::scale(3));\n"
+                       "endprogram\n",
+                       f),
+            "33\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ParameterizedSubroutineSim, AStaticTaskWaitsForItsSpecializationsDelay) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("virtual class C#(parameter D = 1);\n"
+                       "  static task pause; #D; endtask\n"
+                       "endclass\n"
+                       "module m;\n"
+                       "  initial begin\n"
+                       "    C#(3)::pause();\n"
+                       "    $display(\"%0t\", $time);\n"
+                       "    C#(4)::pause();\n"
+                       "    $display(\"%0t\", $time);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3\n7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

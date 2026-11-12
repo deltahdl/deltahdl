@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -154,6 +155,48 @@ TEST(ParameterizedSubroutineElaboration, NonVirtualClassElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ParameterizedSubroutineElaboration,
+     AVirtualClassSpecializationIsReportedWhenConstructed) {
+  ElabFixture f;
+  ElaborateSrc(
+      "virtual class C#(parameter W = 1);\n"
+      "  static function int f; return W; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C#(8) c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot construct object of abstract class 'C'", 7,
+                            "8.21"));
+}
+
+TEST(ParameterizedSubroutineElaboration,
+     AVirtualClassSpecializationsStaticMethodIsCalledUnconstructed) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "virtual class C#(parameter W = 1);\n"
+      "  static function int f; return W; endfunction\n"
+      "endclass\n"
+      "class D#(parameter W = 1);\n"
+      "  static function int f; return W; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  D#(8) d;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    d = new;\n"
+      "    r = C#(8)::f() + D#(8)::f();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
