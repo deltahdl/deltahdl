@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/variable.h"
 
@@ -336,6 +338,86 @@ TEST(ForeachLoopVariableSim, SecondLoopVariableOverAQueueOfArraysInAFunction) {
       f, "s");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 16u);
+}
+
+TEST(ForeachLoopExampleSim, TheWordsExamplePrintsEachIndexAndValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string words [2] = '{ \"hello\", \"world\" };\n"
+                       "  initial\n"
+                       "    foreach( words[j] )\n"
+                       "      $display( j , words[j] );\n"
+                       "endmodule\n",
+                       f),
+            "          0hello\n          1world\n");
+}
+
+TEST(ForeachLoopExampleSim, TheProdExampleInitializesEveryElement) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int prod [1:8] [1:3];\n"
+                 "  int s;\n"
+                 "  initial begin\n"
+                 "    foreach( prod[k, m] )\n"
+                 "      prod[k][m] = k * m;\n"
+                 "    foreach (prod[k, m]) s += prod[k][m];\n"
+                 "    $display(\"%0d %0d %0d\", prod[1][1], prod[8][3], s);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 24 216\n");
+}
+
+TEST(ForeachLoopExampleSim, TheFirstCardinalityExampleNestsIOutsideK) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  int A [2][3][4];\n"
+          "  initial begin\n"
+          "    foreach( A [ i, j, k ] ) $write(\"%0d%0d%0d \", i, j, k);\n"
+          "    $display;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "000 001 002 003 010 011 012 013 020 021 022 023 100 101 102 103 110 111 "
+      "112 113 120 121 122 123 \n");
+}
+
+TEST(ForeachLoopExampleSim, TheSecondCardinalityExampleSkipsTheThirdIndex) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  bit [3:0][2:1] B [5:1][4];\n"
+                 "  int n;\n"
+                 "  initial begin\n"
+                 "    foreach( B [ q, r, , s ] ) begin\n"
+                 "      if (n < 3 || n > 36) $write(\"%0d%0d%0d \", q, r, s);\n"
+                 "      n++;\n"
+                 "    end\n"
+                 "    $display(\"%0d\", n);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "502 501 512 121 132 131 40\n");
+}
+
+TEST(ForeachLoopLifetimeSim, ALoopVariableIsAutomaticInAStaticTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a [3];\n"
+                       "  task static walk;\n"
+                       "    foreach (a[i])\n"
+                       "      #1 $display(\"%0d\", i);\n"
+                       "  endtask\n"
+                       "  initial fork\n"
+                       "    walk;\n"
+                       "    walk;\n"
+                       "  join\n"
+                       "endmodule\n",
+                       f),
+            "0\n0\n1\n1\n2\n2\n");
 }
 
 }  // namespace

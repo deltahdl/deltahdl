@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -137,6 +139,31 @@ TEST(LoopStatementSim, DoWhileMultiBitConditionIsTruthy) {
   ASSERT_NE(iters, nullptr);
   EXPECT_EQ(count->value.ToUint64(), 0u);
   EXPECT_EQ(iters->value.ToUint64(), 5u);
+}
+
+TEST(DoWhileLoopExampleSim, TheMapExampleVisitsEveryKeyOnce) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int map [string];\n"
+                       "  task automatic show;\n"
+                       "    string s;\n"
+                       "    if ( map.first( s ) )\n"
+                       "       do\n"
+                       "          $display( \"%s : %d\\n\", s, map[ s ] );\n"
+                       "       while ( map.next( s ) );\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    show;\n"
+                       "    map[\"b\"] = 2;\n"
+                       "    show;\n"
+                       "    map[\"c\"] = 3;\n"
+                       "    map[\"a\"] = 1;\n"
+                       "    show;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "b :           2\n\na :           1\n\nb :           2\n\nc :      "
+            "     3\n\n");
 }
 
 }  // namespace

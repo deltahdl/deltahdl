@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -134,6 +136,34 @@ TEST(LoopStatementSim, WhileVectorConditionIteratesUntilZero) {
   auto* tempreg = f.ctx.FindVariable("tempreg");
   ASSERT_NE(tempreg, nullptr);
   EXPECT_EQ(tempreg->value.ToUint64(), 0u);
+}
+
+TEST(WhileLoopExampleSim, TheCountOnesExampleCountsTheSetBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] data;\n"
+                       "  int count;\n"
+                       "  task automatic count_ones;\n"
+                       "    begin : count1s\n"
+                       "      logic [7:0] tempreg;\n"
+                       "      count = 0;\n"
+                       "      tempreg = data;\n"
+                       "      while (tempreg) begin\n"
+                       "            if (tempreg[0])\n"
+                       "               count++;\n"
+                       "            tempreg >>= 1;\n"
+                       "      end\n"
+                       "    end\n"
+                       "    $display(\"%0d\", count);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    data = 8'b1011_0110; count_ones;\n"
+                       "    data = 8'hff; count_ones;\n"
+                       "    data = 0; count_ones;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5\n8\n0\n");
 }
 
 }  // namespace

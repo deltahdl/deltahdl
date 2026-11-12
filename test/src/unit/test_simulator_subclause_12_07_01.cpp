@@ -423,4 +423,124 @@ TEST(LoopStatementSim, ForStringAndRealControlVariablesInAFunction) {
       43u);
 }
 
+TEST(ForLoopExampleSim, TheTwoLoopsOfModuleMKeepTheirOwnControlVariables) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int s1, s2;\n"
+                       "  initial begin\n"
+                       "    for (int i = 0; i <= 255; i++)\n"
+                       "      #1 s1 += i;\n"
+                       "    $display(\"%0d %0d\", s1, s2);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    loop2: for (int i = 15; i >= 0; i--)\n"
+                       "      #1 s2 += i;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "32640 120\n");
+}
+
+TEST(ForLoopExampleSim, TheEquivalentBlocksOfModuleMGiveTheSameResult) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int s1, s2;\n"
+                       "  initial begin\n"
+                       "    begin\n"
+                       "      automatic int i;\n"
+                       "      for (i = 0; i <= 255; i++)\n"
+                       "        #1 s1 += i;\n"
+                       "    end\n"
+                       "    $display(\"%0d %0d\", s1, s2);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    begin : loop2\n"
+                       "      automatic int i;\n"
+                       "      for (i = 15; i >= 0; i--)\n"
+                       "        #1 s2 += i;\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "32640 120\n");
+}
+
+TEST(ForLoopExampleSim, TheCountExampleWeighsEachElementByItsPosition) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int a [3] = '{5, 7, 11};\n"
+                       "  int value;\n"
+                       "  initial begin\n"
+                       "    value = 0;\n"
+                       "    for ( int count = 0; count < 3; count++ )\n"
+                       "      value = value +((a[count]) * (count+1));\n"
+                       "    $display(\"%0d\", value);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "52\n");
+}
+
+TEST(ForLoopExampleSim, TheThreeVariableExampleStopsWhenTheProductReaches125) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial\n"
+                       "    for ( int count = 0, done = 0, j = 0; j * count < "
+                       "125; j++, count++)\n"
+                       "      $display(\"Value j = %d\\n\", j );\n"
+                       "endmodule\n",
+                       f),
+            "Value j =           0\n\nValue j =           1\n\nValue j =       "
+            "    2\n\nValue j =           3\n\nValue j =           4\n\nValue "
+            "j =           5\n\nValue j =           6\n\nValue j =           "
+            "7\n\nValue j =           8\n\nValue j =           9\n\nValue j =  "
+            "        10\n\nValue j =          11\n\n");
+}
+
+TEST(ForLoopExampleSim, TheOffsetExampleStartsTheSecondVariableFromTheFirst) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter N = 3;\n"
+                       "  int offset = 10;\n"
+                       "  initial\n"
+                       "    for (int i = 0, j = i + offset; i < N; i++,j++)\n"
+                       "      $display(\"%0d %0d\", i, j);\n"
+                       "endmodule\n",
+                       f),
+            "0 10\n1 11\n2 12\n");
+}
+
+TEST(ForLoopLifetimeSim, ADeclaredControlVariableIsAutomaticInAStaticTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  task static walk;\n"
+                       "    for (int i = 0; i < 3; i++)\n"
+                       "      #1 $display(\"%0d\", i);\n"
+                       "  endtask\n"
+                       "  initial fork\n"
+                       "    walk;\n"
+                       "    walk;\n"
+                       "  join\n"
+                       "endmodule\n",
+                       f),
+            "0\n0\n1\n1\n2\n2\n");
+}
+
+TEST(ForLoopLifetimeSim, AnAssignedControlVariableIsSharedByParallelCalls) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  task static walk;\n"
+                       "    int i;\n"
+                       "    for (i = 0; i < 3; i++)\n"
+                       "      #1 $display(\"%0d\", i);\n"
+                       "  endtask\n"
+                       "  initial fork\n"
+                       "    walk;\n"
+                       "    walk;\n"
+                       "  join\n"
+                       "endmodule\n",
+                       f),
+            "0\n1\n2\n3\n");
+}
+
 }  // namespace

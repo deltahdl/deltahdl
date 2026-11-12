@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -103,6 +105,31 @@ TEST(LoopStatementSim, ForeverWithDelayIteratesAcrossSimTime) {
       f, "ticks");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 4u);
+}
+
+TEST(ForeverLoopExampleSim, TheTwoClocksExampleTogglesOutOfPhase) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic clock1, clock2;\n"
+                       "  initial begin\n"
+                       "     clock1 <= 0;\n"
+                       "     clock2 <= 0;\n"
+                       "     fork\n"
+                       "        forever #10 clock1 = ~clock1;\n"
+                       "        #5 forever #10 clock2 = ~clock2;\n"
+                       "     join\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #1;\n"
+                       "    repeat (7) begin\n"
+                       "      $display(\"%0t %b %b\", $time, clock1, clock2);\n"
+                       "      #5;\n"
+                       "    end\n"
+                       "    $finish(0);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 0 0\n6 0 0\n11 1 0\n16 1 1\n21 0 1\n26 0 0\n31 1 0\n");
 }
 
 }  // namespace

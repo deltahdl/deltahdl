@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "simulator/lowerer.h"
@@ -399,6 +401,37 @@ TEST(LoopStatementSim, RepeatCountAbove64BitsIsNotCutToItsLowWord) {
       f, "n");
   ASSERT_NE(var, nullptr);
   EXPECT_GT(var->value.ToUint64(), 3u);
+}
+
+TEST(RepeatLoopExampleSim, TheMultiplierExampleShiftsAndAdds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  parameter size = 8, longsize = 16;\n"
+                       "  logic [size:1] opa, opb;\n"
+                       "  logic [longsize:1] result;\n"
+                       "  task automatic mul;\n"
+                       "    begin : mult\n"
+                       "      logic [longsize:1] shift_opa, shift_opb;\n"
+                       "      shift_opa = opa;\n"
+                       "      shift_opb = opb;\n"
+                       "      result = 0;\n"
+                       "      repeat (size) begin\n"
+                       "            if (shift_opb[1])\n"
+                       "               result = result + shift_opa;\n"
+                       "            shift_opa = shift_opa << 1;\n"
+                       "            shift_opb = shift_opb >> 1;\n"
+                       "      end\n"
+                       "    end\n"
+                       "    $display(\"%0d\", result);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    opa = 13; opb = 17; mul;\n"
+                       "    opa = 255; opb = 255; mul;\n"
+                       "    opa = 0; opb = 99; mul;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "221\n65025\n0\n");
 }
 
 }  // namespace
