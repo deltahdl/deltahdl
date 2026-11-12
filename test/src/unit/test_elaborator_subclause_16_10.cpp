@@ -279,4 +279,99 @@ TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchInsideAnOrGroupIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.10"));
 }
 
+TEST(LocalVariableElaboration, ATypedOrUntypedFormalRedeclaredIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  sequence s(bit lv, w);\n"
+      "    int w;\n"
+      "    @(posedge clk) lv;\n"
+      "  endsequence\n"
+      "  sequence t(untyped lv);\n"
+      "    logic lv;\n"
+      "    @(posedge clk) a;\n"
+      "  endsequence\n"
+      "  property p(local input int lv);\n"
+      "    int lv;\n"
+      "    @(posedge clk) a;\n"
+      "  endproperty\n"
+      "endmodule\n",
+      f);
+  const char* const kReport = "is a formal argument and cannot be redeclared";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 3, "16.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 7, "16.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.10"));
+}
+
+TEST(LocalVariableElaboration,
+     DISABLED_AFormalRedeclaredOutsideAModuleIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n"
+      "  sequence s(lv); int lv; lv; endsequence\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  sequence s(lv); int lv; lv; endsequence\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  sequence s(lv); int lv; lv; endsequence\n"
+      "endchecker\n"
+      "package pk;\n"
+      "  sequence s(lv); int lv; lv; endsequence\n"
+      "endpackage\n"
+      "sequence s_cu(lv); int lv; lv; endsequence\n"
+      "module m;\n"
+      "  logic clk;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    sequence s(lv); int lv; lv; endsequence\n"
+      "  endclocking\n"
+      "  if (1) begin : g\n"
+      "    sequence s(lv); int lv; lv; endsequence\n"
+      "  end\n"
+      "  i u();\n"
+      "  ck c();\n"
+      "endmodule\n",
+      f);
+  const char* const kReport = "is a formal argument and cannot be redeclared";
+  for (int line : {2, 5, 8, 11, 13, 17, 20}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kReport, line, "16.10"))
+        << line;
+  }
+}
+
+TEST(LocalVariableElaboration,
+     DISABLED_ALocalReachingAClockThroughAnActualIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence t(e); @(posedge e) c; endsequence\n"
+      "  sequence s;\n"
+      "    logic x;\n"
+      "    @(posedge clk) (a, x = b) ##1 t(x);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "local variable \"x\" may not be used in a clocking event expression", 6,
+      "16.10"));
+}
+
+TEST(LocalVariableElaboration, ASignalReachingAClockThroughAnActualIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence t(e); @(posedge e) c; endsequence\n"
+      "  sequence s;\n"
+      "    logic x;\n"
+      "    @(posedge clk) (a, x = b) ##1 t(clk);\n"
+      "  endsequence\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

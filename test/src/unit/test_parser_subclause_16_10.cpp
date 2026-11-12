@@ -303,4 +303,87 @@ TEST(SequenceLocalVariableParsing, AMatchItemTargetMaySelectWithinTheLocal) {
   EXPECT_EQ(items[4].target, nullptr);
 }
 
+struct LocalClockCase {
+  const char* decl;
+  int line;
+};
+
+const LocalClockCase kLocalClockCases[] = {
+    {"module m;\n"
+     "  property p; logic x; @(posedge x) (a, x = b) |-> c; endproperty\n"
+     "endmodule\n",
+     2},
+    {"module m;\n"
+     "  sequence s; logic x; @(x) (a, x = b) ##1 c; endsequence\n"
+     "endmodule\n",
+     2},
+    {"module m;\n"
+     "  sequence s; logic x; @(posedge clk iff x) (a, x = b) ##1 c;\n"
+     "  endsequence\n"
+     "endmodule\n",
+     2},
+    {"module m;\n"
+     "  sequence s; logic x;\n"
+     "    @(posedge clk) (a, x = b) ##1 @(posedge x) c;\n"
+     "  endsequence\n"
+     "endmodule\n",
+     3},
+    {"module m;\n"
+     "  property p; logic x;\n"
+     "    @(posedge clk) (a, x = b) |=> @(negedge x) c;\n"
+     "  endproperty\n"
+     "endmodule\n",
+     3},
+    {"module m;\n"
+     "  sequence s(local input logic x); @(posedge x) a ##1 c; endsequence\n"
+     "endmodule\n",
+     2},
+    {"interface i;\n"
+     "  sequence s; logic x; @(posedge x) (a, x = b) ##1 c; endsequence\n"
+     "endinterface\n",
+     2},
+    {"program pr;\n"
+     "  sequence s; logic x; @(posedge x) (a, x = b) ##1 c; endsequence\n"
+     "endprogram\n",
+     2},
+    {"checker ck;\n"
+     "  sequence s; logic x; @(posedge x) (a, x = b) ##1 c; endsequence\n"
+     "endchecker\n",
+     2},
+    {"package pk;\n"
+     "  sequence s; logic x; @(posedge x) (a, x = b) ##1 c; endsequence\n"
+     "endpackage\n",
+     2},
+    {"module m;\n"
+     "  if (1) begin : g\n"
+     "    sequence s; logic x; @(posedge x) (a, x = b) ##1 c; endsequence\n"
+     "  end\n"
+     "endmodule\n",
+     3},
+    {"sequence s; logic x; @(posedge x) (a, x = b) ##1 c; endsequence\n", 1},
+};
+
+TEST(LocalVariableParsing, ALocalInAnyClockingEventIsReported) {
+  for (const auto& c : kLocalClockCases) {
+    auto r = Parse(c.decl);
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "local variable \"x\" may not be used in a clocking event expression",
+        c.line, "16.10"))
+        << c.decl;
+  }
+}
+
+TEST(LocalVariableParsing, ALocalBesideTheClockingEventIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s; logic x; @(posedge clk iff en) (a, x = b) ##1 x;\n"
+      "  endsequence\n"
+      "  property p; logic x;\n"
+      "    @(posedge clk) (a, x = b) |=> @(negedge clk) x;\n"
+      "  endproperty\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
