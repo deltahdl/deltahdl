@@ -456,4 +456,91 @@ TEST(GlobalClockingSim, AGlobalClockInACheckerActualResolvesInTheChecker) {
   EXPECT_NE(out.find("n=1\n"), std::string::npos) << out;
 }
 
+TEST(GlobalClockingSim,
+     AnOrEventInterfaceChildAndNestedCheckerFollowTheirDeclarations) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface leaf;\n"
+                       "  int n;\n"
+                       "  always @($global_clock) n++;\n"
+                       "endinterface\n"
+                       "interface bus(input logic c);\n"
+                       "  global clocking @(posedge c); endclocking\n"
+                       "  leaf l();\n"
+                       "endinterface\n"
+                       "checker inner_ck;\n"
+                       "  int n = 0;\n"
+                       "  always_ff @($global_clock) n <= n + 1;\n"
+                       "endchecker\n"
+                       "checker outer_ck(logic c);\n"
+                       "  global clocking @(negedge c); endclocking\n"
+                       "  inner_ck i();\n"
+                       "endchecker\n"
+                       "module top;\n"
+                       "  logic clk1 = 0, clk2 = 0;\n"
+                       "  always #5 clk1 = ~clk1;\n"
+                       "  initial #2 forever #10 clk2 = ~clk2;\n"
+                       "  global clocking sys @(clk1 or clk2); endclocking\n"
+                       "  int n;\n"
+                       "  always @($global_clock) n++;\n"
+                       "  bus b(clk1);\n"
+                       "  outer_ck oc(clk1);\n"
+                       "  initial #41 begin $display(\"%0d %0d %0d\", n, "
+                       "b.l.n, oc.i.n); $finish; end\n"
+                       "endmodule\n",
+                       f),
+            "11 4 4\n$finish at time 41\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(GlobalClockingSim,
+     DISABLED_ADeclaredSequenceOnTheGlobalClockResolvesWhereItIsUsed) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk;\n"
+      "  sequence s(x); @($global_clock) x; endsequence\n"
+      "endpackage\n"
+      "module sub(input logic c);\n"
+      "  import pk::*;\n"
+      "  int a, cp, cs, imp, ng, sq, pr;\n"
+      "  global clocking @(posedge c); endclocking\n"
+      "  assert property (s(1'b1)) a++;\n"
+      "  cover property (s(1'b1)) cp++;\n"
+      "  cover sequence (s(1'b1)) cs++;\n"
+      "  property pimp; s(1'b1) |-> 1'b1; endproperty\n"
+      "  property png; not s(1'b0); endproperty\n"
+      "  sequence ssq; s(1'b1) ##1 1'b1; endsequence\n"
+      "  assert property (pimp) imp++;\n"
+      "  assert property (png) ng++;\n"
+      "  assert property (ssq) sq++;\n"
+      "  initial assert property (s(1'b1)) pr++;\n"
+      "endmodule\n"
+      "module own(input logic c);\n"
+      "  int a;\n"
+      "  global clocking @(posedge c); endclocking\n"
+      "  sequence t(x); @($global_clock) x; endsequence\n"
+      "  assert property (t(1'b1)) a++;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  logic fast = 0, slow = 0;\n"
+      "  always #5 fast = ~fast;\n"
+      "  always #10 slow = ~slow;\n"
+      "  global clocking @(posedge fast); endclocking\n"
+      "  sub s1(fast);\n"
+      "  sub s2(slow);\n"
+      "  own o(slow);\n"
+      "  initial #42 begin\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", s1.a, s1.cp, s1.cs, "
+      "s1.imp, s1.ng, s1.sq, s1.pr);\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", s2.a, s2.cp, s2.cs, "
+      "s2.imp, s2.ng, s2.sq, s2.pr);\n"
+      "    $display(\"%0d\", o.a);\n"
+      "    $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("4 4 4 4 4 3 1\n2 2 2 2 2 1 1\n2\n"), std::string::npos)
+      << out;
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
