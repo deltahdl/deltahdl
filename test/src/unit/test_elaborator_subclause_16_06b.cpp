@@ -180,11 +180,12 @@ std::string SideBench(const std::string& items,
          items + "\nendmodule\n";
 }
 
-int SideEffectsAt(const std::vector<Diagnostic>& diags, uint32_t line) {
+int ReportsAt(const std::vector<Diagnostic>& diags, const char* message,
+              uint32_t line) {
   int count = 0;
   for (const auto& diag : diags) {
     if (diag.severity == DiagSeverity::kError &&
-        diag.message.find(kSideEffect) != std::string::npos &&
+        diag.message.find(message) != std::string::npos &&
         diag.loc.line == line && diag.subclause == "16.6") {
       ++count;
     }
@@ -192,12 +193,16 @@ int SideEffectsAt(const std::vector<Diagnostic>& diags, uint32_t line) {
   return count;
 }
 
-void ExpectSideEffectOnce(const std::string& marked, const std::string& form) {
+void ExpectReportedOnce(const char* message, const std::string& marked,
+                        const std::string& form, uint32_t line) {
   const std::string kSrc = WithForm(marked, form);
   ElabFixture f;
   Elaborate(kSrc, f);
-  EXPECT_EQ(SideEffectsAt(f.diag.Diagnostics(), LineHolding(marked, "@@")), 1)
-      << kSrc;
+  EXPECT_EQ(ReportsAt(f.diag.Diagnostics(), message, line), 1) << kSrc;
+}
+
+void ExpectSideEffectOnce(const std::string& marked, const std::string& form) {
+  ExpectReportedOnce(kSideEffect, marked, form, LineHolding(marked, "@@"));
 }
 
 void ExpectNoSideEffect(const std::string& marked, const std::string& form) {
@@ -436,6 +441,190 @@ TEST(AssertionSideEffect, DISABLED_APackageOrUnitSequenceReportsAnIncrement) {
   ExpectSideEffectOnce(
       SideBench(kDeclaredUse, WithForm(kPackageSequence, "1") + kUnitSequence),
       "un++ < 10");
+}
+
+const char kWritingArgument[] =
+    "has an output, inout or ref argument and cannot be called in a concurrent "
+    "assertion";
+
+std::string FnBench(const std::string& items, const std::string& outside = "") {
+  return outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1;\n"
+         "  int cnt;\n"
+         "  function automatic bit fo(output int n); n = 0; return 1; "
+         "endfunction\n"
+         "  function automatic bit fio(inout int n); return n > 0; "
+         "endfunction\n"
+         "  function automatic bit fr(ref int n); return n > 0; endfunction\n"
+         "  function automatic bit frs(ref static int n); return n > 0; "
+         "endfunction\n"
+         "  function automatic bit fin(input int n); return n > 0; "
+         "endfunction\n"
+         "  function automatic bit fcr(const ref int n); return n > 0; "
+         "endfunction\n"
+         "  function automatic bit fcrs(const ref static int n); return n > 0; "
+         "endfunction\n"
+         "  function automatic bit fi(bit b); return b; endfunction\n"
+         "  " +
+         items + "\nendmodule\n";
+}
+
+void ExpectWritingArgumentOnce(const std::string& marked,
+                               const std::string& form) {
+  ExpectReportedOnce(kWritingArgument, marked, form, LineHolding(marked, "@@"));
+}
+
+TEST(AssertionFunctionArgument, EveryWritingArgumentKindIsReported) {
+  for (const char* form : {"fo(cnt)", "fio(cnt)", "fr(cnt)", "frs(cnt)"}) {
+    ExpectWritingArgumentOnce(FnBench(kBoolean), form);
+  }
+}
+
+TEST(AssertionFunctionArgument, EveryReadOnlyArgumentKindIsAccepted) {
+  for (const char* form : {"fin(cnt)", "fcr(cnt)", "fcrs(cnt)"}) {
+    ExpectNoSideEffect(FnBench(kBoolean), form);
+  }
+}
+
+const char* const kFnPlaces[] = {
+    "assume property (@(posedge clk) @@);",
+    "cover property (@(posedge clk) @@);",
+    "cover sequence (@(posedge clk) @@);",
+    "restrict property (@(posedge clk) @@);",
+    "initial expect (@(posedge clk) @@);",
+    "sequence sq; @(posedge clk) @@; endsequence\n  cover property (sq);",
+    "assert property (@(posedge clk) a ##1 @@);",
+    "assert property (@(posedge clk) a |-> @@);",
+    "assert property (@(posedge clk) disable iff (@@) a);",
+    "assert property (@(posedge @@) a);",
+    ("sequence sx(x); @(posedge clk) x; endsequence\n"
+     "  assert property (sx(@@));"),
+    "assert property (@(posedge clk) $past(@@));",
+    "assert property (@(posedge clk) fi(@@));",
+    "always @(posedge clk) assert property (@@);",
+};
+
+const char* const kFnRepeatedPlaces[] = {
+    ("property pq; @(posedge clk) @@; endproperty\n"
+     "  assert property (pq);\n  cover property (pq);"),
+    ("default disable iff (@@);\n  assert property (@(posedge clk) a);\n"
+     "  cover property (@(posedge clk) a);"),
+};
+
+const char* const kFnGeneratePlaces[] = {
+    "if (1) begin : g assert property (@(posedge clk) @@); end",
+    ("for (genvar j = 0; j < 1; j++) begin : lg\n"
+     "    assert property (@(posedge clk) @@);\n  end"),
+};
+
+TEST(AssertionFunctionArgument, EveryPlaceAcceptsAConstRefArgument) {
+  for (const char* place : kFnPlaces) {
+    ExpectNoSideEffect(FnBench(place), "fcr(cnt)");
+  }
+  for (const char* place : kFnRepeatedPlaces) {
+    ExpectNoSideEffect(FnBench(place), "fcr(cnt)");
+  }
+  for (const char* place : kFnGeneratePlaces) {
+    ExpectNoSideEffect(FnBench(place), "fcr(cnt)");
+  }
+}
+
+TEST(AssertionFunctionArgument, EveryDirectiveAndPlaceReportsAnOutputArgument) {
+  for (const char* place : kFnPlaces) {
+    ExpectWritingArgumentOnce(FnBench(place), "fo(cnt)");
+  }
+}
+
+TEST(AssertionFunctionArgument,
+     DISABLED_ANamedPropertyOrDefaultDisableReportsItOnce) {
+  for (const char* place : kFnRepeatedPlaces) {
+    ExpectWritingArgumentOnce(FnBench(place), "fo(cnt)");
+  }
+}
+
+TEST(AssertionFunctionArgument,
+     DISABLED_AGenerateBlockReportsAnOutputArgument) {
+  for (const char* place : kFnGeneratePlaces) {
+    ExpectWritingArgumentOnce(FnBench(place), "fo(cnt)");
+  }
+}
+
+const char kLetUse[] = "assert property (@(posedge clk) l(cnt));";
+
+TEST(AssertionFunctionArgument, ALetCallingAConstRefFunctionIsAccepted) {
+  ExpectNoSideEffect(FnBench(std::string("let l(x) = @@;\n  ") + kLetUse),
+                     "fcr(x)");
+}
+
+TEST(AssertionFunctionArgument,
+     DISABLED_ALetCallingAnOutputFunctionIsReported) {
+  const std::string kMarked =
+      FnBench(std::string("let l(x) = @@;\n  ") + kLetUse);
+  ExpectReportedOnce(kWritingArgument, kMarked, "fo(x)",
+                     LineHolding(kMarked, kLetUse));
+}
+
+const char kFnPackage[] =
+    "package pk;\n"
+    "  function automatic bit pf(output int n); n = 0; return 1; endfunction\n"
+    "  function automatic bit pc(const ref int n); return n > 0; endfunction\n"
+    "  checker pck(logic clk);\n"
+    "    int c;\n"
+    "    assert property (@(posedge clk) @@);\n"
+    "  endchecker\n"
+    "endpackage\n"
+    "class C;\n"
+    "  static function bit sf(ref int n); return n > 0; endfunction\n"
+    "  static function bit sc(const ref int n); return n > 0; endfunction\n"
+    "endclass\n";
+
+TEST(AssertionFunctionArgument,
+     APackageOrClassScopeReadOnlyFunctionIsAccepted) {
+  const std::string kPackage = WithForm(kFnPackage, "pc(c)");
+  for (const char* call : {"pk::pc(cnt)", "C::sc(cnt)"}) {
+    ExpectNoSideEffect(FnBench(kBoolean, kPackage), call);
+  }
+  ExpectNoSideEffect(
+      FnBench("import pk::*;\n  assert property (@(posedge clk) pc(cnt));\n"
+              "  pk::pck k(clk);",
+              kPackage),
+      "");
+}
+
+TEST(AssertionFunctionArgument,
+     DISABLED_APackageOrClassScopeWritingFunctionIsReported) {
+  const std::string kPackage = WithForm(kFnPackage, "pc(c)");
+  for (const char* call : {"pk::pf(cnt)", "C::sf(cnt)"}) {
+    ExpectWritingArgumentOnce(FnBench(kBoolean, kPackage), call);
+  }
+  ExpectWritingArgumentOnce(
+      FnBench(std::string("import pk::*;\n  ") + kBoolean, kPackage),
+      "pf(cnt)");
+  const std::string kChecker = FnBench("pk::pck k(clk);", kFnPackage);
+  ExpectWritingArgumentOnce(kChecker, "pf(c)");
+}
+
+std::string FnUnit(const char* kind) {
+  const std::string kEnd = std::string(kind) == "checker" ? "" : "input ";
+  return std::string(kind) + " u_unit(" + kEnd +
+         "logic clk);\n"
+         "  int cnt;\n"
+         "  function automatic bit fo(output int n); n = 0; return 1; "
+         "endfunction\n"
+         "  function automatic bit fcr(const ref int n); return n > 0; "
+         "endfunction\n"
+         "  assert property (@(posedge clk) @@);\n"
+         "end" +
+         kind + "\n";
+}
+
+TEST(AssertionFunctionArgument, EveryUnitReportsAnOutputArgument) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    const std::string kMarked = FnBench("u_unit u(clk);", FnUnit(kind));
+    ExpectWritingArgumentOnce(kMarked, "fo(cnt)");
+    ExpectNoSideEffect(kMarked, "fcr(cnt)");
+  }
 }
 
 }  // namespace
