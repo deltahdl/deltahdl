@@ -167,4 +167,208 @@ TEST(PassByValueSim, StringOutputReplacesTheActualsTextWhateverItsLength) {
       "6 abcdef 2 xy\n");
 }
 
+TEST(PassByValueSim, DISABLED_TheClauseExampleXorsAThousandByteCopy) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  byte pkt [1000:1];\n"
+                 "  function automatic int crc( byte packet [1000:1] );\n"
+                 "    for( int j= 1; j <= 1000; j++ ) begin\n"
+                 "      crc ^= packet[j];\n"
+                 "    end\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    for (int j = 1; j <= 1000; j++) pkt[j] = j * 5 + 1;\n"
+                 "    $display(\"%0d\", crc(pkt));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "-64\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, ClearingTheArrayCopyLeavesTheCallersArray) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  byte pkt [1000:1];\n"
+                 "  function automatic int clear( byte packet [1000:1] );\n"
+                 "    for (int j = 1; j <= 1000; j++) packet[j] = 0;\n"
+                 "    return packet[1000] + packet[1];\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    for (int j = 1; j <= 1000; j++) pkt[j] = j * 5 + 1;\n"
+                 "    $display(\"%0d %0d %0d\", clear(pkt), pkt[1], "
+                 "pkt[1000]);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 6 -119\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, EachRecursiveActivationKeepsItsFormalAcrossTheInnerCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  function automatic int weigh(int n);\n"
+                       "    int r;\n"
+                       "    if (n == 0) return 0;\n"
+                       "    r = weigh(n - 1);\n"
+                       "    n = n * 10;\n"
+                       "    return n + r;\n"
+                       "  endfunction\n"
+                       "  initial $display(\"%0d\", weigh(3));\n"
+                       "endmodule\n",
+                       f),
+            "60\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, ATaskKeepsTheValueCopiedWhenItWasCalled) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int x;\n"
+                       "  task show(input int v);\n"
+                       "    #5 $display(\"%0t %0d %0d\", $time, v, x);\n"
+                       "    v = 99;\n"
+                       "    #1 $display(\"%0t %0d %0d\", $time, v, x);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    x = 1;\n"
+                       "    fork\n"
+                       "      show(x);\n"
+                       "    join_none\n"
+                       "    #2 x = 2;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 1 2\n6 99 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, AHandleFormalIsCopiedButItsObjectIsShared) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  int a;\n"
+                       "endclass\n"
+                       "module m;\n"
+                       "  C h = new();\n"
+                       "  C kept;\n"
+                       "  function automatic void poke(C p);\n"
+                       "    p.a = 7;\n"
+                       "    p = new();\n"
+                       "    p.a = 8;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    h.a = 1;\n"
+                       "    kept = h;\n"
+                       "    poke(h);\n"
+                       "    $display(\"%0d %0d\", h.a, h == kept);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "7 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, StructStringAndRealFormalsAreCopies) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  typedef struct { int a; byte b; } s_t;\n"
+                       "  s_t s;\n"
+                       "  string t;\n"
+                       "  real r;\n"
+                       "  logic [99:0] w;\n"
+                       "  function automatic int spoil(s_t ps, string pt, "
+                       "real pr, logic [99:0] pw);\n"
+                       "    ps.a = 0;\n"
+                       "    ps.b = 0;\n"
+                       "    pt = \"gone\";\n"
+                       "    pt[0] = \"G\";\n"
+                       "    pr = 0.0;\n"
+                       "    pw[99] = 0;\n"
+                       "    return ps.a + ps.b + pt.len();\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    s = '{5, 6};\n"
+                       "    t = \"kept\";\n"
+                       "    r = 2.5;\n"
+                       "    w = {1'b1, 99'd3};\n"
+                       "    $display(\"%0d %0d %0d %s %0.1f %0d %0d\", "
+                       "spoil(s, t, r, w), s.a, s.b, t, r, w[99], w[1:0]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "4 5 6 kept 2.5 1 3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, AFormalIsACopyInEveryPlaceASubroutineIsDeclared) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("function automatic int unit_f(int v);\n"
+                       "  v = v + 1;\n"
+                       "  return v;\n"
+                       "endfunction\n"
+                       "package p;\n"
+                       "  function automatic int pkg_f(int v);\n"
+                       "    v = v + 2;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "class C;\n"
+                       "  function int meth(int v);\n"
+                       "    v = v + 3;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  static function int smeth(int v);\n"
+                       "    v = v + 4;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "interface ifc;\n"
+                       "  function int if_f(int v);\n"
+                       "    v = v + 5;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "endinterface\n"
+                       "module m;\n"
+                       "  ifc i();\n"
+                       "  C c = new();\n"
+                       "  int x;\n"
+                       "  task static mod_t(int v, output int o);\n"
+                       "    v = v + 6;\n"
+                       "    o = v;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    int o;\n"
+                       "    x = 10;\n"
+                       "    mod_t(x, o);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", "
+                       "unit_f(x), p::pkg_f(x), c.meth(x), C::smeth(x), "
+                       "i.if_f(x), o, x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 12 13 14 15 16 10\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByValueSim, AProgramFunctionFormalIsACopy) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program pg;\n"
+                       "  int x;\n"
+                       "  function automatic int bump(int v);\n"
+                       "    v = v * 3;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    x = 4;\n"
+                       "    $display(\"%0d %0d\", bump(x), x);\n"
+                       "  end\n"
+                       "endprogram\n",
+                       f),
+            "12 4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

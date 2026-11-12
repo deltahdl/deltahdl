@@ -582,4 +582,74 @@ TEST(CompoundAssignSim, RightOperandTakesTheAssignmentsWidth) {
             "256 256 256 040\n");
 }
 
+std::string SignedOperandSrc(const std::string& assigns,
+                             const std::string& shown) {
+  return "module m;\n"
+         "  byte pkt [3:1];\n"
+         "  byte q [$];\n"
+         "  byte da [];\n"
+         "  logic signed [7:0] ls [2];\n"
+         "  byte sb;\n"
+         "  int c1, c2, c3, c4, e, ia [2];\n"
+         "  int ci = 0;\n"
+         "  struct { int a; } s;\n"
+         "  initial begin\n"
+         "    pkt[1] = -64;\n"
+         "    q.push_back(-64);\n"
+         "    da = new[1];\n"
+         "    da[0] = -64;\n"
+         "    ls[0] = -64;\n"
+         "    sb = -64;\n" +
+         assigns + "    $display(\"" + shown + ");\n" +
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(CompoundAssignSim, AWrittenTargetSignExtendsASignedOperand) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(SignedOperandSrc("    c1 = 0;\n"
+                                        "    c1 ^= pkt[1];\n"
+                                        "    c2 = 0;\n"
+                                        "    c2 += sb;\n"
+                                        "    c3 = 0;\n"
+                                        "    c3 |= q[0];\n"
+                                        "    c4 = 0;\n"
+                                        "    c4 |= ls[0];\n"
+                                        "    ia[0] = 0;\n"
+                                        "    ia[0] ^= da[0];\n"
+                                        "    ia[1] = 0;\n"
+                                        "    ia[1] -= sb;\n",
+                                        "%0d %0d %0d %0d %0d %0d\", c1, c2, "
+                                        "c3, c4, ia[0], ia[1]"),
+                       f),
+            "-64 -64 -64 -64 -64 64\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(CompoundAssignSim, AnInitializedMemberOrExpressionTargetSignExtends) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(SignedOperandSrc("    e = (c1 ^= pkt[1]);\n"
+                                        "    s.a ^= pkt[1];\n"
+                                        "    ci += sb;\n",
+                                        "%0d %0d %0d %0d\", c1, e, s.a, ci"),
+                       f),
+            "-64 -64 -64 -64\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(CompoundAssignSim, DISABLED_AnUnwrittenTargetSignExtendsASignedOperand) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(SignedOperandSrc("    c1 ^= pkt[1];\n"
+                                        "    c2 += sb;\n"
+                                        "    c3 |= q[0];\n"
+                                        "    c4 |= ls[0];\n"
+                                        "    ia[0] ^= da[0];\n"
+                                        "    ia[1] -= sb;\n",
+                                        "%0d %0d %0d %0d %0d %0d\", c1, c2, "
+                                        "c3, c4, ia[0], ia[1]"),
+                       f),
+            "-64 -64 -64 -64 -64 64\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
