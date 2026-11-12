@@ -33,4 +33,26 @@ TEST(ClockingScopeSim, BlockPersistsAcrossClockEdges) {
   EXPECT_EQ(cmgr.GetSampledValue("cb", "data"), 0x20u);
 }
 
+TEST(ClockingScopeSim, ABlockOfAnAutomaticModuleKeepsItsSamplesStatically) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module automatic sub(input logic clk);\n"
+                       "  int d = 5;\n"
+                       "  clocking cb @(posedge clk); input d; endclocking\n"
+                       "  initial begin\n"
+                       "    @(cb); d = 6;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  sub u(clk);\n"
+                       "  initial #11 $display(\"%0d\", u.cb.d);\n"
+                       "  initial #21 begin $display(\"%0d\", u.cb.d); "
+                       "$finish; end\n"
+                       "endmodule\n",
+                       f),
+            "5\n6\n$finish at time 21\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

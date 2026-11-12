@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -113,6 +114,43 @@ TEST(ClockingScopeElab, StaticLifetimeInModule) {
              "    @(cb);\n"
              "  end\n"
              "endmodule\n"));
+}
+
+TEST(ClockingScopeElab, ABlockNamedLikeAnotherDeclarationOfItsScopeError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  int cb, d;\n"
+      "  clocking cb @(posedge clk); input d; endclocking\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 'cb'", 4, "23.9"));
+}
+
+TEST(ClockingScopeElab,
+     DISABLED_AChildInstancesBlockIsNotReachedByItsBareName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub(input logic clk);\n"
+      "  int d = 3;\n"
+      "  clocking cb @(posedge clk); input d; endclocking\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  int r;\n"
+      "  sub u(clk);\n"
+      "  initial begin\n"
+      "    r = cb.d;\n"
+      "    r = u.cb.d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'cb' resolves to no declaration",
+                            10, "23.8"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 11));
 }
 
 }  // namespace

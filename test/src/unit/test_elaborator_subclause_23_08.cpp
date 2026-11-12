@@ -227,4 +227,32 @@ TEST(UpwardNameReferenceElaboration, DeclaredFirstNamesAreNotReported) {
              "endmodule\n"));
 }
 
+TEST(UpwardNameReferenceElaboration,
+     DISABLED_AChildInstancesNamedOrGenerateBlockIsNotReachedByItsBareName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub(input logic clk);\n"
+      "  initial begin : blk static int x = 3; end\n"
+      "  if (1) begin : gb int y = 4; end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  int r;\n"
+      "  sub u(clk);\n"
+      "  initial begin\n"
+      "    r = blk.x;\n"
+      "    r = gb.y;\n"
+      "    r = u.blk.x + u.gb.y;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'blk' resolves to no declaration", 10, "23.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical name 'gb' resolves to no declaration",
+                            11, "23.8"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 12));
+}
+
 }  // namespace
