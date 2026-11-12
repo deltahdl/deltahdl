@@ -777,4 +777,94 @@ TEST(SubroutineCallSim,
             "7 0\n");
 }
 
+TEST(SubroutineCallSim, EveryFormOfATfCallReachesItsSubroutine) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("package p;\n"
+                        "  function int pf(int x); return x + 1; endfunction\n"
+                        "  task pt(output int y); y = 70; endtask\n"
+                        "endpackage\n"
+                        "function int uf(int x); return x * 3; endfunction\n"
+                        "module c;\n"
+                        "  function int cf(int x); return x - 1; endfunction\n"
+                        "  task ct(output int y); y = 80; endtask\n"
+                        "endmodule\n"
+                        "module m;\n"
+                        "  int r1, r2, r3, r4, r5, r6, r7, r8;\n"
+                        "  c u();\n"
+                        "  function int add(int a, int b, int k);\n"
+                        "    return a * 100 + b * 10 + k;\n"
+                        "  endfunction\n"
+                        "  initial begin\n"
+                        "    r1 = p::pf(4);\n"
+                        "    r2 = $unit::uf(4);\n"
+                        "    r3 = u.cf(4);\n"
+                        "    r4 = add (* mark *) (1, 2, 3);\n"
+                        "    p::pt(r5);\n"
+                        "    u.ct(r6);\n"
+                        "    r7 = add(.k(3), .a(1), .b(2));\n"
+                        "    r8 = add(4, .k(6), .b(5));\n"
+                        "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                        "             r1, r2, r3, r4, r5, r6, r7, r8);\n"
+                        "  end\n"
+                        "endmodule\n",
+                        f),
+      "5 12 3 123 70 80 123 456\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SubroutineCallArgWriteback, ATaskPassesEachOfFourDirectionsByItsOwnRule) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int av, bv, cv, dv, sa, sb, sc, sd, ta;\n"
+                       "  task automatic t(input int a, output int b,\n"
+                       "                   inout int c, ref int d);\n"
+                       "    b = 10; c = c + 20; d = 30;\n"
+                       "    #5;\n"
+                       "    ta = a;\n"
+                       "    b = b + 1; c = c + 1;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    av = 1; bv = 2; cv = 3; dv = 4;\n"
+                       "    t(av, bv, cv, dv);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                       "             sa, sb, sc, sd, ta, bv, cv, dv, $time);\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    #2 av = 100;\n"
+                       "    sa = av; sb = bv; sc = cv; sd = dv;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "100 2 3 30 1 11 24 30 5\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SubroutineCallArgWriteback,
+     AFunctionPassesEachOfFourDirectionsByItsOwnRule) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int av, bv, cv, dv, seen, seenb, seenc, seend;\n"
+                       "  function automatic void f(input int a,\n"
+                       "      output int b, inout int c, ref int d);\n"
+                       "    av = 50;\n"
+                       "    seen = a;\n"
+                       "    b = a + 1;\n"
+                       "    c = c + 2;\n"
+                       "    d = 40;\n"
+                       "    seenb = bv; seenc = cv; seend = dv;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    av = 5; bv = 0; cv = 7; dv = 8;\n"
+                       "    f(av, bv, cv, dv);\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                       "             seen, seenb, seenc, seend, av, bv, cv, "
+                       "dv);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 0 7 40 50 6 9 40\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <initializer_list>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -461,6 +463,191 @@ TEST(SubroutineCallElaboration,
   for (const int kLine : {20, 23, 24}) {
     EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
   }
+}
+
+struct RejectedActual {
+  const char* call;
+  const char* report;
+  const char* subclause;
+};
+
+constexpr RejectedActual kRejectedActuals[] = {
+    {"o(g())", "output argument 'x' requires a variable", "13.5"},
+    {"o($time)", "output argument 'x' requires a variable", "13.5"},
+    {"o(c0 ? y : z)", "output argument 'x' requires a variable", "13.5"},
+    {"o(int'(y))", "output argument 'x' requires a variable", "13.5"},
+    {"o(-y)", "output argument 'x' requires a variable", "13.5"},
+    {"io(g())", "inout argument 'x' requires a variable", "13.5"},
+    {"io(y + z)", "inout argument 'x' requires a variable", "13.5"},
+    {"o(P)", "constant 'P' cannot be the actual of output argument 'x' of 'o'",
+     "6.20"},
+    {"o(L)", "constant 'L' cannot be the actual of output argument 'x' of 'o'",
+     "6.20"},
+    {"o(K)", "constant 'K' cannot be the actual of output argument 'x' of 'o'",
+     "6.20"},
+    {"o(E1)",
+     "constant 'E1' cannot be the actual of output argument 'x' of 'o'",
+     "6.20"},
+    {"io(P)", "constant 'P' cannot be the actual of inout argument 'x' of 'io'",
+     "6.20"},
+};
+
+TEST(SubroutineCallElaboration,
+     AnOutputOrInoutActualThatIsNoProceduralLvalueIsReportedInEveryKind) {
+  for (const auto& actual : kRejectedActuals) {
+    ElabFixture f;
+    ElaborateSrc(std::string("module m;\n"
+                             "  parameter int P = 1;\n"
+                             "  localparam int L = 2;\n"
+                             "  const int K = 3;\n"
+                             "  typedef enum {E0, E1} e_t;\n"
+                             "  int y, z;\n"
+                             "  logic c0;\n"
+                             "  function int g(); return 1; endfunction\n"
+                             "  function void o(output int x); x = 1; "
+                             "endfunction\n"
+                             "  function void io(inout int x); x = 1; "
+                             "endfunction\n"
+                             "  initial ") +
+                     actual.call +
+                     ";\n"
+                     "endmodule\n",
+                 f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), actual.report, 11,
+                              actual.subclause))
+        << actual.call;
+  }
+}
+
+TEST(SubroutineCallElaboration,
+     AnOutputOrInoutActualThatIsAProceduralLvalueIsAcceptedInEveryKind) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c; int v; endmodule\n"
+      "module m;\n"
+      "  class H; int p; endclass\n"
+      "  int a[4], d[], q[$], s[string];\n"
+      "  logic [15:0] b;\n"
+      "  H h = new;\n"
+      "  c u();\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  function void io(inout int x); x = 1; endfunction\n"
+      "  function void o8(output logic [7:0] x); x = 1; endfunction\n"
+      "  initial begin\n"
+      "    o(a[1]);\n"
+      "    o(d[0]);\n"
+      "    o(q[0]);\n"
+      "    o(s[\"k\"]);\n"
+      "    o(h.p);\n"
+      "    o(u.v);\n"
+      "    o8(b[3+:8]);\n"
+      "    io(a[2]);\n"
+      "    io(h.p);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+struct LiteralOutputCall {
+  const char* src;
+  int line;
+};
+
+constexpr LiteralOutputCall kReportedLiteralOutputCalls[] = {
+    {("module m;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  task t; o(5); endtask\n"
+      "endmodule\n"),
+     3},
+    {("module m;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  function void g; o(5); endfunction\n"
+      "endmodule\n"),
+     3},
+    {("module m;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  class C; function void g; o(5); endfunction endclass\n"
+      "endmodule\n"),
+     3},
+    {("interface i;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  initial o(5);\n"
+      "endinterface\n"
+      "module m; i u(); endmodule\n"),
+     3},
+    {("program q;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  initial o(5);\n"
+      "endprogram\n"),
+     3},
+    {("module m;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  if (1) begin : b initial o(5); end\n"
+      "endmodule\n"),
+     3},
+    {("package p;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "endpackage\n"
+      "module m; import p::*; initial o(5); endmodule\n"),
+     4},
+};
+
+constexpr LiteralOutputCall kUnreportedLiteralOutputCalls[] = {
+    {("package p;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  function void g; o(5); endfunction\n"
+      "endpackage\n"),
+     3},
+    {("function void o(output int x); x = 1; endfunction\n"
+      "function void g; o(5); endfunction\n"),
+     2},
+    {("class C;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "  function void g; o(5); endfunction\n"
+      "endclass\n"),
+     3},
+    {("package p;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "endpackage\n"
+      "module m; initial p::o(5); endmodule\n"),
+     4},
+    {("function void o(output int x); x = 1; endfunction\n"
+      "module m; initial o(5); endmodule\n"),
+     2},
+    {("module c;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "endmodule\n"
+      "module m; c u(); initial u.o(5); endmodule\n"),
+     4},
+    {("class C;\n"
+      "  function void o(output int x); x = 1; endfunction\n"
+      "endclass\n"
+      "module m; C h = new; initial h.o(5); endmodule\n"),
+     4},
+};
+
+template <size_t N>
+void ExpectLiteralOutputReported(const LiteralOutputCall (&calls)[N]) {
+  for (const auto& call : calls) {
+    ElabFixture f;
+    ElaborateSrc(call.src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "output argument 'x' requires a variable",
+                              call.line, "13.5"))
+        << call.src;
+  }
+}
+
+TEST(SubroutineCallElaboration,
+     ALiteralOutputActualIsReportedInAModuleInterfaceProgramOrImport) {
+  ExpectLiteralOutputReported(kReportedLiteralOutputCalls);
+}
+
+TEST(SubroutineCallElaboration,
+     DISABLED_ALiteralOutputActualIsReportedInAPackageTheUnitOrAnotherScope) {
+  ExpectLiteralOutputReported(kUnreportedLiteralOutputCalls);
 }
 
 }  // namespace
