@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -734,6 +735,69 @@ TEST(RealOperandElaboration, RealOperatorRuleHeldInEveryScope) {
                               "is not allowed on real operands", line,
                               "11.3.1"));
   }
+}
+
+TEST(RealOperandElaboration,
+     DISABLED_RealOperandOfAConcatenationOrReplicationIsReported) {
+  constexpr const char* kDecls =
+      "  real r = 1.0; shortreal s; realtime tt; logic [7:0] a;\n"
+      "  parameter real P = 1.5;\n"
+      "  typedef struct { real rv; } st_t; st_t st;\n"
+      "  logic [15:0] v;\n";
+  for (const auto& [item, message] :
+       {std::pair{"  wire [15:0] w = {r, a};\n", "concatenation"},
+        std::pair{"  wire [15:0] w = {2{r}};\n", "replication"},
+        std::pair{"  initial v = {s};\n", "concatenation"},
+        std::pair{"  initial v = {tt, a};\n", "concatenation"},
+        std::pair{"  initial v = {1.5, a};\n", "concatenation"},
+        std::pair{"  initial v = {P, a};\n", "concatenation"},
+        std::pair{"  initial v = {r + 1.0, a};\n", "concatenation"},
+        std::pair{"  initial v = {st.rv, a};\n", "concatenation"},
+        std::pair{"  initial {r, a} = 16'h0;\n", "concatenation"},
+        std::pair{"  logic [15:0] d = {r, a};\n", "concatenation"},
+        std::pair{"  function void f(); v = {r, a}; endfunction\n",
+                  "concatenation"},
+        std::pair{"  initial fork v = {2{r}}; join\n", "replication"}}) {
+    const std::string kSrc =
+        std::string("module t;\n") + kDecls + item + "endmodule\n";
+    ElabFixture f;
+    ElaborateSrc(kSrc, f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string(message) + " is not allowed on real operands", 6, "11.3.1"))
+        << kSrc;
+  }
+}
+
+TEST(RealOperandElaboration,
+     DISABLED_RealOperandOfAConcatenationInAClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  real r; logic [7:0] a; logic [15:0] v;\n"
+      "  function void f(); v = {r, a}; endfunction\n"
+      "endclass\n"
+      "module t; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "concatenation is not allowed on real operands", 3,
+                            "11.3.1"));
+}
+
+TEST(RealOperandElaboration,
+     IntegralConcatenationsAndRealArrayConcatenationsAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  real r = 1.0; logic [7:0] a; logic [15:0] v;\n"
+      "  wire [15:0] w1 = {a, a};\n"
+      "  wire [15:0] w2 = {2{a}};\n"
+      "  real ra[2] = {r, 2.0};\n"
+      "  real q[$];\n"
+      "  initial begin q = {q, r}; v = {a, a}; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

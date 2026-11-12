@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <utility>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -250,6 +252,109 @@ TEST(AssignInExprElaboration, AssignmentInATypeReferenceOfABlockingAssign) {
              "  logic a, b, c;\n"
              "  initial c = type((a = b)) == type(logic);\n"
              "endmodule\n"));
+}
+
+TEST(AssignInExprElaboration,
+     DISABLED_AssignmentInAnElaborationTimeExpressionIsReported) {
+  for (const auto& [src, line] :
+       {std::pair{"module t; parameter int a = 1, b = 2;\n"
+                  "  if ((a = b)) begin : g end\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t; parameter int a = 1, b = 2;\n"
+                  "  case ((a = b)) 1: begin : g end endcase\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t; parameter int a = 1, b = 2;\n"
+                  "  case (a) (a = b): begin : g end endcase\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t; parameter int a = 1, b = 2;\n"
+                  "  for (genvar i = (a = b); i < 2; i++) begin : g end\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t; parameter int a = 1, b = 2;\n"
+                  "  for (genvar i = 0; (a += 1); i++) begin : g end\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module m #(parameter int P = 1); endmodule\n"
+                  "module t; parameter int a = 1, b = 2;\n"
+                  "  m #(.P((a = b))) u();\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"interface m #(parameter int P = 1); endinterface\n"
+                  "module t; parameter int a = 1, b = 2;\n"
+                  "  m #(.P((a = b))) u();\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"program m #(parameter int P = 1); endprogram\n"
+                  "module t; parameter int a = 1, b = 2;\n"
+                  "  m #(.P((a = b))) u();\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"module m #(parameter int P = 1); endmodule\n"
+                  "module t; parameter int a = 1, b = 2;\n"
+                  "  m u(); defparam u.P = (a = b);\n"
+                  "endmodule\n",
+                  3},
+        std::pair{"module t; logic a, b; wire y;\n"
+                  "  and g(y, (a = b), b);\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t; int a, b; wire y;\n"
+                  "  assign #((a = b)) y = 1;\n"
+                  "endmodule\n",
+                  2},
+        std::pair{"module t; int a, b;\n"
+                  "  wire #((a += 1)) y;\n"
+                  "endmodule\n",
+                  2}}) {
+    ElabFixture f;
+    ElaborateSrcAllowingParseErrors(src, f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "assignment operator within expression is illegal in this context",
+        line, "11.3.6"))
+        << src;
+  }
+}
+
+TEST(AssignInExprElaboration,
+     AssignmentInAnInterfaceProgramOrCheckerConnectionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface I(input logic x); endinterface\n"
+      "program P(input logic x); endprogram\n"
+      "checker C(logic x); endchecker\n"
+      "module t; logic a, b;\n"
+      "  I i((a = b));\n"
+      "  P p((a = b));\n"
+      "  C c((a = b));\n"
+      "endmodule\n",
+      f);
+  constexpr std::string_view kMessage =
+      "assignment operator within expression is illegal in this context";
+  for (const int kLine : {5, 6, 7}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, kLine, "11.3.6"))
+        << kLine;
+  }
+}
+
+TEST(AssignInExprElaboration,
+     TheSameElaborationTimeExpressionsWithoutAssignmentAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface I(input logic x); endinterface\n"
+      "module m #(parameter int P = 1); endmodule\n"
+      "module t; parameter int a = 1, b = 2; logic c, d; wire y, z;\n"
+      "  if (a == b) begin : g end\n"
+      "  case (a) b: begin : h end endcase\n"
+      "  for (genvar i = a; i < b; i++) begin : l end\n"
+      "  m #(.P(a + b)) u(); I i(c); and g2(y, c, d);\n"
+      "  assign #(a + b) z = 1;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
