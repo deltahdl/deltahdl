@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
@@ -289,6 +291,60 @@ TEST(SignedExprSim, StoredValueOfUnsignedVariableIsUnsigned) {
       f, "plain");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.is_signed);
+}
+
+TEST(SignedExprSim, TheSignCastsGiveTheExamplesValuesWhereverTheyAreWritten) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package pk;\n"
+          "  localparam logic signed [7:0] PS = $signed(4'b1100);\n"
+          "endpackage\n"
+          "class K;\n"
+          "  static function int f(logic [3:0] v);\n"
+          "    logic signed [7:0] t;\n"
+          "    t = $signed(v);\n"
+          "    return t;\n"
+          "  endfunction\n"
+          "endclass\n"
+          "module m;\n"
+          "  logic [7:0] regA, regB;\n"
+          "  logic signed [7:0] regS;\n"
+          "  logic signed [15:0] w;\n"
+          "  logic [3:0] xz = 4'b1x0z;\n"
+          "  typedef struct packed { logic [1:0] h; logic [1:0] l; } s_t;\n"
+          "  s_t st = 4'b1010;\n"
+          "  logic [1:0][1:0] pa = 4'b1001;\n"
+          "  localparam logic signed [7:0] LS = $signed(4'b1100);\n"
+          "  localparam logic [7:0] LU = $unsigned(-4'sd4);\n"
+          "  function automatic int g(logic [3:0] v); return $signed(v); "
+          "endfunction\n"
+          "  initial begin\n"
+          "    regA = $unsigned(-4); regB = $unsigned(-4'sd4);\n"
+          "    regS = $signed(4'b1100);\n"
+          "    $display(\"%b %b %0d\", regA, regB, regS);\n"
+          "    regA = unsigned'(-4); regS = signed'(4'b1100);\n"
+          "    $display(\"%b %0d\", regA, regS);\n"
+          "    regA = 8'hF0; regB = 8'h20;\n"
+          "    w = regA + regB; $write(\"%0d \", w);\n"
+          "    w = byte'(regA) + byte'(regB); $write(\"%0d \", w);\n"
+          "    w = signed'(regA) + signed'(regB); $write(\"%0d \", w);\n"
+          "    w = $signed(regA) + $signed(regB); $display(\"%0d\", w);\n"
+          "    $display(\"%b %b %0d %0d\", $signed(xz), "
+          "$unsigned($signed(xz)),\n"
+          "             $bits($signed(st)), $bits($unsigned(pa)));\n"
+          "    w = $signed(st); $write(\"%0d \", w);\n"
+          "    w = $signed(pa); $write(\"%0d \", w);\n"
+          "    w = $unsigned(4'sb1000); $display(\"%0d\", w);\n"
+          "    $display(\"%0d %0d %0d %0d %0d\", LS, LU, pk::PS, "
+          "K::f(4'b1100),\n"
+          "             g(4'b1100));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "11111100 00001100 -4\n11111100 -4\n272 16 16 16\n1x0z 1x0z 4 4\n"
+      "-6 -7 8\n-4 12 -4 -4 -4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
