@@ -213,4 +213,46 @@ TEST(MailboxSim, ElementsOfContainersOfMailboxesHoldTheirQueues) {
   EXPECT_EQ(var->value.ToUint64(), 78340u);
 }
 
+TEST(MailboxPutSim, ProgramAndPackageMailboxesHoldMessagesOfEachType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package pk;\n"
+          "  typedef struct { int a; byte b; } pair_t;\n"
+          "  mailbox #(pair_t) pm = new(1);\n"
+          "endpackage\n"
+          "program tb;\n"
+          "  mailbox m = new(2);\n"
+          "  int k = 3;\n"
+          "  initial begin\n"
+          "    pk::pair_t p, q;\n"
+          "    int r1, r2, r3, v;\n"
+          "    string s;\n"
+          "    r1 = m.try_put(k + 1);\n"
+          "    r2 = m.try_put(\"ab\");\n"
+          "    r3 = m.try_put(k);\n"
+          "    p.a = 5; p.b = 6;\n"
+          "    pk::pm.put(p);\n"
+          "    $display(\"%0d %0d %0d %0d\", r1, r2, r3, pk::pm.try_put(p));\n"
+          "    fork\n"
+          "      begin m.put(9); r3 = $time; end\n"
+          "      begin #4 m.get(v); end\n"
+          "    join\n"
+          "    $display(\"got %0d, put done at %0d\", v, r3);\n"
+          "    r1 = m.try_peek(v);\n"
+          "    r2 = m.try_get(s);\n"
+          "    m.get(v);\n"
+          "    pk::pm.peek(q);\n"
+          "    $display(\"%0d %0d %s %0d %0d %0d %0d\", r1, r2, s, v, q.a, "
+          "q.b, m.num());\n"
+          "  end\n"
+          "endprogram\n"
+          "module top;\n"
+          "  tb t();\n"
+          "endmodule\n",
+          f),
+      "1 1 0 0\ngot 4, put done at 4\n-1 1 ab 9 5 6 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
