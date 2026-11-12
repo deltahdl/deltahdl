@@ -573,4 +573,134 @@ TEST(IfMatchesSim, LaterUniqueConditionReadsTheOuterNameInAFunction) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+std::string RunJumpExample(const char* if_statement) {
+  SimFixture f;
+  return RunCapture(
+      std::string("module t;\n"
+                  "  typedef union tagged {\n"
+                  "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                  "    union tagged {\n"
+                  "      bit [9:0] JmpU;\n"
+                  "      struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+                  "    } Jmp;\n"
+                  "  } Instr;\n"
+                  "  int rf [0:3];\n"
+                  "  Instr e;\n"
+                  "  task automatic check;\n") +
+          if_statement +
+          "  endtask\n"
+          "  initial begin\n"
+          "    rf = '{0, 10, 20, 30};\n"
+          "    e = tagged Add '{5'd1, 5'd2, 5'd3}; check;\n"
+          "    e = tagged Jmp (tagged JmpU 10'd100); check;\n"
+          "    e = tagged Jmp (tagged JmpC '{2'd1, 10'd7}); check;\n"
+          "    e = tagged Jmp (tagged JmpC '{2'd0, 10'd9}); check;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(IfMatchesExampleSim, TheConditionalJumpExampleBindsBothMembers) {
+  EXPECT_EQ(
+      RunJumpExample(
+          "    if (e matches (tagged Jmp (tagged JmpC '{cc:.c,addr:.a})))\n"
+          "      $display(\"%0d %0d\", c, a);\n"
+          "    else\n"
+          "      $display(\"other\");\n"),
+      "other\nother\n1 7\n0 9\n");
+}
+
+TEST(IfMatchesExampleSim, TheTwoMatchExampleMatchesTheBoundJump) {
+  EXPECT_EQ(RunJumpExample("    if (e matches (tagged Jmp .j) &&&\n"
+                           "        j matches (tagged JmpC '{cc:.c,addr:.a}))\n"
+                           "      $display(\"%0d %0d\", c, a);\n"
+                           "    else\n"
+                           "      $display(\"other\");\n"),
+            "other\nother\n1 7\n0 9\n");
+}
+
+TEST(IfMatchesExampleSim, TheFilteredExampleTakesTheElseForRegisterZero) {
+  EXPECT_EQ(
+      RunJumpExample(
+          "    if (e matches (tagged Jmp (tagged JmpC '{cc:.c,addr:.a}))\n"
+          "        &&& (rf[c] != 0))\n"
+          "      $display(\"%0d %0d\", c, a);\n"
+          "    else\n"
+          "      $display(\"other\");\n"),
+      "other\nother\n1 7\nother\n");
+}
+
+TEST(IfMatchesSim, EveryFormOfIfMatchesDecidesInEveryKindOfProcedure) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package pk;\n"
+          "  typedef union tagged {\n"
+          "    void Invalid;\n"
+          "    int Valid;\n"
+          "  } VInt;\n"
+          "  function automatic int f(VInt v);\n"
+          "    if (v matches tagged Valid .n &&& n > 0) return n;\n"
+          "    else return -1;\n"
+          "  endfunction\n"
+          "endpackage\n"
+          "import pk::*;\n"
+          "function automatic int g(VInt v);\n"
+          "  priority if (v matches tagged Valid .n) return n + 100;\n"
+          "  else if (v matches tagged Invalid) return 0;\n"
+          "endfunction\n"
+          "class C;\n"
+          "  function int m(VInt v);\n"
+          "    unique if (v matches tagged Valid .n) return n * 2;\n"
+          "    else return 7;\n"
+          "  endfunction\n"
+          "endclass\n"
+          "interface I;\n"
+          "  VInt v;\n"
+          "  initial begin\n"
+          "    v = tagged Valid 5;\n"
+          "    #2 if (v matches tagged Valid .n) $display(\"I %0d\", n);\n"
+          "  end\n"
+          "endinterface\n"
+          "program p;\n"
+          "  VInt v;\n"
+          "  initial begin\n"
+          "    v = tagged Invalid;\n"
+          "    #3 if (v matches tagged Valid .n) $display(\"P %0d\", n);\n"
+          "    else $display(\"P else\");\n"
+          "  end\n"
+          "endprogram\n"
+          "module t;\n"
+          "  I u();\n"
+          "  p pp();\n"
+          "  task tk(VInt v);\n"
+          "    if (v matches tagged Valid .n) $display(\"T %0d\", n);\n"
+          "    else $display(\"T invalid\");\n"
+          "  endtask\n"
+          "  if (1) begin : gb\n"
+          "    VInt gv;\n"
+          "    initial begin\n"
+          "      gv = tagged Valid 9;\n"
+          "      #1 if (gv matches tagged Valid .n &&& n == 9) $display(\"G "
+          "%0d\", n);\n"
+          "    end\n"
+          "  end\n"
+          "  initial begin\n"
+          "    C c;\n"
+          "    VInt a, b, z;\n"
+          "    c = new;\n"
+          "    a = tagged Valid 4;\n"
+          "    b = tagged Valid -2;\n"
+          "    z = tagged Invalid;\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d\", f(a), f(b), f(z), g(a), "
+          "c.m(a), c.m(z));\n"
+          "    tk(z);\n"
+          "    tk(a);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "4 -1 -1 104 8 7\nT invalid\nT 4\nG 9\nI 5\nP else\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 }  // namespace

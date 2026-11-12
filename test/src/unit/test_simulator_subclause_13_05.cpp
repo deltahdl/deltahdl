@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
@@ -615,6 +616,122 @@ TEST(SubroutineCallSim, ActualOfAStaticTaskCallReadInTheCallersClass) {
       f, "r");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 40u);
+}
+
+TEST(NestedTagArgumentSim, DISABLED_AnInputFormalKeepsTheInnerTagOfItsActual) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  typedef union tagged {\n"
+          "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+          "    union tagged {\n"
+          "      bit [9:0] JmpU;\n"
+          "      struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+          "    } Jmp;\n"
+          "  } Instr;\n"
+          "  Instr x, y;\n"
+          "  function automatic int fa(input Instr i);\n"
+          "    if (i matches tagged Jmp (tagged JmpU .a)) return a; else "
+          "return -1;\n"
+          "  endfunction\n"
+          "  function int fs(input Instr i);\n"
+          "    if (i matches tagged Jmp (tagged JmpU .a)) return a; else "
+          "return -1;\n"
+          "  endfunction\n"
+          "  function automatic int fd(input Instr i = tagged Jmp (tagged JmpU "
+          "10'd5));\n"
+          "    if (i matches tagged Jmp (tagged JmpU .a)) return a; else "
+          "return -1;\n"
+          "  endfunction\n"
+          "  task automatic tk(input Instr i);\n"
+          "    y = i;\n"
+          "  endtask\n"
+          "  class C;\n"
+          "    function int m(input Instr i);\n"
+          "      if (i matches tagged Jmp (tagged JmpU .a)) return a; else "
+          "return -1;\n"
+          "    endfunction\n"
+          "  endclass\n"
+          "  initial begin\n"
+          "    C c;\n"
+          "    c = new;\n"
+          "    x = tagged Jmp (tagged JmpU 10'd100);\n"
+          "    $display(\"%0d %0d %0d %0d\", fa(x), fs(x), c.m(x), fd());\n"
+          "    $display(\"%0d\", fa(tagged Jmp (tagged JmpU 10'd7)));\n"
+          "    tk(x);\n"
+          "    if (y matches tagged Jmp (tagged JmpU .a)) $display(\"copy "
+          "%0d\", a);\n"
+          "    else $display(\"copy lost\");\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "100 100 100 5\n7\ncopy 100\n");
+}
+
+TEST(NestedTagArgumentSim,
+     DISABLED_RefAndInoutFormalsKeepTheInnerTagOfTheActual) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef union tagged {\n"
+                       "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                       "    union tagged {\n"
+                       "      bit [9:0] JmpU;\n"
+                       "      struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+                       "    } Jmp;\n"
+                       "  } Instr;\n"
+                       "  Instr x, y;\n"
+                       "  function automatic int fr(ref Instr i);\n"
+                       "    if (i matches tagged Jmp (tagged JmpC '{.c, .a})) "
+                       "return c * 1000 + a;\n"
+                       "    else return -1;\n"
+                       "  endfunction\n"
+                       "  task automatic tio(inout Instr i);\n"
+                       "    if (i matches tagged Jmp (tagged JmpC '{.c, .a})) "
+                       "$display(\"inout %0d %0d\", c, a);\n"
+                       "    else $display(\"inout lost\");\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    x = tagged Jmp (tagged JmpC '{2'd2, 10'd7});\n"
+                       "    $display(\"ref %0d\", fr(x));\n"
+                       "    tio(x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "ref 2007\ninout 2 7\n");
+}
+
+TEST(NestedTagArgumentSim,
+     DISABLED_OutputFormalsAndReturnValuesKeepTheInnerTag) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef union tagged {\n"
+                       "    struct { bit [4:0] reg1, reg2, regd; } Add;\n"
+                       "    union tagged {\n"
+                       "      bit [9:0] JmpU;\n"
+                       "      struct { bit [1:0] cc; bit [9:0] addr; } JmpC;\n"
+                       "    } Jmp;\n"
+                       "  } Instr;\n"
+                       "  Instr x, y;\n"
+                       "  function automatic Instr mk(input bit [9:0] v);\n"
+                       "    return tagged Jmp (tagged JmpU v);\n"
+                       "  endfunction\n"
+                       "  task automatic out(output Instr o);\n"
+                       "    o = tagged Jmp (tagged JmpC '{2'd1, 10'd33});\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    x = mk(10'd44);\n"
+                       "    if (x matches tagged Jmp (tagged JmpU .a)) "
+                       "$display(\"return %0d\", a);\n"
+                       "    else $display(\"return lost\");\n"
+                       "    out(y);\n"
+                       "    if (y matches tagged Jmp (tagged JmpC '{.c, .a})) "
+                       "$display(\"output %0d %0d\", c, a);\n"
+                       "    else $display(\"output lost\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "return 44\noutput 1 33\n");
 }
 
 }  // namespace

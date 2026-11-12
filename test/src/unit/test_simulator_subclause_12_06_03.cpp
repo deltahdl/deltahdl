@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_lower_run.h"
 #include "helpers_matches_short_circuit.h"
@@ -335,6 +337,74 @@ TEST(TernaryMatchesSim, BindingConditionalResultTypeIsBothOperands) {
       f, "ok");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 11u);
+}
+
+TEST(TernaryMatchesSim, TheConditionalOperatorMatchesInEveryKindOfProcedure) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "package pk;\n"
+          "  typedef union tagged {\n"
+          "    void Invalid;\n"
+          "    int Valid;\n"
+          "  } VInt;\n"
+          "  function automatic int f(VInt v);\n"
+          "    return v matches tagged Valid .n &&& n > 0 ? n : -1;\n"
+          "  endfunction\n"
+          "endpackage\n"
+          "import pk::*;\n"
+          "function automatic int g(VInt v);\n"
+          "  return v matches tagged Valid .n ? n + 100 : 0;\n"
+          "endfunction\n"
+          "class C;\n"
+          "  function int m(VInt v);\n"
+          "    return v matches tagged Valid .n ? n * 2 : 7;\n"
+          "  endfunction\n"
+          "endclass\n"
+          "interface I;\n"
+          "  VInt v;\n"
+          "  initial begin\n"
+          "    v = tagged Valid 5;\n"
+          "    #2 $display(\"I %0d\", v matches tagged Valid .n ? n : 0);\n"
+          "  end\n"
+          "endinterface\n"
+          "program p;\n"
+          "  VInt v;\n"
+          "  initial begin\n"
+          "    v = tagged Invalid;\n"
+          "    #3 $display(\"P %0d\", v matches tagged Valid .n ? n : 0);\n"
+          "  end\n"
+          "endprogram\n"
+          "module t;\n"
+          "  I u();\n"
+          "  p pp();\n"
+          "  task tk(VInt v);\n"
+          "    $display(\"T %0d\", v matches tagged Valid .n ? n : -5);\n"
+          "  endtask\n"
+          "  if (1) begin : gb\n"
+          "    VInt gv;\n"
+          "    initial begin\n"
+          "      gv = tagged Valid 9;\n"
+          "      #1 $display(\"G %0d\", gv matches tagged Valid .n &&& n == 9 "
+          "? n : 0);\n"
+          "    end\n"
+          "  end\n"
+          "  initial begin\n"
+          "    C c;\n"
+          "    VInt a, b, z;\n"
+          "    c = new;\n"
+          "    a = tagged Valid 4;\n"
+          "    b = tagged Valid -2;\n"
+          "    z = tagged Invalid;\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d\", f(a), f(b), f(z), g(a), "
+          "c.m(a), c.m(z));\n"
+          "    tk(z);\n"
+          "    tk(a);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "4 -1 -1 104 8 7\nT -5\nT 4\nG 9\nI 5\nP 0\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace
