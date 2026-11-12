@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <format>
+#include <initializer_list>
+#include <tuple>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -116,6 +120,44 @@ TEST(ClockingHierExprElab, OutputRejectsConcatWithNonLvalueElement) {
                             "expression that is not a legal output-port "
                             "connection",
                             3, "14.5"));
+}
+
+TEST(ClockingHierExprElab,
+     EachExpressionIsJudgedAsAPortConnectionOfItsDirection) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, s;\n"
+      "  logic [3:0] a, b, c;\n"
+      "  function automatic logic [3:0] fn(); return 4'd1; endfunction\n"
+      "  clocking cb @(posedge clk);\n"
+      "    output o1 = 4'd3;\n"
+      "    output o2 = fn();\n"
+      "    output o3 = {2{a[1:0]}};\n"
+      "    output o4 = s ? a : b;\n"
+      "    inout  o5 = 4'd2;\n"
+      "    output o6 = {a[1:0], b[3:2]};\n"
+      "    inout  o7 = {c, s};\n"
+      "    input  i1 = 4'd3;\n"
+      "    input  i2 = fn();\n"
+      "    input  i3 = {2{a[1:0]}};\n"
+      "    input  i4 = s ? a : b;\n"
+      "  endclocking\n"
+      "endmodule\n",
+      f);
+  for (auto [dir, name, line] :
+       {std::tuple{"output", "o1", 6u}, std::tuple{"output", "o2", 7u},
+        std::tuple{"output", "o3", 8u}, std::tuple{"output", "o4", 9u},
+        std::tuple{"inout", "o5", 10u}}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::format("clocking {} signal '{}' is bound to an expression that "
+                    "is not a legal output-port connection",
+                    dir, name),
+        line, "14.5"))
+        << name;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
 }  // namespace

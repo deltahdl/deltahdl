@@ -156,4 +156,35 @@ TEST(ClockingHierExprSim, ClockvarBoundToASliceOrConcatenation) {
       "10100110010 11110101\n$finish at time 6\n");
 }
 
+TEST(ClockingHierExprSim, ADriveThroughAConcatenationSplitsAcrossItsSignals) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  logic [3:0] hi = 0;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [3:0] lo = 0, c = 4'b0011;\n"
+                       "  logic s = 1;\n"
+                       "  sub u();\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    output w = {u.hi, lo[3:2]};\n"
+                       "    inout  v = {c, s};\n"
+                       "  endclocking\n"
+                       "  initial begin\n"
+                       "    @(cb);\n"
+                       "    $display(\"v=%b\", cb.v);\n"
+                       "    cb.w <= 6'b101011;\n"
+                       "    cb.v <= 5'b11000;\n"
+                       "    @(cb); #1;\n"
+                       "    $display(\"hi=%b lo=%b c=%b s=%b\", u.hi, lo, c, "
+                       "s);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "v=00111\nhi=1010 lo=1100 c=1100 s=0\n$finish at time 16\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
