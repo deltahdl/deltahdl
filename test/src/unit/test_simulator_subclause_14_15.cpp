@@ -187,4 +187,73 @@ TEST(ClockvarEventSim, EventControlOnAClockvarWakesAtItsSample) {
   EXPECT_EQ(out, "15:2 15:9 25\n$finish at time 25\n");
 }
 
+TEST(ClockvarEventSim, EdgeAndMixedEdgeEventsWakeOnTheSampledChange) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic clk = 0;\n"
+          "  logic s1 = 1, x = 0, y = 0;\n"
+          "  int e1, e2, np, xy;\n"
+          "  always #5 clk = ~clk;\n"
+          "  clocking cb @(posedge clk);\n"
+          "    input s1, x, y;\n"
+          "  endclocking\n"
+          "  initial begin #7 s1 = 0; #11 y = 1; #9 s1 = 1; end\n"
+          "  initial begin @(edge cb.s1) e1 = $time; @(edge cb.s1) e2 = $time; "
+          "end\n"
+          "  initial begin @(negedge cb.s1 or posedge cb.s1) np = $time; end\n"
+          "  initial begin @(negedge cb.x or posedge cb.y) xy = $time; end\n"
+          "  initial #40 begin $display(\"%0d %0d %0d %0d\", e1, e2, np, xy); "
+          "$finish; end\n"
+          "endmodule\n",
+          f),
+      "15 35 15 25\n$finish at time 40\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ClockvarEventSim,
+     DISABLED_ASelectsDynamicIndexIsEvaluatedOnceWhenTheWaitStarts) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic clk = 0;\n"
+          "  logic [7:0] p = 0, n = 8'hff, e = 0, c = 0, w = 0, u = 0, v = 0, "
+          "r = 0;\n"
+          "  int ip = 0, in = 0, ie = 0, ic = 0, iw = 0, iu = 0, iv = 0, ir = "
+          "0;\n"
+          "  int tp, tn, te, tc, tw, tuv, tq, ta;\n"
+          "  always #5 clk = ~clk;\n"
+          "  clocking cb @(posedge clk);\n"
+          "    input p, n, e, c, w, u, v;\n"
+          "    inout q = r;\n"
+          "  endclocking\n"
+          "  initial begin\n"
+          "    #1 ip = 1; in = 1; ie = 1; ic = 1; iw = 4; iu = 1; iv = 1; ir = "
+          "1;\n"
+          "    #11 p[1] = 1; n[1] = 0; e[1] = 1; c[1] = 1; w[5:4] = 3; u[1] = "
+          "1; r[1] = 1;\n"
+          "    #10 p[0] = 1; n[0] = 0; e[0] = 1; c[0] = 1; w[1:0] = 3; v[0] = "
+          "1; r[0] = 1;\n"
+          "  end\n"
+          "  initial @(posedge cb.p[ip]) tp = $time;\n"
+          "  initial @(negedge cb.n[in]) tn = $time;\n"
+          "  initial @(edge cb.e[ie]) te = $time;\n"
+          "  initial @(cb.c[ic]) tc = $time;\n"
+          "  initial @(cb.w[iw +: 2]) tw = $time;\n"
+          "  initial @(posedge cb.u[iu] or posedge cb.v[iv]) tuv = $time;\n"
+          "  initial @(cb.q[ir]) tq = $time;\n"
+          "  initial #2 @(posedge cb.p[ip]) ta = $time;\n"
+          "  initial #40 begin\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", tp, tn, te, tc, "
+          "tw, tuv, tq, ta);\n"
+          "    $finish;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "25 25 25 25 25 25 25 15\n$finish at time 40\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
