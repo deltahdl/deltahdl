@@ -415,4 +415,67 @@ TEST(FunctionSim, BodyDeclarationTypesADirectionOnlyFormal) {
   EXPECT_EQ(val, 5u);
 }
 
+TEST(FunctionSim, AnImplicitReturnTypeIsLogicWithTheRangeAndSigningGiven) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  function [7:0] rng(); return 9'h1a5; endfunction\n"
+                 "  function signed [3:0] sgn(); return 4'b1000; endfunction\n"
+                 "  function scl(); return 2'b10; endfunction\n"
+                 "  function unk(); return 1'bx; endfunction\n"
+                 "  initial $display(\"%h %0d %0d %0d %b %0d %b\", rng(),\n"
+                 "      $bits(rng()), sgn(), $bits(sgn()), scl(),\n"
+                 "      $bits(scl()), unk());\n"
+                 "endmodule\n",
+                 f),
+      "a5 8 -8 4 0 1 x\n");
+}
+
+TEST(FunctionSim, EachFormalTakesTheDirectionAndTypeItsDeclarationGives) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  int y1, y2, y3, s1, s2;\n"
+                 "  int q [3:0];\n"
+                 "  function int four(a); return a === 1'bx; endfunction\n"
+                 "  function int one(a); return a; endfunction\n"
+                 "  function int inh(int a, b); return b; endfunction\n"
+                 "  function void outs(input int a, output int b, c);\n"
+                 "    b = a + 1; c = a + 2;\n"
+                 "  endfunction\n"
+                 "  function void swap(inout int a, b);\n"
+                 "    int t; t = a; a = b; b = t;\n"
+                 "  endfunction\n"
+                 "  function int in(int a); a = 99; return a; endfunction\n"
+                 "  function int arr(input int a [3:0]);\n"
+                 "    return a[0] - a[3];\n"
+                 "  endfunction\n"
+                 "  initial begin\n"
+                 "    q = '{1, 2, 3, 40};\n"
+                 "    y1 = 5; s1 = 8; s2 = 9;\n"
+                 "    outs(y1, y2, y3);\n"
+                 "    swap(s1, s2);\n"
+                 "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                 "        four(1'bx), one(2'b10), inh(1, -7), y2, y3, s1, s2,\n"
+                 "        in(y1), y1, arr(q));\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 0 -7 6 7 9 8 99 5 39\n");
+}
+
+TEST(FunctionSim, DISABLED_AnEmptyBodyReturnsTheImplicitVariablesInitialValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module m;\n"
+                "  function logic [3:0] e4(); endfunction\n"
+                "  function e1(); endfunction\n"
+                "  function automatic logic [3:0] a4(); endfunction\n"
+                "  function int i(); endfunction\n"
+                "  initial $display(\"%b %b %b %0d\", e4(), e1(), a4(), i());\n"
+                "endmodule\n",
+                f),
+            "xxxx x xxxx 0\n");
+}
+
 }  // namespace

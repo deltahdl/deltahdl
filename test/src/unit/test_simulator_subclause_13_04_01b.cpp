@@ -367,4 +367,36 @@ TEST(FunctionReturnSim, SelectOnACallUsesTheReturnTypesRange) {
   EXPECT_EQ(v->value.ToUint64(), 131u);
 }
 
+std::string SignedReturns(const char* fb, const char* fs, const char* fh,
+                          const char* fa) {
+  return std::string("module m;\n  int a, b, c, d;\n") +
+         "  function byte fb(); " + fb + " endfunction\n" +
+         "  function signed [7:0] fs(); " + fs + " endfunction\n" +
+         "  function shortint fh(); " + fh + " endfunction\n" +
+         "  function automatic logic signed [7:0] fa(); " + fa +
+         " endfunction\n"
+         "  initial begin\n"
+         "    a = fb(); b = fs(); c = fh(); d = fa();\n"
+         "    $display(\"%0d %0d %0d %0d %0d\", a, b, c, d, fs() < 0);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(FunctionReturnSim, ASignedValueReturnedByAReturnStatementKeepsItsSign) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(SignedReturns("return 8'h80;", "return 8'h80;",
+                                     "return 16'h8000;", "return 8'h80;"),
+                       f),
+            "-128 -128 -32768 -128 1\n");
+}
+
+TEST(FunctionReturnSim,
+     DISABLED_ASignedValueAssignedToTheFunctionNameKeepsItsSign) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(SignedReturns("fb = 8'h80;", "fs = 8'h80;",
+                                     "fh = 16'h8000;", "fa = 8'h80;"),
+                       f),
+            "-128 -128 -32768 -128 1\n");
+}
+
 }  // namespace
