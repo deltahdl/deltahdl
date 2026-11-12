@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 #include <limits>
+#include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_sampling_bench.h"
 #include "simulator/sva_engine_sampling.h"
 
 using namespace delta;
@@ -238,6 +241,176 @@ TEST(ConcurrentBooleanTruthSim, ADefaultDisableConditionOfXOrZDoesNotDisable) {
                        f),
             "3\n");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+const char kArrays[] =
+    "  int q[$] = '{2, 5};\n"
+    "  int d[] = '{2, 5};\n"
+    "  int aa[int], sa[string], wa[*];\n";
+
+std::string ArrayBench(const std::string& items, const std::string& change,
+                       const std::string& outside = "") {
+  return outside + "module top;\n  logic clk = 0;\n" + kArrays + "  " + items +
+         "\n"
+         "  initial begin\n"
+         "    aa[7] = 5; sa[\"k\"] = 5; wa[7] = 5;\n"
+         "    #5 " +
+         change +
+         " clk = 1;\n"
+         "    #5 $finish;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string Kept(const std::string& expr, const std::string& clock = "clk") {
+  return "assert property (@(posedge " + clock + ") " + expr +
+         ") $display(\"V%0t pass\", $time); else $display(\"V%0t fail\", "
+         "$time);";
+}
+
+void ExpectEachChangeKeepsTheSample(
+    const std::string& expr, std::initializer_list<const char*> changes) {
+  for (const char* change : changes) {
+    ExpectLines(ArrayBench(Kept(expr), change), "V", "5 pass");
+  }
+}
+
+TEST(AssertionSampledArrayElement, AQueueElementOutlivesEveryRemoval) {
+  ExpectEachChangeKeepsTheSample(
+      "q[1] == 5", {"q.pop_back();", "q.delete(1);", "q.delete();", "q = {};",
+                    "q = '{2};", "q.push_front(9);", "q.insert(0, 9);"});
+}
+
+TEST(AssertionSampledArrayElement, ADynamicArrayElementOutlivesEveryResize) {
+  ExpectEachChangeKeepsTheSample(
+      "d[1] == 5",
+      {"d = new[1];", "d.delete();", "d = '{2};", "d = new[3]; d[1] = 9;"});
+}
+
+TEST(AssertionSampledArrayElement,
+     DISABLED_AnAssociativeElementOutlivesItsDeletion) {
+  ExpectEachChangeKeepsTheSample("aa[7] == 5", {"aa.delete(7);", "aa.delete();",
+                                                "aa.delete(7); aa[7] = 6;"});
+  ExpectEachChangeKeepsTheSample("sa[\"k\"] == 5", {"sa.delete(\"k\");"});
+  ExpectEachChangeKeepsTheSample("wa[7] == 5", {"wa.delete(7);"});
+}
+
+TEST(AssertionSampledArrayElement, AnUnchangedAssociativeElementIsRead) {
+  ExpectEachChangeKeepsTheSample("aa[7] == 5", {"aa.delete(8);"});
+}
+
+std::string LaterTickBench(const std::string& change) {
+  return "module top;\n  logic clk = 0;\n" + std::string(kArrays) + "  " +
+         Kept("1 ##1 aa[7] == 5") +
+         "\n"
+         "  initial begin\n"
+         "    aa[7] = 5;\n"
+         "    #5 clk = 1; #5 clk = 0;\n"
+         "    #5 " +
+         change +
+         " clk = 1;\n"
+         "    #5 $finish;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(AssertionSampledArrayElement,
+     DISABLED_AnElementReadAtALaterTickOutlivesItsDeletion) {
+  ExpectLines(LaterTickBench("aa.delete(7);"), "V", "15 pass");
+}
+
+TEST(AssertionSampledArrayElement, AnElementReadAtALaterTickIsReadUnchanged) {
+  ExpectLines(LaterTickBench("aa.delete(8);"), "V", "15 pass");
+}
+
+std::string Assumed(const std::string& expr) {
+  return "assume property (@(posedge clk) " + expr +
+         ") $display(\"V%0t pass\", $time); else $display(\"V%0t fail\", "
+         "$time);";
+}
+
+std::string Covered(const std::string& expr) {
+  return "cover property (@(posedge clk) " + expr +
+         ") $display(\"V%0t pass\", $time);";
+}
+
+std::string Procedural(const std::string& expr) {
+  return "always @(posedge clk) assert property (" + expr +
+         ") $display(\"V%0t pass\", $time); else $display(\"V%0t fail\", "
+         "$time);";
+}
+
+std::string InGenerate(const std::string& expr) {
+  return "if (1) begin : g " + Kept(expr) + " end";
+}
+
+void ExpectEachReaderKeepsTheSample(const std::string& expr,
+                                    const std::string& change) {
+  for (const std::string& items :
+       {Assumed(expr), Covered(expr), Procedural(expr), InGenerate(expr)}) {
+    ExpectLines(ArrayBench(items, change), "V", "5 pass");
+  }
+}
+
+TEST(AssertionSampledArrayElement, EveryReaderKeepsAQueueElement) {
+  ExpectEachReaderKeepsTheSample("q[1] == 5", "q.delete(1);");
+}
+
+TEST(AssertionSampledArrayElement, EveryReaderReadsAnUnchangedElement) {
+  ExpectEachReaderKeepsTheSample("aa[7] == 5", "aa.delete(8);");
+}
+
+TEST(AssertionSampledArrayElement,
+     DISABLED_EveryReaderKeepsAnAssociativeElement) {
+  ExpectEachReaderKeepsTheSample("aa[7] == 5", "aa.delete(7);");
+}
+
+std::string Unit(const char* kind, const std::string& change) {
+  return std::string(kind) +
+         " u_unit;\n"
+         "  logic uc = 0;\n"
+         "  int ua[int];\n  " +
+         Kept("ua[7] == 5", "uc") +
+         "\n"
+         "  initial begin ua[7] = 5; #5 ua." +
+         change + " uc = 1; #5; end\nend" + kind + "\n";
+}
+
+void ExpectEachUnitKeepsTheSample(const std::string& change) {
+  for (const char* kind : {"interface", "program"}) {
+    ExpectLines(ArrayBench("u_unit u();", "", Unit(kind, change)), "V",
+                "5 pass");
+  }
+}
+
+const char kChecker[] =
+    "checker ck(int arr[int], logic c);\n"
+    "  assert property (@(posedge c) arr[7] == 5) $display(\"V%0t pass\", "
+    "$time); else $display(\"V%0t fail\", $time);\n"
+    "endchecker\n";
+
+void ExpectTheCheckerKeepsTheSample(const std::string& change) {
+  ExpectLines(ArrayBench("ck k(aa, clk);", "aa." + change, kChecker), "V",
+              "5 pass");
+}
+
+TEST(AssertionSampledArrayElement, EveryUnitReadsAnUnchangedElement) {
+  ExpectEachUnitKeepsTheSample("delete(8);");
+}
+
+TEST(AssertionSampledArrayElement,
+     DISABLED_EveryUnitKeepsAnAssociativeElement) {
+  ExpectEachUnitKeepsTheSample("delete(7);");
+}
+
+TEST(AssertionSampledArrayElement,
+     DISABLED_ACheckerReadsAnUnchangedElementOfItsActual) {
+  ExpectTheCheckerKeepsTheSample("delete(8);");
+}
+
+TEST(AssertionSampledArrayElement,
+     DISABLED_ACheckerKeepsAnAssociativeElementOfItsActual) {
+  ExpectTheCheckerKeepsTheSample("delete(7);");
 }
 
 }  // namespace
