@@ -368,4 +368,79 @@ TEST(NamedSequenceInstance, EveryOperatorActualIsSelfDetermined) {
   EXPECT_NE(out.find("c3=10\n"), std::string::npos) << out;
 }
 
+std::string RunScopeCase(const std::string& decls, const std::string& gen) {
+  SimFixture f;
+  return RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  logic d = 1, e = 1, k = 0;\n"
+      "  int c1 = 0, c2 = 0;\n" +
+          decls +
+          "  if (1) begin : g\n"
+          "    logic d = 0, e = 0, k = 1;\n" +
+          gen +
+          "  end\n"
+          "  initial #98 $display(\"c1=%0d c2=%0d\", c1, c2);\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(NamedSequenceInstance, AnActualsNamesResolveWhereTheInstanceStands) {
+  EXPECT_EQ(RunScopeCase("  sequence s_a(x); @(posedge clk) x; endsequence\n",
+                         "    cover property (s_a(k)) c1++;\n"
+                         "    cover property (s_a(!k)) c2++;\n"),
+            "c1=10 c2=0\n");
+}
+
+TEST(NamedSequenceInstance,
+     DISABLED_ABodysNamesResolveWhereTheSequenceIsDeclared) {
+  EXPECT_EQ(RunScopeCase("  sequence s_b; @(posedge clk) e; endsequence\n"
+                         "  sequence s_n; @(posedge clk) !d; endsequence\n",
+                         "    cover property (s_b) c1++;\n"
+                         "    cover property (s_n) c2++;\n"),
+            "c1=10 c2=0\n");
+}
+
+TEST(NamedSequenceInstance,
+     DISABLED_ADefaultActualResolvesWhereTheSequenceIsDeclared) {
+  EXPECT_EQ(
+      RunScopeCase("  sequence s_d(x = d); @(posedge clk) x; endsequence\n",
+                   "    cover property (s_d()) c1++;\n"
+                   "    cover property (s_d(d)) c2++;\n"),
+      "c1=10 c2=0\n");
+}
+
+TEST(NamedSequenceInstance, ATypeAppliesToEachUntypedFormalAfterIt) {
+  std::string out = RunEventActualCase(
+      "  logic [3:0] w = 4'h2;\n"
+      "  sequence s_t(bit x, y, int z); @(posedge clk) x && y == 0 && z == 2;\n"
+      "  endsequence\n"
+      "  sequence s_u(x, y); @(posedge clk) x && y == 0; endsequence\n",
+      "  cover property (s_t(1, w, w)) c1++;\n"
+      "  cover property (s_u(1, w)) c2++;\n");
+  EXPECT_NE(out.find("c1=10 c2=0\n"), std::string::npos) << out;
+}
+
+TEST(NamedSequenceInstance, AnActualIsParenthesizedWhereItIsSubstituted) {
+  std::string out = RunEventActualCase(
+      "  logic b = 0, z = 0;\n"
+      "  sequence s_p(x); @(posedge clk) x & z; endsequence\n"
+      "  sequence s_q(x); @(posedge clk) !x; endsequence\n",
+      "  cover property (s_p(a | b)) c1++;\n"
+      "  cover property (s_q(a && b)) c2++;\n");
+  EXPECT_NE(out.find("c1=0 c2=10\n"), std::string::npos) << out;
+}
+
+TEST(NamedSequenceInstance, AnInstanceReadsALocalInWhoseScopeItStands) {
+  std::string out = RunEventActualCase(
+      "  sequence s_eq(x); x == 3; endsequence\n"
+      "  sequence s_l; int v; @(posedge clk) (1, v = 3) ##1 s_eq(v);\n"
+      "  endsequence\n"
+      "  sequence s_m; int v; @(posedge clk) (1, v = 4) ##1 s_eq(v);\n"
+      "  endsequence\n",
+      "  cover property (s_l) c1++;\n"
+      "  cover property (s_m) c2++;\n");
+  EXPECT_NE(out.find("c1=9 c2=0\n"), std::string::npos) << out;
+}
+
 }  // namespace

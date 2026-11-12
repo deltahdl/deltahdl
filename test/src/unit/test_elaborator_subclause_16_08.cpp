@@ -265,4 +265,33 @@ TEST(SequenceDollarActual, ATypedOrOperandFormalIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 26, "16.8"));
 }
 
+TEST(SequenceFlattening, AnInstanceWhoseFlattenedSequenceIsLegalIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence s_f(x); @(posedge clk) x && c; endsequence\n"
+      "  sequence s_g(x); @(posedge clk) x and c; endsequence\n"
+      "  cover property (s_f(a || b));\n"
+      "  cover property (s_g(a ##1 b));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SequenceFlattening, DISABLED_AnInstanceWhoseFlattenedSequenceIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b, c;\n"
+      "  sequence s_f(x); @(posedge clk) x && c; endsequence\n"
+      "  cover property (s_f(a ##1 b));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the flattened sequence of this instance of \"s_f\" is not legal", 4,
+      "16.8"));
+}
+
 }  // namespace
