@@ -126,4 +126,50 @@ TEST(DefaultClockingSim, ANestedModuleCountsItsEnclosingModulesDefault) {
   EXPECT_EQ(out, "n 5\n$finish at time 20\n");
 }
 
+TEST(DefaultClockingSim, ANestedInterfaceCountsItsEnclosingModulesDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  default clocking cb @(posedge clk); endclocking\n"
+                 "  interface ifc;\n"
+                 "    initial begin ##2 $display(\"if %0t\", $time); end\n"
+                 "  endinterface\n"
+                 "  ifc u();\n"
+                 "  initial #40 $finish;\n"
+                 "endmodule\n",
+                 f),
+      "if 15\n$finish at time 40\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DefaultClockingSim, TheClauseProgramCountsItsDefaultBlocksEvents) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program test(input logic clk, input logic [15:0] data);\n"
+                 "  default clocking bus @(posedge clk);\n"
+                 "    inout data;\n"
+                 "  endclocking\n"
+                 "  initial begin\n"
+                 "    ## 5;\n"
+                 "    if (bus.data == 10)\n"
+                 "      ## 1;\n"
+                 "    else\n"
+                 "      ## 3;\n"
+                 "    $display(\"%0t %0d\", $time, bus.data);\n"
+                 "  end\n"
+                 "endprogram\n"
+                 "module top;\n"
+                 "  logic clk = 0;\n"
+                 "  logic [15:0] data = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  initial #42 data = 10;\n"
+                 "  test t(clk, data);\n"
+                 "endmodule\n",
+                 f),
+      "55 10\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

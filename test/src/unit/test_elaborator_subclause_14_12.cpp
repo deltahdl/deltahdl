@@ -237,4 +237,29 @@ TEST(DefaultClockingElab, DefaultsInDifferentElementsAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(DefaultClockingElab,
+     AnInstantiatedModuleOrInterfaceDoesNotTakeTheDefault) {
+  for (const char* kind : {"module", "interface"}) {
+    SCOPED_TRACE(kind);
+    ElabFixture f;
+    auto* design = ElaborateSrc(std::string(kind) +
+                                    " inner;\n"
+                                    "  initial ##2 $display(\"x\");\n"
+                                    "end" +
+                                    kind +
+                                    "\n"
+                                    "module top;\n"
+                                    "  logic clk;\n"
+                                    "  default clocking cb @(posedge clk); "
+                                    "endclocking\n"
+                                    "  inner u();\n"
+                                    "endmodule\n",
+                                f, "top");
+    ASSERT_NE(design, nullptr);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "cycle delay (##) requires a default clocking block", 2, "14.11"));
+  }
+}
+
 }  // namespace
