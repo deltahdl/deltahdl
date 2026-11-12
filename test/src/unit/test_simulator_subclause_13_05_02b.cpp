@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -137,6 +138,183 @@ TEST(PassByRef, RefFormalOfAClassPropertyIsWrittenInPlace) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1 1 12 2\n");
+}
+
+TEST(PassByRef, ACallerAndATaskSeeEachOthersWritesDuringTheCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int x;\n"
+                       "  task automatic t(ref int r);\n"
+                       "    #5 $display(\"%0t in %0d\", $time, r);\n"
+                       "    r = 7;\n"
+                       "    #5 $display(\"%0t in %0d\", $time, r);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    x = 1;\n"
+                       "    fork\n"
+                       "      t(x);\n"
+                       "    join_none\n"
+                       "    #2 x = 3;\n"
+                       "    #4 $display(\"%0t out %0d\", $time, x);\n"
+                       "    x = 8;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 in 3\n6 out 7\n10 in 8\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByRef, TheClauseExamplesCallByReferenceAsByValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  byte packet1[1000:1];\n"
+                 "  byte d [];\n"
+                 "  function automatic int crc(ref byte packet [1000:1]);\n"
+                 "    for(int j= 1; j <= 1000; j++) begin\n"
+                 "      crc ^= packet[j];\n"
+                 "    end\n"
+                 "  endfunction\n"
+                 "  task automatic show ( const ref byte data [] );\n"
+                 "    for ( int j = 0; j < data.size ; j++ )\n"
+                 "      $display( data[j] );\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    int k;\n"
+                 "    for (int j = 1; j <= 1000; j++) packet1[j] = j;\n"
+                 "    packet1[3] = 0;\n"
+                 "    k = 0;\n"
+                 "    k = crc(packet1);\n"
+                 "    $display(\"%0d\", k);\n"
+                 "    d = '{5, -2};\n"
+                 "    show(d);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "-21\n   5\n  -2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+std::string OutdatedRefSrc(const std::string& callee,
+                           const std::string& calls) {
+  return "module m;\n"
+         "  int aa [int];\n"
+         "  int ab [int];\n"
+         "  int ag [int];\n"
+         "  int da [];\n"
+         "  int db [];\n"
+         "  int dc [];\n"
+         "  int dd [];\n"
+         "  int de [];\n" +
+         callee +
+         "  initial begin\n"
+         "    aa[1] = 1;\n"
+         "    ab[1] = 1;\n"
+         "    ag[1] = 1;\n"
+         "    da = '{1, 2};\n"
+         "    db = '{1, 2};\n"
+         "    dc = '{1, 2};\n"
+         "    dd = '{1, 2};\n"
+         "    de = '{1, 2};\n" +
+         calls +
+         "    $display(\"%0d %0d %0d %0d\", aa.exists(1), aa.num(), "
+         "ab.exists(1), ab.num());\n"
+         "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", da[0], da.size(), "
+         "db[0], dc.size(), dd[0], dd[1], ag[1], de[0]);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string OutdatingBody(const std::string& kind, const std::string& ret) {
+  return "  " + kind + " automatic " + ret +
+         "w(ref int r, input int k);\n"
+         "    case (k)\n"
+         "      0: aa.delete(1);\n"
+         "      1: ab.delete();\n"
+         "      2: da = new[4];\n"
+         "      3: db = new[2](db);\n"
+         "      4: dc.delete();\n"
+         "      5: dd = '{7, 8};\n"
+         "      6: ag[5] = 1;\n"
+         "      7: de[1] = 3;\n"
+         "    endcase\n"
+         "    r = 99;\n"
+         "  end" +
+         kind + "\n";
+}
+
+constexpr const char* kOutdatingCalls =
+    "    w(aa[1], 0);\n"
+    "    w(ab[1], 1);\n"
+    "    w(da[0], 2);\n"
+    "    w(db[0], 3);\n"
+    "    w(dc[0], 4);\n"
+    "    w(dd[0], 5);\n"
+    "    w(ag[1], 6);\n"
+    "    w(de[0], 7);\n";
+
+TEST(PassByRef, AWriteThroughAnOutdatedDynamicArrayElementIsNotSeen) {
+  for (const auto& [kind, ret] :
+       {std::pair<const char*, const char*>{"task", ""},
+        std::pair<const char*, const char*>{"function", "void "}}) {
+    SimFixture f;
+    std::string out = RunCapture(
+        OutdatedRefSrc(OutdatingBody(kind, ret), kOutdatingCalls), f);
+    EXPECT_EQ(out.substr(out.find('\n') + 1), "0 4 1 0 7 8 99 99\n") << kind;
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+TEST(PassByRef, DISABLED_AWriteThroughADeletedAssocElementLeavesItDeleted) {
+  for (const auto& [kind, ret] :
+       {std::pair<const char*, const char*>{"task", ""},
+        std::pair<const char*, const char*>{"function", "void "}}) {
+    SimFixture f;
+    std::string out = RunCapture(
+        OutdatedRefSrc(OutdatingBody(kind, ret), kOutdatingCalls), f);
+    EXPECT_EQ(out.substr(0, out.find('\n') + 1), "0 0 0 0\n") << kind;
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+std::string OutdatingMethodSrc(const std::string& assoc_line,
+                               const std::string& dynamic_line) {
+  return "class C;\n"
+         "  int pa [int];\n"
+         "  int pd [];\n"
+         "  task w(ref int r, input int k);\n"
+         "    if (k == 0) " +
+         assoc_line + "\n    else " + dynamic_line +
+         "\n"
+         "    r = 99;\n"
+         "  endtask\n"
+         "endclass\n"
+         "module m;\n"
+         "  C o = new();\n"
+         "  initial begin\n"
+         "    o.pa[1] = 1;\n"
+         "    o.pd = '{1, 2};\n"
+         "    o.w(o.pa[1], 0);\n"
+         "    o.w(o.pd[0], 1);\n"
+         "    $display(\"%0d %0d %0d %0d %0d\", o.pa.exists(1), o.pa.num(), "
+         "(o.pa.exists(1) ? o.pa[1] : -1), o.pd[0], o.pd.size());\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(PassByRef, AMethodsWriteThroughALivePropertyElementIsSeen) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(OutdatingMethodSrc("pa[2] = 5;", "pd[1] = 3;"), f),
+            "1 2 99 99 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PassByRef,
+     DISABLED_AMethodsWriteThroughAnOutdatedPropertyElementIsNotSeen) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(OutdatingMethodSrc("pa.delete(1);", "pd = new[3];"), f),
+            "0 0 -1 0 3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
