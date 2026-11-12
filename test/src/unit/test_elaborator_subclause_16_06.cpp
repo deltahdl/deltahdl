@@ -420,4 +420,126 @@ TEST(AssertionExpressionType, EveryUnitAcceptsAnIntegralExpression) {
                      "endpackage\n");
 }
 
+const char kStaticReadsAutomatic[] =
+    "a static concurrent assertion shall not reference an automatic variable";
+
+const char kLifetimes[] =
+    "  task automatic ta(input int a); int x; x = a; endtask\n"
+    "  task static ts(input int a); int x; x = a; endtask\n"
+    "  function automatic int fa(); int v; v = 1; return v; endfunction\n"
+    "  function static int fs(); int v; v = 1; return v; endfunction\n";
+
+std::string LifetimeBench(const std::string& items,
+                          const std::string& outside = "",
+                          const char* lifetime = "") {
+  return outside + "module " + lifetime +
+         "top;\n"
+         "  logic clk = 0, a = 1;\n" +
+         kLifetimes +
+         "  initial begin : ib automatic int y; static int z; y = 1; z = 1; "
+         "end\n"
+         "  initial begin : mb int w; static int s; w = 1; s = 1; end\n"
+         "  " +
+         items + "\nendmodule\n";
+}
+
+void ExpectAutomaticReported(const std::string& marked,
+                             const std::string& form) {
+  const std::string kSrc = Replaced(marked, form);
+  ElabFixture f;
+  Elaborate(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kStaticReadsAutomatic,
+                            LineHolding(marked, "@@"), "16.6"))
+      << kSrc;
+}
+
+void ExpectLifetimeAccepted(const std::string& src) {
+  ElabFixture f;
+  auto* design = Elaborate(src, f);
+  ASSERT_NE(design, nullptr) << src;
+  EXPECT_FALSE(f.has_errors) << src;
+}
+
+const char kStaticRead[] = "assert property (@(posedge clk) @@ == 1);";
+
+TEST(StaticAssertionAutomaticRef,
+     AStaticVariableNamedHierarchicallyIsAccepted) {
+  for (const char* form : {"ts.x", "ts.a", "fs.v", "ib.z"}) {
+    ExpectLifetimeAccepted(LifetimeBench(Replaced(kStaticRead, form)));
+  }
+  ExpectLifetimeAccepted(
+      LifetimeBench(Replaced(kStaticRead, "mb.s"), "", "automatic "));
+}
+
+TEST(StaticAssertionAutomaticRef,
+     DISABLED_ASubroutinesOrBlocksAutomaticVariableIsReported) {
+  for (const char* form : {"ta.x", "ta.a", "fa.v", "ib.y"}) {
+    ExpectAutomaticReported(LifetimeBench(kStaticRead), form);
+  }
+}
+
+TEST(StaticAssertionAutomaticRef,
+     DISABLED_AnAutomaticModulesBlockVariableIsReported) {
+  ExpectAutomaticReported(LifetimeBench(kStaticRead, "", "automatic "), "mb.w");
+}
+
+const char* const kStaticPlaces[] = {
+    "assert property (@(posedge clk) @@ == 1);",
+    "assume property (@(posedge clk) @@ == 1);",
+    "cover property (@(posedge clk) @@ == 1);",
+    "restrict property (@(posedge clk) @@ == 1);",
+    ("property pp; @(posedge clk) @@ == 1; endproperty\n  assert property "
+     "(pp);"),
+    ("sequence sq; @(posedge clk) @@ == 1; endsequence\n  assert property "
+     "(sq);"),
+    "let lt = @@ == 1;\n  assert property (@(posedge clk) lt);",
+    "assert property (@(posedge clk) disable iff (@@ == 1) a);",
+    "default disable iff (@@ == 1);\n  assert property (@(posedge clk) a);",
+    "if (1) begin : g assert property (@(posedge clk) @@ == 1); end",
+};
+
+TEST(StaticAssertionAutomaticRef, EveryStaticPlaceAcceptsAStaticVariable) {
+  for (const char* place : kStaticPlaces) {
+    ExpectLifetimeAccepted(LifetimeBench(Replaced(place, "fs.v")));
+  }
+}
+
+TEST(StaticAssertionAutomaticRef,
+     DISABLED_EveryStaticPlaceReportsAnAutomaticVariable) {
+  for (const char* place : kStaticPlaces) {
+    ExpectAutomaticReported(LifetimeBench(place), "fa.v");
+  }
+}
+
+std::string LifetimeUnit(const char* kind) {
+  return std::string(kind) + " u_unit(input logic clk);\n" + kLifetimes +
+         "  assert property (@(posedge clk) @@ == 1);\nend" + kind + "\n";
+}
+
+const char kLifetimeChecker[] =
+    "checker u_unit(logic clk);\n"
+    "  function automatic int fa(); int v; v = 1; return v; endfunction\n"
+    "  function static int fs(); int v; v = 1; return v; endfunction\n"
+    "  assert property (@(posedge clk) @@ == 1);\n"
+    "endchecker\n";
+
+TEST(StaticAssertionAutomaticRef, EveryUnitAcceptsAStaticVariable) {
+  for (const std::string& unit :
+       {LifetimeUnit("interface"), LifetimeUnit("program"),
+        std::string(kLifetimeChecker)}) {
+    ExpectLifetimeAccepted(
+        LifetimeBench("u_unit u(clk);", Replaced(unit, "fs.v")));
+  }
+}
+
+TEST(StaticAssertionAutomaticRef,
+     DISABLED_EveryUnitReportsAnAutomaticVariable) {
+  for (const std::string& unit :
+       {LifetimeUnit("interface"), LifetimeUnit("program"),
+        std::string(kLifetimeChecker)}) {
+    const std::string kMarked = LifetimeBench("u_unit u(clk);", unit);
+    ExpectAutomaticReported(kMarked, "fa.v");
+  }
+}
+
 }  // namespace

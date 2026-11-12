@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_sampling_bench.h"
 
 using namespace delta;
 
@@ -125,6 +126,84 @@ TEST(ProceduralAssertionArgumentsRun, AConditionalReadsTheCurrentValue) {
                       "  end\n"),
       f);
   EXPECT_EQ(out, "a9 at 15\na10 at 25\n$finish at time 40\n");
+}
+
+const char kSavedVerdict[] =
+    " $display(\"V%0t pass\", $time); else $display(\"V%0t fail\", $time);";
+
+std::string SavedBench(const std::string& items, const char* lifetime = "") {
+  return std::string("module ") + lifetime +
+         "top;\n"
+         "  logic clk = 0, en = 1, d = 1, q;\n"
+         "  logic [3:0] v = 4'b1000;\n"
+         "  int s;\n"
+         "  property pb(int i); v[i]; endproperty\n"
+         "  sequence sb(int i); v[i]; endsequence\n"
+         "  " +
+         items +
+         "\n"
+         "  initial begin #5 clk = 1; #5 clk = 0; #5 $finish; end\n"
+         "endmodule\n";
+}
+
+std::string Changed(const std::string& head, const std::string& assertion,
+                    const char* decl = "automatic int k = 3;",
+                    const char* var = "k") {
+  return head + " begin " + decl + " " + assertion + " " + var + " = 0; end";
+}
+
+std::string Asserted(const std::string& expr) {
+  return "assert property (" + expr + ")" + kSavedVerdict;
+}
+
+const char kOnEdge[] = "always @(posedge clk)";
+
+TEST(ProceduralAssertionArgumentsRun, AStaticVariableChangedAfterItIsSampled) {
+  ExpectLines(SavedBench(Changed(kOnEdge, Asserted("v[s]"), "s = 3;", "s")),
+              "V", "5 fail");
+}
+
+TEST(ProceduralAssertionArgumentsRun, AnAutomaticBlockVariableIsSaved) {
+  ExpectLines(SavedBench(Changed(kOnEdge, Asserted("v[k]"))), "V", "5 pass");
+  ExpectLines(SavedBench(Changed("initial", Asserted("@(posedge clk) v[k]"))),
+              "V", "5 pass");
+}
+
+TEST(ProceduralAssertionArgumentsRun,
+     AnAutomaticModulesBlockVariableIsSavedWithoutAKeyword) {
+  ExpectLines(SavedBench(Changed(kOnEdge, Asserted("v[k]"), "int k = 3;"),
+                         "automatic "),
+              "V", "5 pass");
+}
+
+TEST(ProceduralAssertionArgumentsRun, EveryKindOfAlwaysSavesIt) {
+  ExpectLines(SavedBench(Changed("always_ff @(posedge clk)", Asserted("v[k]"))),
+              "V", "5 pass");
+  ExpectLines(
+      SavedBench(Changed("always_comb", Asserted("@(posedge clk) v[k]"))), "V",
+      "5 pass");
+  ExpectLines(
+      SavedBench(Changed("always_latch",
+                         "if (en) q = d; " + Asserted("@(posedge clk) v[k]"))),
+      "V", "5 pass");
+}
+
+TEST(ProceduralAssertionArgumentsRun, EveryAssertionStatementSavesIt) {
+  ExpectLines(SavedBench(Changed(kOnEdge, "assume property (v[k])" +
+                                              std::string(kSavedVerdict))),
+              "V", "5 pass");
+  ExpectLines(SavedBench(Changed(kOnEdge,
+                                 "cover property (v[k]) $display(\"V%0t "
+                                 "pass\", $time);")),
+              "V", "5 pass");
+  SimFixture f;
+  RunCapture(SavedBench(Changed(kOnEdge, "restrict property (v[k]);")), f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ProceduralAssertionArgumentsRun, AnInstanceActualIsSaved) {
+  ExpectLines(SavedBench(Changed(kOnEdge, Asserted("pb(k)"))), "V", "5 pass");
+  ExpectLines(SavedBench(Changed(kOnEdge, Asserted("sb(k)"))), "V", "5 pass");
 }
 
 }  // namespace
