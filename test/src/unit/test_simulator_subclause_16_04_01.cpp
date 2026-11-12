@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "simulator/sim_context.h"
 
 using namespace delta;
 
@@ -185,6 +186,122 @@ TEST(DeferredAssertionReporting, DeferredDefaultErrorNamesTheAssertionsScope) {
   EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
   EXPECT_EQ(f.ctx.LastSeverityScope(), "t.b1.a1");
   EXPECT_EQ(f.ctx.LastSeverityLine(), 3u);
+}
+
+const char kShow[] =
+    "  task automatic show(input string s, input int x);\n"
+    "    $display(\"%s v=%0d\", s, x);\n"
+    "  endtask\n"
+    "  task automatic note(input string s); $display(\"%s\", s); endtask\n";
+
+std::string InInitial(const std::string& stmts) {
+  return std::string("module t;\n  int v, c = 1;\n") + kShow +
+         "  initial begin\n" + stmts + "  end\nendmodule\n";
+}
+
+TEST(DeferredAssertionReporting,
+     AnAssumeFinalPassActionRunsInThePostponedRegion) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(InInitial("    v = 1;\n"
+                           "    assume final (v == 1) show(\"pass\", v);\n"
+                           "    v = 5;\n"
+                           "    $display(\"active done\");\n"),
+                 f),
+      "active done\npass v=1\n");
+  EXPECT_EQ(f.ctx.LastSeverity(), "");
+}
+
+TEST(DeferredAssertionReporting, AnAssumeFailActionIsAPendingReport) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                InInitial("    v = 1;\n"
+                          "    assume final (v == 2) else show(\"final\", v);\n"
+                          "    assume #0 (v == 2) else show(\"observed\", v);\n"
+                          "    v = 5;\n"
+                          "    $display(\"active done\");\n"),
+                f),
+            "active done\nobserved v=1\nfinal v=1\n");
+  EXPECT_EQ(f.ctx.LastSeverity(), "");
+}
+
+TEST(DeferredAssertionReporting, AnAssumeFinalDefaultErrorReportIsDeferred) {
+  SimFixture f;
+  RunCapture(InInitial("    assume final (0);\n"
+                       "    $warning(\"later\");\n"),
+             f);
+  EXPECT_EQ(f.ctx.LastSeverity(), "ERROR");
+  EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
+}
+
+TEST(DeferredAssertionReporting, AFailWithOnlyAPassStatementQueuesTheError) {
+  for (const char* form :
+       {"assert #0", "assert final", "assume #0", "assume final"}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(InInitial(std::string("    ") + form +
+                                   " (0) note(\"pass ran\");\n"
+                                   "    $warning(\"later\");\n"),
+                         f),
+              "[0] WARNING t (<test>:9): later\n")
+        << form;
+    EXPECT_EQ(f.ctx.LastSeverity(), "ERROR") << form;
+    EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.") << form;
+  }
+}
+
+TEST(DeferredAssertionReporting, APassWithNoStatementQueuesNothing) {
+  for (const char* stmt :
+       {"assert final (1);", "assume #0 (1);", "assume final (1);"}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(InInitial(std::string("    ") + stmt + "\n"), f), "")
+        << stmt;
+    EXPECT_EQ(f.ctx.LastSeverity(), "") << stmt;
+  }
+}
+
+TEST(DeferredAssertionReporting, ADeferredCoverWithNoStatementStillCounts) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(InInitial("    c0: cover #0 (1);\n"
+                                 "    c1: cover final (1);\n"),
+                       f),
+            "");
+  const auto& results = f.ctx.ImmediateCovers().Results();
+  ASSERT_EQ(results.size(), 2u);
+  for (const auto& r : results) {
+    EXPECT_EQ(r.evaluated, 1u) << r.scope;
+    EXPECT_EQ(r.succeeded, 1u) << r.scope;
+  }
+}
+
+TEST(DeferredAssertionReporting, APassOfAnElseOnlyAssertionQueuesNothing) {
+  for (const char* form : {"assert final", "assume #0", "assume final"}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(InInitial(std::string("    ") + form +
+                                   " (c == 1) else note(\"fail ran\");\n"),
+                         f),
+              "")
+        << form;
+    EXPECT_EQ(f.ctx.LastSeverity(), "") << form;
+  }
+}
+
+TEST(DeferredAssertionReporting,
+     AnObservedReportRunsAfterTheNbaAndInactiveWork) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic x = 0;\n"
+                       "  task automatic note(input string s); "
+                       "$display(\"%s\", s); endtask\n"
+                       "  always @(x) $display(\"nba update seen\");\n"
+                       "  initial begin\n"
+                       "    assert final (1) note(\"final report\");\n"
+                       "    assert #0 (1) note(\"observed report\");\n"
+                       "    x <= 1;\n"
+                       "  end\n"
+                       "  initial #0 $display(\"inactive\");\n"
+                       "endmodule\n",
+                       f),
+            "inactive\nnba update seen\nobserved report\nfinal report\n");
 }
 
 }  // namespace
