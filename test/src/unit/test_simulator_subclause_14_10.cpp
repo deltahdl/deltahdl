@@ -407,4 +407,35 @@ TEST(ClockingBlockEventSim, NamedEventClocksTheBlock) {
   EXPECT_EQ(out, "4:2 9:3\n$finish at time 9\n");
 }
 
+TEST(ClockingBlockEventSim,
+     TheClauseExampleBlockEventRunsAfterTheEdgesUpdates) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module foo(input phi1, input [7:0] data);\n"
+          "  logic [7:0] address;\n"
+          "  int v = 0, w = 0;\n"
+          "  clocking dram @(posedge phi1);\n"
+          "    input data;\n"
+          "    output negedge #1 address;\n"
+          "  endclocking\n"
+          "  always @(posedge phi1) $display(\"clocking event %0d %0d\", v, "
+          "w);\n"
+          "  always @(dram) $display(\"clocking block event %0d %0d\", v, w);\n"
+          "  always @(posedge phi1) v <= v + 1;\n"
+          "  always @(posedge phi1) #0 w = w + 1;\n"
+          "endmodule\n"
+          "module top;\n"
+          "  logic phi1 = 0;\n"
+          "  logic [7:0] data = 3;\n"
+          "  foo f(phi1, data);\n"
+          "  initial begin #5 phi1 = 1; #5 phi1 = 0; #5 phi1 = 1; #1 $finish; "
+          "end\n"
+          "endmodule\n",
+          f),
+      "clocking event 0 0\nclocking block event 1 1\nclocking event 1 1\n"
+      "clocking block event 2 2\n$finish at time 16\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
