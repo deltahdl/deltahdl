@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
+#include "helpers_statement_in_every_procedure.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -614,6 +617,118 @@ TEST(JumpStatementSim, BreakEndsLabeledForeverInFunction) {
                       "endmodule\n",
                       "r"),
             105u);
+}
+
+TEST(LoopStatementSim, ContinueJumpsToEndOfWhileBody) {
+  SimFixture f;
+  auto* count = RunAndFindVar(
+      "module t;\n"
+      "  logic [7:0] x, count;\n"
+      "  initial begin\n"
+      "    x = 8'd0;\n"
+      "    count = 8'd0;\n"
+      "    while (x < 8'd6) begin\n"
+      "      x = x + 8'd1;\n"
+      "      if (x == 8'd3) continue;\n"
+      "      count = count + 8'd1;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f, "count");
+  ASSERT_NE(count, nullptr);
+
+  EXPECT_EQ(count->value.ToUint64(), 5u);
+}
+
+constexpr const char* kJumpLoops[] = {
+    ("for (int i = 1; i <= 5; i++) begin if (i == 2) continue; if (i == 4) "
+     "break; r += i; end\n"),
+    ("begin int i; i = 0; repeat (5) begin i++; if (i == 2) continue; if (i "
+     "== 4) break; r += i; end end\n"),
+    ("begin int i; i = 0; while (i < 5) begin i++; if (i == 2) continue; if "
+     "(i == 4) break; r += i; end end\n"),
+    ("begin int i; i = 0; do begin i++; if (i == 2) continue; if (i == 4) "
+     "break; r += i; end while (i < 5); end\n"),
+    ("begin int i; i = 0; forever begin i++; if (i == 2) continue; if (i == "
+     "4) break; r += i; end end\n"),
+    ("begin int a [1:5]; foreach (a[i]) begin if (i == 2) continue; if (i == "
+     "4) break; r += i; end end\n")};
+
+TEST(JumpStatementSim, BreakAndContinueWorkInEveryLoopOfEveryProcedure) {
+  for (const char* loop : kJumpLoops) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(StatementInEveryProcedure(loop), f),
+              "4 4 4 4 4\nG 4\nI 4\nP 4\n")
+        << loop;
+    EXPECT_EQ(f.diag.WarningCount(), 0u) << loop;
+  }
+}
+
+TEST(JumpStatementSim, ReturnLeavesEveryKindOfSubroutine) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  function automatic int pf(int x);\n"
+                       "    if (x > 0) return x * 2;\n"
+                       "    return -1;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "import pk::*;\n"
+                       "function automatic int cf(int x);\n"
+                       "  if (x > 0) return x + 100;\n"
+                       "  return -2;\n"
+                       "endfunction\n"
+                       "class C;\n"
+                       "  int log;\n"
+                       "  function void vm(int x);\n"
+                       "    log = 1;\n"
+                       "    if (x > 0) return;\n"
+                       "    log = 2;\n"
+                       "  endfunction\n"
+                       "  task tm(int x);\n"
+                       "    #1 if (x > 0) return;\n"
+                       "    log = 3;\n"
+                       "  endtask\n"
+                       "endclass\n"
+                       "interface I;\n"
+                       "  function int f(int x);\n"
+                       "    if (x > 0) return 7;\n"
+                       "    return 8;\n"
+                       "  endfunction\n"
+                       "endinterface\n"
+                       "program p;\n"
+                       "  task automatic t(output int r);\n"
+                       "    r = 1;\n"
+                       "    return;\n"
+                       "    r = 2;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    int r;\n"
+                       "    #5 t(r);\n"
+                       "    $display(\"P %0d\", r);\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  I u();\n"
+                       "  p pp();\n"
+                       "  initial begin\n"
+                       "    C c;\n"
+                       "    c = new;\n"
+                       "    $display(\"%0d %0d %0d %0d\", pf(3), pf(0), cf(1), "
+                       "cf(0));\n"
+                       "    $display(\"%0d %0d\", u.f(1), u.f(0));\n"
+                       "    c.vm(1);\n"
+                       "    $write(\"%0d \", c.log);\n"
+                       "    c.vm(0);\n"
+                       "    $write(\"%0d \", c.log);\n"
+                       "    c.tm(1);\n"
+                       "    $write(\"%0d \", c.log);\n"
+                       "    c.tm(0);\n"
+                       "    $display(\"%0d %0t\", c.log, $time);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "6 -1 101 -2\n7 8\n1 2 2 3 2\nP 1\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

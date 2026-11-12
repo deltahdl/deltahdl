@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -533,6 +536,228 @@ TEST(JumpStatementElaboration, AnUnknownBaseLeavesTheVariablesAroundUnread) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+struct JumpPlace {
+  const char* head;
+  const char* tail;
+  int line;
+};
+
+constexpr JumpPlace kBlockPlaces[] = {
+    {"module m;\n  initial begin\n    ", "\n  end\nendmodule\n", 3},
+    {"module m;\n  int x;\n  always_comb begin\n    x = 0;\n    ",
+     "\n  end\nendmodule\n", 5},
+    {"module m;\n  final begin\n    ", "\n  end\nendmodule\n", 3},
+    {"interface i;\n  initial begin\n    ",
+     "\n  end\nendinterface\nmodule m;\n  i u();\nendmodule\n", 3},
+    {"program p;\n  initial begin\n    ", "\n  end\nendprogram\n", 3}};
+
+constexpr JumpPlace kGenerateBlockPlaces[] = {
+    {"module m;\n  if (1) begin : g\n    initial begin\n      ",
+     "\n    end\n  end\nendmodule\n", 4},
+    {"module m;\n  for (genvar k = 0; k < 1; k++) begin : g\n    initial "
+     "begin\n      ",
+     "\n    end\n  end\nendmodule\n", 4},
+    {"module m;\n  case (1)\n    1: begin : g\n      initial begin\n        ",
+     "\n      end\n    end\n  endcase\nendmodule\n", 5}};
+
+constexpr JumpPlace kSubroutinePlaces[] = {
+    {"module m;\n  function void f();\n    ", "\n  endfunction\nendmodule\n",
+     3},
+    {"module m;\n  task t();\n    ", "\n  endtask\nendmodule\n", 3},
+    {"class C;\n  function void f();\n    ", "\n  endfunction\nendclass\n", 3},
+    {"class C;\n  task t();\n    ", "\n  endtask\nendclass\n", 3},
+    {"package p;\n  function void f();\n    ", "\n  endfunction\nendpackage\n",
+     3},
+    {"program p;\n  function void f();\n    ", "\n  endfunction\nendprogram\n",
+     3},
+    {"function void f();\n  ", "\nendfunction\n", 2}};
+
+constexpr JumpPlace kInterfaceSubroutinePlaces[] = {
+    {"interface i;\n  task t();\n    ",
+     "\n  endtask\nendinterface\nmodule m;\n  i u();\nendmodule\n", 3},
+    {"interface i;\n  function void f();\n    ",
+     "\n  endfunction\nendinterface\nmodule m;\n  i u();\nendmodule\n", 3}};
+
+constexpr JumpPlace kValueFunctionPlaces[] = {
+    {"module m;\n  function int f();\n    ", "\n  endfunction\nendmodule\n", 3},
+    {"class C;\n  function int f();\n    ", "\n  endfunction\nendclass\n", 3},
+    {"package p;\n  function int f();\n    ", "\n  endfunction\nendpackage\n",
+     3},
+    {"interface i;\n  function int f();\n    ",
+     "\n  endfunction\nendinterface\nmodule m;\n  i u();\nendmodule\n", 3},
+    {"program p;\n  function int f();\n    ", "\n  endfunction\nendprogram\n",
+     3},
+    {"function int f();\n  ", "\nendfunction\n", 2}};
+
+struct LoopJump {
+  const char* outside;
+  const char* inside;
+  const char* message;
+};
+
+constexpr LoopJump kLoopJumps[] = {
+    {"break;", "for (int i = 0; i < 2; i++) break;",
+     "break statement is not inside a loop"},
+    {"continue;", "while (0) continue;",
+     "continue statement is not inside a loop"}};
+
+constexpr const char* kReturnOutside =
+    "return statement is only allowed inside a subroutine";
+
+constexpr const char* kNoValue = "gives no value to return";
+
+std::string Placed(const JumpPlace& place, const char* stmt) {
+  return std::string(place.head) + stmt + place.tail;
+}
+
+bool ElaboratesClean(const std::string& src) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  return !f.diag.HasErrors();
+}
+
+bool ElaborationReports(const std::string& src, const char* message, int line) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  return ReportedError(f.diag.Diagnostics(), message, line, "12.8");
+}
+
+template <std::size_t N>
+void ExpectReportedIn(const JumpPlace (&places)[N], const char* stmt,
+                      const char* message) {
+  for (const auto& place : places) {
+    EXPECT_TRUE(ElaborationReports(Placed(place, stmt), message, place.line))
+        << Placed(place, stmt);
+  }
+}
+
+template <std::size_t N>
+void ExpectAcceptedIn(const JumpPlace (&places)[N], const char* stmt) {
+  for (const auto& place : places) {
+    EXPECT_TRUE(ElaboratesClean(Placed(place, stmt))) << Placed(place, stmt);
+  }
+}
+
+TEST(JumpStatementElaboration,
+     BreakAndContinueOutsideALoopAreReportedInEveryPlace) {
+  for (const auto& jump : kLoopJumps) {
+    ExpectReportedIn(kBlockPlaces, jump.outside, jump.message);
+    ExpectReportedIn(kSubroutinePlaces, jump.outside, jump.message);
+    ExpectReportedIn(kInterfaceSubroutinePlaces, jump.outside, jump.message);
+  }
+}
+
+TEST(JumpStatementElaboration,
+     DISABLED_BreakAndContinueOutsideALoopAreReportedInEveryGenerateBlock) {
+  for (const auto& jump : kLoopJumps) {
+    ExpectReportedIn(kGenerateBlockPlaces, jump.outside, jump.message);
+  }
+}
+
+TEST(JumpStatementElaboration,
+     BreakAndContinueInsideALoopAreAcceptedInEveryPlace) {
+  for (const auto& jump : kLoopJumps) {
+    ExpectAcceptedIn(kBlockPlaces, jump.inside);
+    ExpectAcceptedIn(kGenerateBlockPlaces, jump.inside);
+    ExpectAcceptedIn(kSubroutinePlaces, jump.inside);
+    ExpectAcceptedIn(kInterfaceSubroutinePlaces, jump.inside);
+  }
+}
+
+constexpr const char* kLoopHeads[] = {"for (int i = 0; i < 2; i++)",
+                                      "repeat (2)", "while (x < 2)", "forever",
+                                      "foreach (a[i])"};
+
+constexpr const char* kJoins[] = {"join", "join_any", "join_none"};
+
+std::string LoopAroundFork(const char* loop, const char* body,
+                           const char* join) {
+  return std::string(
+             "module m;\n"
+             "  int x;\n"
+             "  int a [2];\n"
+             "  initial begin\n"
+             "    ") +
+         loop +
+         " begin\n"
+         "      fork\n"
+         "        " +
+         body +
+         "\n"
+         "      " +
+         join +
+         "\n"
+         "    end\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+struct ForkJump {
+  const char* stmt;
+  const char* message;
+};
+
+constexpr ForkJump kForkJumps[] = {
+    {"break;",
+     "break inside fork-join cannot exit a loop outside the fork-join block"},
+    {"continue;",
+     "continue inside fork-join cannot affect a loop outside the fork-join "
+     "block"},
+    {"begin x++; break; end",
+     "break inside fork-join cannot exit a loop outside the fork-join block"},
+    {"if (x > 0) continue;",
+     "continue inside fork-join cannot affect a loop outside the fork-join "
+     "block"}};
+
+TEST(JumpStatementElaboration,
+     AJumpInAForkOutOfAnOuterLoopIsReportedInEveryForm) {
+  for (const char* loop : kLoopHeads) {
+    for (const char* join : kJoins) {
+      for (const auto& jump : kForkJumps) {
+        EXPECT_TRUE(ElaborationReports(LoopAroundFork(loop, jump.stmt, join),
+                                       jump.message, 7))
+            << loop << " " << jump.stmt << " " << join;
+      }
+    }
+  }
+}
+
+TEST(JumpStatementElaboration, AJumpInALoopInsideAForkIsAcceptedInEveryForm) {
+  for (const char* loop : kLoopHeads) {
+    for (const char* join : kJoins) {
+      for (const auto& jump : kForkJumps) {
+        std::string inner = std::string("do ") + jump.stmt + " while (0);";
+        EXPECT_TRUE(ElaboratesClean(LoopAroundFork(loop, inner.c_str(), join)))
+            << loop << " " << jump.stmt << " " << join;
+      }
+    }
+  }
+}
+
+TEST(JumpStatementElaboration,
+     AReturnOutsideASubroutineIsReportedInEveryPlace) {
+  ExpectReportedIn(kBlockPlaces, "return;", kReturnOutside);
+}
+
+TEST(JumpStatementElaboration,
+     DISABLED_AReturnOutsideASubroutineIsReportedInEveryGenerateBlock) {
+  ExpectReportedIn(kGenerateBlockPlaces, "return;", kReturnOutside);
+}
+
+TEST(JumpStatementElaboration, AReturnInsideASubroutineIsAcceptedInEveryPlace) {
+  ExpectAcceptedIn(kSubroutinePlaces, "return;");
+  ExpectAcceptedIn(kInterfaceSubroutinePlaces, "return;");
+}
+
+TEST(JumpStatementElaboration,
+     ABareReturnFromAValuedFunctionIsReportedInEveryPlace) {
+  ExpectReportedIn(kValueFunctionPlaces, "return;", kNoValue);
+}
+
+TEST(JumpStatementElaboration, AReturnWithAValueFromAValuedFunctionIsAccepted) {
+  ExpectAcceptedIn(kValueFunctionPlaces, "return 1;");
 }
 
 }  // namespace
