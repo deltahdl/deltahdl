@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -309,6 +312,83 @@ TEST(SequenceExpressionParsing, ExpressionOrDistInsideSequenceParses) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+struct CycleDelayPlace {
+  const char* name;
+  const char* source;
+  uint32_t line;
+};
+
+constexpr CycleDelayPlace kCycleDelayPlaces[] = {
+    {"sequence declaration",
+     "module m;\n  logic clk, a, b;\n"
+     "  sequence s; @(posedge clk) a FORM b; endsequence\nendmodule\n",
+     3},
+    {"leading delay of a sequence declaration",
+     "module m;\n  logic clk, a, b;\n"
+     "  sequence s; @(posedge clk) FORM a; endsequence\nendmodule\n",
+     3},
+    {"property declaration",
+     "module m;\n  logic clk, a, b;\n"
+     "  property p; @(posedge clk) a FORM b; endproperty\nendmodule\n",
+     3},
+    {"module assert property",
+     "module m;\n  logic clk, a, b;\n"
+     "  assert property (@(posedge clk) a FORM b);\nendmodule\n",
+     3},
+    {"package sequence declaration",
+     "package pk;\n  bit clk, a, b;\n"
+     "  sequence s; @(posedge clk) a FORM b; endsequence\nendpackage\n",
+     3},
+    {"interface assert property",
+     "interface i;\n  logic clk, a, b;\n"
+     "  assert property (@(posedge clk) a FORM b);\nendinterface\n",
+     3},
+    {"program assert property",
+     "program g;\n  logic clk, a, b;\n"
+     "  assert property (@(posedge clk) a FORM b);\nendprogram\n",
+     3},
+    {"checker assert property",
+     "checker c(logic clk, a, b);\n"
+     "  assert property (@(posedge clk) a FORM b);\nendchecker\n",
+     2},
+    {"generate block assert property",
+     "module m;\n  logic clk, a, b;\n  if (1) begin : gb\n"
+     "    assert property (@(posedge clk) a FORM b);\n  end\nendmodule\n",
+     4},
+    {"procedural assert property",
+     "module m;\n  logic clk, a, b;\n  always @(posedge clk) begin\n"
+     "    assert property (a FORM b);\n  end\nendmodule\n",
+     4}};
+
+std::string WithCycleDelay(const char* source, const std::string& form) {
+  std::string text = source;
+  text.replace(text.find("FORM"), 4, form);
+  return text;
+}
+
+TEST(CycleDelaySyntax, MalformedBracketFormsAreReportedInEveryPlace) {
+  const char* const kForms[] = {"##[3]", "##[*3]", "##[+3]", "##[$]"};
+  for (const auto& place : kCycleDelayPlaces) {
+    for (const char* form : kForms) {
+      auto r = Parse(WithCycleDelay(place.source, form));
+      EXPECT_TRUE(ReportedError(r.diags, "is not one the grammar admits",
+                                place.line, "A.2.10"))
+          << place.name << ": " << form;
+    }
+  }
+}
+
+TEST(CycleDelaySyntax, WellFormedBracketFormsParseInEveryPlace) {
+  const char* const kForms[] = {"##[3:3]", "##[*]", "##[+]", "##[3:$]",
+                                "##[1:3]"};
+  for (const auto& place : kCycleDelayPlaces) {
+    for (const char* form : kForms) {
+      auto r = Parse(WithCycleDelay(place.source, form));
+      EXPECT_FALSE(r.has_errors) << place.name << ": " << form;
+    }
+  }
 }
 
 }  // namespace
