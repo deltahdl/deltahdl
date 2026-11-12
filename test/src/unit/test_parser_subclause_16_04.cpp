@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
+#include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -371,6 +374,70 @@ TEST(DeferredAssertionParsing, ModuleLevelFinalCoverWithPassStatementParses) {
               "  logic c, hit;\n"
               "  cover final (c) hit = 1;\n"
               "endmodule\n"));
+}
+
+size_t ErrorCount(const std::vector<Diagnostic>& diags) {
+  size_t n = 0;
+  for (const auto& d : diags) n += d.severity == DiagSeverity::kError;
+  return n;
+}
+
+TEST(DeferredAssertionParsing, AProgramsGenerateBlockRefusesAStaticForm) {
+  auto r = Parse(
+      "program p;\n"
+      "  if (1) begin : g\n"
+      "    a1: assert #0 (1);\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a deferred immediate assertion is not an item of a program", 3,
+      "A.1.7"));
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  if (1) begin : g\n"
+              "    a1: assert #0 (1);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(DeferredAssertionParsing, APackageRefusesEveryStaticForm) {
+  for (const char* item :
+       {"a1: assert #0 (1);", "a1: assume final (1);", "a1: cover #0 (1);"}) {
+    auto r = Parse(std::string("package p;\n  ") + item + "\nendpackage\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags, "an assertion statement is not an item of a package", 2,
+        "A.1.11"))
+        << item;
+    EXPECT_TRUE(ParseOk(std::string("module m;\n  ") + item + "\nendmodule\n"))
+        << item;
+  }
+}
+
+TEST(DeferredAssertionParsing, DISABLED_AClassBodyRefusesAStaticForm) {
+  auto r = Parse(
+      "class C;\n"
+      "  a1: assert #0 (1);\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an assertion statement is not an item of a class", 2, "A.1.9"));
+  EXPECT_EQ(ErrorCount(r.diags), 1u);
+  EXPECT_TRUE(
+      ParseOk("class C;\n"
+              "  function void f;\n"
+              "    a1: assert #0 (1);\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+TEST(DeferredAssertionParsing, DISABLED_TheCompilationUnitRefusesAStaticForm) {
+  auto r = Parse(
+      "a1: assert #0 (1);\n"
+      "module m;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "an assertion statement is not an item of the compilation unit",
+      1, "A.1.2"));
+  EXPECT_EQ(ErrorCount(r.diags), 1u);
 }
 
 }  // namespace
