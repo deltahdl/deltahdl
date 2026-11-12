@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -248,6 +250,54 @@ TEST(SyncDriveSignalsElab, AssociatedVariableIsTheExpressionsSignal) {
                             "continuous assignment to clocking output "
                             "variable 'b'",
                             9, "14.16.2"));
+}
+
+const char* const kAcceptedClockingOutputNetDrivers[] = {
+    "  wire w = d;\n",
+    "  wire w;\n  sub u(w);\n",
+    "  wire w;\n  inv g(w, d);\n",
+};
+
+TEST(SyncDriveSignalsElab, ANetDeclarationPortOrUdpDriverOfAClockingOutputNet) {
+  for (const char* drivers : kAcceptedClockingOutputNetDrivers) {
+    SCOPED_TRACE(drivers);
+    EXPECT_TRUE(ElabOk(std::string("primitive inv(output o, input i);\n"
+                                   "  table 0 : 1; 1 : 0; endtable\n"
+                                   "endprimitive\n"
+                                   "module sub(output wire o);\n"
+                                   "  assign o = 1'b0;\n"
+                                   "endmodule\n"
+                                   "module m;\n"
+                                   "  logic clk = 0;\n"
+                                   "  logic d = 0;\n") +
+                       drivers +
+                       "  clocking cb @(posedge clk); output w; endclocking\n"
+                       "endmodule\n"));
+  }
+}
+
+const char* const kRefusedClockingOutputNetDrivers[] = {
+    "  wire w;\n  assign w = d;\n",
+    "  wire [3:0] w;\n  assign w[1] = d;\n",
+    "  wire w;\n  buf (w, d);\n",
+    "  wire w;\n  initial begin force w = d; #1 release w; end\n",
+    "  wand w;\n  assign w = d;\n",
+    "  wor w;\n  assign w = d;\n",
+    "  tri w;\n  assign w = d;\n",
+    "  typedef logic T;\n  nettype T nt;\n  nt w;\n  assign w = d;\n",
+};
+
+TEST(SyncDriveSignalsElab,
+     DISABLED_AContinuousGateOrForceDriverOfAClockingOutputNet) {
+  for (const char* drivers : kRefusedClockingOutputNetDrivers) {
+    SCOPED_TRACE(drivers);
+    EXPECT_TRUE(ElabOk(std::string("module m;\n"
+                                   "  logic clk = 0;\n"
+                                   "  logic d = 0;\n") +
+                       drivers +
+                       "  clocking cb @(posedge clk); output w; endclocking\n"
+                       "endmodule\n"));
+  }
 }
 
 }  // namespace

@@ -234,4 +234,198 @@ TEST(SyncDriveSignals, DriveAndNonblockingAssignToSameVariableBothApply) {
   EXPECT_EQ(after, 0x55u);
 }
 
+TEST(SyncDriveSignalsSim, DrivesOfOneVariableFromSourceTakeTheLastOrEachEdge) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  logic [3:0] nibble = 0;\n"
+                 "  logic [7:0] v = 0, j = 0, k = 0, h = 0, q = 0;\n"
+                 "  int nn = 0;\n"
+                 "  string jl = \"\", kl = \"\", hl = \"\";\n"
+                 "  default clocking pe @(posedge clk);\n"
+                 "    output nibble, v, h, q;\n"
+                 "  endclocking\n"
+                 "  clocking pj @(posedge clk); output j; endclocking\n"
+                 "  clocking nj @(negedge clk); output j; endclocking\n"
+                 "  clocking ek @(edge clk); output k; endclocking\n"
+                 "  always @(nibble) nn++;\n"
+                 "  always @(j) jl = {jl, $sformatf(\"%0t:%0d \", $time, j)};\n"
+                 "  always @(k) kl = {kl, $sformatf(\"%0t:%0d \", $time, k)};\n"
+                 "  always @(h) hl = {hl, $sformatf(\"%0t:%0d \", $time, h)};\n"
+                 "  initial begin\n"
+                 "    ##2;\n"
+                 "    pe.nibble <= 4'b0101;\n"
+                 "    pe.nibble <= 4'b0011;\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    #7 pe.v <= 8'd1;\n"
+                 "    #1 pe.v <= 8'd2;\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    @(pj) pj.j <= 8'd1;\n"
+                 "    @(nj) nj.j <= 8'd2;\n"
+                 "    @(nj);\n"
+                 "    @(pj) pj.j <= 8'd3;\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    @(ek) ek.k <= 8'd1;\n"
+                 "    @(ek) ek.k <= 8'd2;\n"
+                 "    @(ek);\n"
+                 "    @(ek) ek.k <= 8'd3;\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    #1 h = 8'd7;\n"
+                 "    #30 pe.h <= 8'd9;\n"
+                 "  end\n"
+                 "  initial begin\n"
+                 "    @(pe);\n"
+                 "    pe.q <= 8'd4;\n"
+                 "    q <= 8'd5;\n"
+                 "  end\n"
+                 "  initial #50 begin\n"
+                 "    $display(\"nibble=%b n=%0d v=%0d\", nibble, nn, v);\n"
+                 "    $display(\"%s\", jl);\n"
+                 "    $display(\"%s\", kl);\n"
+                 "    $display(\"%s\", hl);\n"
+                 "    $display(\"qok=%0d\", q == 4 || q == 5);\n"
+                 "    $finish;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "nibble=0011 n=1 v=2\n5:1 10:2 25:3 \n5:1 10:2 20:3 \n1:7 35:9 "
+      "\nqok=1\n$finish at time 50\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSignalsSim, DrivesInSuccessiveReNbaPassesGlitchTheVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  bit a = 1'b1;\n"
+                 "  bit x = 0;\n"
+                 "  string al = \"\";\n"
+                 "  default clocking cb @(posedge clk);\n"
+                 "    output a;\n"
+                 "  endclocking\n"
+                 "  always @(a) al = {al, $sformatf(\"%0t:%b \", $time, a)};\n"
+                 "  always @(a) x = ~x;\n"
+                 "  initial begin\n"
+                 "    ## 1;\n"
+                 "    cb.a <= 1'b0;\n"
+                 "    @(x);\n"
+                 "    cb.a <= 1'b1;\n"
+                 "  end\n"
+                 "  initial #20 begin $display(\"%s\", al); $finish; end\n"
+                 "endmodule\n",
+                 f),
+      "5:0 5:1 \n$finish at time 20\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSignalsSim, DrivesInSuccessiveReNbaPassesGlitchTheNet) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  wire w;\n"
+                 "  bit x = 0;\n"
+                 "  string wl = \"\";\n"
+                 "  default clocking cb @(posedge clk);\n"
+                 "    output w;\n"
+                 "  endclocking\n"
+                 "  always @(w) wl = {wl, $sformatf(\"%0t:%b \", $time, w)};\n"
+                 "  always @(w) if ($time == 5) x = ~x;\n"
+                 "  initial begin\n"
+                 "    ## 1;\n"
+                 "    cb.w <= 1'b0;\n"
+                 "    @(x);\n"
+                 "    cb.w <= 1'b1;\n"
+                 "  end\n"
+                 "  initial #20 begin $display(\"%s\", wl); $finish; end\n"
+                 "endmodule\n",
+                 f),
+      "5:0 5:1 \n$finish at time 20\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSignalsSim,
+     DISABLED_AProgramsSecondDriveInTheTimeStepGlitchesTheVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program tb(input logic clk);\n"
+                 "  clocking cb @(posedge clk);\n"
+                 "    output a = m.a;\n"
+                 "  endclocking\n"
+                 "  initial begin\n"
+                 "    @(cb);\n"
+                 "    cb.a <= 1'b0;\n"
+                 "    @(m.a);\n"
+                 "    cb.a <= 1'b1;\n"
+                 "    #10;\n"
+                 "  end\n"
+                 "endprogram\n"
+                 "module m;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  bit a = 1'b1;\n"
+                 "  string al = \"\";\n"
+                 "  always @(a) al = {al, $sformatf(\"%0t:%b \", $time, a)};\n"
+                 "  tb t(clk);\n"
+                 "  initial #12 $display(\"%s\", al);\n"
+                 "endmodule\n",
+                 f),
+      "5:0 5:1 \n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSignalsSim,
+     DISABLED_SeveralClockingOutputsOnANetResolveByItsType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  logic clk = 0;\n"
+          "  always #5 clk = ~clk;\n"
+          "  wire w;\n"
+          "  wand wa;\n"
+          "  wor wo;\n"
+          "  tri0 t0;\n"
+          "  tri1 t1;\n"
+          "  trireg tr;\n"
+          "  wire pn, z;\n"
+          "  logic v;\n"
+          "  clocking c1 @(posedge clk); output w, wa, wo, t0, t1, tr, z, v; "
+          "endclocking\n"
+          "  clocking c2 @(posedge clk); output w, wa, wo, t0, t1, tr, z, v; "
+          "endclocking\n"
+          "  clocking cp @(posedge clk); output pn; endclocking\n"
+          "  clocking cn @(negedge clk); output pn; endclocking\n"
+          "  initial begin\n"
+          "    @(c1);\n"
+          "    c1.w <= 1; c1.wa <= 1; c1.wo <= 1; c1.tr <= 1; c1.z <= 1'b0; "
+          "c1.v <= 1;\n"
+          "    c1.t0 <= 1'bz; c1.t1 <= 1'bz;\n"
+          "    c2.w <= 0; c2.wa <= 0; c2.wo <= 0; c2.tr <= 0; c2.v <= 0;\n"
+          "    c2.t0 <= 1'bz; c2.t1 <= 1'bz;\n"
+          "    c2.z <= 1'bz;\n"
+          "    #1 $display(\"w=%b wa=%b wo=%b t0=%b t1=%b tr=%b z=%b v=%b\", "
+          "w, wa, wo, t0, t1, tr, z, v);\n"
+          "  end\n"
+          "  initial begin\n"
+          "    @(cp) cp.pn <= 1;\n"
+          "    @(cn) cn.pn <= 0;\n"
+          "    #1 $display(\"pn=%b\", pn);\n"
+          "    $finish;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "w=x wa=0 wo=1 t0=0 t1=1 tr=x z=0 v=0\npn=x\n$finish at time 11\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
