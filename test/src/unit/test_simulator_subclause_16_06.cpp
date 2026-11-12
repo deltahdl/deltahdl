@@ -413,4 +413,111 @@ TEST(AssertionSampledArrayElement,
   ExpectTheCheckerKeepsTheSample("delete(7);");
 }
 
+const char kOneFailure[] = "5 pass 15 pass 25 pass 35 fail 45 pass";
+const char kOneLaterFailure[] = "15 pass 25 pass 35 fail 45 pass";
+
+std::string LiveBench(const std::string& items,
+                      const std::string& outside = "") {
+  return outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1, live = 0, en = 1;\n"
+         "  int tick = 0;\n"
+         "  wire w;\n"
+         "  assign w = live;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always @(posedge clk) begin\n"
+         "    tick = tick + 1; live = (tick == 3); en = (tick != 3);\n"
+         "  end\n"
+         "  " +
+         items +
+         "\n"
+         "  initial #48 $finish;\n"
+         "endmodule\n";
+}
+
+std::string LiveVerdict(const std::string& head) {
+  return head +
+         " $display(\"V%0t pass\", $time); else $display(\"V%0t fail\", "
+         "$time);";
+}
+
+void ExpectLive(const std::string& items, const char* expected,
+                const std::string& outside = "") {
+  ExpectLines(LiveBench(items, outside), "V", expected);
+}
+
+TEST(AssertionSampledOperand, AnIffGateReadsItsCurrentValue) {
+  ExpectLive(LiveVerdict("assert property (@(posedge clk iff en) 1)"),
+             "5 pass 15 pass 35 pass 45 pass");
+}
+
+TEST(AssertionSampledOperand, AnOperandAfterADelayReadsItsSampledValue) {
+  ExpectLive(LiveVerdict("assert property (@(posedge clk) a ##1 !live)"),
+             kOneLaterFailure);
+}
+
+TEST(AssertionSampledOperand, ANamedSequenceOrPropertyReadsSampledValues) {
+  ExpectLive("sequence s; a ##1 !live; endsequence\n  " +
+                 LiveVerdict("assert property (@(posedge clk) s)"),
+             kOneLaterFailure);
+  ExpectLive("property p; @(posedge clk) a ##1 !live; endproperty\n  " +
+                 LiveVerdict("assert property (p)"),
+             kOneLaterFailure);
+}
+
+TEST(AssertionSampledOperand, AnImplicationsConsequentReadsSampledValues) {
+  ExpectLive(LiveVerdict("assert property (@(posedge clk) a |-> !live)"),
+             kOneFailure);
+  ExpectLive(LiveVerdict("assert property (@(posedge clk) a |=> !live)"),
+             kOneLaterFailure);
+}
+
+TEST(AssertionSampledOperand, AnImplicationsAntecedentReadsSampledValues) {
+  ExpectLive(LiveVerdict("assert property (@(posedge clk) live |-> 0)"),
+             kOneFailure);
+  ExpectLive(
+      "assert property (@(posedge clk) live |=> 0) else "
+      "$display(\"V%0t fail\", $time);",
+      "45 fail");
+}
+
+TEST(AssertionSampledOperand, AnAssumptionReadsSampledValues) {
+  ExpectLive(LiveVerdict("assume property (@(posedge clk) !live)"),
+             kOneFailure);
+}
+
+TEST(AssertionSampledOperand, ACoverReadsSampledValues) {
+  ExpectLive("cover property (@(posedge clk) live) $display(\"V%0t\", $time);",
+             "35");
+  ExpectLive("cover sequence (@(posedge clk) live) $display(\"V%0t\", $time);",
+             "35");
+}
+
+TEST(AssertionSampledOperand, ANetReadsItsSampledValue) {
+  ExpectLive(LiveVerdict("assert property (@(posedge clk) !w)"), kOneFailure);
+}
+
+std::string LiveUnit(const char* kind) {
+  return std::string(kind) +
+         " u_unit(input logic clk, input logic live);\n"
+         "  " +
+         LiveVerdict("assert property (@(posedge clk) !live)") + "\nend" +
+         kind + "\n";
+}
+
+TEST(AssertionSampledOperand, AnInterfaceOrProgramReadsSampledValues) {
+  for (const char* kind : {"interface", "program"}) {
+    ExpectLive("u_unit u(clk, live);", kOneFailure, LiveUnit(kind));
+  }
+}
+
+TEST(AssertionSampledOperand, AGenerateBlockReadsSampledValues) {
+  ExpectLive("if (1) begin : g " +
+                 LiveVerdict("assert property (@(posedge clk) !live)") + " end",
+             kOneFailure);
+  ExpectLive("for (genvar j = 0; j < 1; j++) begin : lg " +
+                 LiveVerdict("assert property (@(posedge clk) !live)") + " end",
+             kOneFailure);
+}
+
 }  // namespace
