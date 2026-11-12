@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <iterator>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -397,6 +399,204 @@ TEST(FunctionReturnSim,
                                      "fh = 16'h8000;", "fa = 8'h80;"),
                        f),
             "-128 -128 -32768 -128 1\n");
+}
+
+struct CapturedRun {
+  const char* src;
+  const char* output;
+};
+
+void ExpectEachRun(const CapturedRun* runs, size_t count) {
+  for (size_t i = 0; i < count; ++i) {
+    SCOPED_TRACE(runs[i].src);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(runs[i].src, f), runs[i].output);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+TEST(FunctionReturnSim,
+     DISABLED_AFunctionAssignsItsNameWhereAParameterOfThatNameIsVisible) {
+  const CapturedRun kRuns[] = {
+      {"package pk;\n  parameter int F = 100;\nendpackage\nmodule t;\n"
+       "  import pk::*;\n  function int F(int x);\n    F = x + 1;\n"
+       "  endfunction\n  localparam int A = F(3);\n"
+       "  initial $display(\"%0d %0d\", A, F(5));\nendmodule\n",
+       "4 6\n"},
+      {"parameter int F = 100;\nmodule t;\n  function int F(int x);\n"
+       "    F = x + 1;\n  endfunction\n  localparam int A = F(3);\n"
+       "  initial $display(\"%0d %0d\", A, F(5));\nendmodule\n",
+       "4 6\n"},
+      {"module t;\n  parameter int F = 100;\n  class C;\n"
+       "    static function int F(int x);\n      F = x + 1;\n"
+       "    endfunction\n  endclass\n"
+       "  initial $display(\"%0d\", C::F(5));\nendmodule\n",
+       "6\n"},
+      {"module t;\n  parameter int F = 100;\n  if (1) begin : g\n"
+       "    function int F(int x);\n      F = x + 1;\n    endfunction\n"
+       "    initial $display(\"%0d\", F(5));\n  end\nendmodule\n",
+       "6\n"},
+      {"parameter int F = 100;\ninterface i;\n  int r;\n"
+       "  function int F(int x);\n    F = x + 1;\n  endfunction\n"
+       "  initial r = F(5);\nendinterface\nmodule t;\n  i u();\n"
+       "  initial #1 $display(\"%0d\", u.r);\nendmodule\n",
+       "6\n"},
+      {"parameter int F = 100;\nprogram q;\n  function int F(int x);\n"
+       "    F = x + 1;\n  endfunction\n"
+       "  initial $display(\"%0d\", F(5));\nendprogram\n",
+       "6\n"},
+      {"package pk;\n  parameter int F = 100;\nendpackage\npackage q;\n"
+       "  import pk::*;\n  function int F(int x);\n    F = x + 1;\n"
+       "  endfunction\nendpackage\nmodule t;\n"
+       "  initial $display(\"%0d\", q::F(5));\nendmodule\n",
+       "6\n"},
+      {"package pk;\n  parameter int F = 100;\nendpackage\nimport pk::*;\n"
+       "function int F(int x);\n  F = x + 1;\nendfunction\nmodule t;\n"
+       "  initial $display(\"%0d\", F(5));\nendmodule\n",
+       "6\n"},
+  };
+  ExpectEachRun(kRuns, std::size(kRuns));
+}
+
+TEST(FunctionReturnSim,
+     DISABLED_AFunctionAssignsItsNameOverAConstantOfAnyTypeOrKind) {
+  const CapturedRun kRuns[] = {
+      {"package pk;\n  parameter real F = 1.0;\nendpackage\nmodule t;\n"
+       "  import pk::*;\n  function real F(real x);\n    F = x + 0.5;\n"
+       "  endfunction\n  initial $display(\"%0.1f\", F(2.0));\nendmodule\n",
+       "2.5\n"},
+      {"package pk;\n  parameter string F = \"no\";\nendpackage\nmodule t;\n"
+       "  import pk::*;\n  function string F(string x);\n"
+       "    F = {x, \"!\"};\n  endfunction\n"
+       "  initial $display(\"%s\", F(\"hi\"));\nendmodule\n",
+       "hi!\n"},
+      {"package pk;\n  localparam int F = 100;\nendpackage\nmodule t;\n"
+       "  import pk::*;\n  function int F(int x);\n    F = x + 1;\n"
+       "  endfunction\n  initial $display(\"%0d\", F(5));\nendmodule\n",
+       "6\n"},
+      {"package pk;\n  typedef enum {F, G} e_t;\nendpackage\nmodule t;\n"
+       "  import pk::*;\n  function int F(int x);\n    F = x + 1;\n"
+       "  endfunction\n  initial $display(\"%0d\", F(5));\nendmodule\n",
+       "6\n"},
+  };
+  ExpectEachRun(kRuns, std::size(kRuns));
+}
+
+TEST(FunctionReturnSim,
+     DISABLED_ANameReadAfterBeingAssignedReadsTheVariableOverAParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("parameter int F = 100;\nmodule t;\n"
+                       "  function int F(int x);\n    F = x;\n"
+                       "    return F + 1;\n  endfunction\n"
+                       "  initial $display(\"%0d\", F(5));\nendmodule\n",
+                       f),
+            "6\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionReturnSim, ComplexPkgFunctionsBuildTheirResultsMemberByMember) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package ComplexPkg;\n"
+                 "  typedef struct { shortreal i, r; } Complex;\n"
+                 "  function Complex add(Complex a, b);\n"
+                 "    add.r = a.r + b.r;\n"
+                 "    add.i = a.i + b.i;\n"
+                 "  endfunction\n"
+                 "  function Complex mul(Complex a, b);\n"
+                 "    mul.r = (a.r * b.r) - (a.i * b.i);\n"
+                 "    mul.i = (a.r * b.i) + (a.i * b.r);\n"
+                 "  endfunction\n"
+                 "endpackage\n"
+                 "module m;\n"
+                 "  import ComplexPkg::*;\n"
+                 "  Complex a = '{i:1.0, r:2.0}, b = '{i:3.0, r:4.0}, s, p;\n"
+                 "  initial begin\n"
+                 "    s = add(a, b);\n"
+                 "    p = mul(a, b);\n"
+                 "    $display(\"%0.1f %0.1f %0.1f %0.1f\", s.r, s.i, p.r, "
+                 "p.i);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "6.0 4.0 5.0 10.0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionReturnSim, APackedUnionReturnIsBuiltThroughOneMember) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  typedef union packed { logic [7:0] b; "
+                       "logic [7:0] c; } u_t;\n"
+                       "  function u_t mk();\n"
+                       "    mk.b = 8'h5A;\n"
+                       "  endfunction\n"
+                       "  u_t r;\n"
+                       "  initial begin\n"
+                       "    r = mk();\n"
+                       "    $display(\"%h\", r.c);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5a\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionReturnSim,
+     DISABLED_AnInlinePackedStructReturnIsBuiltMemberByMember) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  function struct packed { logic [7:0] a, b; } mk();\n"
+                       "    mk.a = 8'd3;\n"
+                       "    mk.b = 8'd4;\n"
+                       "  endfunction\n"
+                       "  logic [15:0] r;\n"
+                       "  initial begin\n"
+                       "    r = mk();\n"
+                       "    $display(\"%h\", r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0304\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionReturnSim, ANetContinuouslyAssignedACallFollowsItsValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic logic pure_func(input logic a);\n"
+                       "    return ~a;\n"
+                       "  endfunction\n"
+                       "  logic in = 0;\n"
+                       "  wire r;\n"
+                       "  assign r = pure_func(in);\n"
+                       "  initial begin\n"
+                       "    #1 $write(\"%b \", r);\n"
+                       "    in = 1;\n"
+                       "    #1 $write(\"%b \", r);\n"
+                       "    in = 0;\n"
+                       "    #1 $display(\"%b\", r);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(FunctionReturnSim, DISABLED_AModuleVariablesInitializerTakesACallsValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic logic pure_func(input logic a);\n"
+                       "    return ~a;\n"
+                       "  endfunction\n"
+                       "  logic y0 = pure_func(1'b0);\n"
+                       "  logic y1 = pure_func(1'b1);\n"
+                       "  int z = 2 * pure_func(1'b0) + 5;\n"
+                       "  initial $display(\"%b %b %0d\", y0, y1, z);\n"
+                       "endmodule\n",
+                       f),
+            "1 0 7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
