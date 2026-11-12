@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -175,6 +177,36 @@ TEST(StringLiteralExpressionsSim, PaddingConsistentWithNonstringUnsigned) {
   ASSERT_NE(b, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 0x4869ULL);
   EXPECT_EQ(a->value.ToUint64(), b->value.ToUint64());
+}
+
+TEST(StringLiteralExpressionsSim, TheExamplesPrintTheirStoredValues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module string_test;\n"
+          "  bit [8*14:1] stringvar;\n"
+          "  bit [8*10:1] s1, s2;\n"
+          "  initial begin\n"
+          "    stringvar = \"Hello world\";\n"
+          "    $display(\"%s is stored as %h\", stringvar, stringvar);\n"
+          "    stringvar = {stringvar,\"!!!\"};\n"
+          "    $display(\"%s is stored as %h\", stringvar, stringvar);\n"
+          "    s1 = \"Hello\";\n"
+          "    s2 = \" world!\";\n"
+          "    if ({s1,s2} == \"Hello world!\")\n"
+          "      $display(\"strings are equal\");\n"
+          "    $display(\"%h %h %h\", s1, s2, {s1, s2});\n"
+          "    $display(\"%0d %0d %0d %0d\", \"\" == \"\\0\", \"\" == \"0\", "
+          "\"\", \"0\");\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "Hello world is stored as 00000048656c6c6f20776f726c64\n"
+      "Hello world!!! is stored as 48656c6c6f20776f726c64212121\n"
+      "000000000048656c6c6f 00000020776f726c6421 "
+      "000000000048656c6c6f00000020776f726c6421\n"
+      "1 0 0 48\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
