@@ -185,4 +185,42 @@ TEST(ConditionalStatementSim, IfElseIfNoMatchNoElseRetainsValue) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
+TEST(IfElseIfExampleSim, TheIndexExampleTakesTheBranchOfTheFirstTrueCondition) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  logic [31:0] instruction, segment_area[255:0];\n"
+                 "  logic [7:0] index;\n"
+                 "  logic [5:0] modify_seg1, modify_seg2, modify_seg3;\n"
+                 "  parameter segment1 = 0, inc_seg1 = 1, segment2 = 20, "
+                 "inc_seg2 = 2,\n"
+                 "            segment3 = 64, inc_seg3 = 4, data = 128;\n"
+                 "  task step(input logic [7:0] start);\n"
+                 "    index = start;\n"
+                 "    if (index < segment2) begin\n"
+                 "      instruction = segment_area [index + modify_seg1];\n"
+                 "      index = index + inc_seg1;\n"
+                 "    end\n"
+                 "    else if (index < segment3) begin\n"
+                 "      instruction = segment_area [index + modify_seg2];\n"
+                 "      index = index + inc_seg2;\n"
+                 "    end\n"
+                 "    else if (index < data) begin\n"
+                 "      instruction = segment_area [index + modify_seg3];\n"
+                 "      index = index + inc_seg3;\n"
+                 "    end\n"
+                 "    else\n"
+                 "      instruction = segment_area [index];\n"
+                 "    $display(\"%0d %0d\", instruction, index);\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    for (int i = 0; i < 256; i++) segment_area[i] = i * 3;\n"
+                 "    modify_seg1 = 2; modify_seg2 = 3; modify_seg3 = 5;\n"
+                 "    step(5); step(30); step(100); step(200);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "21 6\n99 32\n315 104\n600 200\n");
+}
+
 }  // namespace

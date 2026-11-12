@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <utility>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -295,6 +297,47 @@ TEST(QualifiedIfParsing, QualifierBeforeAStatementThatIsNoIfOrCaseRejected) {
                                "unique, unique0 and priority may qualify only "
                                "an if or a case statement",
                                line, "12.4"));
+  }
+}
+
+constexpr std::pair<const char*, const char*> kProceduralPlaces[] = {
+    {"module m;\n  function void f();\n", "  endfunction\nendmodule\n"},
+    {"module m;\n  task t();\n", "  endtask\nendmodule\n"},
+    {"module m;\n  final begin\n", "  end\nendmodule\n"},
+    {"module m;\n  always_comb begin\n", "  end\nendmodule\n"},
+    {"class c;\n  function void f();\n", "  endfunction\nendclass\n"},
+    {"class c;\n  task t();\n", "  endtask\nendclass\n"},
+    {"interface i;\n  initial begin\n", "  end\nendinterface\n"},
+    {"program p;\n  initial begin\n", "  end\nendprogram\n"},
+    {"package q;\n  function void f();\n", "  endfunction\nendpackage\n"},
+    {"function void f();\n  begin\n", "  end\nendfunction\n"},
+};
+
+TEST(QualifiedIfParsing, AQualifiedElseIfIsReportedInEveryProceduralPlace) {
+  for (const auto& [head, tail] : kProceduralPlaces) {
+    for (const char* inner : {"unique", "unique0", "priority"}) {
+      std::string src = std::string(head) +
+                        "    priority if (a) x = 1;\n    else " + inner +
+                        " if (b) x = 2;\n" + tail;
+      auto r = Parse(src);
+      EXPECT_TRUE(ReportedError(r.diags,
+                                "unique, unique0, or priority cannot appear "
+                                "on an else-if branch",
+                                4, "12.4.2"))
+          << src;
+    }
+  }
+}
+
+TEST(QualifiedIfParsing, AQualifiedIfInABlockAfterElseIsAcceptedInEveryPlace) {
+  for (const auto& [head, tail] : kProceduralPlaces) {
+    std::string src = std::string(head) +
+                      "    unique if (a) x = 1;\n"
+                      "    else begin unique0 if (b) x = 2; end\n" +
+                      tail;
+    auto r = Parse(src);
+    ASSERT_NE(r.cu, nullptr);
+    EXPECT_FALSE(r.has_errors) << src;
   }
 }
 

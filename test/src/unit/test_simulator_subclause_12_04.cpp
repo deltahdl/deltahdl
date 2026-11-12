@@ -561,4 +561,47 @@ TEST(ConditionalStatementSim, NegativeZeroRealConditionIsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 100u);
 }
 
+TEST(ConditionalStatementSim, TheIfElseDecidesInEveryKindOfProcedure) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package q;\n"
+                 "  function automatic int pick(int v);\n"
+                 "    if (v) return 1; else return 2;\n"
+                 "  endfunction\n"
+                 "endpackage\n"
+                 "class C;\n"
+                 "  function int pick(logic [3:0] v);\n"
+                 "    if (v) return 3; else return 4;\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "interface I;\n"
+                 "  logic [1:0] v = 2'bx0;\n"
+                 "  initial #1 if (v) $display(\"I then\"); else $display(\"I "
+                 "else\");\n"
+                 "endinterface\n"
+                 "program p;\n"
+                 "  real r = 0.25;\n"
+                 "  initial #2 if (r) $display(\"P then\"); else $display(\"P "
+                 "else\");\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  I u();\n"
+                 "  p pp();\n"
+                 "  task automatic show(logic v);\n"
+                 "    if (v) $display(\"T then\"); else $display(\"T else\");\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    C c;\n"
+                 "    c = new;\n"
+                 "    $display(\"%0d %0d %0d %0d\", q::pick(0), q::pick(-1), "
+                 "c.pick(4'bz000),\n"
+                 "             c.pick(4'b0100));\n"
+                 "    show(1'bz);\n"
+                 "    show(1'b1);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "2 1 4 3\nT else\nT then\nI else\nP then\n");
+}
+
 }  // namespace
