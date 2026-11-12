@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -350,6 +352,60 @@ TEST(SyncDriveElab, DriveFormInSubroutineAndGenerateErrors) {
                             10, "14.16"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "not by a blocking assignment", 13, "14.16"));
+}
+
+struct HierarchicalClockvarWrite {
+  const char* item;
+  const char* message;
+  const char* subclause;
+};
+
+const HierarchicalClockvarWrite kHierarchicalClockvarWrites[] = {
+    {"initial u.cb.a <= #4 8'd1;",
+     "intra-assignment delay (#) is not a legal synchronous drive", "14.16"},
+    {"initial u.cb.i <= 8'd1;", "write to input clockvar", "14.3"},
+    {"initial force u.cb.a = 8'd1;",
+     "procedural continuous assignment (assign/force)", "14.16"},
+    {"initial assign u.cb.a = 8'd1;",
+     "procedural continuous assignment (assign/force)", "14.16"},
+    {"assign u.cb.a = 8'd1;", "continuous assignment to a clockvar", "14.16"},
+};
+
+TEST(SyncDriveElab, DISABLED_AForbiddenWriteToAHierarchicalClockvarIsReported) {
+  for (const auto& w : kHierarchicalClockvarWrites) {
+    SCOPED_TRACE(w.item);
+    ElabFixture f;
+    ElaborateSrc(std::string("module unit(input logic clk);\n"
+                             "  logic [7:0] a = 0, i = 0;\n"
+                             "  clocking cb @(posedge clk);\n"
+                             "    output a;\n"
+                             "    input i;\n"
+                             "  endclocking\n"
+                             "endmodule\n"
+                             "module top;\n"
+                             "  logic clk = 0;\n"
+                             "  unit u(clk);\n"
+                             "  ") +
+                     w.item + "\nendmodule\n",
+                 f, "top");
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), w.message, 11, w.subclause));
+  }
+}
+
+TEST(SyncDriveElab, ASynchronousDriveToAHierarchicalOutputClockvarIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module unit(input logic clk);\n"
+             "  logic [7:0] a = 0;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    output a;\n"
+             "  endclocking\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic clk = 0;\n"
+             "  unit u(clk);\n"
+             "  initial u.cb.a <= 8'd1;\n"
+             "endmodule\n"));
 }
 
 }  // namespace

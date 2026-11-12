@@ -376,4 +376,204 @@ TEST(SyncDriveSim, DriveBetweenClockingEventsMaturesAtTheNextEvent) {
             "0 5\n$finish at time 6\n");
 }
 
+TEST(SyncDriveSim,
+     DISABLED_ACycleDelayedDriveBetweenEventsMaturesAtTheNthEvent) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  logic clk = 0;\n"
+          "  always #5 clk = ~clk;\n"
+          "  logic [7:0] v = 0, p = 0, q = 0, r = 0, s = 0, z = 0, k = 0;\n"
+          "  int tp, tq, tr, ts, tz, tk;\n"
+          "  string log = \"\";\n"
+          "  default clocking cb @(posedge clk);\n"
+          "    output v;\n"
+          "  endclocking\n"
+          "  clocking c2 @(posedge clk); output p, r, s, k; endclocking\n"
+          "  clocking c3 @(posedge clk); output #2 q, z; endclocking\n"
+          "  always @(v) log = {log, $sformatf(\"%0t:%0d \", $time, v)};\n"
+          "  always @(p) tp = $time;\n"
+          "  always @(q) tq = $time;\n"
+          "  always @(r) tr = $time;\n"
+          "  always @(s) ts = $time;\n"
+          "  always @(z) tz = $time;\n"
+          "  always @(k) tk = $time;\n"
+          "  initial begin\n"
+          "    ##1;\n"
+          "    cb.v <= 1;\n"
+          "    cb.v <= ##2 2;\n"
+          "    #1 cb.v <= ##2 3;\n"
+          "    ##1 cb.v <= ##1 4;\n"
+          "  end\n"
+          "  initial begin\n"
+          "    #7;\n"
+          "    c2.p <= ##3 1;\n"
+          "    c3.q <= ##2 1;\n"
+          "    c2.s <= 1;\n"
+          "    c2.k <= ##1 1;\n"
+          "  end\n"
+          "  initial begin\n"
+          "    @(c2);\n"
+          "    c2.r <= ##2 1;\n"
+          "    c3.z <= ##2 1;\n"
+          "  end\n"
+          "  initial #50 begin\n"
+          "    $display(\"%s\", log);\n"
+          "    $display(\"p%0d q%0d r%0d s%0d z%0d k%0d\", tp, tq, tr, ts, tz, "
+          "tk);\n"
+          "    $finish;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "5:1 25:4 \np35 q27 r25 s15 z27 k15\n$finish at time 50\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSim,
+     DISABLED_AProgramsCycleDelayedDriveBetweenEventsMaturesAtTheNthEvent) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program tb(input logic clk, output logic [7:0] p, q);\n"
+                 "  clocking c2 @(posedge clk); output p; endclocking\n"
+                 "  clocking c3 @(posedge clk); output #2 q; endclocking\n"
+                 "  initial begin\n"
+                 "    #7;\n"
+                 "    c2.p <= ##3 1;\n"
+                 "    c3.q <= ##2 1;\n"
+                 "    #45;\n"
+                 "  end\n"
+                 "endprogram\n"
+                 "module m;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  logic [7:0] p, q;\n"
+                 "  int tp, tq;\n"
+                 "  tb t(clk, p, q);\n"
+                 "  always @(p) if (p == 1) tp = $time;\n"
+                 "  always @(q) if (q == 1) tq = $time;\n"
+                 "  initial #50 $display(\"p%0d q%0d\", tp, tq);\n"
+                 "endmodule\n",
+                 f),
+      "p35 q27\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSim, ADriveThroughAnotherScopesPathDrivesAtTheNextEvent) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module unit(input logic clk);\n"
+                "  logic [7:0] a = 0, c = 0, d = 0, e = 0, io = 0;\n"
+                "  clocking cb @(posedge clk);\n"
+                "    output a, c, d, e;\n"
+                "    inout io;\n"
+                "  endclocking\n"
+                "endmodule\n"
+                "module own(input logic clk);\n"
+                "  logic [7:0] b = 0;\n"
+                "  clocking cb @(posedge clk);\n"
+                "    output b;\n"
+                "  endclocking\n"
+                "  initial #7 top.o.cb.b <= 8'd4;\n"
+                "endmodule\n"
+                "module top;\n"
+                "  logic clk = 0;\n"
+                "  always #5 clk = ~clk;\n"
+                "  unit u(clk);\n"
+                "  own o(clk);\n"
+                "  initial begin\n"
+                "    #7;\n"
+                "    u.cb.a <= 8'd1;\n"
+                "    u.cb.c[3] <= 1'b1;\n"
+                "    u.cb.d[7:4] <= 4'hf;\n"
+                "    u.cb.io <= 8'd9;\n"
+                "  end\n"
+                "endmodule\n"
+                "module other;\n"
+                "  initial #7 top.u.cb.e <= 8'd5;\n"
+                "  initial begin\n"
+                "    #12 $display(\"a%0d c%h d%h io%0d e%0d b%0d\", top.u.a, "
+                "top.u.c, top.u.d, top.u.io, top.u.e, top.o.b);\n"
+                "    #5 $display(\"a%0d c%h d%h io%0d e%0d b%0d\", top.u.a, "
+                "top.u.c, top.u.d, top.u.io, top.u.e, top.o.b);\n"
+                "    $finish;\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "a0 c00 d00 io0 e0 b0\na1 c08 df0 io9 e5 b4\n$finish at time 17\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSim, AProgramDrivesAModulesClockvarThroughItsPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module dut(input logic clk);\n"
+                       "  logic [7:0] a = 0;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    output a;\n"
+                       "  endclocking\n"
+                       "endmodule\n"
+                       "program tb;\n"
+                       "  initial begin\n"
+                       "    #7 top.u.cb.a <= 8'd7;\n"
+                       "    #20;\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  dut u(clk);\n"
+                       "  tb t();\n"
+                       "  initial #20 $display(\"a%0d\", u.a);\n"
+                       "endmodule\n",
+                       f),
+            "a7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SyncDriveSim, DISABLED_AnOwnScopePathAndHierarchicalCycleDelaysDrive) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          "module unit(input logic clk);\n"
+          "  logic [7:0] b = 0, f = 0, g = 0;\n"
+          "  clocking cb @(posedge clk);\n"
+          "    output b, f, g;\n"
+          "  endclocking\n"
+          "endmodule\n"
+          "module own(input logic clk);\n"
+          "  logic [7:0] a = 0, n = 0;\n"
+          "  clocking cb @(posedge clk);\n"
+          "    output a, n;\n"
+          "  endclocking\n"
+          "  initial begin\n"
+          "    #7;\n"
+          "    own.cb.a <= 8'd3;\n"
+          "    top.o.cb.n <= ##2 8'd8;\n"
+          "  end\n"
+          "endmodule\n"
+          "module top;\n"
+          "  logic clk = 0;\n"
+          "  always #5 clk = ~clk;\n"
+          "  unit u(clk);\n"
+          "  own o(clk);\n"
+          "  initial #7 u.cb.b <= ##2 8'd2;\n"
+          "  initial #7 u.cb.g[1:0] <= ##2 2'd3;\n"
+          "endmodule\n"
+          "module other;\n"
+          "  initial #7 top.u.cb.f <= ##2 8'd6;\n"
+          "  initial begin\n"
+          "    #10 $display(\"a%0d b%0d f%0d g%0d n%0d\", top.o.a, "
+          "top.u.b, top.u.f, top.u.g, top.o.n);\n"
+          "    #10 $display(\"a%0d b%0d f%0d g%0d n%0d\", top.o.a, "
+          "top.u.b, top.u.f, top.u.g, top.o.n);\n"
+          "    #10 $display(\"a%0d b%0d f%0d g%0d n%0d\", top.o.a, "
+          "top.u.b, top.u.f, top.u.g, top.o.n);\n"
+          "    $finish;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "a0 b0 f0 g0 n0\na3 b0 f0 g0 n0\na3 b2 f6 g3 n8\n$finish at time 30\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
