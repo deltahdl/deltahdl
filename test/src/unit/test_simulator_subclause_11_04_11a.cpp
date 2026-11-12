@@ -461,4 +461,109 @@ TEST(ConditionalArraySim, AssociativeArraysAreChosenOrEmptied) {
             "0\n1 1\n1 1\n");
 }
 
+TEST(ConditionalStringParameterSim,
+     DISABLED_AModuleStringParameterGivenAConditionalHasItsCharacters) {
+  constexpr const char* kModule =
+      "module m #(parameter int N = 1);\n"
+      "  localparam string A = \"a\", B = \"bb\";\n"
+      "  localparam string S = N ? \"yes\" : \"no\";\n"
+      "  localparam string X = {S, \"!\"};\n"
+      "  localparam int L = S.len();\n"
+      "  localparam bit E = S == \"yes\";\n"
+      "  localparam string Y = (A == \"a\") ? {2{B}} : {A, B};\n"
+      "  localparam string V = N ? A : B;\n"
+      "  localparam string V2 = {V, \"!\"};\n"
+      "  localparam real R = 0.0;\n"
+      "  localparam string Z = N ? (R ? \"r1\" : \"r0\") : \"z\";\n"
+      "  localparam string Z2 = {Z, \"!\"};\n"
+      "  logic [S.len()-1:0] vec;\n"
+      "  if (S == \"yes\") begin : g\n"
+      "    initial #1 $display(\"G\");\n"
+      "  end\n"
+      "  initial $display(\"%s %0d %b %s %s %s %0d %s\", X, L, E, Y, V2,\n"
+      "                   Z2, $bits(vec),\n"
+      "                   S.getc(0));\n"
+      "endmodule\n";
+  {
+    SimFixture f;
+    EXPECT_EQ(
+        RunCapture(std::string(kModule) + "module t; m u(); endmodule\n", f),
+        "yes! 3 1 bbbb a! r0! 3 y\nG\n");
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+  {
+    SimFixture f;
+    EXPECT_EQ(
+        RunCapture(
+            std::string(kModule) + "module t; m #(.N(0)) u(); endmodule\n", f),
+        "no! 2 0 bbbb bb! z! 2 n\n");
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+TEST(
+    ConditionalStringParameterSim,
+    DISABLED_AnInterfaceProgramOrGenerateStringParameterGivenAConditionalHasItsCharacters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface I;\n"
+                       "  localparam string S = 1 ? \"iy\" : \"in\";\n"
+                       "  localparam string X = {S, \"!\"};\n"
+                       "endinterface\n"
+                       "program P;\n"
+                       "  localparam string S = 0 ? \"py\" : \"pn\";\n"
+                       "  localparam string X = {S, \"!\"};\n"
+                       "  initial #3 $display(\"P %s\", X);\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  if (1) begin : g\n"
+                       "    localparam string G = 1 ? \"gy\" : \"gn\";\n"
+                       "    localparam string X = {G, \"!\"};\n"
+                       "    initial #1 $display(\"G %s\", X);\n"
+                       "  end\n"
+                       "  I i(); P p();\n"
+                       "  initial #2 $display(\"I %s\", i.X);\n"
+                       "endmodule\n",
+                       f),
+            "G gy!\nI iy!\nP pn!\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalStringParameterSim,
+     APackageUnitOrClassStringParameterGivenAConditionalHasItsCharacters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "package pk;\n"
+                "  localparam string PC = 1 ? \"py\" : \"pn\";\n"
+                "endpackage\n"
+                "localparam string US = 0 ? \"uy\" : \"un\";\n"
+                "class C #(parameter int N = 0);\n"
+                "  localparam string S = N ? \"cy\" : \"cn\";\n"
+                "  localparam string X = {S, \"!\"};\n"
+                "endclass\n"
+                "module t;\n"
+                "  import pk::*;\n"
+                "  localparam string X1 = {pk::PC, \"!\"}, X2 = {PC, \"?\"};\n"
+                "  localparam string X3 = {US, \"!\"};\n"
+                "  initial $display(\"%s %s %s %s %s\", X1, X2, X3, C#(1)::X,\n"
+                "                   C#()::X);\n"
+                "endmodule\n",
+                f),
+            "py! py? un! cy! cn!\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalStringParameterSim,
+     AnAmbiguousConditionOverStringParametersGivesTheirCommonValueOrEmpty) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  localparam string A = \"a\", B = \"bb\";\n"
+                 "  localparam string W = 1'bx ? A : B, V = 1'bx ? A : A;\n"
+                 "  initial $display(\"[%s] [%s] %0d\", W, V, W.len());\n"
+                 "endmodule\n",
+                 f),
+      "[] [a] 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

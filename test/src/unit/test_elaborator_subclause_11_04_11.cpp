@@ -445,4 +445,135 @@ TEST(ConditionalOperatorElaboration,
   }
 }
 
+TEST(ConditionalOperatorElaboration,
+     DISABLED_ClassBesideAnInterfaceItImplementsIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IC; endclass\n"
+      "class C implements IC; endclass\n"
+      "module m;\n"
+      "  bit s; IC ic, ic2; C c;\n"
+      "  initial begin ic2 = s ? c : ic; ic2 = s ? ic : c; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalOperatorElaboration,
+     ClassBranchesAssignedToTheirCommonTypeAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class D extends A; endclass\n"
+      "class E extends A; endclass\n"
+      "class K;\n"
+      "  function A pick(bit s, D d, E e); return s ? d : e; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  bit s; A a, a2; D d, d2; E e;\n"
+      "  initial begin\n"
+      "    a2 = s ? d : e; a2 = s ? d : a; a2 = s ? a : d;\n"
+      "    d2 = s ? null : d; d2 = s ? d : null;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalOperatorElaboration,
+     DISABLED_ACommonBaseResultAssignedToADerivedHandleIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class D extends A; endclass\n"
+      "class E extends A; endclass\n"
+      "class K;\n"
+      "  function D pick(bit s, D d, E e); D r; r = s ? d : e; return r; "
+      "endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  bit s; A a; D d, d2; E e;\n"
+      "  initial begin\n"
+      "    d2 = s ? d : e;\n"
+      "    d2 = s ? a : d;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {5, 10, 11}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "class handle assignment requires assignment compatible", kLine, "8.4"))
+        << kLine;
+  }
+}
+
+TEST(ConditionalOperatorElaboration,
+     TwoImplementersOfOneInterfaceClassAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IC; endclass\n"
+      "class C1 implements IC; endclass\n"
+      "class C2 implements IC; endclass\n"
+      "module m;\n"
+      "  bit s; IC ic; C1 c1; C2 c2;\n"
+      "  initial ic = s ? c1 : c2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "conditional operands of class types 'C1' and 'C2' "
+                            "share no base class",
+                            6, "11.4.11"));
+}
+
+TEST(ConditionalOperatorElaboration,
+     DISABLED_ClassBranchesWithNoCommonTypeInASubroutineArgumentAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IC; endclass\n"
+      "class C1 implements IC; endclass\n"
+      "class C2 implements IC; endclass\n"
+      "module m;\n"
+      "  bit s, r; C1 c1; C2 c2;\n"
+      "  function bit id(bit x); return x; endfunction\n"
+      "  initial begin\n"
+      "    $display(\"%b\", (s ? c1 : c2) == null);\n"
+      "    r = id((s ? c1 : c2) == null);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {8, 9}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "conditional operands of class types 'C1' and "
+                              "'C2' share no base class",
+                              kLine, "11.4.11"))
+        << kLine;
+  }
+}
+
+TEST(ConditionalOperatorElaboration,
+     AStringLocalparamConditionedOnAVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit v;\n"
+      "  localparam string S = v ? \"a\" : \"b\";\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "localparam 'S' initializer is not a constant expression", 3, "6.20.4"));
+}
+
+TEST(ConditionalOperatorElaboration,
+     AStringLocalparamConditionedOnAParameterIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter int N = 1;\n"
+      "  localparam string S = N ? \"a\" : \"b\";\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

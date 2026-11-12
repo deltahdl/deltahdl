@@ -121,4 +121,61 @@ TEST(InsideElaboration, UnpackedSubArrayOrMemberLeftOperandReported) {
   }
 }
 
+TEST(InsideOperatorElaboration,
+     DISABLED_ARangeBoundWithoutRelationalOperatorsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class R;\n"
+      "  rand int v; A h1;\n"
+      "  constraint c { v inside {[h1:h1]}; }\n"
+      "endclass\n"
+      "module m;\n"
+      "  typedef struct { int f; } s_t;\n"
+      "  A h, h1, h2; chandle c1, c2, ch; event e, e1, e2;\n"
+      "  s_t s1, s2; int a1 [2], a2 [2]; int i; bit r;\n"
+      "  wire w = i inside {[h1:h2]};\n"
+      "  initial begin\n"
+      "    r = h inside {[h1:h2]};\n"
+      "    r = ch inside {[c1:c2]};\n"
+      "    r = e inside {[e1:e2]};\n"
+      "    r = i inside {[s1:s2]};\n"
+      "    r = i inside {[a1:a2]};\n"
+      "    r = h inside {[h1:$]};\n"
+      "    r = i inside {[5:h2]};\n"
+      "    r = h inside {[h +/- 1]};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {4, 10, 12, 13, 14, 15, 16, 17, 18, 19}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a range bound of inside shall be of a type with "
+                              "relational operators",
+                              kLine, "11.4.13"))
+        << kLine;
+  }
+}
+
+TEST(InsideOperatorElaboration,
+     HandlesAndUnpackedArraysAsPlainMembersAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class R;\n"
+      "  rand int v; int a1 [2];\n"
+      "  constraint c { v inside {a1}; }\n"
+      "endclass\n"
+      "module m;\n"
+      "  A h, h1, h2; chandle c1, ch; int a1 [2]; int i; bit r;\n"
+      "  wire w = i inside {a1};\n"
+      "  initial begin\n"
+      "    r = h inside {h1, h2};\n"
+      "    r = ch inside {c1};\n"
+      "    r = i inside {a1, [1:3]};\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

@@ -776,4 +776,23 @@ TEST(PowerOperatorSim, ExponentSignIsItsOwnAndResultTakesTheBasesType) {
             "0 xxxxxxxx 1 1 -1 0 9\n");
 }
 
+TEST(ArithmeticOperatorSim, EveryModulusAndPowerExampleGivesItsResult) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  initial begin\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d\", 10 % 3, 11 % 3, 12 % 3,\n"
+          "             -10 % 3, 11 % -3, -4'd12 % 3);\n"
+          "    $display(\"%0d %0d %0d %0d %g %0d %0d %g\", 3 ** 2, 2 ** 3,\n"
+          "             2 ** 0, 0 ** 0, 2.0 ** -3'sb1, 2 ** -3'sb1, 0 ** -1,\n"
+          "             9 ** 0.5);\n"
+          "    $display(\"%g %g\", 9.0 ** (1 / 2), -3.0 ** 2.0);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 2 0 -1 2 1\n9 8 1 1 0.5 0 x 3\n1 9\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

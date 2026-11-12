@@ -346,4 +346,107 @@ TEST(EqualityOperatorElaboration,
   }
 }
 
+TEST(OperatorElaboration,
+     InterfaceClassHandleAgainstANonImplementingClassReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IC; endclass\n"
+      "class B; endclass\n"
+      "module m;\n"
+      "  IC i; B b; logic r;\n"
+      "  initial r = (i == b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "class handle comparison requires assignment compatible", 5, "11.4.5"));
+}
+
+TEST(OperatorElaboration,
+     InterfaceClassHandleAgainstAnImplementingClassAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IC; endclass\n"
+      "class A implements IC; endclass\n"
+      "module m;\n"
+      "  IC i, j; A a; logic r;\n"
+      "  initial r = (i == a) && (i === j) && (a != i);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OperatorElaboration, DISABLED_ChandleAgainstAClassHandleReported) {
+  for (const char* const kOp : {"==", "!=", "===", "!=="}) {
+    ElabFixture f;
+    ElaborateSrc(std::string("class B; endclass\n"
+                             "module m;\n"
+                             "  chandle h; B b; logic r;\n"
+                             "  initial r = (h ") +
+                     kOp +
+                     " b);\n"
+                     "endmodule\n",
+                 f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a chandle compares only with a chandle or null",
+                              4, "11.4.5"))
+        << kOp;
+  }
+}
+
+TEST(OperatorElaboration, TwoChandlesCompareWithEveryEqualityOperator) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  chandle h, g; logic r;\n"
+      "  initial r = (h == g) || (h != g) || (h === g) || (h !== g);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OperatorElaboration,
+     DISABLED_IncompatibleHandleComparisonInASubroutineArgumentReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface class IC; endclass\n"
+      "class A; endclass\n"
+      "class B; endclass\n"
+      "module m;\n"
+      "  A a; B b; IC i; logic r;\n"
+      "  function bit id(bit x); return x; endfunction\n"
+      "  initial begin\n"
+      "    r = id(a == b);\n"
+      "    $display(\"%b\", a != b);\n"
+      "    $display(\"%b\", i === b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {8, 9, 10}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(),
+                      "class handle comparison requires assignment compatible",
+                      kLine, "11.4.5"))
+        << kLine;
+  }
+}
+
+TEST(OperatorElaboration,
+     CompatibleHandleComparisonInASubroutineArgumentAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class A; endclass\n"
+      "class D extends A; endclass\n"
+      "module m;\n"
+      "  A a; D d; logic r;\n"
+      "  function bit id(bit x); return x; endfunction\n"
+      "  initial begin\n"
+      "    r = id(a == d);\n"
+      "    $display(\"%b\", d !== a, a == null);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

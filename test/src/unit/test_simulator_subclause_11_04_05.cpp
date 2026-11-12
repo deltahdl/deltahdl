@@ -568,4 +568,67 @@ TEST(EqualityOperatorSim, AnUnpackedArrayEqualsAPatternElementByElement) {
   EXPECT_EQ(out, "1 0 1 0\n1 0 1\n");
 }
 
+TEST(EqualityOperatorSim, InterfaceClassHandlesCompareTheObjectsTheyReference) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface class IC; endclass\n"
+          "class A implements IC; endclass\n"
+          "class K;\n"
+          "  static function string cmp(IC i, IC j, A a);\n"
+          "    return $sformatf(\"%b%b%b%b %b%b%b%b\", i == a, i === a,\n"
+          "                     i != a, i !== a, i == j, i === j, i != j,\n"
+          "                     i !== j);\n"
+          "  endfunction\n"
+          "endclass\n"
+          "module t;\n"
+          "  function string cmp(IC i, IC j, A a);\n"
+          "    return $sformatf(\"%b%b%b%b %b%b%b%b\", i == a, i === a,\n"
+          "                     i != a, i !== a, i == j, i === j, i != j,\n"
+          "                     i !== j);\n"
+          "  endfunction\n"
+          "  IC i1, i2; A a1, a2;\n"
+          "  initial begin\n"
+          "    a1 = new; a2 = new; i1 = a1; i2 = a1;\n"
+          "    $display(\"%b%b%b%b %b%b%b%b\", i1 == a1, i1 === a1,\n"
+          "             i1 != a1, i1 !== a1, i1 == i2, i1 === i2, i1 != i2,\n"
+          "             i1 !== i2);\n"
+          "    $display(\"%s %s\", cmp(i1, i2, a1), K::cmp(i1, i2, a1));\n"
+          "    i2 = a2;\n"
+          "    $display(\"%s %s\", cmp(i1, i2, a2), K::cmp(i1, i2, a2));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1100 1100\n1100 1100 1100 1100\n0011 0011 0011 0011\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(EqualityOperatorSim, ChandlesCompareTheirValues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class K;\n"
+                 "  static function string cmp(chandle a, chandle b);\n"
+                 "    return $sformatf(\"%b%b%b%b\", a == b, a === b, a != b,\n"
+                 "                     a !== b);\n"
+                 "  endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  function string cmp(chandle a, chandle b);\n"
+                 "    return $sformatf(\"%b%b%b%b\", a == b, a === b, a != b,\n"
+                 "                     a !== b);\n"
+                 "  endfunction\n"
+                 "  chandle h1, h2;\n"
+                 "  initial begin\n"
+                 "    $display(\"%b%b%b%b\", h1 == h2, h1 === h2, h1 != h2,\n"
+                 "             h1 !== h2);\n"
+                 "    h2 = h1;\n"
+                 "    $display(\"%s %s %b\", cmp(h1, h2), K::cmp(h1, h2),\n"
+                 "             h2 == null);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1100\n1100 1100 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

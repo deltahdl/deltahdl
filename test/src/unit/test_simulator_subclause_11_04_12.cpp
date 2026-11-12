@@ -473,4 +473,74 @@ TEST(ConcatenationSim, LhsConcatStillWritesAPackedSelectInPlace) {
   EXPECT_EQ(RunAndGet(src, "b"), 0xBCu);
 }
 
+TEST(ConcatenationSim,
+     DISABLED_AConcatenationOfAGenerateBlocksNetsTakesTheBitsOfEach) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  wire n; wire [3:0] q;\n"
+          "  if (1) begin : gi\n"
+          "    wire a, b, c, a2; wire [3:0] w; wire [3:0] n; wire q;\n"
+          "    wire x, y, z;\n"
+          "    assign {a, b, c} = 3'b101;\n"
+          "    assign {w, a2} = 5'b1100_1;\n"
+          "    assign {n, q} = 5'b1010_1;\n"
+          "    assign {x, {y, z}} = 3'b011;\n"
+          "  end\n"
+          "  case (1)\n"
+          "    1: begin : gc\n"
+          "      wire a, b; wire [3:0] w;\n"
+          "      assign {a, w, b} = 6'b1_0110_0;\n"
+          "    end\n"
+          "  endcase\n"
+          "  for (genvar i = 0; i < 1; i++) begin : gl\n"
+          "    wire a, b; wire [3:0] w;\n"
+          "    assign {w, a, b} = 6'b0011_10;\n"
+          "  end\n"
+          "  initial #1 begin\n"
+          "    $display(\"%b%b%b %b%b %b%b %b%b%b\", gi.a, gi.b, gi.c, gi.w,\n"
+          "             gi.a2, gi.n, gi.q, gi.x, gi.y, gi.z);\n"
+          "    $display(\"%b %b %b | %b %b %b\", gc.a, gc.w, gc.b, gl[0].w,\n"
+          "             gl[0].a, gl[0].b);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "101 11001 10101 011\n1 0110 0 | 0011 1 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConcatenationSim,
+     DISABLED_AGenerateBlocksScalarNetShadowingAModuleVectorTakesOneBit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  wire [3:0] s;\n"
+                       "  if (1) begin : g\n"
+                       "    wire s; wire [3:0] v;\n"
+                       "    assign {v, s} = 5'b0110_1;\n"
+                       "  end\n"
+                       "  initial #1 $display(\"%b %b\", g.v, g.s);\n"
+                       "endmodule\n",
+                       f),
+            "0110 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConcatenationSim, AGenerateBlocksNetOnTheRightIsWidenedOrUsedAsItStands) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  if (1) begin : g\n"
+                 "    wire [3:0] r1, r2;\n"
+                 "    wire [1:0] src2 = 2'b11; wire [3:0] src4 = 4'b1001;\n"
+                 "    assign r1 = src2;\n"
+                 "    assign r2 = src4;\n"
+                 "  end\n"
+                 "  initial #1 $display(\"%b %b\", g.r1, g.r2);\n"
+                 "endmodule\n",
+                 f),
+      "0011 1001\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

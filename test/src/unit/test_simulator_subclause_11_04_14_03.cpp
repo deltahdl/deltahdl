@@ -465,4 +465,24 @@ TEST(StreamUnpackSim, HandleAndWholeArrayTargetsTakeTheirMembersAndElements) {
             "ab cd 12 34 02 03\n");
 }
 
+TEST(StreamingUnpackSim,
+     AnUnpackWritesDeclaredPropertiesAndLeavesTheirRandomModes) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class K; rand bit [7:0] x; rand bit [7:0] y; endclass\n"
+                 "module m;\n"
+                 "  K h;\n"
+                 "  initial begin\n"
+                 "    h = new;\n"
+                 "    h.x.rand_mode(0);\n"
+                 "    {>>{h}} = 16'h5A3C;\n"
+                 "    $display(\"%h %h %0d %0d\", h.x, h.y, h.x.rand_mode(),\n"
+                 "             h.y.rand_mode());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "5a 3c 0 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

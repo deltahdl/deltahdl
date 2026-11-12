@@ -528,4 +528,92 @@ TEST(ConditionalOperatorSim, AmbiguousPredicateOverOperandsNotLogicallyEqual) {
       "x0 1 1 ab 0 xxxx 5\n");
 }
 
+TEST(ConditionalOperatorSim, RealBesideShortrealIsReal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  real r = 1.0000000001; shortreal sr = 2.5; bit s1 = 1, s0 = 0;\n"
+          "  initial $display(\"%0d %0d %.10f %.10f\", $bits(s1 ? r : sr),\n"
+          "                   $bits(s0 ? sr : r), s1 ? r : sr, s0 ? sr : r);\n"
+          "endmodule\n",
+          f),
+      "64 64 1.0000000001 1.0000000001\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalOperatorSim,
+     DISABLED_IntegralBesideShortrealIsCastToShortreal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  shortreal sr = 2.5; int i = 16777217; bit s1 = 1, s0 = 0;\n"
+          "  initial $display(\"%0d %0d %.1f %.1f\", $bits(s1 ? sr : i),\n"
+          "                   $bits(s1 ? i : sr), s0 ? sr : i, s1 ? i : sr);\n"
+          "endmodule\n",
+          f),
+      "32 32 16777216.0 16777216.0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalOperatorSim,
+     DISABLED_ClassBranchesTakeTheirCommonOrNonNullType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface class IC; endclass\n"
+          "class A; function string nv(); return \"A\"; endfunction endclass\n"
+          "class D extends A;\n"
+          "  int d_only = 7;\n"
+          "  function string nv(); return \"D\"; endfunction\n"
+          "endclass\n"
+          "class E extends A; function string nv(); return \"E\"; endfunction "
+          "endclass\n"
+          "module m;\n"
+          "  bit s1 = 1, s0 = 0; D d; E e; A a;\n"
+          "  initial begin\n"
+          "    d = new; e = new; a = new;\n"
+          "    $display(\"%s %s %s %s\", (s1 ? d : e).nv(), (s0 ? d : "
+          "e).nv(),\n"
+          "             (s1 ? d : a).nv(), (s0 ? a : d).nv());\n"
+          "    $display(\"%s %0d\", (s1 ? null : d).nv(), (s0 ? null : "
+          "d).d_only);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "A A A A\nD 7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ConditionalOperatorSim, ClassBranchesYieldTheSelectedHandle) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface class IC; endclass\n"
+          "class A; function string nv(); return \"A\"; endfunction endclass\n"
+          "class D extends A;\n"
+          "  int d_only = 7;\n"
+          "  function string nv(); return \"D\"; endfunction\n"
+          "endclass\n"
+          "class E extends A; function string nv(); return \"E\"; endfunction "
+          "endclass\n"
+          "class C implements IC; endclass\n"
+          "module m;\n"
+          "  bit s1 = 1, s0 = 0; D d; E e; A a; IC ic; C c;\n"
+          "  initial begin\n"
+          "    d = new; e = new; a = new; c = new; ic = c;\n"
+          "    $display(\"%b %b %b %b\", (s1 ? d : e) == d, (s0 ? d : e) == "
+          "e,\n"
+          "             (s1 ? a : d) == a, (s0 ? a : d) == d);\n"
+          "    $display(\"%b %b %b\", (s1 ? ic : c) == c, (s1 ? null : d) == "
+          "null,\n"
+          "             (s1 ? null : null) == null);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 1 1 1\n1 1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

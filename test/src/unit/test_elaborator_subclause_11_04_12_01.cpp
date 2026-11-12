@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -656,6 +657,44 @@ TEST(ReplicationElaboration, ReplicationAssignedWithinAnExpressionRejected) {
                               line, "11.4.12.1"));
   }
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(
+    ReplicationElaboration,
+    AZeroReplicationAloneInANestedConcatenationOrASystemTaskArgumentIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  parameter P = 32;\n"
+      "  wire [31:0] a, c;\n"
+      "  assign c[31:0] = { {{32-P{1'b1}}}, a[P-1:0] };\n"
+      "  initial\n"
+      "    $displayb({32-P{1'b1}}, a[P-1:0]);\n"
+      "endmodule\n",
+      f);
+  for (const int kLine : {4, 6}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a zero replication needs a positive-size "
+                              "operand beside it in the same concatenation",
+                              kLine, "11.4.12.1"))
+        << kLine;
+  }
+}
+
+TEST(ReplicationElaboration,
+     AZeroReplicationBesideAPositiveOperandIsAcceptedForEveryMultiplier) {
+  for (const char* const kP : {"1", "16", "32"}) {
+    ElabFixture f;
+    ElaborateSrc(std::string("module m;\n"
+                             "  parameter P = ") +
+                     kP +
+                     ";\n"
+                     "  wire [31:0] a, b;\n"
+                     "  assign b[31:0] = { {32-P{1'b1}}, a[P-1:0] };\n"
+                     "endmodule\n",
+                 f);
+    EXPECT_FALSE(f.diag.HasErrors()) << kP;
+  }
 }
 
 }  // namespace

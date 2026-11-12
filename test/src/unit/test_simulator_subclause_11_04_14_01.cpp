@@ -482,4 +482,61 @@ TEST(StreamingConcatSim, ClassMembersAndPackedUnionsStreamAsTheClauseSays) {
       "0b00000001112233445566 a5\n");
 }
 
+TEST(StreamingConcatSim, DISABLED_ThisStreamsTheMembersOfTheObject) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "class B; bit [3:0] b = 4'h1; endclass\n"
+          "class X extends B;\n"
+          "  bit [3:0] x = 4'h2;\n"
+          "  function bit [7:0] ret(); return {>>{this}}; endfunction\n"
+          "  function bit [7:0] asg();\n"
+          "    bit [7:0] r; r = {>>{this}}; return r;\n"
+          "  endfunction\n"
+          "  function bit [7:0] cst(); return 8'({<<4{this}}); endfunction\n"
+          "endclass\n"
+          "class P;\n"
+          "  protected bit [3:0] p = 4'h5; local bit [3:0] l = 4'h6;\n"
+          "  function bit [7:0] me(); return {>>{this}}; endfunction\n"
+          "endclass\n"
+          "module m;\n"
+          "  X xo; P po;\n"
+          "  initial begin\n"
+          "    xo = new; po = new;\n"
+          "    $display(\"%h %h %h %h\", xo.ret(), xo.asg(), xo.cst(), "
+          "po.me());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "12 12 21 56\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(StreamingConcatSim, ANamedHandleInAMethodStreamsTheMembersOfTheObject) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "class B; bit [3:0] b = 4'h1; endclass\n"
+          "class X extends B;\n"
+          "  bit [3:0] x = 4'h2;\n"
+          "  function bit [7:0] me(); X o = this; return {>>{o}}; endfunction\n"
+          "  function bit [7:0] other(X y); return {>>{y}}; endfunction\n"
+          "endclass\n"
+          "class P;\n"
+          "  protected bit [3:0] p = 4'h5; local bit [3:0] l = 4'h6;\n"
+          "  function bit [7:0] me(P o); bit [7:0] r; r = {>>{o}}; return r; "
+          "endfunction\n"
+          "endclass\n"
+          "module m;\n"
+          "  X xo, x2; P po;\n"
+          "  initial begin\n"
+          "    xo = new; x2 = new; x2.x = 4'h7; po = new;\n"
+          "    $display(\"%h %h %h\", xo.me(), xo.other(x2), po.me(po));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "12 17 56\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
