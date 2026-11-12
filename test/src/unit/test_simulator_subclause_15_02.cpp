@@ -89,4 +89,91 @@ TEST(BuiltinClassRedefinitionSim, ArrayOfAClassNamedSemaphoreHoldsItsObjects) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
+TEST(BuiltInSyncClassSim,
+     StdQualifiedNamesReachTheBuiltInsBesideARedefinition) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  class semaphore;\n"
+          "    int keys;\n"
+          "    function new(int k = 0); keys = k + 100; endfunction\n"
+          "  endclass\n"
+          "  class Logged extends std::mailbox #(int);\n"
+          "    int puts;\n"
+          "    task send(int v);\n"
+          "      puts++;\n"
+          "      put(v);\n"
+          "    endtask\n"
+          "  endclass\n"
+          "  semaphore mine = new(1);\n"
+          "  std::semaphore real_sem = new(1);\n"
+          "  Logged lm = new;\n"
+          "  initial begin\n"
+          "    int v, got;\n"
+          "    got = real_sem.try_get(1);\n"
+          "    $display(\"mine=%0d got=%0d again=%0d\", mine.keys, got, "
+          "real_sem.try_get(1));\n"
+          "    lm.send(7);\n"
+          "    lm.send(8);\n"
+          "    lm.get(v);\n"
+          "    $display(\"puts=%0d v=%0d n=%0d\", lm.puts, v, lm.num());\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "mine=101 got=1 again=0\nputs=2 v=7 n=1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BuiltInSyncClassSim, DISABLED_ADerivedClassesMethodHidesTheBuiltInOne) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  class Counted extends semaphore;\n"
+          "    int puts, gets, tries;\n"
+          "    function new(int k = 0); super.new(k); endfunction\n"
+          "    function void put(int n = 1); puts++; super.put(n); "
+          "endfunction\n"
+          "    task get(int n = 1); gets++; super.get(n); endtask\n"
+          "    function int try_get(int n = 1); tries++; return "
+          "super.try_get(n); endfunction\n"
+          "  endclass\n"
+          "  class Mb extends mailbox;\n"
+          "    int gets, peeks, tries, nums;\n"
+          "    task get(ref int v); gets++; super.get(v); endtask\n"
+          "    task peek(ref int v); peeks++; super.peek(v); endtask\n"
+          "    function int try_put(int v); tries++; return super.try_put(v); "
+          "endfunction\n"
+          "    function int num(); nums++; return super.num(); endfunction\n"
+          "  endclass\n"
+          "  Counted s = new(1);\n"
+          "  Mb b = new;\n"
+          "  initial begin\n"
+          "    int v, n;\n"
+          "    s.get(1);\n"
+          "    s.put(1);\n"
+          "    void'(s.try_get(1));\n"
+          "    void'(b.try_put(4));\n"
+          "    b.peek(v);\n"
+          "    b.get(v);\n"
+          "    n = b.num();\n"
+          "    $display(\"%0d %0d %0d | %0d %0d %0d %0d\", s.gets, s.puts, "
+          "s.tries, b.tries, b.peeks, b.gets, b.nums);\n"
+          "    begin\n"
+          "      semaphore h;\n"
+          "      mailbox g;\n"
+          "      h = s;\n"
+          "      g = b;\n"
+          "      h.put(1);\n"
+          "      n = g.num();\n"
+          "      $display(\"%0d %0d\", s.puts, b.nums);\n"
+          "    end\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 1 1 | 1 1 1 1\n1 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
