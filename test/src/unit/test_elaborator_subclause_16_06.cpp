@@ -542,4 +542,180 @@ TEST(StaticAssertionAutomaticRef,
   }
 }
 
+const char kNonStaticMember[] =
+    "concurrent assertion expression references non-static class member";
+
+const char kMemberClasses[] =
+    "package pk;\n"
+    "  class I; bit v; static bit sv; endclass\n"
+    "  class H;\n"
+    "    bit v; static bit sv; I i = new; static H sh = new;\n"
+    "    function bit get(); return v; endfunction\n"
+    "    static function bit sget(); return sv; endfunction\n"
+    "  endclass\n"
+    "  H ph = new;\n"
+    "endpackage\n"
+    "import pk::*;\n"
+    "H gh = new;\n";
+
+std::string MemberBench(const std::string& items,
+                        const std::string& outside = "") {
+  return std::string(kMemberClasses) + outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1;\n"
+         "  H h = new;\n"
+         "  " +
+         items + "\nendmodule\n";
+}
+
+std::string LastLine(const std::string& text) {
+  return text.substr(text.rfind('\n') + 1);
+}
+
+void ExpectMemberReported(const std::string& place, const std::string& form,
+                          const std::string& outside = "") {
+  const std::string kSrc = Replaced(MemberBench(place, outside), form);
+  const std::string kStatement = Replaced(LastLine(place), form);
+  ElabFixture f;
+  Elaborate(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNonStaticMember,
+                            LineHolding(kSrc, kStatement), "16.6"))
+      << kSrc;
+}
+
+void ExpectMemberAccepted(const std::string& place, const std::string& form,
+                          const std::string& outside = "") {
+  const std::string kSrc = Replaced(MemberBench(place, outside), form);
+  ElabFixture f;
+  auto* design = Elaborate(kSrc, f);
+  ASSERT_NE(design, nullptr) << kSrc;
+  EXPECT_FALSE(f.has_errors) << kSrc;
+}
+
+const char kDirect[] = "assert property (@(posedge clk) @@);";
+
+TEST(NonStaticMemberInAssertion, EveryStaticMemberIsAccepted) {
+  for (const char* form : {"h.sv", "H::sv", "h.sget()", "H::sget()", "H::sh.sv",
+                           "pk::ph.sv", "gh.sv"}) {
+    ExpectMemberAccepted(kDirect, form);
+  }
+}
+
+TEST(NonStaticMemberInAssertion, EveryNonStaticMemberHandleIsReported) {
+  for (const char* form : {"h.v", "h.get()", "h.i.v", "h.i.sv"}) {
+    ExpectMemberReported(kDirect, form);
+  }
+}
+
+TEST(NonStaticMemberInAssertion,
+     DISABLED_AMemberThroughAStaticPackageOrUnitHandleIsReported) {
+  for (const char* form : {"H::sh.v", "pk::ph.v", "gh.v"}) {
+    ExpectMemberReported(kDirect, form);
+  }
+}
+
+const char* const kReportedPlaces[] = {
+    "assume property (@(posedge clk) @@);",
+    "cover property (@(posedge clk) @@);",
+    "property q; @(posedge clk) @@; endproperty\n  assert property (q);",
+    ("property qa(x); @(posedge clk) x; endproperty\n"
+     "  assert property (qa(@@));"),
+};
+
+const char* const kUnreportedPlaces[] = {
+    "restrict property (@(posedge clk) @@);",
+    "assert property (@(posedge clk) a ##1 @@);",
+    "assert property (@(posedge clk) a ##[1:2] @@);",
+    "assert property (@(posedge clk) @@ |-> a);",
+    "assert property (@(posedge clk) a |-> @@);",
+    "assert property (@(posedge clk) @@ |=> a);",
+    "assert property (@(posedge clk) a |=> @@);",
+    "sequence s; @(posedge clk) @@ ##1 a; endsequence\n  cover property (s);",
+    "let l = @@;\n  assert property (@(posedge clk) l);",
+    "assert property (@(posedge clk) disable iff (@@) a);",
+    "default disable iff (@@);\n  assert property (@(posedge clk) a);",
+    "always @(posedge clk) assert property (@@);",
+    "initial assert property (@(posedge clk) @@);",
+    ("property pm; bit x; @(posedge clk) (a, x = @@) |-> x; endproperty\n"
+     "  assert property (pm);"),
+};
+
+TEST(NonStaticMemberInAssertion, EveryPlaceAcceptsAStaticMember) {
+  for (const char* place : kReportedPlaces) {
+    ExpectMemberAccepted(place, "h.sv");
+  }
+  for (const char* place : kUnreportedPlaces) {
+    ExpectMemberAccepted(place, "h.sv");
+    ExpectMemberAccepted(place, "H::sget()");
+  }
+}
+
+TEST(NonStaticMemberInAssertion, TheAssertionsOwnPlacesReportAMember) {
+  for (const char* place : kReportedPlaces) {
+    ExpectMemberReported(place, "h.v");
+  }
+}
+
+TEST(NonStaticMemberInAssertion, DISABLED_EveryOtherPlaceReportsAMember) {
+  for (const char* place : kUnreportedPlaces) {
+    ExpectMemberReported(place, "h.v");
+    ExpectMemberReported(place, "h.get()");
+  }
+}
+
+std::string MemberUnit(const char* kind, const char* body) {
+  return std::string(kind) + " u_unit(input logic clk, input logic a);\n" +
+         "  H h = new;\n  " + body + "\nend" + kind + "\n";
+}
+
+const char* const kUnitBodies[] = {
+    "assert property (@(posedge clk) @@);",
+    "assert property (@(posedge clk) a |-> @@);",
+};
+
+std::string CheckerUnit(const char* body) {
+  return std::string("checker u_unit(logic clk, logic a);\n  H h = new;\n  ") +
+         body + "\nendchecker\n";
+}
+
+std::string GenerateBody(const char* body) {
+  return std::string("if (1) begin : g ") + body + " end";
+}
+
+void ExpectEveryUnit(const char* body, const char* form, bool reported) {
+  for (const std::string& unit :
+       {MemberUnit("interface", body), MemberUnit("program", body),
+        CheckerUnit(body)}) {
+    const std::string kPlace = std::string("u_unit u(clk, a);");
+    if (reported) {
+      const std::string kSrc = Replaced(MemberBench(kPlace, unit), form);
+      ElabFixture f;
+      Elaborate(kSrc, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNonStaticMember,
+                                LineHolding(kSrc, Replaced(body, form)),
+                                "16.6"))
+          << kSrc;
+    } else {
+      ExpectMemberAccepted(kPlace, form, unit);
+    }
+  }
+  if (reported) {
+    ExpectMemberReported(GenerateBody(body), form);
+  } else {
+    ExpectMemberAccepted(GenerateBody(body), form);
+  }
+}
+
+TEST(NonStaticMemberInAssertion, EveryUnitAcceptsAStaticMember) {
+  for (const char* body : kUnitBodies) ExpectEveryUnit(body, "h.sv", false);
+}
+
+TEST(NonStaticMemberInAssertion, EveryUnitReportsADirectMember) {
+  ExpectEveryUnit(kUnitBodies[0], "h.v", true);
+}
+
+TEST(NonStaticMemberInAssertion, DISABLED_EveryUnitReportsATemporalMember) {
+  ExpectEveryUnit(kUnitBodies[1], "h.v", true);
+}
+
 }  // namespace
