@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "builders_ast.h"
@@ -557,6 +558,67 @@ TEST(CasexStatementSim, AllSignedExpressionsSignExtend) {
       f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 1u);
+}
+
+TEST(CaseDoNotCareExampleSim, TheCasezExampleCallsTheTaskOfTheFirstMatch) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic [7:0] ir;\n"
+          "  task instruction1(input logic [7:0] v); $display(\"1 %b\", v); "
+          "endtask\n"
+          "  task instruction2(input logic [7:0] v); $display(\"2 %b\", v); "
+          "endtask\n"
+          "  task instruction3(input logic [7:0] v); $display(\"3 %b\", v); "
+          "endtask\n"
+          "  task instruction4(input logic [7:0] v); $display(\"4 %b\", v); "
+          "endtask\n"
+          "  task decode(input logic [7:0] v);\n"
+          "    ir = v;\n"
+          "    casez (ir)\n"
+          "      8'b1???????: instruction1(ir);\n"
+          "      8'b01??????: instruction2(ir);\n"
+          "      8'b00010???: instruction3(ir);\n"
+          "      8'b000001??: instruction4(ir);\n"
+          "    endcase\n"
+          "  endtask\n"
+          "  initial begin\n"
+          "    decode(8'b1xz00110); decode(8'b01000000); decode(8'b00010101);\n"
+          "    decode(8'b00000110); decode(8'b00001000); decode(8'bz0010111);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 1xz00110\n2 01000000\n3 00010101\n4 00000110\n1 z0010111\n");
+}
+
+TEST(CaseDoNotCareExampleSim, TheCasexExampleMasksBitsAtRunTime) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic [7:0] r, mask;\n"
+          "  task stat1; $display(\"stat1\"); endtask\n"
+          "  task stat2; $display(\"stat2\"); endtask\n"
+          "  task stat3; $display(\"stat3\"); endtask\n"
+          "  task stat4; $display(\"stat4\"); endtask\n"
+          "  task decode(input logic [7:0] v);\n"
+          "    r = v;\n"
+          "    mask = 8'bx0x0x0x0;\n"
+          "    casex (r ^ mask)\n"
+          "      8'b001100xx: stat1;\n"
+          "      8'b1100xx00: stat2;\n"
+          "      8'b00xx0011: stat3;\n"
+          "      8'bxx010100: stat4;\n"
+          "    endcase\n"
+          "  endtask\n"
+          "  initial begin\n"
+          "    decode(8'b01100110); decode(8'b00000001); decode(8'b00010100);\n"
+          "    decode(8'b01010000); decode(8'b00010000);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "stat2\nstat3\nstat4\nstat1\n");
 }
 
 }  // namespace

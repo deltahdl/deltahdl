@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "fixture_simulator.h"
@@ -680,6 +681,185 @@ TEST(CaseStatementSim, OneUnsignedItemMakesEveryExpressionUnsigned) {
       f, "x");
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 3u);
+}
+
+TEST(CaseExampleSim, TheDecoderExampleClearsOneBitPerValueAndElseX) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [15:0] data;\n"
+                       "  logic [9:0] result;\n"
+                       "  task decode(input logic [15:0] d);\n"
+                       "    data = d;\n"
+                       "    case (data)\n"
+                       "      16'd0:  result = 10'b0111111111;\n"
+                       "      16'd1:  result = 10'b1011111111;\n"
+                       "      16'd2:  result = 10'b1101111111;\n"
+                       "      16'd3:  result = 10'b1110111111;\n"
+                       "      16'd4:  result = 10'b1111011111;\n"
+                       "      16'd5:  result = 10'b1111101111;\n"
+                       "      16'd6:  result = 10'b1111110111;\n"
+                       "      16'd7:  result = 10'b1111111011;\n"
+                       "      16'd8:  result = 10'b1111111101;\n"
+                       "      16'd9:  result = 10'b1111111110;\n"
+                       "      default result = 'x;\n"
+                       "    endcase\n"
+                       "    $display(\"%b\", result);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    decode(16'd0); decode(16'd4); decode(16'd9); "
+                       "decode(16'd12); decode('x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0111111111\n1111011111\n1111111110\nxxxxxxxxxx\nxxxxxxxxxx\n");
+}
+
+TEST(CaseExampleSim, TheXAndZExampleResolvesAnUnknownSelectBit) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic [1:2] select;\n"
+          "  logic flaga, flagb, result;\n"
+          "  task pick(input logic [1:2] s, input logic fa, input logic fb);\n"
+          "    select = s; flaga = fa; flagb = fb;\n"
+          "    case (select[1:2])\n"
+          "      2'b00:  result = 0;\n"
+          "      2'b01:  result = flaga;\n"
+          "      2'b0x,\n"
+          "      2'b0z:  result = flaga ? 'x : 0;\n"
+          "      2'b10:  result = flagb;\n"
+          "      2'bx0,\n"
+          "      2'bz0:  result = flagb ? 'x : 0;\n"
+          "      default result = 'x;\n"
+          "    endcase\n"
+          "    $display(\"%b\", result);\n"
+          "  endtask\n"
+          "  initial begin\n"
+          "    pick(2'b0x, 0, 1); pick(2'b0z, 1, 0); pick(2'b01, 1, 0); "
+          "pick(2'b10, 0, 1);\n"
+          "    pick(2'bx0, 0, 1); pick(2'bz0, 1, 0); pick(2'b11, 0, 0); "
+          "pick(2'b00, 1, 1);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "0\nx\n1\n1\nx\n0\nx\n0\n");
+}
+
+TEST(CaseExampleSim, TheSignalExampleTellsFloatingFromUnknown) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  logic sig;\n"
+                 "  task show(input logic s);\n"
+                 "    sig = s;\n"
+                 "    case (sig)\n"
+                 "      1'bz:    $display(\"signal is floating\");\n"
+                 "      1'bx:    $display(\"signal is unknown\");\n"
+                 "      default: $display(\"signal is %b\", sig);\n"
+                 "    endcase\n"
+                 "  endtask\n"
+                 "  initial begin\n"
+                 "    show(1'bz); show(1'bx); show(1'b1); show(1'b0);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "signal is floating\nsignal is unknown\nsignal is 1\nsignal is 0\n");
+}
+
+TEST(CaseStatementSim, TheItemsAreEvaluatedInOrderUntilTheFirstMatch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic int note(input int v);\n"
+                       "    $write(\"%0d \", v);\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    case (note(2))\n"
+                       "      note(1): $display(\"one\");\n"
+                       "      note(2), note(3): $display(\"two\");\n"
+                       "      note(2): $display(\"again\");\n"
+                       "      default: $display(\"none\");\n"
+                       "    endcase\n"
+                       "    case (note(9))\n"
+                       "      note(7): $display(\"seven\");\n"
+                       "      default: $display(\"default\");\n"
+                       "      note(8): $display(\"eight\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 1 2 two\n9 7 8 default\n");
+}
+
+TEST(CaseStatementSim, EveryKindOfCaseDecidesInEveryKindOfProcedure) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  function automatic int f(input logic [3:0] v);\n"
+                       "    casez (v)\n"
+                       "      4'b1???: return 1;\n"
+                       "      default return 0;\n"
+                       "    endcase\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "function automatic int g(input logic [3:0] v);\n"
+                       "  casex (v)\n"
+                       "    4'b01xx: return 2;\n"
+                       "    default: return 0;\n"
+                       "  endcase\n"
+                       "endfunction\n"
+                       "class C;\n"
+                       "  function int m(input int v);\n"
+                       "    case (v) inside\n"
+                       "      [1:3]: return 3;\n"
+                       "      default: return 0;\n"
+                       "    endcase\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "interface I;\n"
+                       "  logic [1:0] v;\n"
+                       "  initial begin\n"
+                       "    v = 2'bz1;\n"
+                       "    #2 case (v)\n"
+                       "      2'b01: $display(\"I 01\");\n"
+                       "      2'bz1: $display(\"I z1\");\n"
+                       "      default: $display(\"I other\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endinterface\n"
+                       "program p;\n"
+                       "  initial #3 unique case (2)\n"
+                       "    1: $display(\"P one\");\n"
+                       "    2: $display(\"P two\");\n"
+                       "  endcase\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  I u();\n"
+                       "  p pp();\n"
+                       "  task tk(input int v);\n"
+                       "    priority case (v)\n"
+                       "      0: $display(\"T zero\");\n"
+                       "      1, 2: $display(\"T low\");\n"
+                       "    endcase\n"
+                       "  endtask\n"
+                       "  if (1) begin : gb\n"
+                       "    initial #1 casez (4'b10z1)\n"
+                       "      4'b11?1: $display(\"G one\");\n"
+                       "      4'b10?1: $display(\"G hit\");\n"
+                       "      default: $display(\"G miss\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "  initial begin\n"
+                       "    C c;\n"
+                       "    c = new;\n"
+                       "    $display(\"%0d %0d %0d %0d\", pk::f(4'b1010), "
+                       "g(4'b01z1), c.m(2), c.m(5));\n"
+                       "    tk(2);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 2 3 0\nT low\nG hit\nI z1\nP two\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

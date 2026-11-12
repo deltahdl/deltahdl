@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -493,6 +495,52 @@ TEST(CaseInsideStatementSim, CaseInsideNoMatchNoDefaultLeavesTargetUnchanged) {
       f, "x");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
+}
+
+TEST(CaseInsideExampleSim, ThePriorityCaseInsideExampleMatchesWithWildcards) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic [2:0] status;\n"
+          "  task task1; $display(\"task1 %b\", status); endtask\n"
+          "  task task2; $display(\"task2 %b\", status); endtask\n"
+          "  task check(input logic [2:0] v);\n"
+          "    status = v;\n"
+          "    priority case (status) inside\n"
+          "      1, 3 :         task1;\n"
+          "      3'b0?0, [4:7]: task2;\n"
+          "    endcase\n"
+          "  endtask\n"
+          "  initial begin\n"
+          "    check(3'b001); check(3'b011); check(3'b000); check(3'b010);\n"
+          "    check(3'b0x0); check(3'b0z0); check(3'b100); check(3'b111);\n"
+          "    check(3'b00x); check(3'b01x); check(3'bxxx);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "task1 001\ntask1 011\ntask2 000\ntask2 010\ntask2 0x0\ntask2 0z0\ntask2 "
+      "100\ntask2 111\n");
+  EXPECT_EQ(f.diag.WarningCount(), 3u);
+}
+
+TEST(CaseInsideStatementSim, TheItemsAreEvaluatedInOrderUntilTheFirstMatch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  function automatic int note(input int v);\n"
+                       "    $write(\"%0d \", v);\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    case (note(5)) inside\n"
+                       "      note(1), [note(2):note(3)]: $display(\"low\");\n"
+                       "      [note(4):note(6)], note(7): $display(\"mid\");\n"
+                       "      note(8): $display(\"high\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 1 2 3 4 6 mid\n");
 }
 
 }  // namespace

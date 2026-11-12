@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -409,6 +411,99 @@ TEST(CaseSyntaxParsing, MissingEndcaseNames12_5) {
       "    case (x)\n"
       "      0: y = 1;");
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endcase'", 4, "12.5"));
+}
+
+constexpr const char* kSecondDefault =
+    "case statement shall have at most one 'default' item";
+
+constexpr const char* kCaseHeads[] = {
+    "case (x)",          "casez (x)",          "casex (x)",
+    "case (x) inside",   "case (x) matches",   "unique case (x)",
+    "unique0 casez (x)", "priority casex (x)", "priority case (x) inside"};
+
+constexpr const char* kTwoDefaultItems[] = {
+    "      0: y = 1;\n      default: y = 2;\n      default: y = 3;\n",
+    "      0: y = 1;\n      default y = 2;\n      default: y = 3;\n",
+    "      0: y = 1;\n      default: y = 2;\n      default y = 3;\n",
+    "      default: y = 1;\n      0: y = 2;\n      default y = 3;\n"};
+
+struct PlacedCase {
+  const char* src;
+  int second_default_line;
+};
+
+constexpr PlacedCase kTwoDefaultsInPlaces[] = {
+    {"module m;\n  function int f(int x);\n    case (x)\n"
+     "      default: return 1;\n      default return 2;\n    endcase\n"
+     "  endfunction\nendmodule\n",
+     5},
+    {"module m;\n  task t(int x);\n    casez (x)\n      default: ;\n"
+     "      1: ;\n      default: ;\n    endcase\n  endtask\nendmodule\n",
+     6},
+    {"class C;\n  function void f(int x);\n    case (x) inside\n"
+     "      [0:1]: ;\n      default ;\n      default: ;\n    endcase\n"
+     "  endfunction\nendclass\n",
+     6},
+    {"package p;\n  function int f(int x);\n    unique casex (x)\n"
+     "      default: return 1;\n      1: return 2;\n      default: return 3;\n"
+     "    endcase\n  endfunction\nendpackage\n",
+     6},
+    {"interface i;\n  int x, y;\n  always_comb\n    priority case (x)\n"
+     "      default y = 1;\n      default y = 2;\n    endcase\nendinterface\n",
+     6},
+    {"program p;\n  int x, y;\n  initial\n    unique0 case (x)\n"
+     "      0: y = 0;\n      default: y = 1;\n      default: y = 2;\n"
+     "    endcase\nendprogram\n",
+     7},
+    {"function int f(int x);\n  case (x) matches\n    default: return 1;\n"
+     "    default: return 2;\n  endcase\nendfunction\n",
+     4}};
+
+std::string CaseInInitial(const char* head, const char* items) {
+  return std::string("module m;\n  initial begin\n    ") + head + "\n" + items +
+         "    endcase\n  end\nendmodule\n";
+}
+
+std::string WithoutLine(const std::string& src, int line) {
+  std::string::size_type begin = 0;
+  for (int i = 1; i < line; ++i) begin = src.find('\n', begin) + 1;
+  return src.substr(0, begin) + src.substr(src.find('\n', begin) + 1);
+}
+
+TEST(CaseSyntaxParsing, ASecondDefaultIsReportedInEveryFormOfCase) {
+  for (const char* head : kCaseHeads) {
+    for (const char* items : kTwoDefaultItems) {
+      auto r = Parse(CaseInInitial(head, items));
+      EXPECT_TRUE(ReportedError(r.diags, kSecondDefault, 6, "12.5"))
+          << head << "\n"
+          << items;
+    }
+  }
+}
+
+TEST(CaseSyntaxParsing, OneDefaultIsAcceptedInEveryFormOfCase) {
+  for (const char* head : kCaseHeads) {
+    for (const char* items : kTwoDefaultItems) {
+      auto r = Parse(WithoutLine(CaseInInitial(head, items), 6));
+      EXPECT_FALSE(r.has_errors) << head << "\n" << items;
+    }
+  }
+}
+
+TEST(CaseSyntaxParsing, ASecondDefaultIsReportedInEveryPlace) {
+  for (const auto& placed : kTwoDefaultsInPlaces) {
+    auto r = Parse(placed.src);
+    EXPECT_TRUE(ReportedError(r.diags, kSecondDefault,
+                              placed.second_default_line, "12.5"))
+        << placed.src;
+  }
+}
+
+TEST(CaseSyntaxParsing, OneDefaultIsAcceptedInEveryPlace) {
+  for (const auto& placed : kTwoDefaultsInPlaces) {
+    auto r = Parse(WithoutLine(placed.src, placed.second_default_line));
+    EXPECT_FALSE(r.has_errors) << placed.src;
+  }
 }
 
 }  // namespace

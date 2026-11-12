@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
@@ -335,6 +336,33 @@ TEST(CaseViolationDeferralSim, UniqueCaseOverlapNames12_5_3_1) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
                               "unique case: multiple items matched", 5,
                               "12.5.3.1"));
+}
+
+TEST(CaseViolationDeferralSim,
+     AssertionControlSilencesEachKindOfCaseViolation) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] x;\n"
+                       "  initial begin\n"
+                       "    $assertcontrol(4, 128);\n"
+                       "    priority casez (2'b11)\n"
+                       "      2'b0?: x = 1;\n"
+                       "    endcase\n"
+                       "    $assertcontrol(4, 64);\n"
+                       "    unique0 case (1)\n"
+                       "      1: x = 2;\n"
+                       "      1: x = 3;\n"
+                       "    endcase\n"
+                       "    $assertcontrol(3, 128);\n"
+                       "    priority casex (2'b11)\n"
+                       "      2'b0x: x = 4;\n"
+                       "    endcase\n"
+                       "    $display(\"%0d\", x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2\n");
+  EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
 }  // namespace

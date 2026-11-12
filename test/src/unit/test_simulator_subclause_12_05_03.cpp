@@ -281,4 +281,111 @@ TEST(CaseQualifierSim, UniqueNoMatchWithDefaultSilent) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+TEST(QualifiedCaseExampleSim, TheUniqueExampleReportsValuesNoItemMatches) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [2:0] a;\n"
+                       "  initial for (int i = 0; i < 8; i++) begin\n"
+                       "    a = i;\n"
+                       "    unique case(a)\n"
+                       "      0,1: $display(\"0 or 1\");\n"
+                       "      2:   $display(\"2\");\n"
+                       "      4:   $display(\"4\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 or 1\n0 or 1\n2\n4\n");
+  EXPECT_EQ(f.diag.WarningCount(), 4u);
+}
+
+TEST(QualifiedCaseExampleSim,
+     ThePriorityCasezExampleReportsValuesNoItemMatches) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [2:0] a;\n"
+                       "  initial for (int i = 0; i < 8; i++) begin\n"
+                       "    a = i;\n"
+                       "    priority casez(a)\n"
+                       "      3'b00?: $display(\"0 or 1\");\n"
+                       "      3'b0??: $display(\"2 or 3\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 or 1\n0 or 1\n2 or 3\n2 or 3\n");
+  EXPECT_EQ(f.diag.WarningCount(), 4u);
+}
+
+TEST(QualifiedCaseExampleSim, TheUnique0ExampleReportsNoValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [2:0] a;\n"
+                       "  initial for (int i = 0; i < 8; i++) begin\n"
+                       "    a = i;\n"
+                       "    unique0 case(a)\n"
+                       "      0,1: $display(\"0 or 1\");\n"
+                       "      2:   $display(\"2\");\n"
+                       "      4:   $display(\"4\");\n"
+                       "    endcase\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 or 1\n0 or 1\n2\n4\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(CaseQualifierSim, UniqueAndUnique0EvaluateTheItemsAfterTheMatch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int n;\n"
+                       "  function automatic int item(input int v);\n"
+                       "    n++;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    n = 0;\n"
+                       "    unique case (1)\n"
+                       "      item(1): $display(\"u first\");\n"
+                       "      item(2): $display(\"u second\");\n"
+                       "      item(3): $display(\"u third\");\n"
+                       "    endcase\n"
+                       "    $display(\"%0d\", n);\n"
+                       "    n = 0;\n"
+                       "    unique0 case (1)\n"
+                       "      item(1): $display(\"u0 first\");\n"
+                       "      item(2): $display(\"u0 second\");\n"
+                       "      item(3): $display(\"u0 third\");\n"
+                       "    endcase\n"
+                       "    $display(\"%0d\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "u first\n3\nu0 first\n3\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(CaseQualifierSim, APriorityCaseStopsEvaluatingAtTheFirstMatch) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int n;\n"
+                       "  function automatic int item(input int v);\n"
+                       "    n++;\n"
+                       "    return v;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    n = 0;\n"
+                       "    priority case (1)\n"
+                       "      item(1): $display(\"first\");\n"
+                       "      item(1): $display(\"second\");\n"
+                       "      item(3): $display(\"third\");\n"
+                       "    endcase\n"
+                       "    $display(\"%0d\", n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "first\n1\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
 }  // namespace
