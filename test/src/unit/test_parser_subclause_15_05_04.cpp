@@ -134,4 +134,22 @@ TEST(WaitOrderParser, WaitOrderElseOnly) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
+TEST(WaitOrderParser, APackageQualifiedOperandIsReported) {
+  auto r = Parse(
+      "package pk;\n"
+      "  event pe;\n"
+      "endpackage\n"
+      "module m;\n"
+      "  event a;\n"
+      "  initial begin\n"
+      "    wait_order(a, pk::pe);\n"
+      "    wait_order(a, $root.m.a);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "wait_order operand shall be a hierarchical identifier", 7,
+      "15.5.4"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
 }  // namespace

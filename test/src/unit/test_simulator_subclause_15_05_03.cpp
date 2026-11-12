@@ -460,4 +460,31 @@ TEST(NamedEventSim, TriggeredWakesNoProcessWithoutAFreshTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+TEST(IpcSync, TheClauseExampleForksEndThroughAnAliasAndATriggeredWait) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  event done, blast;\n"
+                       "  event done_too = done;\n"
+                       "  int log_ = 0;\n"
+                       "  task trigger(event ev);\n"
+                       "    -> ev;\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    fork\n"
+                       "      @ done_too;\n"
+                       "      #1 trigger(done);\n"
+                       "    join\n"
+                       "    $display(\"first fork ends at %0t\", $time);\n"
+                       "    fork\n"
+                       "      -> blast;\n"
+                       "      wait (blast.triggered);\n"
+                       "    join\n"
+                       "    $display(\"second fork ends at %0t\", $time);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "first fork ends at 1\nsecond fork ends at 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

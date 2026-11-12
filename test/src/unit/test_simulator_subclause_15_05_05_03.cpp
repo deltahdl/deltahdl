@@ -316,4 +316,40 @@ TEST(IpcSync, NullEventIsFalsy) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
+TEST(IpcSync, DISABLED_ElementsAndEventsOfOtherScopesCompareByTheirQueues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  event pe;\n"
+                 "endpackage\n"
+                 "interface ifc;\n"
+                 "  event ie;\n"
+                 "endinterface\n"
+                 "module sub;\n"
+                 "  event se;\n"
+                 "endmodule\n"
+                 "module m;\n"
+                 "  ifc i();\n"
+                 "  sub s();\n"
+                 "  event arr [2];\n"
+                 "  event x, y;\n"
+                 "  initial begin\n"
+                 "    $display(\"arr0!=null %0d  arr0!=arr1 %0d  arr0?%0d\", "
+                 "arr[0] != null, arr[0] != arr[1], arr[0] ? 1 : 0);\n"
+                 "    $display(\"ie!=null %0d  se!=null %0d  pe!=null %0d\", "
+                 "i.ie != null, s.se != null, pk::pe != null);\n"
+                 "    $display(\"ie==pe %0d  ie==se %0d  x==y %0d  ie==x "
+                 "%0d\", i.ie == pk::pe, i.ie == s.se, x == y, i.ie == x);\n"
+                 "    $display(\"if(ie) %0d  if(se) %0d  if(pe) %0d\", i.ie ? "
+                 "1 : 0, s.se ? 1 : 0, pk::pe ? 1 : 0);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "arr0!=null 1  arr0!=arr1 1  arr0?1\n"
+      "ie!=null 1  se!=null 1  pe!=null 1\n"
+      "ie==pe 0  ie==se 0  x==y 0  ie==x 0\n"
+      "if(ie) 1  if(se) 1  if(pe) 1\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

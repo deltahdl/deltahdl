@@ -294,4 +294,81 @@ TEST(WaitOrderSim, StatementsAfterTheWaitRunAsTheWaiter) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+TEST(IpcSync, PlainNamedOperandsSucceedInOrderAndFailOutOfOrder) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  event e0, e1, e2;\n"
+                 "  bit ok;\n"
+                 "  task automatic run(int which);\n"
+                 "    fork\n"
+                 "      begin\n"
+                 "        case (which)\n"
+                 "          0: wait_order(e0, e1) ok = 1; else ok = 0;\n"
+                 "          1: wait_order(e0, e2) ok = 1; else ok = 0;\n"
+                 "          2: wait_order(e0, e2) ok = 1; else ok = 0;\n"
+                 "          3: wait_order(e1, e2) ok = 1; else ok = 0;\n"
+                 "          default: wait_order(e0, e1) ok = 1; else ok = 0;\n"
+                 "        endcase\n"
+                 "        $display(\"%0d ok=%0d at %0t\", which, ok, $time);\n"
+                 "      end\n"
+                 "      begin\n"
+                 "        case (which)\n"
+                 "          0: begin #1 -> e0; #1 -> e1; end\n"
+                 "          1, 2: begin #1 -> e0; #1 -> e2; end\n"
+                 "          3: begin #1 -> e1; #1 -> e2; end\n"
+                 "          default: begin #1 -> e1; #1 -> e0; end\n"
+                 "        endcase\n"
+                 "      end\n"
+                 "    join_any\n"
+                 "    #5;\n"
+                 "  endtask\n"
+                 "  initial for (int k = 0; k < 5; k++) run(k);\n"
+                 "endmodule\n",
+                 f),
+      "0 ok=1 at 2\n1 ok=1 at 9\n2 ok=1 at 16\n3 ok=1 at 23\n4 ok=0 at 29\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IpcSync, DISABLED_DottedOperandsSucceedInOrderAndFailOutOfOrder) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "interface ifc;\n"
+          "  event ie;\n"
+          "endinterface\n"
+          "module m;\n"
+          "  ifc i();\n"
+          "  event e0, e2;\n"
+          "  bit ok;\n"
+          "  task automatic run(int which);\n"
+          "    fork\n"
+          "      begin\n"
+          "        case (which)\n"
+          "          0: wait_order(e0, i.ie) ok = 1; else ok = 0;\n"
+          "          1: wait_order(e0, $root.m.e2) ok = 1; else ok = 0;\n"
+          "          2: wait_order(e0, m.e2) ok = 1; else ok = 0;\n"
+          "          3: wait_order(i.ie, e2) ok = 1; else ok = 0;\n"
+          "          default: wait_order(e0, i.ie) ok = 1; else ok = 0;\n"
+          "        endcase\n"
+          "        $display(\"%0d ok=%0d at %0t\", which, ok, $time);\n"
+          "      end\n"
+          "      begin\n"
+          "        case (which)\n"
+          "          0: begin #1 -> e0; #1 -> i.ie; end\n"
+          "          1, 2: begin #1 -> e0; #1 -> e2; end\n"
+          "          3: begin #1 -> i.ie; #1 -> e2; end\n"
+          "          default: begin #1 -> i.ie; #1 -> e0; end\n"
+          "        endcase\n"
+          "      end\n"
+          "    join_any\n"
+          "    #5;\n"
+          "  endtask\n"
+          "  initial for (int k = 0; k < 5; k++) run(k);\n"
+          "endmodule\n",
+          f),
+      "0 ok=1 at 2\n1 ok=1 at 9\n2 ok=1 at 16\n3 ok=1 at 23\n4 ok=0 at 29\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
