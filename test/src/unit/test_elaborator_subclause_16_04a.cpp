@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
-
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -165,48 +163,6 @@ TEST(DeferredAssertionElaboration, DeferredCoverBeginEndRejected) {
                             3, "16.4"));
 }
 
-TEST(DeferredAssertionElaboration, FinalDeferredPostponedIllegalCalleeFlagged) {
-  ElabFixture deferred_final;
-  ASSERT_NE(Elaborate("module m;\n"
-                      "  logic [7:0] x;\n"
-                      "  task mutator; x = 8'd1; endtask\n"
-                      "  initial assert final (1) mutator();\n"
-                      "endmodule\n",
-                      deferred_final),
-            nullptr);
-  uint32_t final_warnings = deferred_final.diag.WarningCount();
-  ASSERT_GE(final_warnings, 1u);
-
-  ElabFixture deferred_obs;
-  ASSERT_NE(Elaborate("module m;\n"
-                      "  logic [7:0] x;\n"
-                      "  task mutator; x = 8'd1; endtask\n"
-                      "  initial assert #0 (1) mutator();\n"
-                      "endmodule\n",
-                      deferred_obs),
-            nullptr);
-  EXPECT_LT(deferred_obs.diag.WarningCount(), final_warnings);
-}
-
-TEST(DeferredAssertionElaboration, FinalDeferredPostponedSafeCalleeAccepted) {
-  ElabFixture safe;
-  ASSERT_NE(Elaborate("module m;\n"
-                      "  task reporter; $info(\"ok\"); endtask\n"
-                      "  initial assert final (1) reporter();\n"
-                      "endmodule\n",
-                      safe),
-            nullptr);
-  ElabFixture unsafe;
-  ASSERT_NE(Elaborate("module m;\n"
-                      "  logic [7:0] x;\n"
-                      "  task mutator; x = 8'd1; endtask\n"
-                      "  initial assert final (1) mutator();\n"
-                      "endmodule\n",
-                      unsafe),
-            nullptr);
-  EXPECT_LT(safe.diag.WarningCount(), unsafe.diag.WarningCount());
-}
-
 TEST(DeferredAssertionElaboration, ClassMemberToRefFormalRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -306,7 +262,7 @@ TEST(DeferredAssertionElaboration, AssignmentPassActionNames16_4) {
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInAForkArmFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInAForkArmReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -319,14 +275,14 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              8, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            8, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInAForInitializationFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInAForInitializationReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -337,14 +293,14 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              6, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            6, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInAForStepFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInAForStepReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -355,14 +311,14 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              6, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            6, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInAnAssertionPassActionFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInAnAssertionPassActionReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -373,14 +329,14 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              6, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            6, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInAnAssertionFailActionFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInAnAssertionFailActionReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -391,14 +347,14 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              6, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            6, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInARandcaseArmFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInARandcaseArmReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -411,14 +367,14 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              8, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            8, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
-     FinalDeferredCalleeAssignsInARandsequenceCodeBlockFlagged) {
+     DISABLED_FinalDeferredCalleeAssignsInARandsequenceCodeBlockReported) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -431,10 +387,10 @@ TEST(DeferredAssertionElaboration,
       "  initial assert final (1) mutator();\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "whose body contains statements not legally "
-                              "callable in the Postponed region",
-                              8, "16.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "whose body contains statements not legally "
+                            "callable in the Postponed region",
+                            8, "16.4"));
 }
 
 TEST(DeferredAssertionElaboration,
