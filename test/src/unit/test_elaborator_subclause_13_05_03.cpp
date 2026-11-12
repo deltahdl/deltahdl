@@ -164,4 +164,26 @@ TEST(DefaultArgumentElaboration, TaggedMemberValueInDefaultIsResolved) {
                             3, "13.5.3"));
 }
 
+TEST(DefaultArgumentElaboration,
+     DefaultOnANonAnsiTaskIsReportedBesideAnAnsiOne) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  task t;\n"
+      "    input int x = 5;\n"
+      "  endtask\n"
+      "  task u(input int x = 5);\n"
+      "  endtask\n"
+      "  task v;\n"
+      "    input int x;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "default argument values are only allowed with", 2,
+                            "13.5.3"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 5));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 7));
+}
+
 }  // namespace

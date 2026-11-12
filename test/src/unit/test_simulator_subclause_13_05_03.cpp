@@ -286,4 +286,101 @@ TEST(DefaultArgumentSim, OutputDefaultBindsInTheDeclaringScope) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
+TEST(DefaultArgumentSim, TheClauseReadExampleFillsEachOmittedArgument) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  task read(int j = 0, int k, int data = 1 );\n"
+                       "    $display(\"%0d %0d %0d\", j, k, data);\n"
+                       "  endtask\n"
+                       "  initial begin\n"
+                       "    read( , 5 );\n"
+                       "    read( 2, 5 );\n"
+                       "    read( , 5, );\n"
+                       "    read( , 5, 7 );\n"
+                       "    read( 1, 5, 2 );\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0 5 1\n2 5 1\n0 5 1\n0 5 7\n1 5 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DefaultArgumentSim, ADefaultIsEvaluatedOnlyWhenTheCallUsesIt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  int n, r;\n"
+                       "  function automatic int bump();\n"
+                       "    n++;\n"
+                       "    return n * 10;\n"
+                       "  endfunction\n"
+                       "  class C;\n"
+                       "    function int me(int k = bump());\n"
+                       "      return k;\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  C c = new();\n"
+                       "  task automatic t(int k = bump(), int z = 0);\n"
+                       "    $display(\"%0d %0d\", k, n);\n"
+                       "  endtask\n"
+                       "  function automatic int f(int k = bump());\n"
+                       "    return k;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+
+                       "    t(1);\n"
+                       "    t(.k(2));\n"
+                       "    t();\n"
+                       "    t(, 3);\n"
+                       "    t(.k());\n"
+                       "    r = f(4);\n"
+                       "    $display(\"%0d %0d\", r, n);\n"
+                       "    r = f();\n"
+                       "    $display(\"%0d %0d\", r, n);\n"
+                       "    r = c.me(5);\n"
+                       "    $display(\"%0d %0d\", r, n);\n"
+                       "    r = c.me();\n"
+                       "    $display(\"%0d %0d\", r, n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 0\n2 0\n10 1\n20 2\n30 3\n4 3\n40 4\n5 4\n50 5\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(DefaultArgumentSim, APackageClassOrInterfaceDefaultReadsItsOwnScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  int base = 3;\n"
+                       "  function automatic int g(int k = base);\n"
+                       "    return k;\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "class C;\n"
+                       "  int base = 5;\n"
+                       "  function int me(int k = base);\n"
+                       "    return k;\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "interface ifc;\n"
+                       "  int base = 9;\n"
+                       "  function automatic int h(int k = base);\n"
+                       "    return k;\n"
+                       "  endfunction\n"
+                       "endinterface\n"
+                       "module m;\n"
+                       "  int base = 100;\n"
+                       "  C c = new();\n"
+                       "  ifc i();\n"
+                       "  initial begin\n"
+
+                       "    c.base = 7;\n"
+                       "    #1 $display(\"%0d %0d %0d\", pk::g(), c.me(), "
+                       "i.h());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 7 9\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
