@@ -5,6 +5,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_sampling_bench.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
@@ -160,7 +161,8 @@ struct Wires {
 };
 
 std::string TickBench(const std::string& items, const Wires& wires,
-                      const std::string& outside = "") {
+                      const std::string& outside = "",
+                      const char* finish = "58") {
   return outside +
          "module top;\n"
          "  logic clk = 0;\n"
@@ -174,7 +176,9 @@ std::string TickBench(const std::string& items, const Wires& wires,
          "  " +
          items +
          "\n"
-         "  initial #58 $finish;\n"
+         "  initial #" +
+         finish +
+         " $finish;\n"
          "endmodule\n";
 }
 
@@ -309,6 +313,110 @@ TEST(UnboundedDelayShorthand, EveryPlaceEndsWhereTheRangeDoes) {
   };
   ExpectBothEnd(kGenerate, "a ##? b", kStar, "15");
   ExpectBothEnd(kGenerate, "a ##? b", kPlus, "");
+}
+
+void ExpectEnds(const std::string& property, const Wires& wires,
+                const char* ends) {
+  ExpectLines(TickBench(Shown(property), wires), "E", ends);
+}
+
+TEST(CycleDelayCount, ALeadingDelayCountsFromTheStartingTick) {
+  const Wires kWires{"t == 1 || t == 2 || t == 5", "0"};
+  ExpectEnds("##2 a", kWires, "25 55");
+  ExpectEnds("##0 a", kWires, "15 25 55");
+  ExpectEnds("##[0:3] a", {"t == 4", "0"}, "45 45 45 45");
+}
+
+TEST(CycleDelayCount, ALeadingDelayEndsWhereTriggeredReadsIt) {
+  ExpectLines(TickBench("sequence s; @(posedge clk) ##1 a; endsequence\n"
+                        "  initial forever begin\n"
+                        "    wait (s.triggered);\n"
+                        "    $display(\"E%0t\", $time);\n"
+                        "    @(posedge clk);\n"
+                        "  end",
+                        {"t == 1 || t == 2 || t == 5", "0"}),
+              "E", "15 25 55");
+}
+
+TEST(CycleDelayCount, ALeadingDelayAssertionPassesTwoTicksLater) {
+  ExpectLines(
+      TickBench(Asserted("@(posedge clk) ##2 a"), {"t == 2 || t == 5", "0"}),
+      "E", "25 pass 35 fail 45 fail 55 pass");
+}
+
+TEST(CycleDelayCount, AJoiningDelayCountsFromTheFirstSequencesEnd) {
+  const Wires kWires{"t == 1", "t == 2", "t == 3", "t == 4"};
+  ExpectEnds("(a ##1 b) ##1 (c ##1 d)", kWires, "45");
+  ExpectEnds("(a ##1 b) ##2 (c ##1 d)", kWires, "");
+}
+
+TEST(CycleDelayCount, AJoiningDelayAssertionPassesAtTheSecondsEnd) {
+  ExpectLines(TickBench(Asserted("@(posedge clk) (a ##1 b) ##1 (c ##1 d)"),
+                        {"t == 0 || t == 3", "t == 1", "t == 2", "t == 3"}),
+              "E", "15 fail 25 fail 35 pass 45 fail 45 fail 55 fail");
+}
+
+const char kOverlap[] = "(a ##1 b ##1 c) ##0 (d ##1 e ##1 f)";
+
+std::string SixWires(const std::string& items, const char* d, const char* e,
+                     const char* f) {
+  return TickBench(
+      std::string("wire e = ") + e + ", f = " + f + ";\n  " + items,
+      {"t == 0 || t == 4", "t == 1", "t == 2", d});
+}
+
+TEST(CycleDelayCount, AZeroDelayOverlapsTheLastAndFirstTicks) {
+  for (const char* property : {kOverlap, "a ##1 b ##1 c && d ##1 e ##1 f"}) {
+    ExpectLines(SixWires(Shown(property), "t == 2", "t == 3", "t == 4"), "E",
+                "45");
+  }
+  ExpectLines(SixWires(Shown(kOverlap), "t == 3", "t == 4", "t == 5"), "E", "");
+  ExpectLines(SixWires(Shown("(a ##1 b ##1 c) ##1 (d ##1 e ##1 f)"), "t == 3",
+                       "t == 4", "t == 5"),
+              "E", "55");
+}
+
+TEST(CycleDelayCount, AZeroDelayAssertionPassesWhereTheOverlapEnds) {
+  ExpectLines(SixWires(Asserted(std::string("@(posedge clk) ") + kOverlap),
+                       "t == 2", "t == 3", "t == 4"),
+              "E", "15 fail 25 fail 35 fail 45 pass 55 fail 55 fail");
+}
+
+const char kTrueMacro[] = "`define true 1'b1\n";
+
+void ExpectMacroLines(const std::string& src, const char* expected) {
+  SimFixture f;
+  const std::string kOut = PreprocessAndCapture(src, f);
+  EXPECT_FALSE(f.diag.HasErrors()) << src;
+  EXPECT_EQ(LinesStartingWith(kOut, "E"), expected) << src << kOut;
+}
+
+TEST(CycleDelayCount, ATrueExtensionEndsThreeTicksAfterTheLast) {
+  const Wires kWires{"t == 0", "t == 1", "t == 2"};
+  ExpectMacroLines(
+      TickBench(Shown("a ##1 b ##1 c ##3 `true"), kWires, kTrueMacro), "55");
+  ExpectEnds("a ##1 b ##1 c ##3 1'b1", kWires, "55");
+  ExpectEnds("a ##1 b ##1 c", kWires, "25");
+}
+
+std::string FailsOnly(const std::string& property) {
+  return "assert property (@(posedge clk) " + property +
+         ") else $display(\"E%0t fail\", $time);";
+}
+
+TEST(CycleDelayCount, ATrueExtensionDelaysTheNextImplicationTick) {
+  const char kExtended[] = "a ##1 b ##1 c ##3 `true |=> d";
+  ExpectMacroLines(
+      TickBench(FailsOnly(kExtended), {"t == 0", "t == 1", "t == 2", "t == 6"},
+                kTrueMacro, "88"),
+      "");
+  ExpectMacroLines(
+      TickBench(FailsOnly(kExtended), {"t == 0", "t == 1", "t == 2", "t == 3"},
+                kTrueMacro, "88"),
+      "65 fail");
+  ExpectLines(TickBench(FailsOnly("a ##1 b ##1 c |=> d"),
+                        {"t == 0", "t == 1", "t == 2", "t == 6"}, "", "88"),
+              "E", "35 fail");
 }
 
 }  // namespace
