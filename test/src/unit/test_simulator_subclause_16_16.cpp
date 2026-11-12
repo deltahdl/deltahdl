@@ -61,6 +61,31 @@ TEST(ClockResolutionRun, EachRuleClocksItsStatement) {
             "d3 at 30\nd5 at 30\np1 at 30\n$finish at time 40\n");
 }
 
+TEST(ClockResolutionRun, AClockingBlocksPropertyByPathTakesTheBlocksClock) {
+  for (const char* default_decl :
+       {"", "  default clocking dclk @(posedge clk); endclocking\n"}) {
+    SimFixture f;
+    std::string out =
+        RunCapture(Design("module m(input logic a, b, clk);\n"
+                          "  clocking primary_clk @(negedge clk);\n"
+                          "    property p3; a |=> !b; endproperty\n"
+                          "  endclocking\n" +
+                          std::string(default_decl) +
+                          "  k1: assert property (primary_clk.p3)\n"
+                          "    else $display(\"k1 at %0d\", $time);\n"
+                          "  always @(posedge clk) begin\n"
+                          "    k2: assert property (primary_clk.p3)\n"
+                          "      else $display(\"k2 at %0d\", $time);\n"
+                          "  end\n"
+                          "endmodule\n"),
+                   f);
+    EXPECT_TRUE(f.diag.Diagnostics().empty()) << default_decl;
+    EXPECT_NE(out.find("k1 at 30\n"), std::string::npos) << default_decl;
+    EXPECT_NE(out.find("k2 at 30\n"), std::string::npos) << default_decl;
+    EXPECT_EQ(out.find(" at 25\n"), std::string::npos) << default_decl;
+  }
+}
+
 TEST(ClockResolutionRun, WithoutADefaultAnInstanceDeterminesTheClock) {
   SimFixture f;
   std::string out = RunCapture(
