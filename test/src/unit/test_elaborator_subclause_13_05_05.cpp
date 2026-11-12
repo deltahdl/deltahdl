@@ -298,4 +298,40 @@ TEST(OptionalArgumentListElaboration, ACallInAMethodOfAUnitOrPackageClass) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
+TEST(OptionalArgumentListElaboration,
+     DISABLED_ANonvoidFunctionNamedAsAnOperandIsReported) {
+  const std::string kSrc =
+      "package pk;\n"
+      "  function automatic int pn(); return 4; endfunction\n"
+      "endpackage\n"
+      "class C;\n"
+      "  function int get(); return 5; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  import \"DPI-C\" function int c_get();\n"
+      "  function int nf(); return 9; endfunction\n"
+      "  C c = new();\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    r = nf;\n"
+      "    r = nf + 1;\n"
+      "    r = pk::pn;\n"
+      "    r = c_get;\n"
+      "    r = nf() + pk::pn() + c_get() + c.get;\n"
+      "  end\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  for (auto [text, name] :
+       {std::pair{"r = nf;", "nf"}, std::pair{"r = nf + 1;", "nf"},
+        std::pair{"r = pk::pn;", "pn"}, std::pair{"r = c_get;", "c_get"}}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string(kNonvoidOmitted) + name + "'",
+                              LineHolding(kSrc, text), "13.5.5"))
+        << text;
+  }
+  EXPECT_FALSE(
+      ErrorOnLine(f.diag.Diagnostics(), LineHolding(kSrc, "r = nf() +")));
+}
+
 }  // namespace

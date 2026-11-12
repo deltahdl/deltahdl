@@ -348,4 +348,55 @@ TEST(ArgumentBindingSim, BareMethodNameInsideItIsTheResultVariable) {
   EXPECT_EQ(v->value.ToUint64(), 8u);
 }
 
+TEST(ArgumentBindingSim,
+     InterfaceAndPackageSubroutinesWithDefaultsNeedNoParens) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  function automatic void pv(int a = 1);\n"
+                       "    $display(\"pv %0d\", a);\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "interface ifc;\n"
+                       "  function automatic void iv();\n"
+                       "    $display(\"iv\");\n"
+                       "  endfunction\n"
+                       "  task automatic it(int a = 2);\n"
+                       "    $display(\"it %0d\", a);\n"
+                       "  endtask\n"
+                       "endinterface\n"
+                       "module m;\n"
+                       "  ifc i();\n"
+                       "  initial begin\n"
+                       "    pk::pv;\n"
+                       "    i.iv;\n"
+                       "    i.it;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "pv 1\niv\nit 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ArgumentBindingSim, AQualifiedRecursiveMethodCallNeedsNoParentheses) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  int n;\n"
+                       "  function int down();\n"
+                       "    if (n == 0) return 0;\n"
+                       "    n--;\n"
+                       "    return 1 + this.down;\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module m;\n"
+                       "  C c = new();\n"
+                       "  initial begin\n"
+                       "    c.n = 3;\n"
+                       "    $display(\"%0d %0d\", c.down, c.n);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "3 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
