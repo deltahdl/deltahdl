@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -590,6 +592,54 @@ TEST(ExprType, DecimalLiteralOperandIsSignedFullPipeline) {
       "endmodule\n",
       "w");
   EXPECT_EQ(val, 0xFFFFu);
+}
+
+TEST(ExprType,
+     DISABLED_AConstantComparisonOfASixtyFourBitUnsignedOperandIsUnsigned) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  localparam time T = 64'h8000_0000_0000_0000;\n"
+          "  localparam bit [63:0] B = 64'h8000_0000_0000_0000;\n"
+          "  localparam longint unsigned U = 64'h8000_0000_0000_0000;\n"
+          "  localparam longint S = 64'h8000_0000_0000_0000;\n"
+          "  localparam bit L1 = 64'h8000_0000_0000_0000 > 1;\n"
+          "  localparam bit L2 = T > 1, L3 = B >= 1, L4 = U < 1, L5 = U <= 1;\n"
+          "  localparam bit L6 = S > 1, L7 = S < 1;\n"
+          "  logic a [(U > 1) ? 2 : 1];\n"
+          "  initial $display(\"%b%b%b%b%b %b%b %0d\", L1, L2, L3, L4, L5, "
+          "L6,\n"
+          "                   L7, $size(a));\n"
+          "endmodule\n",
+          f),
+      "11100 01 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ExprType,
+     ConstantDivisionShiftAndGenerateConditionOfASixtyFourBitUnsignedOperand) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  localparam time T = 64'h8000_0000_0000_0000;\n"
+          "  localparam bit [63:0] B = 64'h8000_0000_0000_0000;\n"
+          "  localparam longint unsigned U = 64'h8000_0000_0000_0000;\n"
+          "  localparam longint S = 64'h8000_0000_0000_0000;\n"
+          "  localparam bit [63:0] D1 = U / 2, D2 = U % 3, D3 = U >> 1;\n"
+          "  localparam bit [63:0] D4 = B / 2, D5 = T >> 1, D6 = S >>> 1;\n"
+          "  if (U > 1) begin : g logic x; end\n"
+          "  if (S > 1) begin : h logic x; end\n"
+          "  else begin : h logic [1:0] x; end\n"
+          "  initial $display(\"%h %0d %h %h %h %h %0d %0d\", D1, D2, D3, D4, "
+          "D5,\n"
+          "                   D6, $bits(g.x), $bits(h.x));\n"
+          "endmodule\n",
+          f),
+      "4000000000000000 2 4000000000000000 4000000000000000 4000000000000000 "
+      "c000000000000000 1 2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
