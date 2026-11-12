@@ -272,4 +272,45 @@ TEST(SignalMultiBlockSim, SameClockSignalOppositeEdgesNotShared) {
   EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "sig_n"), 0u);
 }
 
+TEST(SignalMultiBlockSim, BlocksOnOneClockShareItsEventsFromSource) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  logic clk = 0, k2 = 0, en = 0;\n"
+          "  int d = 0, q = 0;\n"
+          "  int n1 = 0, n2 = 0, n3 = 0, n4 = 0, n5 = 0, t1 = -1, t2 = -1, t3 "
+          "= -1;\n"
+          "  int s1, s2, s3;\n"
+          "  always #5 clk = ~clk;\n"
+          "  always #3 k2 = ~k2;\n"
+          "  initial begin #8 d = 1; #10 en = 1; end\n"
+          "  clocking cb1 @(posedge clk); input #2 d; endclocking\n"
+          "  clocking cb2 @(posedge clk); input #2 d; output q; endclocking\n"
+          "  clocking cb3 @(negedge clk); input d; inout q; endclocking\n"
+          "  clocking cb4 @(posedge clk iff en); endclocking\n"
+          "  clocking cb5 @(posedge clk iff en); endclocking\n"
+          "  clocking cb6 @(posedge k2); input clk; endclocking\n"
+          "  always @(cb1) begin n1++; t1 = $time; end\n"
+          "  always @(cb2) begin n2++; t2 = $time; end\n"
+          "  always @(cb3) begin n3++; t3 = $time; end\n"
+          "  always @(cb4) n4++;\n"
+          "  always @(cb5) n5++;\n"
+          "  initial begin\n"
+          "    @(cb2) cb2.q <= 4;\n"
+          "    @(cb3) cb3.q <= 6;\n"
+          "  end\n"
+          "  initial #28 begin\n"
+          "    $display(\"%0d %0d %0d %0d %0d\", n1, n2, n3, n4, n5);\n"
+          "    $display(\"%0d %0d %0d\", t1, t2, t3);\n"
+          "    $display(\"%0d %0d %0d q=%0d clk=%0d\", cb1.d, cb2.d, cb3.d, q, "
+          "cb6.clk);\n"
+          "    $finish;\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "3 3 2 1 1\n25 25 20\n1 1 1 q=6 clk=1\n$finish at time 28\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
