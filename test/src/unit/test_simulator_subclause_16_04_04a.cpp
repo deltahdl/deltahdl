@@ -132,16 +132,21 @@ TEST(DeferredDisableSpecific, CancelsAllPendingReportsOfSameAssertion) {
       "a2");
 }
 
-TEST(DeferredDisableSpecific, DoesNotAffectOtherProcessQueue) {
+TEST(DeferredDisableSpecific,
+     DISABLED_AlsoCancelsItsReportsInAnotherProcessQueue) {
   DeferredDisableFixture f;
   f.QueueObserved("p0", "a1");
   f.QueueObserved("p1", "a1");
+  f.QueueObserved("p1", "a2");
 
   f.engine.ApplyDisableToDeferredAssertions(
       "p0", DisableTarget::kSpecificAssertion, "a1");
 
   EXPECT_EQ(f.engine.GetDeferredReportQueue("p0").Size(), 0u);
-  EXPECT_EQ(f.engine.GetDeferredReportQueue("p1").Size(), 1u);
+  ASSERT_EQ(f.engine.GetDeferredReportQueue("p1").Size(), 1u);
+  EXPECT_EQ(
+      f.engine.GetDeferredReportQueue("p1").Entries().front().da.instance_name,
+      "a2");
 }
 
 TEST(DeferredDisableOutermost, EmptyQueueIsSafeNoOp) {
