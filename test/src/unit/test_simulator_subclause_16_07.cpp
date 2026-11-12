@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <functional>
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_sampling_bench.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -147,6 +150,165 @@ TEST(CycleDelayConcat, AParameterBoundIsItsValue) {
     EXPECT_EQ(hits->value.ToUint64(), 1u) << body;
     EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u) << body;
   }
+}
+
+struct Wires {
+  const char* a;
+  const char* b;
+  const char* c = "0";
+  const char* d = "0";
+};
+
+std::string TickBench(const std::string& items, const Wires& wires,
+                      const std::string& outside = "") {
+  return outside +
+         "module top;\n"
+         "  logic clk = 0;\n"
+         "  int t = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always @(negedge clk) t++;\n"
+         "  wire a = " +
+         wires.a + ";\n  wire b = " + wires.b + ";\n  wire c = " + wires.c +
+         ";\n  wire d = " + wires.d +
+         ";\n"
+         "  " +
+         items +
+         "\n"
+         "  initial #58 $finish;\n"
+         "endmodule\n";
+}
+
+std::string Covered(const std::string& property) {
+  return "cover property (" + property + ") $display(\"E%0t\", $time);";
+}
+
+std::string Asserted(const std::string& property) {
+  return "assert property (" + property +
+         ") $display(\"E%0t pass\", $time); else $display(\"E%0t fail\", "
+         "$time);";
+}
+
+std::string Shown(const std::string& property) {
+  return "sequence s; @(posedge clk) " + property + "; endsequence\n  " +
+         Covered("s");
+}
+
+struct Shorthand {
+  const char* shorthand;
+  const char* range;
+};
+
+const Shorthand kStar{"##[*]", "##[0:$]"};
+const Shorthand kPlus{"##[+]", "##[1:$]"};
+
+std::string Spelled(const std::string& pattern, const char* delay) {
+  std::string out = pattern;
+  for (std::size_t at = out.find("##?"); at != std::string::npos;
+       at = out.find("##?", at)) {
+    out.replace(at, 3, delay);
+  }
+  return out;
+}
+
+void ExpectBothEnd(const std::function<std::string(const std::string&)>& run,
+                   const std::string& pattern, const Shorthand& form,
+                   const char* ends) {
+  ExpectLines(run(Spelled(pattern, form.shorthand)), "E", ends);
+  ExpectLines(run(Spelled(pattern, form.range)), "E", ends);
+}
+
+std::function<std::string(const std::string&)> Declared(const Wires& wires) {
+  return [=](const std::string& property) {
+    return TickBench(Shown(property), wires);
+  };
+}
+
+TEST(UnboundedDelayShorthand, AStarDelayReachesADistantTick) {
+  ExpectBothEnd(Declared({"t == 1", "t == 5"}), "a ##? b", kStar, "55");
+}
+
+TEST(UnboundedDelayShorthand, AStarDelayEndsAtTheSameTickAndAPlusNever) {
+  ExpectBothEnd(Declared({"t == 1", "t == 1"}), "a ##? b", kStar, "15");
+  ExpectBothEnd(Declared({"t == 1", "t == 1"}), "a ##? b", kPlus, "");
+}
+
+TEST(UnboundedDelayShorthand, ALeadingStarStartsAtTheFirstTickAndAPlusLater) {
+  ExpectBothEnd(Declared({"t == 0", "0"}), "##? a", kStar, "5");
+  ExpectBothEnd(Declared({"t == 0", "0"}), "##? a", kPlus, "");
+  ExpectBothEnd(Declared({"t == 3", "0"}), "##? a", kStar, "35 35 35 35");
+  ExpectBothEnd(Declared({"t == 3", "0"}), "##? a", kPlus, "35 35 35");
+}
+
+TEST(UnboundedDelayShorthand, ASequenceOperandStartsWhereTheRangeAllows) {
+  const auto kRun =
+      Declared({"t == 1", "t == 2", "t == 2 || t == 4", "t == 3 || t == 5"});
+  ExpectBothEnd(kRun, "a ##1 b ##? (c ##1 d)", kStar, "35");
+  ExpectBothEnd(kRun, "a ##1 b ##? (c ##1 d)", kPlus, "55");
+}
+
+TEST(UnboundedDelayShorthand, AnAssertionPassesWhereTheRangeDoes) {
+  const auto kRun = [](const std::string& property) {
+    return TickBench(Asserted("@(posedge clk) " + property),
+                     {"t == 1", "t == 1"});
+  };
+  ExpectBothEnd(kRun, "a ##? b", kStar,
+                "5 fail 15 pass 25 fail 35 fail 45 fail 55 fail");
+  ExpectBothEnd(kRun, "a ##? b", kPlus,
+                "5 fail 25 fail 35 fail 45 fail 55 fail");
+}
+
+TEST(UnboundedDelayShorthand, ACoverStatementMatchesWhereTheRangeDoes) {
+  const auto kRun = [](const std::string& property) {
+    return TickBench(Covered("@(posedge clk) " + property),
+                     {"t == 1", "t == 1 || t == 3"});
+  };
+  ExpectBothEnd(kRun, "a ##? b", kStar, "15");
+  ExpectBothEnd(kRun, "a ##? b", kPlus, "35");
+}
+
+TEST(UnboundedDelayShorthand, ANamedPropertyBehavesAsTheRangeDoes) {
+  const auto kRun = [](const std::string& property) {
+    return TickBench("property p; @(posedge clk) " + property +
+                         "; endproperty\n  " + Asserted("p"),
+                     {"t == 1", "t == 1"});
+  };
+  ExpectBothEnd(kRun, "a ##? b", kStar,
+                "5 fail 15 pass 25 fail 35 fail 45 fail 55 fail");
+  ExpectBothEnd(kRun, "a ##? b", kPlus,
+                "5 fail 25 fail 35 fail 45 fail 55 fail");
+}
+
+std::string ShorthandUnit(const char* kind, const std::string& property) {
+  const bool kChecker = std::string(kind) == "checker";
+  return std::string(kind) + " u_unit" +
+         (kChecker ? "(logic clk, logic a, logic b)"
+                   : "(input logic clk, a, b)") +
+         ";\n  sequence su; @(posedge clk) " + property + "; endsequence\n  " +
+         Covered("su") + "\nend" + kind + "\n";
+}
+
+TEST(UnboundedDelayShorthand, EveryPlaceEndsWhereTheRangeDoes) {
+  for (const char* kind : {"interface", "program", "checker"}) {
+    const auto kRun = [kind](const std::string& property) {
+      return TickBench("u_unit u(clk, a, b);", {"t == 1", "t == 1"},
+                       ShorthandUnit(kind, property));
+    };
+    ExpectBothEnd(kRun, "a ##? b", kStar, "15");
+    ExpectBothEnd(kRun, "a ##? b", kPlus, "");
+  }
+  const auto kPackage = [](const std::string& property) {
+    return TickBench(Covered("pk::ps(clk, a, b)"), {"t == 1", "t == 1"},
+                     "package pk;\n  sequence ps(ck, x, y); @(posedge ck) " +
+                         property + "; endsequence\nendpackage\n");
+  };
+  ExpectBothEnd(kPackage, "x ##? y", kStar, "15");
+  ExpectBothEnd(kPackage, "x ##? y", kPlus, "");
+  const auto kGenerate = [](const std::string& property) {
+    return TickBench("if (1) begin : g\n    " + Shown(property) + "\n  end",
+                     {"t == 1", "t == 1"});
+  };
+  ExpectBothEnd(kGenerate, "a ##? b", kStar, "15");
+  ExpectBothEnd(kGenerate, "a ##? b", kPlus, "");
 }
 
 }  // namespace

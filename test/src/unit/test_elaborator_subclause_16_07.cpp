@@ -162,7 +162,7 @@ void ExpectDelayReported(const std::string& marked, const std::string& form,
                          const char* message) {
   const std::string kSrc = Placed(marked, form);
   ElabFixture f;
-  Elaborate(kSrc, f);
+  ElaborateSrcAllowingParseErrors(kSrc, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
                             LineHolding(marked, "@@"), "16.7"))
       << kSrc;
@@ -211,7 +211,7 @@ TEST(CycleDelayConstant, DISABLED_EveryNonConstantDelayIsReported) {
   }
 }
 
-std::string DelayUnit(const char* kind) {
+std::string DelayUnit(const char* kind, const char* sequence = "a ##2 b") {
   const bool kChecker = std::string(kind) == "checker";
   return std::string(kind) + " u_unit" +
          (kChecker ? "(logic clk)" : "(input logic clk)") +
@@ -222,7 +222,8 @@ std::string DelayUnit(const char* kind) {
                    : "  localparam int P = 2;\n"
                      "  localparam real R = 1.5;\n"
                      "  localparam int NEG = -1;\n") +
-         "  sequence su; @(posedge clk) a ##2 b; endsequence\n"
+         "  sequence su; @(posedge clk) " + sequence +
+         "; endsequence\n"
          "  cover property (su);\n"
          "  assert property (@(posedge clk) @@);\n"
          "end" +
@@ -299,7 +300,7 @@ void ExpectNegativeReported(const std::string& marked, const std::string& form,
                             std::string_view at = "@@") {
   const std::string kSrc = Placed(marked, form);
   ElabFixture f;
-  Elaborate(kSrc, f);
+  ElaborateSrcAllowingParseErrors(kSrc, f);
   EXPECT_TRUE(NegativeReported(f.diag.Diagnostics(), LineHolding(marked, at)))
       << kSrc;
 }
@@ -322,11 +323,12 @@ TEST(CycleDelayNonNegative, EveryPlaceAcceptsAZeroOrPositiveDelay) {
   }
 }
 
-TEST(CycleDelayNonNegative, EveryPlaceReportsANegativeParameterDelay) {
+TEST(CycleDelayNonNegative, EveryPlaceReportsANegativeParameterOrFoldedDelay) {
   for (const char* place : kNegativePlaces) {
     for (const char* form :
          {"a ##NEG b", "a ##(NEG) b", "a ##(0-1) b", "a ##[NEG:2] b",
-          "a ##[0:NEG] b", "a ##[NEG:$] b", "a ##[(0-1):2] b", "##NEG b"}) {
+          "a ##[0:NEG] b", "a ##[NEG:$] b", "a ##[(0-1):2] b", "##NEG b",
+          "a ##['sd0-1:2] b"}) {
       ExpectNegativeReported(DelayBench(place), form);
     }
   }
@@ -337,7 +339,7 @@ TEST(CycleDelayNonNegative, DISABLED_EveryPlaceReportsANegativeLiteralDelay) {
     for (const char* form :
          {"a ##[-1:5] b", "a ##[1:-1] b", "a ##[-1:$] b", "a ##(-1) b",
           "a ##(-3) b", "a ##[(-2):3] b", "a ##[0:(-1)] b", "a ##[-(1):2] b",
-          "a ##['sd0-1:2] b", "##[-1:2] b", "##(-1) b"}) {
+          "##[-1:2] b", "##(-1) b"}) {
       ExpectNegativeReported(DelayBench(place), form);
     }
   }
@@ -394,6 +396,22 @@ TEST(CycleDelayNonNegative, EveryUnitAcceptsAZeroOrPositiveDelay) {
   ExpectDelayAccepted(DelayBench(kNegativeGenerate), "a ##[0:2] b");
 }
 
+TEST(CycleDelayNonNegative, ASequenceDeclarationReportsANegativeLiteralRange) {
+  for (const char* form : {"a ##[-1:5] b", "a ##[1:-1] b", "##[-1:2] b"}) {
+    ExpectNegativeReported(DelayBench(kNegativePlaces[1]), form);
+  }
+  for (const char* kind : {"interface", "program", "checker"}) {
+    ExpectNegativeReported(DelayBench("u_unit u(clk);", DelayUnit(kind, "@@")),
+                           "a ##[-1:5] b");
+  }
+  ExpectNegativeReported(
+      DelayBench("cover property (pk::ps);", kNegativePackage),
+      "pa ##[-1:2] pa");
+  ExpectNegativeReported(DelayBench("cover property (us);", kNegativeUnitScope),
+                         "ua ##[-1:2] ua");
+  ExpectNegativeReported(DelayBench(kNegativeGenerate), "a ##[-1:2] b");
+}
+
 TEST(CycleDelayNonNegative, AnInterfaceOrProgramReportsANegativeParameter) {
   for (const char* kind : {"interface", "program"}) {
     ExpectNegativeReported(DelayBench("u_unit u(clk);", DelayUnit(kind)),
@@ -413,15 +431,10 @@ TEST(CycleDelayNonNegative, DISABLED_EveryUnitReportsANegativeDelay) {
   const std::string kUnit =
       DelayBench("cover property (us);", kNegativeUnitScope);
   const std::string kGenerate = DelayBench(kNegativeGenerate);
-  for (const char* form : {"pa ##[-1:2] pa", "pa ##PNEG pa"}) {
-    ExpectNegativeReported(kPackage, form);
-  }
-  for (const char* form : {"ua ##[-1:2] ua", "ua ##UNEG ua"}) {
-    ExpectNegativeReported(kUnit, form);
-  }
-  for (const char* form : {"a ##[-1:2] b", "a ##NEG b"}) {
-    ExpectNegativeReported(kGenerate, form);
-  }
+  ExpectNegativeReported(kPackage, "pa ##PNEG pa");
+  ExpectNegativeReported(kUnit, "ua ##UNEG ua");
+  ExpectNegativeReported(kGenerate, "a ##NEG b");
+  ExpectNegativeReported(DelayBench(kDelayGenerate), "a ##NEG b");
 }
 
 }  // namespace
