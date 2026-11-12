@@ -53,6 +53,22 @@ TEST(ExpectStatementRun, BlocksUntilTheSequenceMatchesOrFails) {
             "$finish at time 210\n");
 }
 
+TEST(ExpectStatementRun, OnlyItsOwnProcessWaitsAndAnOpenPropertyKeepsIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      Design("    fork\n"
+             "      repeat (3) @(posedge clk) $display(\"tick at %0d\", "
+             "$time);\n"
+             "    join_none\n"
+             "    expect (@(posedge clk) ##[1:$] data == 1000)\n"
+             "      $display(\"matched at %0d\", $time);\n"
+             "      else $display(\"failed at %0d\", $time);\n"
+             "    $display(\"after at %0d\", $time);\n"),
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "tick at 25\ntick at 35\ntick at 45\n$finish at time 210\n");
+}
+
 TEST(ExpectStatementRun, AFailureWithoutAnElseClauseReportsAnError) {
   SimFixture f;
   std::string out =
