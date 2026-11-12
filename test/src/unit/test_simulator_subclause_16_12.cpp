@@ -275,4 +275,40 @@ TEST(PropertyEvaluation, APackagePropertyCallsItsPackagesFunction) {
             "p=9 f=1\n");
 }
 
+std::string RunPropertyFormalCase(const std::string& decl,
+                                  const std::string& asserts) {
+  SimFixture f;
+  return RunCapture(
+      "module t;\n"
+      "  logic clk = 0; initial repeat (20) #5 clk = ~clk;\n"
+      "  bit [0:9] av = 10'b1010101010, bv = 10'b0101010101;\n"
+      "  always @(negedge clk) begin av <= av << 1; bv <= bv << 1; end\n"
+      "  wire a = av[0], b = bv[0];\n"
+      "  int p1 = 0, f1 = 0, p2 = 0, f2 = 0;\n" +
+          decl + asserts +
+          "  initial #98 $display(\"%0d %0d %0d %0d\", p1, f1, p2, f2);\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(DeclaringProperties, AFormalStandsForAPropertySpec) {
+  EXPECT_EQ(RunPropertyFormalCase(
+                "  property p_spec(q); q; endproperty\n",
+                "  assert property (p_spec(@(posedge clk) a |=> b)) p1++;\n"
+                "    else f1++;\n"
+                "  assert property (p_spec(@(posedge clk) a |=> a)) p2++;\n"
+                "    else f2++;\n"),
+            "10 0 5 5\n");
+}
+
+TEST(DeclaringProperties, AFormalStandsForAPropertyExpr) {
+  EXPECT_EQ(RunPropertyFormalCase(
+                "  property p_expr(q); a |-> q; endproperty\n",
+                "  assert property (@(posedge clk) p_expr(##1 b)) p1++;\n"
+                "    else f1++;\n"
+                "  assert property (@(posedge clk) p_expr(##1 a)) p2++;\n"
+                "    else f2++;\n"),
+            "10 0 5 5\n");
+}
+
 }  // namespace

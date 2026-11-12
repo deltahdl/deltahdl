@@ -236,4 +236,33 @@ TEST(PropertyDollarActual, AnOperandFormalIsReported) {
                             6, "16.12"));
 }
 
+TEST(PropertyFlattening, AnInstanceWhoseFlattenedPropertyIsLegalIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  property p(x); @(posedge clk) x |-> b; endproperty\n"
+      "  property q(x); @(posedge clk) a |-> x; endproperty\n"
+      "  assert property (p(a ##1 b));\n"
+      "  assert property (q(s_eventually b));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(PropertyFlattening, DISABLED_AnInstanceWhoseFlattenedPropertyIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  property p(x); @(posedge clk) x |-> b; endproperty\n"
+      "  assert property (p(s_eventually a));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the flattened property of this instance of \"p\" is not legal", 4,
+      "16.12"));
+}
+
 }  // namespace
