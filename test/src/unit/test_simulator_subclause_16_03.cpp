@@ -560,4 +560,68 @@ TEST(ImmediateAssertSim, CoverPropertyIsNotAnImmediateCoverResult) {
   EXPECT_TRUE(f.ctx.ImmediateCovers().Results().empty());
 }
 
+TEST(ImmediateAssertSim,
+     ALabelNamesTheScopeItsActionBlockDisplaysWithPercentM) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module m;\n"
+                "  bit z = 0;\n"
+                "  logic q;\n"
+                "  task t();\n"
+                "    lt: assume (1) $display(\"%m\");\n"
+                "  endtask\n"
+                "  function void fn();\n"
+                "    lf: cover (1) $display(\"%m\");\n"
+                "  endfunction\n"
+                "  for (genvar g = 0; g < 1; g++) begin : gb\n"
+                "    initial #2 lg: assert (1) $display(\"%m\");\n"
+                "  end\n"
+                "  always_comb begin\n"
+                "    q = z;\n"
+                "    if ($time == 0) begin\n"
+                "      lac: assert (!q) $display(\"%m\");\n"
+                "    end\n"
+                "  end\n"
+                "  initial begin\n"
+                "    a1: assert (1) $display(\"%m\"); else $display(\"bad\");\n"
+                "    a2: assert (0) $display(\"bad\"); else $display(\"%m\");\n"
+                "    u1: assume (1) $display(\"%m\");\n"
+                "    u2: assume (0) $display(\"bad\"); else $display(\"%m\");\n"
+                "    c1: cover (1) $display(\"%m\");\n"
+                "    begin : nb\n"
+                "      a3: assert (1) $display(\"%m\");\n"
+                "    end\n"
+                "    assert (1) $display(\"%m\");\n"
+                "    t();\n"
+                "    fn();\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "m.a1\nm.a2\nm.u1\nm.u2\nm.c1\nm.nb.a3\nm\nm.t.lt\nm.fn.lf\nm.lac\n"
+            "m.gb[0].lg\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ImmediateAssertSim, TheDefaultErrorOfALabelledFailureNamesItsScope) {
+  SimFixture f;
+  testing::internal::CaptureStderr();
+  RunCapture(
+      "module m;\n"
+      "  initial begin\n"
+      "    a4: assert (0);\n"
+      "    u4: assume (0);\n"
+      "    assert (0);\n"
+      "    begin : nb\n"
+      "      a5: assert (0);\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  std::string err = testing::internal::GetCapturedStderr();
+  EXPECT_NE(err.find("ERROR m.a4 ("), std::string::npos);
+  EXPECT_NE(err.find("ERROR m.u4 ("), std::string::npos);
+  EXPECT_NE(err.find("ERROR m ("), std::string::npos);
+  EXPECT_NE(err.find("ERROR m.nb.a5 ("), std::string::npos);
+}
+
 }  // namespace
