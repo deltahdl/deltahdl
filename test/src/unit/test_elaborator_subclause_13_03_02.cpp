@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -463,6 +464,101 @@ TEST(TaskBodyElaboration, AutoTaskVarReadByForceOrAssignError) {
       f.diag.Diagnostics(),
       "automatic task variable in procedural continuous assignment", 5,
       "13.3.2"));
+}
+
+struct AutomaticTaskPlace {
+  const char* head;
+  const char* task;
+  const char* tail;
+  int line;
+};
+
+constexpr AutomaticTaskPlace kReportingTaskPlaces[] = {
+    {"module m;\n", "task automatic t();", "endmodule\n", 2},
+    {"module automatic m;\n", "task t();", "endmodule\n", 2},
+    {"class C;\n", "task t();", "endclass\nmodule m; endmodule\n", 2},
+    {"interface i;\n", "task automatic t();",
+     "endinterface\nmodule m; i u(); endmodule\n", 2},
+    {"interface automatic i;\n", "task t();",
+     "endinterface\nmodule m; i u(); endmodule\n", 2},
+    {"program p;\n", "task automatic t();", "endprogram\n", 2},
+    {"program automatic p;\n", "task t();", "endprogram\n", 2},
+    {"module m;\n  if (1) begin : g\n", "task automatic t();",
+     "  end\nendmodule\n", 3}};
+
+constexpr AutomaticTaskPlace kPackageAndUnitTaskPlaces[] = {
+    {"package q;\n", "task automatic t();", "endpackage\nmodule m; endmodule\n",
+     2},
+    {"package automatic q;\n", "task t();", "endpackage\nmodule m; endmodule\n",
+     2},
+    {"package q;\nclass C;\n", "task t();",
+     "endclass\nendpackage\nmodule m; endmodule\n", 3},
+    {"", "task automatic t();", "module m; endmodule\n", 1}};
+
+struct AutomaticVariableUse {
+  const char* stmt;
+  const char* message;
+};
+
+constexpr AutomaticVariableUse kAutomaticVariableUses[] = {
+    {"v <= 1;", "automatic task variable in nonblocking assignment"},
+    {"assign v = 1;",
+     "automatic task variable in procedural continuous assignment"},
+    {"force v = 1;",
+     "automatic task variable in procedural continuous assignment"},
+    {"w <= @(v) 1;",
+     "automatic task variable in intra-assignment event control of "
+     "nonblocking assignment"},
+    {"$monitor(v);", "automatic task variable traced by system task"},
+    {"$dumpvars(0, v);", "automatic task variable traced by system task"}};
+
+std::string AutomaticTaskIn(const AutomaticTaskPlace& place, const char* local,
+                            const char* stmt) {
+  return std::string(place.head) + "  " + place.task + " " + local +
+         " static int w; " + stmt + " endtask\n" + place.tail;
+}
+
+template <std::size_t N>
+void ExpectAutomaticUsesReported(const AutomaticTaskPlace (&places)[N]) {
+  for (const auto& place : places) {
+    for (const auto& use : kAutomaticVariableUses) {
+      ElabFixture f;
+      std::string src = AutomaticTaskIn(place, "int v;", use.stmt);
+      ElaborateSrc(src, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), use.message, place.line,
+                                "13.3.2"))
+          << src;
+    }
+  }
+}
+
+template <std::size_t N>
+void ExpectStaticUsesAccepted(const AutomaticTaskPlace (&places)[N]) {
+  for (const auto& place : places) {
+    for (const auto& use : kAutomaticVariableUses) {
+      ElabFixture f;
+      std::string src = AutomaticTaskIn(place, "static int v;", use.stmt);
+      ElaborateSrc(src, f);
+      EXPECT_FALSE(f.diag.HasErrors()) << src;
+    }
+  }
+}
+
+TEST(TaskBodyElaboration,
+     EveryBarredUseOfAnAutomaticTaskVariableIsReportedInEveryPlace) {
+  ExpectAutomaticUsesReported(kReportingTaskPlaces);
+}
+
+TEST(
+    TaskBodyElaboration,
+    DISABLED_EveryBarredUseOfAnAutomaticTaskVariableIsReportedInAPackageOrTheUnit) {
+  ExpectAutomaticUsesReported(kPackageAndUnitTaskPlaces);
+}
+
+TEST(TaskBodyElaboration,
+     TheSameUsesOfAStaticVariableOfAnAutomaticTaskAreAcceptedInEveryPlace) {
+  ExpectStaticUsesAccepted(kReportingTaskPlaces);
+  ExpectStaticUsesAccepted(kPackageAndUnitTaskPlaces);
 }
 
 }  // namespace

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_type.h"
@@ -373,6 +376,247 @@ TEST(TaskElaboration, BodyDeclarationThatTypesNoFormalIsARedeclaration) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'b'", 7, "23.9"));
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'c'", 8, "23.9"));
+}
+
+struct TaskPlace {
+  const char* head;
+  const char* tail;
+  int line;
+};
+
+constexpr TaskPlace kTaskPlaces[] = {
+    {"module m;\n", "endmodule\n", 2},
+    {"interface i;\n", "endinterface\nmodule m; i u(); endmodule\n", 2},
+    {"program p;\n", "endprogram\n", 2},
+    {"module m;\n  if (1) begin : g\n", "  end\nendmodule\n", 3},
+    {"module m;\n  for (genvar k = 0; k < 1; k++) begin : g\n",
+     "  end\nendmodule\n", 3}};
+
+constexpr TaskPlace kClassTaskPlaces[] = {
+    {"class C;\n", "endclass\nmodule m; endmodule\n", 2}};
+
+constexpr TaskPlace kPackageClassTaskPlaces[] = {
+    {"package q;\nclass C;\n", "endclass\nendpackage\nmodule m; endmodule\n",
+     3}};
+
+constexpr TaskPlace kPackageAndUnitTaskPlaces[] = {
+    {"package pk;\n", "endpackage\nmodule m; endmodule\n", 2},
+    {"", "module m; endmodule\n", 1}};
+
+constexpr const char* kTaskReturnsAValue = "task returns a value";
+constexpr const char* kTaskOverrideMisplaced =
+    "a task's dynamic_override_specifiers belong on a class method "
+    "declaration";
+constexpr const char* kTaskOperand =
+    "is enabled from a statement and cannot be an operand of an expression";
+
+std::string TaskIn(const TaskPlace& place, const std::string& task) {
+  return std::string(place.head) + "  " + task + "\n" + place.tail;
+}
+
+bool TaskElaboratesClean(const std::string& src) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  return !f.diag.HasErrors();
+}
+
+bool TaskElaborationReports(const std::string& src, const char* message,
+                            int line) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  return ReportedError(f.diag.Diagnostics(), message, line, "13.3");
+}
+
+template <std::size_t N>
+void ExpectTaskReported(const TaskPlace (&places)[N], const char* task,
+                        const char* message) {
+  for (const auto& place : places) {
+    EXPECT_TRUE(
+        TaskElaborationReports(TaskIn(place, task), message, place.line))
+        << TaskIn(place, task);
+  }
+}
+
+template <std::size_t N>
+void ExpectTaskAccepted(const TaskPlace (&places)[N], const char* task) {
+  for (const auto& place : places) {
+    EXPECT_TRUE(TaskElaboratesClean(TaskIn(place, task)))
+        << TaskIn(place, task);
+  }
+}
+
+constexpr const char* kValueReturn = "task t(); return 1; endtask";
+constexpr const char* kBareReturn =
+    "task t(output int r); r = 1; if (r == 1) return; r = 2; endtask";
+
+TEST(TaskReturnElaboration, AValueReturnedFromATaskIsReportedInEveryPlace) {
+  ExpectTaskReported(kTaskPlaces, kValueReturn, kTaskReturnsAValue);
+  ExpectTaskReported(kClassTaskPlaces, kValueReturn, kTaskReturnsAValue);
+}
+
+TEST(TaskReturnElaboration,
+     DISABLED_AValueReturnedFromATaskInAPackageOrTheUnitIsReported) {
+  ExpectTaskReported(kPackageAndUnitTaskPlaces, kValueReturn,
+                     kTaskReturnsAValue);
+  ExpectTaskReported(kPackageClassTaskPlaces, kValueReturn, kTaskReturnsAValue);
+}
+
+TEST(TaskReturnElaboration, ABareReturnFromATaskIsAcceptedInEveryPlace) {
+  ExpectTaskAccepted(kTaskPlaces, kBareReturn);
+  ExpectTaskAccepted(kClassTaskPlaces, kBareReturn);
+  ExpectTaskAccepted(kPackageAndUnitTaskPlaces, kBareReturn);
+  ExpectTaskAccepted(kPackageClassTaskPlaces, kBareReturn);
+}
+
+constexpr const char* kOverriddenTasks[] = {
+    "task :initial t(); endtask", "task :extends t(); endtask",
+    "task :final t(); endtask", "task :initial :final t(); endtask"};
+
+TEST(TaskOverrideElaboration,
+     ADynamicOverrideOnATaskOutsideAClassIsReportedInEveryPlace) {
+  for (const char* task : kOverriddenTasks) {
+    ExpectTaskReported(kTaskPlaces, task, kTaskOverrideMisplaced);
+    ExpectTaskReported(kPackageAndUnitTaskPlaces, task, kTaskOverrideMisplaced);
+  }
+}
+
+TEST(TaskOverrideElaboration,
+     ADynamicOverrideOnATaskDefinedOutsideItsScopeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  extern task :initial t();\n"
+      "endclass\n"
+      "task :initial C::t(); endtask\n"
+      "interface bus;\n"
+      "  extern task put(int d);\n"
+      "endinterface\n"
+      "module m (bus b);\n"
+      "  task :final b.put(int d); endtask\n"
+      "endmodule\n"
+      "module top;\n"
+      "  bus i ();\n"
+      "  m u (i);\n"
+      "endmodule\n",
+      f);
+  for (int line : {4, 9}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTaskOverrideMisplaced,
+                              line, "13.3"))
+        << line;
+  }
+}
+
+TEST(TaskOverrideElaboration, ADynamicOverrideOnAClassTaskIsAccepted) {
+  ExpectTaskAccepted(kClassTaskPlaces, "virtual task :initial t(); endtask");
+  ExpectTaskAccepted(kPackageClassTaskPlaces,
+                     "virtual task :initial t(); endtask");
+  EXPECT_TRUE(
+      TaskElaboratesClean("class C;\n"
+                          "  virtual task :initial t(); endtask\n"
+                          "endclass\n"
+                          "class D extends C;\n"
+                          "  virtual task :extends t(); endtask\n"
+                          "endclass\n"
+                          "class E extends D;\n"
+                          "  task :final t(); endtask\n"
+                          "endclass\n"
+                          "class G;\n"
+                          "  extern task :initial u();\n"
+                          "endclass\n"
+                          "task G::u(); endtask\n"
+                          "module m; endmodule\n"));
+}
+
+struct TaskOperandForm {
+  const char* operand;
+  const char* statement;
+  int line;
+};
+
+constexpr TaskOperandForm kOwnTaskOperands[] = {
+    {"module m;\n  int x;\n  task t(); endtask\n  task outer;\n"
+     "    x = t();\n  endtask\nendmodule\n",
+     "module m;\n  int x;\n  task t(); endtask\n  task outer;\n"
+     "    t();\n  endtask\nendmodule\n",
+     5},
+    {"program p;\n  int x;\n  task t; endtask\n  initial x = t();\n"
+     "endprogram\n",
+     "program p;\n  int x;\n  task t; endtask\n  initial t();\n"
+     "endprogram\n",
+     4},
+    {"interface i;\n  int x;\n  task t; endtask\n  initial x = t();\n"
+     "endinterface\nmodule m; i u(); endmodule\n",
+     "interface i;\n  int x;\n  task t; endtask\n  initial t();\n"
+     "endinterface\nmodule m; i u(); endmodule\n",
+     4},
+    {"module m;\n  int x;\n  task t; endtask\n"
+     "  for (genvar k = 0; k < 1; k++) begin : g\n"
+     "    initial x = t();\n  end\nendmodule\n",
+     "module m;\n  int x;\n  task t; endtask\n"
+     "  for (genvar k = 0; k < 1; k++) begin : g\n"
+     "    initial t();\n  end\nendmodule\n",
+     5}};
+
+constexpr TaskOperandForm kNamedTaskOperands[] = {
+    {"class C;\n  task t(); endtask\nendclass\nmodule m;\n  C h = new;\n"
+     "  int x;\n  initial x = h.t();\nendmodule\n",
+     "class C;\n  task t(); endtask\nendclass\nmodule m;\n  C h = new;\n"
+     "  int x;\n  initial h.t();\nendmodule\n",
+     7},
+    {"class C;\n  int x;\n  task t(); endtask\n  task u();\n"
+     "    x = t();\n  endtask\nendclass\nmodule m; endmodule\n",
+     "class C;\n  int x;\n  task t(); endtask\n  task u();\n"
+     "    t();\n  endtask\nendclass\nmodule m; endmodule\n",
+     5},
+    {"class C;\n  int x;\n  task t(); endtask\n  task u();\n"
+     "    x = this.t();\n  endtask\nendclass\nmodule m; endmodule\n",
+     "class C;\n  int x;\n  task t(); endtask\n  task u();\n"
+     "    this.t();\n  endtask\nendclass\nmodule m; endmodule\n",
+     5},
+    {"class B;\n  task t(); endtask\nendclass\nclass D extends B;\n"
+     "  int x;\n  task u();\n    x = super.t();\n  endtask\nendclass\n"
+     "module m; endmodule\n",
+     "class B;\n  task t(); endtask\nendclass\nclass D extends B;\n"
+     "  int x;\n  task u();\n    super.t();\n  endtask\nendclass\n"
+     "module m; endmodule\n",
+     7},
+    {"module c;\n  task t(); endtask\nendmodule\nmodule m;\n  int x;\n"
+     "  c u1();\n  initial x = u1.t();\nendmodule\n",
+     "module c;\n  task t(); endtask\nendmodule\nmodule m;\n  int x;\n"
+     "  c u1();\n  initial u1.t();\nendmodule\n",
+     7},
+    {"interface i;\n  task t(); endtask\nendinterface\nmodule n(i b);\n"
+     "  int x;\n  initial x = b.t();\nendmodule\n"
+     "module m;\n  i u();\n  n k(u);\nendmodule\n",
+     "interface i;\n  task t(); endtask\nendinterface\nmodule n(i b);\n"
+     "  int x;\n  initial b.t();\nendmodule\n"
+     "module m;\n  i u();\n  n k(u);\nendmodule\n",
+     6}};
+
+TEST(TaskOperandElaboration,
+     ATaskOperandInATaskAProgramAnInterfaceOrALoopGenerateIsReported) {
+  for (const auto& form : kOwnTaskOperands) {
+    EXPECT_TRUE(TaskElaborationReports(form.operand, kTaskOperand, form.line))
+        << form.operand;
+  }
+}
+
+TEST(
+    TaskOperandElaboration,
+    DISABLED_ATaskOperandThroughAHandleThisSuperOrAHierarchicalNameIsReported) {
+  for (const auto& form : kNamedTaskOperands) {
+    EXPECT_TRUE(TaskElaborationReports(form.operand, kTaskOperand, form.line))
+        << form.operand;
+  }
+}
+
+TEST(TaskOperandElaboration, TheSameTaskEnabledAsAStatementIsAccepted) {
+  for (const auto& form : kOwnTaskOperands) {
+    EXPECT_TRUE(TaskElaboratesClean(form.statement)) << form.statement;
+  }
+  for (const auto& form : kNamedTaskOperands) {
+    EXPECT_TRUE(TaskElaboratesClean(form.statement)) << form.statement;
+  }
 }
 
 }  // namespace

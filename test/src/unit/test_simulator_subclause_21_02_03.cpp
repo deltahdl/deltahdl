@@ -360,4 +360,35 @@ TEST(IoMonitorSim, MonitorInAMethodFollowsItsObjectAndStaticProperties) {
             "1 1 5\n2 2 5\n2 2 6\nend\n");
 }
 
+TEST(IoMonitorSim,
+     DISABLED_MonitorRedisplaysWhenAnotherInstancesVariableChanges) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("module c;\n"
+                              "  logic r;\n"
+                              "  initial begin r = 0; #5 r = 1; #5 r = 0; end\n"
+                              "endmodule\n"
+                              "module top;\n"
+                              "  c u();\n"
+                              "  initial $monitor(\"%0t %b\", $time, u.r);\n"
+                              "  initial #20 $finish(0);\n"
+                              "endmodule\n",
+                              f),
+            "0 0\n5 1\n10 0\n");
+}
+
+TEST(IoMonitorSim, MonitorRedisplaysWhenItsOwnInstancesVariableChanges) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("module c;\n"
+                              "  logic r;\n"
+                              "  initial begin r = 0; #5 r = 1; #5 r = 0; end\n"
+                              "  initial $monitor(\"%0t %b\", $time, r);\n"
+                              "endmodule\n"
+                              "module top;\n"
+                              "  c u();\n"
+                              "  initial #20 $finish(0);\n"
+                              "endmodule\n",
+                              f),
+            "0 0\n5 1\n10 0\n");
+}
+
 }  // namespace

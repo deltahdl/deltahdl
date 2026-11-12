@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -238,6 +239,167 @@ TEST(TaskSim, BodyDeclarationTypesADirectionOnlyFormal) {
                       "endmodule\n",
                       "r"),
             21u);
+}
+
+std::string BlockingTaskRun(const std::string& src) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(src, f);
+  EXPECT_EQ(f.diag.WarningCount(), 0u) << src;
+  return out;
+}
+
+TEST(TaskSim, AModuleTaskWaitingOnAConditionReturnsWhenItBecomesTrue) {
+  EXPECT_EQ(BlockingTaskRun("module m;\n"
+                            "  bit go;\n"
+                            "  int x;\n"
+                            "  task t(); wait (go); endtask\n"
+                            "  initial begin t(); x = $time; "
+                            "$display(\"%0d\", x); end\n"
+                            "  initial #7 go = 1;\n"
+                            "endmodule\n"),
+            "7\n");
+}
+
+TEST(TaskSim, AnInterfaceTaskEnabledThroughAPortReturnsAfterItsEdgeOrWait) {
+  EXPECT_EQ(BlockingTaskRun("interface i(input logic clk);\n"
+                            "  bit go;\n"
+                            "  task te(); @(posedge clk); endtask\n"
+                            "  task tw(); wait (go); endtask\n"
+                            "endinterface\n"
+                            "module n(i b);\n"
+                            "  int x, y;\n"
+                            "  initial begin\n"
+                            "    b.te(); x = $time; b.tw(); y = $time;\n"
+                            "    $display(\"%0d %0d\", x, y);\n"
+                            "  end\n"
+                            "endmodule\n"
+                            "module m;\n"
+                            "  logic clk = 0;\n"
+                            "  i u(clk);\n"
+                            "  n k(u);\n"
+                            "  initial begin #5 clk = 1; #7 u.go = 1; end\n"
+                            "endmodule\n"),
+            "5 12\n");
+}
+
+TEST(TaskSim, AProgramTaskReturnsAfterItsEdgeOrWait) {
+  EXPECT_EQ(BlockingTaskRun("program p;\n"
+                            "  logic clk = 0;\n"
+                            "  bit go;\n"
+                            "  int x, y;\n"
+                            "  task te(); @(posedge clk); endtask\n"
+                            "  task tw(); wait (go); endtask\n"
+                            "  initial begin\n"
+                            "    te(); x = $time; tw(); y = $time;\n"
+                            "    $display(\"%0d %0d\", x, y);\n"
+                            "  end\n"
+                            "  initial begin #5 clk = 1; #7 go = 1; end\n"
+                            "endprogram\n"),
+            "5 12\n");
+}
+
+TEST(TaskSim, APackageTaskReturnsAfterItsEventOrWait) {
+  EXPECT_EQ(BlockingTaskRun("package p;\n"
+                            "  event e;\n"
+                            "  bit go;\n"
+                            "  task te(); @(e); endtask\n"
+                            "  task tw(); wait (go); endtask\n"
+                            "  task fire(); ->e; endtask\n"
+                            "endpackage\n"
+                            "module m;\n"
+                            "  int x, y;\n"
+                            "  initial begin\n"
+                            "    p::te(); x = $time; p::tw(); y = $time;\n"
+                            "    $display(\"%0d %0d\", x, y);\n"
+                            "  end\n"
+                            "  initial begin #4 p::fire(); #5 p::go = 1; end\n"
+                            "endmodule\n"),
+            "4 9\n");
+}
+
+TEST(TaskSim, ACompilationUnitTaskReturnsAfterItsEventOrWait) {
+  EXPECT_EQ(BlockingTaskRun("event e;\n"
+                            "bit go;\n"
+                            "task te(); @(e); endtask\n"
+                            "task tw(); wait (go); endtask\n"
+                            "module m;\n"
+                            "  int x, y;\n"
+                            "  initial begin\n"
+                            "    te(); x = $time; tw(); y = $time;\n"
+                            "    $display(\"%0d %0d\", x, y);\n"
+                            "  end\n"
+                            "  initial begin #4 ->e; #5 go = 1; end\n"
+                            "endmodule\n"),
+            "4 9\n");
+}
+
+TEST(TaskExampleSim,
+     TheMyTaskExampleCopiesArgumentsInAndResultsOutInBothForms) {
+  EXPECT_EQ(BlockingTaskRun("module m;\n"
+                            "  logic v, w, x, y, z, x2, y2, z2;\n"
+                            "  task my_task;\n"
+                            "    input a, b;\n"
+                            "    inout c;\n"
+                            "    output d, e;\n"
+                            "    c = a;\n"
+                            "    d = b;\n"
+                            "    e = c;\n"
+                            "  endtask\n"
+                            "  task my_task2 (input a, b, inout c, output d, "
+                            "e);\n"
+                            "    c = a;\n"
+                            "    d = b;\n"
+                            "    e = c;\n"
+                            "  endtask\n"
+                            "  initial begin\n"
+                            "    v = 1; w = 0; x = 0; x2 = 0;\n"
+                            "    my_task (v, w, x, y, z);\n"
+                            "    my_task2 (v, w, x2, y2, z2);\n"
+                            "    $display(\"%b%b%b %b%b%b\", x, y, z, x2, y2, "
+                            "z2);\n"
+                            "  end\n"
+                            "endmodule\n"),
+            "101 101\n");
+}
+
+TEST(TaskExampleSim, TheTrafficLightExampleTurnsEachLightOffAfterItsTics) {
+  EXPECT_EQ(
+      BlockingTaskRun(
+          "module traffic_lights;\n"
+          "  logic clock, red, amber, green;\n"
+          "  parameter on = 1, off = 0, red_tics = 350,\n"
+          "            amber_tics = 30, green_tics = 200;\n"
+          "  initial red = off;\n"
+          "  initial amber = off;\n"
+          "  initial green = off;\n"
+          "  always begin\n"
+          "    red = on;\n"
+          "    light(red, red_tics);\n"
+          "    green = on;\n"
+          "    light(green, green_tics);\n"
+          "    amber = on;\n"
+          "    light(amber, amber_tics);\n"
+          "  end\n"
+          "  task light (output color, input [31:0] tics);\n"
+          "    repeat (tics) @ (posedge clock);\n"
+          "    color = off;\n"
+          "  endtask: light\n"
+          "  always begin\n"
+          "    #100 clock = 0;\n"
+          "    #100 clock = 1;\n"
+          "  end\n"
+          "endmodule: traffic_lights\n"
+          "module top;\n"
+          "  traffic_lights #(.red_tics(3), .green_tics(2), .amber_tics(1)) "
+          "t();\n"
+          "  initial begin\n"
+          "    @(posedge t.green) $display(\"green on %0t\", $time);\n"
+          "    @(negedge t.green) $display(\"green off %0t\", $time);\n"
+          "    @(negedge t.amber) $display(\"amber off %0t\", $time);\n"
+          "    $finish(0);\n"
+          "  end\n"
+          "endmodule\n"),
+      "green on 600\ngreen off 1000\namber off 1200\n");
 }
 
 }  // namespace

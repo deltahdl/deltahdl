@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "fixture_parser.h"
@@ -696,6 +697,26 @@ TEST(TaskAndFunctionParsing, BodyDeclarationTypesADirectionOnlyFormal) {
   EXPECT_EQ(tk->func_args[1].data_type.packed_dim_left->int_val, 3u);
   ASSERT_EQ(tk->func_body_stmts.size(), 1u);
   EXPECT_NE(tk->func_body_stmts[0]->kind, StmtKind::kVarDecl);
+}
+
+TEST(TaskDeclParsing, ATaskDeclaredWithADataTypeIsReported) {
+  for (const char* type : {"int", "void", "logic [3:0]"}) {
+    std::string kw(type);
+    auto r = Parse("module m;\n  task " + kw + " t;\n  endtask\nendmodule\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "expected identifier, got '" + kw.substr(0, kw.find(' ')) + "'", 2,
+        "13.3"))
+        << type;
+  }
+}
+
+TEST(TaskDeclParsing, ATaskDeclaredWithoutADataTypeIsAccepted) {
+  for (const char* lifetime : {"", "static ", "automatic "}) {
+    auto r = Parse(std::string("module m;\n  task ") + lifetime +
+                   "t;\n  endtask\nendmodule\n");
+    EXPECT_FALSE(r.has_errors) << lifetime;
+  }
 }
 
 }  // namespace

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -325,6 +328,60 @@ TEST(FunctionLifetimeSim, UnitFunctionStaticLocalSharedByEveryInstance) {
       "endmodule\n",
       "r");
   EXPECT_EQ(val, 3u);
+}
+
+constexpr const char* kCountingFunction =
+    "(); int c; c++; return c; endfunction\n";
+
+std::string CountingFunction(const char* head) {
+  return std::string("  ") + head + kCountingFunction;
+}
+
+TEST(FunctionLifetimeSim,
+     AnInterfaceFunctionIsStaticUnlessTheInterfaceIsAutomatic) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface i;\n" + CountingFunction("function int f") +
+                           "endinterface\n"
+                           "interface automatic ia;\n" +
+                           CountingFunction("function int fa") +
+                           CountingFunction("function static int fs") +
+                           "endinterface\n"
+                           "module m;\n"
+                           "  i u(); ia v();\n"
+                           "  int a, b, c, d, e, g;\n"
+                           "  initial begin\n"
+                           "    a = u.f(); b = u.f(); c = v.fa(); d = v.fa();\n"
+                           "    e = v.fs(); g = v.fs();\n"
+                           "    $display(\"%0d %0d %0d %0d %0d %0d\", a, b, c, "
+                           "d, e, g);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "1 2 1 1 1 2\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(FunctionLifetimeSim, AProgramFunctionIsStaticUnlessTheProgramIsAutomatic) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n" + CountingFunction("function int f") +
+                           "  int a, b;\n"
+                           "  initial begin\n"
+                           "    #1 a = f(); b = f();\n"
+                           "    $display(\"%0d %0d\", a, b);\n"
+                           "  end\n"
+                           "endprogram\n"
+                           "program automatic q;\n" +
+                           CountingFunction("function int fa") +
+                           CountingFunction("function static int fs") +
+                           "  int a, b, e, g;\n"
+                           "  initial begin\n"
+                           "    #2 a = fa(); b = fa(); e = fs(); g = fs();\n"
+                           "    $display(\"%0d %0d %0d %0d\", a, b, e, g);\n"
+                           "  end\n"
+                           "endprogram\n",
+                       f),
+            "1 2\n1 1 1 2\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace

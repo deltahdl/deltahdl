@@ -734,4 +734,47 @@ TEST(NestedTagArgumentSim,
             "return 44\noutput 1 33\n");
 }
 
+std::string WokenByChildWrite(const std::string& child_subroutine,
+                              const std::string& child_write) {
+  SimFixture f;
+  return RunCaptureAllTops(
+      "module c;\n"
+      "  logic g;\n"
+      "  int tb;\n  " +
+          child_subroutine +
+          "\n"
+          "  initial begin g = 1; " +
+          child_write +
+          " end\n"
+          "endmodule\n"
+          "module top;\n"
+          "  c u();\n"
+          "  int tb;\n"
+          "  initial begin @(negedge u.g); tb = 7; end\n"
+          "  initial #6 $display(\"%0d %0d\", tb, u.tb);\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(
+    SubroutineCallSim,
+    DISABLED_AProcessWokenByAnOutputCopiedOutInAnotherInstanceWritesItsOwnVariable) {
+  EXPECT_EQ(
+      WokenByChildWrite("task light(output o); #2 o = 0; endtask", "light(g);"),
+      "7 0\n");
+  EXPECT_EQ(
+      WokenByChildWrite("task light(output o); o = 0; endtask", "#2 light(g);"),
+      "7 0\n");
+  EXPECT_EQ(
+      WokenByChildWrite("function void light(output o); o = 0; endfunction",
+                        "#2 light(g);"),
+      "7 0\n");
+}
+
+TEST(SubroutineCallSim,
+     AProcessWokenByATaskBodyWriteInAnotherInstanceWritesItsOwnVariable) {
+  EXPECT_EQ(WokenByChildWrite("task light(); #2 g = 0; endtask", "light();"),
+            "7 0\n");
+}
+
 }  // namespace

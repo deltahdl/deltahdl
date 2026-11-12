@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "parser/ast_expr.h"
@@ -208,6 +210,110 @@ TEST(TaskDeclSim, SetupReturnsTaskItem) {
   EXPECT_EQ(result->name, "my_task");
 
   TeardownTaskCall(result, call, f.ctx, f.arena);
+}
+
+constexpr const char* kCountingTask =
+    "(output int r); int c; c++; r = c; endtask\n";
+
+std::string CountingTask(const char* head) {
+  return std::string("  ") + head + kCountingTask;
+}
+
+TEST(TaskLifetimeSim, AnInterfaceTaskIsStaticUnlessTheInterfaceIsAutomatic) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("interface i;\n" + CountingTask("task t") +
+                     "endinterface\n"
+                     "interface automatic ia;\n" +
+                     CountingTask("task ta") + CountingTask("task static ts") +
+                     "endinterface\n"
+                     "module m;\n"
+                     "  i u(); ia v();\n"
+                     "  int a, b, c, d, e, g;\n"
+                     "  initial begin\n"
+                     "    u.t(a); u.t(b); v.ta(c); v.ta(d); v.ts(e); v.ts(g);\n"
+                     "    $display(\"%0d %0d %0d %0d %0d %0d\", a, b, c, d, e, "
+                     "g);\n"
+                     "  end\n"
+                     "endmodule\n",
+                 f),
+      "1 2 1 1 1 2\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(TaskLifetimeSim, AProgramTaskIsStaticUnlessTheProgramIsAutomatic) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program p;\n" + CountingTask("task t") +
+                     "  int a, b;\n"
+                     "  initial begin\n"
+                     "    #1 t(a); t(b);\n"
+                     "    $display(\"%0d %0d\", a, b);\n"
+                     "  end\n"
+                     "endprogram\n"
+                     "program automatic q;\n" +
+                     CountingTask("task ta") + CountingTask("task static ts") +
+                     "  int a, b, e, g;\n"
+                     "  initial begin\n"
+                     "    #2 ta(a); ta(b); ts(e); ts(g);\n"
+                     "    $display(\"%0d %0d %0d %0d\", a, b, e, g);\n"
+                     "  end\n"
+                     "endprogram\n",
+                 f),
+      "1 2\n1 1 1 2\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+std::string CountingTaskCaller(const char* kind, const char* name,
+                               const char* task, int delay) {
+  std::string d = std::to_string(delay);
+  return std::string(kind) + " " + name + ";\n" + CountingTask(task) +
+         "  int x, y;\n  initial begin #" + d + " t(x); t(y); $display(\"" +
+         name + " %0d %0d\", x, y); end\nend" +
+         (std::string(kind).find("module") != std::string::npos ? "module"
+          : std::string(kind).find("interface") != std::string::npos
+              ? "interface"
+              : "program") +
+         "\n";
+}
+
+TEST(TaskLifetimeSim,
+     DISABLED_ATaskKeepsItsOwnLifetimeBesideASameNamedTaskElsewhere) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          CountingTaskCaller("module", "sa", "task t", 1) +
+              CountingTaskCaller("module", "aa", "task automatic t", 2) +
+              CountingTaskCaller("module automatic", "ma", "task t", 3) +
+              CountingTaskCaller("interface automatic", "ia", "task t", 4) +
+              CountingTaskCaller("program automatic", "pa", "task t", 5) +
+              CountingTaskCaller("module", "sb", "task t", 6) +
+              CountingTaskCaller("program", "ps", "task t", 7) +
+              "module top; sa a(); aa b(); ma c(); ia d(); sb e(); "
+              "endmodule\n",
+          f),
+      "sa 1 2\naa 1 1\nma 1 1\nia 1 1\npa 1 1\nsb 1 2\nps 1 2\n");
+}
+
+TEST(TaskLifetimeSim,
+     AnAutomaticTaskEnabledByAHierarchicalNameGetsItsOwnItemsPerCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("module c;\n"
+                              "  task automatic t(input int d, output int r);\n"
+                              "    int k;\n"
+                              "    k++;\n"
+                              "    #d r = k * 10 + d;\n"
+                              "  endtask\n"
+                              "endmodule\n"
+                              "module top;\n"
+                              "  c u1();\n"
+                              "  int a, b;\n"
+                              "  initial fork u1.t(3, a); u1.t(5, b); join\n"
+                              "  initial #9 $display(\"%0d %0d\", a, b);\n"
+                              "endmodule\n",
+                              f),
+            "13 15\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
 }  // namespace
