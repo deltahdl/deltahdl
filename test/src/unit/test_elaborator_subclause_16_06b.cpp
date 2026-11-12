@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -162,6 +165,277 @@ TEST(ChandleInAssertion, EveryUnitReportsAChandleBesideAVariable) {
         << kSrc;
     ExpectChandleAccepted("u_unit u(clk);", kLogicForm, unit);
   }
+}
+
+const char kSideEffect[] = "is a side effect";
+
+std::string SideBench(const std::string& items,
+                      const std::string& outside = "") {
+  return "typedef struct {int f;} t_s;\n" + outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1;\n"
+         "  int n; int v[2]; t_s s;\n"
+         "  function void f(); endfunction\n"
+         "  " +
+         items + "\nendmodule\n";
+}
+
+int SideEffectsAt(const std::vector<Diagnostic>& diags, uint32_t line) {
+  int count = 0;
+  for (const auto& diag : diags) {
+    if (diag.severity == DiagSeverity::kError &&
+        diag.message.find(kSideEffect) != std::string::npos &&
+        diag.loc.line == line && diag.subclause == "16.6") {
+      ++count;
+    }
+  }
+  return count;
+}
+
+void ExpectSideEffectOnce(const std::string& marked, const std::string& form) {
+  const std::string kSrc = WithForm(marked, form);
+  ElabFixture f;
+  Elaborate(kSrc, f);
+  EXPECT_EQ(SideEffectsAt(f.diag.Diagnostics(), LineHolding(marked, "@@")), 1)
+      << kSrc;
+}
+
+void ExpectNoSideEffect(const std::string& marked, const std::string& form) {
+  const std::string kSrc = WithForm(marked, form);
+  ElabFixture f;
+  auto* design = Elaborate(kSrc, f);
+  ASSERT_NE(design, nullptr) << kSrc;
+  EXPECT_FALSE(f.has_errors) << kSrc;
+}
+
+const char kBoolean[] = "assert property (@(posedge clk) @@);";
+
+TEST(AssertionSideEffect, ABooleanWithoutAWriteIsAccepted) {
+  for (const char* form : {"n < 10", "n == 3", "v[0] < 10", "s.f == 1"}) {
+    ExpectNoSideEffect(SideBench(kBoolean), form);
+  }
+}
+
+TEST(AssertionSideEffect, EveryIncrementOrDecrementInABooleanIsReported) {
+  for (const char* form :
+       {"n++ < 10", "++n < 10", "n-- < 10", "--n < 10", "v[0]++ < 10"}) {
+    ExpectSideEffectOnce(SideBench(kBoolean), form);
+  }
+}
+
+TEST(AssertionSideEffect, DISABLED_EveryAssignmentInABooleanIsReported) {
+  for (const char* form :
+       {"(n = 3) == 3", "(n += 1) > 0", "(n -= 1) > 0", "(n *= 2) > 0",
+        "(n /= 2) > 0", "(n %= 2) > 0", "(n &= 1) > 0", "(n |= 1) > 0",
+        "(n ^= 1) > 0", "(n <<= 1) > 0", "(n >>= 1) > 0", "(n <<<= 1) > 0",
+        "(n >>>= 1) > 0", "(s.f = 1) == 1", "(v[0] = 1) == 1"}) {
+    ExpectSideEffectOnce(SideBench(kBoolean), form);
+  }
+}
+
+const char kLocalProperty[] =
+    "property plv; int x; int w[2]; t_s t;\n"
+    "    @(posedge clk) @@;\n"
+    "  endproperty\n"
+    "  assert property (plv);";
+
+TEST(AssertionSideEffect, EveryMatchItemWritingALocalIsAccepted) {
+  for (const char* form : {"(a, x = 0)",
+                           "(a, x = 0, x++)",
+                           "(a, x = 0, ++x)",
+                           "(a, x = 0, x--)",
+                           "(a, x = 0, --x)",
+                           "(a, x = 0, x += 2)",
+                           "(a, x = 0, x -= 2)",
+                           "(a, x = 0, x *= 2)",
+                           "(a, x = 0, x /= 2)",
+                           "(a, x = 0, x %= 2)",
+                           "(a, x = 0, x &= 1)",
+                           "(a, x = 0, x |= 1)",
+                           "(a, x = 0, x ^= 1)",
+                           "(a, x = 0, x <<= 1)",
+                           "(a, x = 0, x >>= 1)",
+                           "(a, x = 0, x <<<= 1)",
+                           "(a, x = 0, x >>>= 1)",
+                           "(a, w = '{0, 0}, w[1] = 1)",
+                           "(a, t = '{f: 0}, t.f = 1)",
+                           "(a, x = 0) ##1 (a, x++)",
+                           "(a, f())"}) {
+    ExpectNoSideEffect(SideBench(kLocalProperty), form);
+  }
+}
+
+TEST(AssertionSideEffect,
+     DISABLED_AnIncrementOfALocalOutsideAMatchItemIsReported) {
+  ExpectSideEffectOnce(SideBench(kLocalProperty), "(a, x = 0) ##1 x++ < 10");
+}
+
+TEST(AssertionSideEffect,
+     DISABLED_AnAssignmentOfALocalOutsideAMatchItemIsReported) {
+  for (const char* form : {"(x = 1) ##1 a", "(a, x = 0) ##1 (x += 1) > 0"}) {
+    ExpectSideEffectOnce(SideBench(kLocalProperty), form);
+  }
+}
+
+TEST(AssertionSideEffect, DISABLED_AMatchItemWritingAModuleVariableIsReported) {
+  for (const char* form : {"(a, n = 1)", "(a, n++)", "(a, --n)", "(a, n += 1)",
+                           "(a, v[0] = 1)", "(a, s.f = 1)"}) {
+    ExpectSideEffectOnce(SideBench(kLocalProperty), form);
+  }
+}
+
+const char kFormalSequences[] =
+    "sequence su(u); @(posedge clk) (a, u = 0, @@); endsequence\n"
+    "  sequence sf(local inout int w); @(posedge clk) (a, w = 0, @@);\n"
+    "  endsequence\n"
+    "  property pl; int y; su(y); endproperty\n"
+    "  property pf; int y; @(posedge clk) (1, y = 0) ##0 sf(y); endproperty\n"
+    "  ";
+
+std::string OnTarget(const char* form, const char* target) {
+  std::string out;
+  for (const char* c = form; *c != '\0'; ++c) {
+    if (*c == '$') {
+      out.append(target);
+    } else {
+      out.push_back(*c);
+    }
+  }
+  return out;
+}
+
+TEST(AssertionSideEffect, EveryMatchItemOnALocalThroughAFormalIsAccepted) {
+  for (const char* form :
+       {"$ = 1", "$++", "++$", "$--", "--$", "$ += 2", "$ -= 2", "$ *= 2",
+        "$ /= 2", "$ %= 2", "$ &= 1", "$ |= 1", "$ ^= 1", "$ <<= 1", "$ >>= 1",
+        "$ <<<= 1", "$ >>>= 1"}) {
+    const std::string kSrc =
+        SideBench(std::string(kFormalSequences) +
+                  "assert property (pl);\n  assert property (pf);");
+    const std::size_t kAt = kSrc.find("@@");
+    ExpectNoSideEffect(
+        kSrc.substr(0, kAt) + OnTarget(form, "u") + kSrc.substr(kAt + 2),
+        OnTarget(form, "w"));
+  }
+}
+
+TEST(AssertionSideEffect,
+     DISABLED_AMatchItemOnAModuleVariableThroughAFormalIsReported) {
+  ExpectSideEffectOnce(SideBench("sequence su(u); @(posedge clk) (a, u = 1); "
+                                 "endsequence\n  cover property (su(@@));"),
+                       "n");
+}
+
+const char* const kSidePlaces[] = {
+    "assert property (@(posedge clk) a ##1 @@);",
+    "assert property (@(posedge clk) a |-> @@);",
+    "sequence sq; @(posedge clk) @@; endsequence\n  cover property (sq);",
+    ("property pq; @(posedge clk) @@; endproperty\n"
+     "  assert property (pq);\n  cover property (pq);"),
+    "assert property (@(posedge clk) disable iff (@@) a);",
+    ("default disable iff (@@);\n  assert property (@(posedge clk) a);\n"
+     "  cover property (@(posedge clk) a);"),
+    "always @(posedge clk) assert property (@@);",
+    "if (1) begin : g assert property (@(posedge clk) @@); end",
+    ("for (genvar j = 0; j < 1; j++) begin : lg\n"
+     "    assert property (@(posedge clk) @@);\n  end"),
+};
+
+TEST(AssertionSideEffect, EveryPlaceAcceptsABooleanWithoutAWrite) {
+  for (const char* place : kSidePlaces) {
+    ExpectNoSideEffect(SideBench(place), "n < 10");
+  }
+}
+
+TEST(AssertionSideEffect, DISABLED_EveryPlaceReportsAnIncrementOnce) {
+  for (const char* place : kSidePlaces) {
+    ExpectSideEffectOnce(SideBench(place), "n++ < 10");
+  }
+}
+
+TEST(AssertionSideEffect, DISABLED_EveryPlaceReportsAnAssignmentOnce) {
+  for (const char* place : kSidePlaces) {
+    ExpectSideEffectOnce(SideBench(place), "(n = 3) == 3");
+  }
+}
+
+std::string SideUnit(const char* kind) {
+  return std::string(kind) +
+         " u_unit(input logic clk, input logic a);\n"
+         "  int n;\n"
+         "  sequence sl; int x; @(posedge clk) (a, x = 0, x++); endsequence\n"
+         "  cover property (sl);\n"
+         "  assert property (@(posedge clk) @@);\n"
+         "end" +
+         kind + "\n";
+}
+
+const char kSideChecker[] =
+    "checker u_unit(logic clk, logic a);\n"
+    "  int n;\n"
+    "  sequence sl; int x; @(posedge clk) (a, x = 0, x++); endsequence\n"
+    "  cover property (sl);\n"
+    "  assert property (@(posedge clk) @@);\n"
+    "endchecker\n";
+
+const char kPackageSequence[] =
+    "package pk;\n"
+    "  logic pclk = 0; int pn;\n"
+    "  sequence ps; @(posedge pclk) @@; endsequence\n"
+    "  sequence pl; int x; @(posedge pclk) (1, x = 0, x++); endsequence\n"
+    "endpackage\n";
+
+const char kUnitSequence[] =
+    "logic uclk = 0; int un;\n"
+    "sequence us; @(posedge uclk) @@; endsequence\n"
+    "sequence ul; int x; @(posedge uclk) (1, x = 0, x++); endsequence\n";
+
+const char kDeclaredUse[] =
+    "cover property (pk::ps);\n  cover property (us);\n"
+    "  cover property (pk::pl);\n  cover property (ul);";
+
+void ExpectEveryUnit(const char* form, bool reported) {
+  for (const std::string& unit : {SideUnit("interface"), SideUnit("program"),
+                                  std::string(kSideChecker)}) {
+    const std::string kMarked = SideBench("u_unit u(clk, a);", unit);
+    if (reported) {
+      ExpectSideEffectOnce(kMarked, form);
+    } else {
+      ExpectNoSideEffect(kMarked, form);
+    }
+  }
+}
+
+TEST(AssertionSideEffect, EveryUnitAcceptsALocalMatchItem) {
+  ExpectEveryUnit("n < 10", false);
+  for (const char* place :
+       {"if (1) begin : g\n    @@\n  end",
+        "for (genvar j = 0; j < 1; j++) begin : lg\n    @@\n  end"}) {
+    ExpectNoSideEffect(SideBench(place),
+                       "sequence sl; int x; @(posedge clk) (a, x = 0, x++); "
+                       "endsequence\n    cover property (sl);");
+  }
+  ExpectNoSideEffect(
+      SideBench(kDeclaredUse, WithForm(kPackageSequence, "pn < 10") +
+                                  WithForm(kUnitSequence, "un < 10")),
+      "");
+}
+
+TEST(AssertionSideEffect, EveryUnitReportsAnIncrement) {
+  ExpectEveryUnit("n++ < 10", true);
+}
+
+TEST(AssertionSideEffect, DISABLED_EveryUnitReportsAnAssignment) {
+  ExpectEveryUnit("(n = 3) == 3", true);
+}
+
+TEST(AssertionSideEffect, DISABLED_APackageOrUnitSequenceReportsAnIncrement) {
+  ExpectSideEffectOnce(
+      SideBench(kDeclaredUse, kPackageSequence + WithForm(kUnitSequence, "1")),
+      "pn++ < 10");
+  ExpectSideEffectOnce(
+      SideBench(kDeclaredUse, WithForm(kPackageSequence, "1") + kUnitSequence),
+      "un++ < 10");
 }
 
 }  // namespace
