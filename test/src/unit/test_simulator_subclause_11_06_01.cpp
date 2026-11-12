@@ -487,4 +487,91 @@ TEST(ExpressionBitLengthSim, ComparisonSizesBothOperandsToTheWider) {
   EXPECT_EQ(out, "0 1 1 1\n");
 }
 
+TEST(ExpressionBitLengthSim,
+     EveryOperatorOfTheTableTakesItsWidthInAWiderContext) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module m;\n"
+          "  logic [3:0] a = 4'hF, b = 4'h1, z4 = 0;\n"
+          "  logic [5:0] b6 = 6'h3;\n"
+          "  logic [7:0] r;\n"
+          "  initial begin\n"
+          "    r = a + b; $write(\"%h \", r); r = z4 - b; $write(\"%h \", r);\n"
+          "    r = a * a; $write(\"%h \", r); r = {4'h0, a} / b; $write(\"%h "
+          "\", r);\n"
+          "    r = ~a; $write(\"%h \", r); r = -b; $write(\"%h \", r);\n"
+          "    r = +a; $write(\"%h \", r); r = a & ~b; $write(\"%h \", r);\n"
+          "    r = a | ~b; $write(\"%h \", r); r = a ^ ~b; $write(\"%h \", "
+          "r);\n"
+          "    r = a ^~ b; $write(\"%h \", r); r = a ~^ b; $display(\"%h\", "
+          "r);\n"
+          "    r = a << 1; $write(\"%h \", r); r = a <<< 1; $write(\"%h \", "
+          "r);\n"
+          "    r = (a << 1) >> 1; $write(\"%h \", r);\n"
+          "    r = (a <<< 1) >>> 1; $write(\"%h \", r);\n"
+          "    r = a ** 2; $write(\"%h \", r); r = 2'd3 ** b6; $write(\"%h \", "
+          "r);\n"
+          "    r = a << b6; $display(\"%h\", r);\n"
+          "    r = (a + b) == 5'h10; $write(\"%h \", r);\n"
+          "    r = ~(a == b); $write(\"%h \", r); r = ~(a && b); $write(\"%h "
+          "\", r);\n"
+          "    r = ~(a || b); $write(\"%h \", r); r = ~(a -> b); $write(\"%h "
+          "\", r);\n"
+          "    r = ~(a <-> b); $write(\"%h \", r); r = ~&a; $write(\"%h \", "
+          "r);\n"
+          "    r = ~(&a); $write(\"%h \", r); r = ~(|a); $write(\"%h \", r);\n"
+          "    r = ~(^a); $write(\"%h \", r); r = ~(!a); $display(\"%h\", r);\n"
+          "    r = (a + b) > 4'h0; $write(\"%h \", r);\n"
+          "    r = 1 ? a + b : 0; $write(\"%h \", r);\n"
+          "    r = {a + b}; $write(\"%h \", r); r = {2{a + b}}; $write(\"%h "
+          "\", r);\n"
+          "    r = (a + b) && 1; $write(\"%h \", r); r = |(a + b); $write(\"%h "
+          "\", r);\n"
+          "    r = (a + b) % 5'h11; $write(\"%h \", r);\n"
+          "    r = (a + b) % 4'h3; $display(\"%h\", r);\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+          "             $bits(a + b6), $bits(a == b6), $bits(a && b6), "
+          "$bits(&b6),\n"
+          "             $bits(a << b6), $bits(1 ? a : b6), $bits({a, b6}),\n"
+          "             $bits({3{a, b6}}), $bits(5), $bits(3'd5), $bits(-a));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "10 ff e1 0f f0 ff 0f 0e ff f1 f1 f1\n"
+      "1e 1e 0f 0f e1 1b 78\n"
+      "01 ff fe fe fe fe 00 fe fe ff ff\n"
+      "00 10 00 00 00 00 10 01\n"
+      "6 1 1 1 4 6 10 30 32 3 4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ExpressionBitLengthSim,
+     DISABLED_AGenerateBlocksNetSizesItsContinuousAssignment) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  wire [3:0] a = 4'hF, b = 4'h1;\n"
+                       "  wire [3:0] w4;\n"
+                       "  wire [7:0] w8;\n"
+                       "  logic [3:0] p = 4'h5, q = 4'hA;\n"
+                       "  if (1) begin : gi\n"
+                       "    wire [7:0] w; assign w = a + b;\n"
+                       "    wire [7:0] w4; assign w4 = a + b;\n"
+                       "    wire [3:0] w8; assign w8 = a + b;\n"
+                       "    wire [11:0] s; assign s = {>> {p, q}};\n"
+                       "  end\n"
+                       "  case (1) 1: begin : gc wire [7:0] w; assign w = a + "
+                       "b; end endcase\n"
+                       "  for (genvar k = 0; k < 1; k++) begin : gf\n"
+                       "    wire [7:0] w; assign w = a + b;\n"
+                       "  end\n"
+                       "  initial #1 $display(\"%h %h %h %h %h %h\", gi.w, "
+                       "gi.w4, gi.w8, gc.w,\n"
+                       "                      gf[0].w, gi.s);\n"
+                       "endmodule\n",
+                       f),
+            "10 10 0 10 10 5a0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
