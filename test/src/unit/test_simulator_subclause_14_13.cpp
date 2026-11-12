@@ -391,4 +391,55 @@ TEST(ClockingSampleSim, ZeroSkewInputRuleHoldsInAnInterfaceAndAProgram) {
   EXPECT_EQ(out, "00\n10\n00\n10 20\n");
 }
 
+TEST(ClockingSampleSim, AProgramReadsTheSampleFromBeforeTheDesignsEdgeUpdate) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program tb(input logic clk, input logic [7:0] d);\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    input d;\n"
+                       "  endclocking\n"
+                       "  initial begin\n"
+                       "    @(cb);\n"
+                       "    $display(\"%0d %0d\", cb.d, d);\n"
+                       "    @(cb);\n"
+                       "    $display(\"%0d %0d\", cb.d, d);\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] d = 5;\n"
+                       "  always #5 clk = ~clk;\n"
+                       "  always @(posedge clk) d <= d + 1;\n"
+                       "  tb t(clk, d);\n"
+                       "endmodule\n",
+                       f),
+            "5 6\n6 7\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ClockingSampleSim, ASkewedInputTakesThePostponedValueThatManyUnitsBefore) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  logic clk = 0;\n"
+                       "  logic [7:0] v = 0;\n"
+                       "  clocking cb @(posedge clk);\n"
+                       "    input #3 v;\n"
+                       "  endclocking\n"
+                       "  initial begin\n"
+                       "    #6 v = 1;\n"
+                       "    #1 v = 2;\n"
+                       "    #1 v = 3;\n"
+                       "    #1 v = 4;\n"
+                       "    #1 clk = 1;\n"
+                       "    #1 $display(\"%0d\", cb.v);\n"
+                       "    v = 5; #3 v = 6; #2 v = 7;\n"
+                       "    clk = 0; #1 clk = 1;\n"
+                       "    #1 $display(\"%0d\", cb.v);\n"
+                       "    $finish;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2\n6\n$finish at time 18\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
