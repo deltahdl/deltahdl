@@ -634,4 +634,101 @@ TEST(OperatorPrecedenceRun, DISABLED_AParenthesizedNotGroupsAsTheTableSays) {
   }
 }
 
+constexpr const char* kLateMatch =
+    "  assign a = tick == 1;\n"
+    "  assign b = tick == 4;\n";
+
+struct DollarRun {
+  const char* declarations;
+  const char* written;
+  const char* meant;
+  const char* bounded;
+};
+
+void ExpectUnboundedInPlace(const std::string& place, const DollarRun& run) {
+  bool differs = false;
+  for (const char* directive : {"assert", "assume", "cover"}) {
+    SCOPED_TRACE(run.declarations);
+    SCOPED_TRACE(run.written);
+    SCOPED_TRACE(place + " " + directive);
+    const PlaceCounts kExpected = CountThroughTheEnd(
+        PropertyPlaceSource(place, directive, run.meant, kLateMatch));
+    EXPECT_EQ(CountThroughTheEnd(PropertyPlaceSource(
+                  place, directive, run.written, kLateMatch, run.declarations)),
+              kExpected);
+    differs = differs || CountThroughTheEnd(PropertyPlaceSource(
+                             place, directive, run.bounded, kLateMatch,
+                             run.declarations)) != kExpected;
+  }
+  EXPECT_TRUE(differs) << place << ": " << run.bounded
+                       << " counts as the unbounded range does";
+}
+
+constexpr DollarRun kUnboundedDollarRuns[] = {
+    {"  property q(x, y, m); x |-> ##[1:m] y; endproperty\n", "q(a, b, $)",
+     "a |-> ##[1:$] b", "q(a, b, 2)"},
+    {"  property q(x, y, m = $); x |-> ##[1:m] y; endproperty\n", "q(a, b)",
+     "a |-> ##[1:$] b", "q(a, b, 2)"},
+    {"  property q(x, y, m); x |-> ##1 (!y)[*1:m] ##1 y; endproperty\n",
+     "q(a, b, $)", "a |-> ##1 (!b)[*1:$] ##1 b", "q(a, b, 1)"},
+    {"  property r(x, y, n); x |-> ##[1:n] y; endproperty\n"
+     "  property q(x, y, m); r(x, y, m); endproperty\n",
+     "q(a, b, $)", "a |-> ##[1:$] b", "q(a, b, 2)"},
+};
+
+constexpr const char* kDollarRunPlaces[] = {
+    "module",  "procedural", "generate",       "interface",
+    "program", "checker",    "module property"};
+
+TEST(DollarActualRun, ADollarActualRunsAsAnUnboundedRangeInEachPlace) {
+  for (const char* place : kDollarRunPlaces) {
+    for (const DollarRun& run : kUnboundedDollarRuns) {
+      ExpectUnboundedInPlace(place, run);
+    }
+  }
+}
+
+TEST(DollarActualRun,
+     DISABLED_ADollarActualRunsAsAnUnboundedRangeInAPackageProperty) {
+  for (const DollarRun& run : kUnboundedDollarRuns) {
+    ExpectUnboundedInPlace("package property", run);
+  }
+}
+
+TEST(DollarActualRun,
+     DISABLED_ADollarPassedOnToASequenceRunsAsAnUnboundedRangeInEachPlace) {
+  const DollarRun kPassedOn = {
+      "  sequence s(y, n); ##[1:n] y; endsequence\n"
+      "  property q(x, y, m); x |-> s(y, m); endproperty\n",
+      "q(a, b, $)", "a |-> ##[1:$] b", "q(a, b, 2)"};
+  for (const char* place : kPropertyPlaces) {
+    ExpectUnboundedInPlace(place, kPassedOn);
+  }
+}
+
+TEST(DollarActualRun,
+     DISABLED_ADollarBoundByNameRunsAsAnUnboundedRangeInEachPlace) {
+  const DollarRun kNamed = {
+      "  property q(x, y, m); x |-> ##[1:m] y; endproperty\n",
+      "q(.m($), .y(b), .x(a))", "a |-> ##[1:$] b", "q(.m(2), .y(b), .x(a))"};
+  for (const char* place : kPropertyPlaces) {
+    ExpectUnboundedInPlace(place, kNamed);
+  }
+}
+
+TEST(DollarActualRun,
+     DISABLED_AnAlwaysOrSEventuallyDollarMaximumRunsUnboundedInEachPlace) {
+  const DollarRun kRuns[] = {
+      {"  property q(x, y, m); x |-> always [1:m] !y; endproperty\n",
+       "q(a, b, $)", "a |-> always [1:$] !b", "q(a, b, 2)"},
+      {"  property q(x, y, m); x |-> s_eventually [1:m] y; endproperty\n",
+       "q(a, b, $)", "a |-> s_eventually [1:$] b", "q(a, b, 2)"},
+  };
+  for (const char* place : kPropertyPlaces) {
+    for (const DollarRun& run : kRuns) {
+      ExpectUnboundedInPlace(place, run);
+    }
+  }
+}
+
 }  // namespace
