@@ -266,4 +266,53 @@ TEST(LocalIndexPlaces,
       2, kOutsideIndex);
 }
 
+std::string FlowSource(const std::string& items) {
+  return SequenceCoverSource(
+      "  sequence sub(lv); (te2, lv = 3); endsequence\n"
+      "  sequence sub2(lv); (te2, lv = 3) ##1 (1, lv += 4); endsequence\n" +
+          items,
+      DriveTicks({{1, 5}, {2, 6}}));
+}
+
+void ExpectEachCoverTwice(const std::string& src, int covers) {
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  for (int i = 1; i <= covers; ++i) {
+    std::string label = "c" + std::to_string(i) + ":";
+    EXPECT_EQ(CoverCount(f, src, label), 2u) << label;
+  }
+}
+
+TEST(LocalThroughInstance, APropertyLocalPassedWholeTakesTheInstancesValue) {
+  ExpectEachCoverTwice(
+      FlowSource(
+          "  property pa; int v;\n"
+          "    @(posedge clk) (te1, v = 0) ##1 sub(v) |-> ##1 (v == 3);\n"
+          "  endproperty\n"
+          "  property pc; int v;\n"
+          "    @(posedge clk) te1 ##1 sub(v) |-> (v == 3);\n"
+          "  endproperty\n"
+          "  c1: cover property (pa);\n"
+          "  c2: cover property (pc);\n"),
+      2);
+}
+
+TEST(LocalThroughInstance, ALocalFormalPassedWholeTakesTheInstancesValue) {
+  ExpectEachCoverTwice(
+      FlowSource("  sequence sl(local input int v);\n"
+                 "    te1 ##1 sub(v) ##1 (v == 3);\n"
+                 "  endsequence\n"
+                 "  c1: cover sequence (@(posedge clk) sl(0));\n"),
+      1);
+}
+
+TEST(LocalThroughInstance, TheLastOfSeveralAssignmentsFlowsOut) {
+  ExpectEachCoverTwice(
+      FlowSource("  sequence sm; int v;\n"
+                 "    @(posedge clk) te1 ##1 sub2(v) ##1 (v == 7);\n"
+                 "  endsequence\n"
+                 "  c1: cover sequence (sm);\n"),
+      1);
+}
+
 }  // namespace

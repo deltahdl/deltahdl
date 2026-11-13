@@ -257,4 +257,123 @@ TEST(InstanceLocalVisibility, AnOwnLocalOfTheSameNameIsAccepted) {
   }
 }
 
+constexpr const char* kWholeActual =
+    "a local variable passed to an instance whose sequence assigns the "
+    "formal shall be an entire actual argument";
+
+constexpr const char* kAssigningSequences =
+    "  sequence sub(lv); (a, lv = d) ##1 (b == lv); endsequence\n"
+    "  sequence sp(lv); (a, lv += d) ##1 (b == lv); endsequence\n"
+    "  sequence si(lv); (a, lv++) ##1 (b == lv); endsequence\n"
+    "  sequence sr(lv); a ##1 (b == lv); endsequence\n";
+
+std::string TopSequence(const std::string& instance,
+                        const std::string& name = "top") {
+  return "  sequence " + name + "; int v1; (c, v1 = 0) ##1 " + instance +
+         " ##1 (b == v1); endsequence\n";
+}
+
+std::string AssigningModule(const std::string& body) {
+  return std::string(
+             "module m;\n"
+             "  logic clk, a, b, c;\n"
+             "  int d;\n"
+             "  default clocking @(posedge clk); endclocking\n") +
+         kAssigningSequences + body + "endmodule\n";
+}
+
+void ExpectWholeActualReported(const std::string& bad, const char* at,
+                               const std::string& good) {
+  {
+    SCOPED_TRACE(bad);
+    ElabFixture f;
+    ElaborateSrc(bad, f);
+    uint32_t line = LineHolding(bad, at);
+    ASSERT_NE(line, 0u);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kWholeActual, line, "16.10"));
+  }
+  SCOPED_TRACE(good);
+  ElabFixture g;
+  ElaborateSrc(good, g);
+  EXPECT_FALSE(g.diag.HasErrors());
+}
+
+struct ActualPair {
+  const char* bad;
+  const char* good;
+};
+
+TEST(WholeLocalActual, DISABLED_ALocalInsideAnAssignedFormalsActualIsReported) {
+  const ActualPair kPairs[] = {
+      {"sub(v1 + 1)", "sub(v1)"},      {"sp(v1 + 1)", "sp(v1)"},
+      {"si(v1 + 1)", "si(v1)"},        {"sub(v1[3:0])", "sub(v1)"},
+      {"sub(v1[0])", "sub(v1)"},       {"sub({v1})", "sub(v1)"},
+      {"sub(c ? v1 : v1)", "sub(v1)"}, {"sub(.lv(v1 + 1))", "sub(.lv(v1))"},
+  };
+  for (const ActualPair& pair : kPairs) {
+    ExpectWholeActualReported(AssigningModule(TopSequence(pair.bad)), pair.bad,
+                              AssigningModule(TopSequence(pair.good)));
+  }
+}
+
+TEST(WholeLocalActual, DISABLED_ALocalInsideAnActualInAPropertyIsReported) {
+  ExpectWholeActualReported(
+      AssigningModule("  property q; int v1;"
+                      " (c, v1 = 0) ##1 sub(v1 + 1) |-> (b == v1);"
+                      " endproperty\n"),
+      "sub(v1 + 1)",
+      AssigningModule("  property q; int v1;"
+                      " (c, v1 = 0) ##1 sub(v1) |-> (b == v1);"
+                      " endproperty\n"));
+}
+
+TEST(WholeLocalActual, ALocalInsideAReadOnlyFormalsActualIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(AssigningModule(TopSequence("sr(v1 + 1)") +
+                               TopSequence("sr(v1[3:0])", "top2")),
+               f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+std::string AssigningPlace(const std::string& place,
+                           const std::string& instance) {
+  std::string body = std::string(kAssigningSequences) + TopSequence(instance);
+  if (place == "interface") {
+    return "interface e(input logic clk, a, b, c);\n  int d;\n" + body +
+           "endinterface\n";
+  }
+  if (place == "program") {
+    return "program e(input logic clk, a, b, c);\n  int d;\n" + body +
+           "endprogram\n";
+  }
+  if (place == "checker") {
+    return "checker e(logic clk, logic a, logic b, logic c, int d);\n" + body +
+           "endchecker\n";
+  }
+  if (place == "package") {
+    return "package e;\n  logic a, b, c;\n  int d;\n" + body + "endpackage\n";
+  }
+  if (place == "unit") {
+    return "logic a, b, c;\nint d;\n" + body + "module m;\nendmodule\n";
+  }
+  if (place == "generate") {
+    return "module m;\n  logic clk, a, b, c;\n  int d;\n"
+           "  if (1) begin : g\n" +
+           body + "  end\nendmodule\n";
+  }
+  return "module m;\n  logic clk, a, b, c;\n  int d;\n"
+         "  clocking cb @(posedge clk);\n" +
+         body + "  endclocking\nendmodule\n";
+}
+
+TEST(WholeLocalActual, DISABLED_ALocalInsideAnActualIsReportedInEveryPlace) {
+  for (const char* place : {"interface", "program", "checker", "package",
+                            "unit", "generate", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectWholeActualReported(AssigningPlace(place, "sub(v1 + 1)"),
+                              "sub(v1 + 1)", AssigningPlace(place, "sub(v1)"));
+  }
+}
+
 }  // namespace
