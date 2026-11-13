@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -115,6 +116,44 @@ TEST(RecursiveProperty, AbortsInsideTheRecursionDecideTheAttempt) {
   EXPECT_EQ(counts.fails, 4u);
   EXPECT_EQ(counts.passes_at_end, 4u);
   EXPECT_EQ(counts.fails_at_end, 4u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedRecursions =
+    "  property pa(p); p and (1'b1 |=> pa(p)); endproperty\n"
+    "  property pwu(p, q); q or (p and (1'b1 |=> pwu(p, q))); endproperty\n"
+    "  property cnt(x, local input int n);\n"
+    "    (n == 0) or (x and (1'b1 |=> cnt(x, n - 1)));\n"
+    "  endproperty\n"
+    "  property ph1(x, y); x and (1'b1 |=> ph2(x, y)); endproperty\n"
+    "  property ph2(x, y); y and (1'b1 |=> ph1(x, y)); endproperty\n"
+    "  property ab(p, acc); accept_on(acc) p and (1'b1 |=> ab(p, acc));\n"
+    "  endproperty\n";
+
+const PlacedProperty kRecursionsInPlace[] = {
+    {"c |-> pa(d)", {2, 2}, 2}, {"pwu(d, c)", {4, 0}, 4},
+    {"pwu(a, b)", {3, 1}, 3},   {"cnt(d, 2)", {2, 2}, 2},
+    {"ph1(d, c)", {2, 2}, 2},   {"ab(d, c)", {4, 0}, 4}};
+
+TEST(RecursiveProperty, ARecursionCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kRecursionsInPlace) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedRecursions);
+    }
+  }
+}
+
+TEST(RecursiveProperty, DISABLED_ARecursionCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kRecursionsInPlace) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedRecursions);
+  }
 }
 
 }  // namespace
