@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_placed_assertion_runs.h"
 
 using namespace delta;
 
@@ -66,6 +67,79 @@ TEST(RestrictStatementRun, ANamedInstanceAndATemporalRestrictReportNothing) {
   EXPECT_EQ(out, "$finish at time 50\n");
   EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
   EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
+constexpr const char* kRestrictSignals =
+    "  logic clk = 0, ctr = 1, rst = 0;\n"
+    "  always #5 clk = ~clk;\n"
+    "  initial #40 $finish;\n";
+
+constexpr PlacedDesign kRestrictDesign = {kRestrictSignals,
+                                          "(input logic clk, ctr)", "clk, ctr"};
+
+constexpr const char* kAssumeFailures =
+    "[5] ERROR %.a1: Assertion failed.\n"
+    "[15] ERROR %.a1: Assertion failed.\n"
+    "[25] ERROR %.a1: Assertion failed.\n"
+    "[35] ERROR %.a1: Assertion failed.\n";
+
+TEST(RestrictStatementRun, ARestrictIsNotVerifiedInEachPlace) {
+  ExpectPlacedLinesInEachPlace(
+      kRestrictDesign,
+      {"r1: restrict property (@(posedge clk) ctr == '0);\n"
+       "r2: restrict property (@(posedge clk) ctr |=> !ctr);\n"
+       "a1: assume property (@(posedge clk) ctr == '0);\n",
+       kAssumeFailures, "[15] ERROR %.a1: Assertion failed.\n"});
+}
+
+TEST(RestrictStatementRun,
+     ARestrictWithAClockInferredFromItsProcedureIsNotVerified) {
+  SimFixture f;
+  PlacedRun run = RunPlaced(PlacedSource(kRestrictDesign, "always",
+                                         "r1: restrict property (ctr == '0);\n"
+                                         "a1: assume property (ctr == '0);\n"),
+                            f);
+  EXPECT_EQ(run.lines, PlacedExpected(kAssumeFailures, "t"));
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 4);
+}
+
+TEST(RestrictStatementRun, ARestrictInEachGenerateLoopIterationIsNotVerified) {
+  SimFixture f;
+  PlacedRun run =
+      RunPlaced("module t;\n" + std::string(kRestrictSignals) +
+                    "  for (genvar i = 0; i < 2; i++) begin : gl\n"
+                    "    r1: restrict property (@(posedge clk) ctr == '0);\n"
+                    "    a1: assume property (@(posedge clk) ctr == '0);\n"
+                    "  end\n"
+                    "endmodule\n",
+                f);
+  std::string each_iteration = PlacedExpected(kAssumeFailures, "t.gl[0]") +
+                               PlacedExpected(kAssumeFailures, "t.gl[1]");
+  EXPECT_EQ(run.lines, PlacedSorted(PlacedLines(each_iteration)));
+  EXPECT_EQ(f.ctx.AssertionFailCount(), 8);
+}
+
+TEST(RestrictStatementRun,
+     ARestrictTakingItsDefaultClockAndDisableConditionIsNotVerified) {
+  for (const char* disable : {"", "disable iff (rst) "}) {
+    SCOPED_TRACE(disable);
+    SimFixture f;
+    std::string out =
+        RunCapture("module t;\n" + std::string(kRestrictSignals) +
+                       "  default clocking @(posedge clk); endclocking\n"
+                       "  default disable iff (rst);\n"
+                       "  r1: restrict property (" +
+                       disable +
+                       "ctr == '0);\n"
+                       "  a1: assume property (" +
+                       disable +
+                       "ctr == '0) else "
+                       "$display(\"a1 %0t\", $time);\n"
+                       "endmodule\n",
+                   f);
+    EXPECT_EQ(out, "a1 5\na1 15\na1 25\na1 35\n$finish at time 40\n");
+    EXPECT_TRUE(f.diag.Diagnostics().empty());
+  }
 }
 
 }  // namespace

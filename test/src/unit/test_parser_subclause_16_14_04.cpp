@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "fixture_parser.h"
+#include "helpers_nested_assertions.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
@@ -49,6 +53,53 @@ TEST(RestrictStatementParsing, RejectsElseClause) {
       "  restrict property (@(posedge clk) ctr == '0) else $error(\"x\");\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'else'", 4, "16.14.4"));
+}
+
+struct RestrictEnding {
+  const char* tail;
+  const char* report;
+};
+
+constexpr RestrictEnding kActionBlockEndings[] = {
+    {" $display(\"x\");", "expected ';', got system identifier"},
+    {" else $error(\"x\");", "expected ';', got 'else'"},
+    {" begin end else $error(\"x\");", "expected ';', got 'begin'"}};
+
+std::vector<std::string> RestrictPrefixes(const std::string& place) {
+  return {"", NestingProcedureIn(place), "initial "};
+}
+
+std::string RestrictSource(const std::string& place, const std::string& prefix,
+                           const std::string& tail) {
+  return NestingSource(
+      place, prefix + "x1: restrict property (@(posedge clk) a)" + tail);
+}
+
+TEST(RestrictStatementParsing, AnActionBlockIsRefusedInEachPlace) {
+  for (const char* place : kNestingPlaces) {
+    for (const std::string& prefix : RestrictPrefixes(place)) {
+      if (std::string(place) == "checker" && prefix == "initial ") continue;
+      for (const RestrictEnding& ending : kActionBlockEndings) {
+        std::string src = RestrictSource(place, prefix, ending.tail);
+        SCOPED_TRACE(src);
+        auto r = Parse(src);
+        EXPECT_TRUE(ReportedError(r.diags, ending.report,
+                                  LineHolding(src, "x1:"), "16.14.4"));
+      }
+    }
+  }
+}
+
+TEST(RestrictStatementParsing,
+     TheStatementEndingAtItsSemicolonIsAcceptedInEachPlace) {
+  for (const char* place : kNestingPlaces) {
+    for (const std::string& prefix : RestrictPrefixes(place)) {
+      if (std::string(place) == "checker" && prefix == "initial ") continue;
+      std::string src = RestrictSource(place, prefix, ";");
+      SCOPED_TRACE(src);
+      EXPECT_FALSE(Parse(src).has_errors);
+    }
+  }
 }
 
 }  // namespace
