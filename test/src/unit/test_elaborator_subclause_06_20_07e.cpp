@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_dollar_param_reports.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -550,6 +554,55 @@ TEST(DollarConstantElaboration,
       f);
   ExpectDollarReportedOnlyOn(f, {15, 46, 53, 63, 112, 114, 116, 118, 120},
                              {29, 36, 111, 113, 115, 117, 119, 121});
+}
+
+const char kScopedTakers[] =
+    "sequence s(x, k); x ##[1:k] x; endsequence\n"
+    "  property p(x, k); x ##[1:k] x; endproperty\n";
+
+std::string ScopedActualSource(const char* const* names, size_t count) {
+  const std::string kTakers = kScopedTakers;
+  std::string src = "package pk;\n  " + kTakers + "endpackage\n" +
+                    "interface ifc;\n  " + kTakers + "endinterface\n" +
+                    kTakers +
+                    "module top;\n"
+                    "  bit clk, a;\n  " +
+                    kTakers +
+                    "  ifc i();\n"
+                    "  clocking cb @(posedge clk);\n    " +
+                    kTakers +
+                    "  endclocking\n"
+                    "  if (1) begin : g\n    " +
+                    kTakers + "  end\n";
+  for (size_t at = 0; at < count; ++at) {
+    src += "  assert property (@(posedge clk) " + std::string(names[at]) +
+           "(a, $));\n";
+  }
+  return src + "endmodule\n";
+}
+
+void ExpectDollarAdmittedAsAnActual(const char* const* names, size_t count) {
+  const std::string kSrc = ScopedActualSource(names, count);
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  for (size_t at = 0; at < count; ++at) {
+    const std::string kUse = std::string(names[at]) + "(a, $)";
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "may stand only in",
+                               LineHolding(kSrc, kUse), "6.20.7"))
+        << kUse;
+  }
+}
+
+TEST(DollarConstantElaboration, DollarIsAnActualOfAnInstanceNamedSimply) {
+  const char* const kNames[] = {"s", "p", "$unit::s", "$unit::p"};
+  ExpectDollarAdmittedAsAnActual(kNames, 4);
+}
+
+TEST(DollarConstantElaboration,
+     DISABLED_DollarIsAnActualOfAnInstanceNamedThroughAScope) {
+  const char* const kNames[] = {"pk::s", "pk::p", "i.s", "i.p",   "cb.s",
+                                "cb.p",  "g.s",   "g.p", "top.s", "top.p"};
+  ExpectDollarAdmittedAsAnActual(kNames, 10);
 }
 
 }  // namespace
