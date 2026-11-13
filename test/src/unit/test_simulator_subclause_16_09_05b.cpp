@@ -246,6 +246,17 @@ TEST(SequenceAndMatches, DISABLED_EveryKindOfOperandPairsEveryMatch) {
   EXPECT_EQ(CoverCount(f, src, "c3:"), 5u);
 }
 
+TEST(SequenceAndMatches, DISABLED_AGroupOfTwoInstancesIsEvaluated) {
+  std::string src = SequenceCoverSource(
+      InstanceOperands() +
+          "  c1: cover sequence (@(posedge clk) (sa(te1, te2) and"
+          " sb(te3, te4, te5)));\n",
+      FixedDrive());
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
+}
+
 TEST(SequenceAndImplication, AnAntecedentAttemptFailsOnce) {
   std::string items;
   for (const char* directive : {"assert", "assume"}) {
