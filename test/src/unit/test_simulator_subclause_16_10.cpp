@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -552,6 +553,101 @@ TEST(TypedLocals, DISABLED_UnpackedLocalsInASequenceBodyKeepItsClock) {
           "  c1: cover property (sw);\n"
           "  c2: cover property (sb);\n"),
       2);
+}
+
+std::string PlaceDrive() { return DriveTicks({{1, 3}, {2, 4}}); }
+
+constexpr char kHeldSequence[] =
+    "sequence sl; int x;\n"
+    "    @(posedge clk) (te1, x = 5) ##1 (te2 && x == 5);\n"
+    "  endsequence\n";
+
+constexpr char kHeldProperty[] =
+    "property pl; int x;\n"
+    "    @(posedge clk) (te1, x = 5) |=> (te2 && x == 5);\n"
+    "  endproperty\n";
+
+void ExpectEachLabelTwice(const std::string& src,
+                          std::initializer_list<const char*> labels) {
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  for (const char* label : labels) {
+    EXPECT_EQ(CoverCount(f, src, label), 2u) << label;
+  }
+}
+
+TEST(LocalPlaces, ASequenceLocalInEveryDesignElementHoldsItsValue) {
+  ExpectEachLabelTwice(
+      DesignElementCoverSource(
+          std::string("cover sequence (sl);\n  ") + kHeldSequence,
+          PlaceDrive()),
+      {"i1:", "p1:", "k1:", "g1:"});
+}
+
+TEST(LocalPlaces, APropertyLocalInEveryDesignElementHoldsItsValue) {
+  ExpectEachLabelTwice(
+      DesignElementCoverSource(
+          std::string("cover property (pl);\n  ") + kHeldProperty,
+          PlaceDrive()),
+      {"i1:", "p1:", "k1:", "g1:"});
+}
+
+TEST(LocalPlaces, AModuleLocalHoldsItsValue) {
+  ExpectEachLabelTwice(SequenceCoverSource(std::string("  ") + kHeldSequence +
+                                               "  " + kHeldProperty +
+                                               "  c1: cover sequence (sl);\n"
+                                               "  c2: cover property (pl);\n",
+                                           PlaceDrive()),
+                       {"c1:", "c2:"});
+}
+
+constexpr char kPackageLocals[] =
+    "package pk;\n"
+    "  sequence ps(c, a, b); int x;\n"
+    "    @(posedge c) (a, x = 5) ##1 (b && x == 5);\n"
+    "  endsequence\n"
+    "  property pp(c, a, b); int x;\n"
+    "    @(posedge c) (a, x = 5) |=> (b && x == 5);\n"
+    "  endproperty\n"
+    "endpackage\n";
+
+TEST(LocalPlaces, APackageLocalReachedThroughAnImportHoldsItsValue) {
+  ExpectEachLabelTwice(SequenceCoverSource("  import pk::*;\n"
+                                           "  c1: cover sequence (ps(clk, te1,"
+                                           " te2));\n"
+                                           "  c2: cover property (pp(clk, te1,"
+                                           " te2));\n",
+                                           PlaceDrive(), kPackageLocals),
+                       {"c1:", "c2:"});
+}
+
+TEST(LocalPlaces, AClockingBlockLocalHoldsItsValue) {
+  ExpectEachLabelTwice(
+      SequenceCoverSource(
+          "  clocking cb @(posedge clk);\n"
+          "    sequence s; int x; (te1, x = 5) ##1 (te2 && x == 5);"
+          " endsequence\n"
+          "    property p; int x; (te1, x = 5) |=> (te2 && x == 5);"
+          " endproperty\n"
+          "  endclocking\n"
+          "  c1: cover sequence (cb.s);\n"
+          "  c2: cover property (cb.p);\n",
+          PlaceDrive()),
+      {"c1:", "c2:"});
+}
+
+TEST(LocalPlaces, DISABLED_ACompilationUnitLocalHoldsItsValue) {
+  ExpectEachLabelTwice(
+      SequenceCoverSource("  c1: cover sequence (us(clk, te1, te2));\n"
+                          "  c2: cover property (up(clk, te1, te2));\n",
+                          PlaceDrive(),
+                          "sequence us(c, a, b); int x;\n"
+                          "  @(posedge c) (a, x = 5) ##1 (b && x == 5);\n"
+                          "endsequence\n"
+                          "property up(c, a, b); int x;\n"
+                          "  @(posedge c) (a, x = 5) |=> (b && x == 5);\n"
+                          "endproperty\n"),
+      {"c1:", "c2:"});
 }
 
 }  // namespace
