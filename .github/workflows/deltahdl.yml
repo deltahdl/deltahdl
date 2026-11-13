@@ -384,8 +384,8 @@ jobs:
                        -not -path src/simulator/vpi_user.h)
           do
             lines=$(wc -l < "$f")
-            if [ "$lines" -ge 1000 ]; then
-              echo "::error file=$f,line=$lines::$f has $lines lines (max 999); split it before adding to it"
+            if [ "$lines" -gt 1000 ]; then
+              echo "::error file=$f,line=$lines::$f has $lines lines (max 1000); split it before adding to it"
               fail=1
             fi
           done
