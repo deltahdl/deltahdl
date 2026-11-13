@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "elaborator/sequence_match_attach.h"
 #include "fixture_simulator.h"
@@ -287,6 +289,145 @@ TEST(AttachedTask, ATaskAttachedInEachPlaceIsCalledAtTheMatch) {
         "procedural task at 25\n", "procedural task method at 25\n"}) {
     EXPECT_EQ(Occurrences(out, line), 1u) << line << out;
   }
+}
+
+std::string RunStatements(const std::string& prelude, const std::string& drive,
+                          const std::string& outside = "") {
+  SimFixture f;
+  return RunCapture(outside + SequenceTickSource("te5", drive, prelude), f);
+}
+
+void ExpectLines(const std::string& out,
+                 const std::vector<std::pair<std::string, size_t>>& lines) {
+  for (const auto& [line, count] : lines) {
+    EXPECT_EQ(Occurrences(out, line + "\n"), count) << line << "\n" << out;
+  }
+}
+
+std::string Call(const std::string& tag) {
+  return "$display(\"" + tag + " at %0t\", $time)";
+}
+
+TEST(AttachedEndPoint,
+     DISABLED_ALoneBooleanGroupAsTheWholePropertyRunsItsCall) {
+  std::string out = RunStatements(
+      "  default clocking @(posedge clk); endclocking\n"
+      "  a1: assert property (@(posedge clk) (te1, " +
+          Call("assert") +
+          ")) else;\n"
+          "  m1: assume property (@(posedge clk) (te1, " +
+          Call("assume") +
+          ")) else;\n"
+          "  c1: cover property (@(posedge clk) (te1, " +
+          Call("cover") +
+          "));\n"
+          "  c2: cover property ((te1, " +
+          Call("default") +
+          "));\n"
+          "  c3: cover property (@(posedge clk) (te1 or te2, " +
+          Call("either") + "));\n",
+      DriveTicks({{2}, {3}}));
+  ExpectLines(out, {{"assert at 15", 1},
+                    {"assume at 15", 1},
+                    {"cover at 15", 1},
+                    {"default at 15", 1},
+                    {"either at 15", 1},
+                    {"either at 25", 1}});
+}
+
+TEST(AttachedEndPoint,
+     DISABLED_ALoneBooleanGroupAsAPropertyBodyOrConsequentRuns) {
+  std::string out =
+      RunStatements("  property p; @(posedge clk) (te1, " + Call("body") +
+                        "); endproperty\n"
+                        "  c1: cover property (p);\n"
+                        "  c2: cover property (@(posedge clk) te2 |-> (te1, " +
+                        Call("consequent") + "));\n",
+                    DriveTicks({{2, 4}, {2}}));
+  ExpectLines(out, {{"body at 15", 1},
+                    {"body at 35", 1},
+                    {"consequent at 15", 1},
+                    {"consequent at 35", 0}});
+}
+
+TEST(AttachedEndPoint, AGroupSpanningTicksAsTheWholePropertyRunsAtItsEnd) {
+  std::string out = RunStatements(
+      "  property p; @(posedge clk) (te1 ##1 te2, " + Call("body") +
+          "); endproperty\n"
+          "  c1: cover property (p);\n"
+          "  a1: assert property (@(posedge clk) (te1 ##1 te2, " +
+          Call("whole") + ")) else;\n",
+      DriveTicks({{2}, {3}}));
+  ExpectLines(out, {{"body at 25", 1}, {"whole at 25", 1}, {"whole at 15", 0}});
+}
+
+TEST(AttachedEndPoint, ARepeatedGroupRunsAtEachIterationOfEachAttempt) {
+  std::string out = RunStatements(
+      "  c1: cover property (@(posedge clk) (te1, " + Call("twice") +
+          ")[*2]);\n"
+          "  c2: cover property (@(posedge clk) (te1, " +
+          Call("plus") +
+          ")[+] ##1 te2);\n"
+          "  c3: cover property (@(posedge clk) (te1, " +
+          Call("range") + ")[*1:2] ##1 te2);\n",
+      DriveTicks({{2, 3}, {4}}));
+  ExpectLines(out, {{"twice at 15", 1},
+                    {"twice at 25", 2},
+                    {"twice at 35", 0},
+                    {"plus at 15", 1},
+                    {"plus at 25", 2},
+                    {"range at 15", 1},
+                    {"range at 25", 2}});
+}
+
+TEST(AttachedEndPoint, ACallRunsAtTheGroupsEndWhateverTheRestDoes) {
+  std::string out = RunStatements(
+      "  c1: cover property (@(posedge clk) (te1 or te1 ##1 te2, " +
+          Call("either") +
+          ") ##1 te3);\n"
+          "  c2: cover property (@(posedge clk) (te1, " +
+          Call("failing") +
+          ") ##1 te4);\n"
+          "  c3: cover property (@(posedge clk) (te5, " +
+          Call("never") + ") ##1 te1);\n",
+      DriveTicks({{2}, {3}}));
+  ExpectLines(out, {{"either at 15", 1},
+                    {"either at 25", 1},
+                    {"failing at 15", 1},
+                    {"never at 15", 0},
+                    {"never at 25", 0}});
+}
+
+TEST(AttachedEndPoint,
+     DISABLED_ALoneBooleanGroupInEachDesignElementRunsItsCall) {
+  std::string outside =
+      "interface ifc(input logic clk, te1);\n"
+      "  c1: cover property (@(posedge clk) (te1, " +
+      Call("interface") +
+      "));\n"
+      "endinterface\n"
+      "program pg(input logic clk, te1);\n"
+      "  c2: cover property (@(posedge clk) (te1, " +
+      Call("program") +
+      "));\n"
+      "endprogram\n"
+      "checker ck(logic clk, logic te1);\n"
+      "  c3: cover property (@(posedge clk) (te1, " +
+      Call("checker") +
+      "));\n"
+      "endchecker\n";
+  std::string out = RunStatements(
+      "  ifc i(clk, te1);\n"
+      "  pg p(clk, te1);\n"
+      "  ck k(clk, te1);\n"
+      "  if (1) begin : g\n"
+      "    c4: cover property (@(posedge clk) (te1, " +
+          Call("generate") + "));\n  end\n",
+      DriveTicks({{2}}), outside);
+  ExpectLines(out, {{"interface at 15", 1},
+                    {"program at 15", 1},
+                    {"checker at 15", 1},
+                    {"generate at 15", 1}});
 }
 
 }  // namespace
