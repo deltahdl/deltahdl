@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_properties.h"
@@ -146,6 +147,61 @@ TEST(FollowedByProperty, IsTheDualOfTheImplication) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"d #-# b", {2, 2}, 2},
+    {"a #-# c", {0, 4}, 0},
+    {"a #=# c", {2, 2}, 2},
+    {"d ##[0:1] b #-# c", {2, 2}, 2},
+    {"a ##1 b #-# c", {1, 3}, 1},
+    {"a ##1 b #=# c", {0, 4}, 0},
+    {"b[*0:1] ##1 1 #-# c", {3, 1}, 3},
+    {"d #-# b ##1 c", {1, 3}, 1},
+    {"d #=# (b |-> c)", {2, 2}, 2},
+    {"d #-# q(b, c)", {2, 2}, 2},
+    {"not (d |-> not b)", {2, 2}, 2},
+    {"not (a |=> not c)", {2, 2}, 2},
+    {"d #-# strong(b ##1 c)", {1, 3}, 1},
+    {"strong(d ##0 b ##1 c)", {1, 3}, 1},
+    {"d #=# strong(c ##1 b)", {1, 3}, 1},
+    {"strong(d ##1 c ##1 b)", {1, 3}, 1}};
+
+TEST(FollowedByProperty, AFollowedByCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+const PlacedProperty kEmptyMatchProperties[] = {{"b[*0:1] #=# c", {3, 1}, 3},
+                                                {"b[*0] #=# c", {2, 2}, 2}};
+
+TEST(FollowedByProperty,
+     DISABLED_AnEmptyMatchStartsANonoverlappedConsequentAtItsTickInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kEmptyMatchProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
+}
+
+TEST(FollowedByProperty, DISABLED_AFollowedByCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
 }
 
 }  // namespace
