@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
-#include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_placed_assertion_runs.h"
 
 using namespace delta;
 
@@ -152,23 +151,6 @@ std::string QueueSource(const std::string& unit, const std::string& body) {
          "  w u(clk, fast, slow);\nendmodule\n";
 }
 
-std::string SortedLines(const std::string& text) {
-  std::vector<std::string> lines;
-  size_t at = 0;
-  while (at < text.size()) {
-    size_t end = text.find('\n', at);
-    std::string line = text.substr(at, end - at);
-    if (!line.starts_with("$finish") && !line.starts_with("cover ")) {
-      lines.push_back(line);
-    }
-    at = end + 1;
-  }
-  std::sort(lines.begin(), lines.end());
-  std::string out;
-  for (const std::string& line : lines) out.append(line).append("\n");
-  return out;
-}
-
 constexpr const char* kQueueDirectives[] = {
     "assert property", "assume property", "cover property", "cover sequence"};
 
@@ -188,7 +170,7 @@ TEST(ProceduralAssertionQueueRun,
                          "\n";
       SimFixture f;
       std::string out = RunCapture(QueueSource(unit, body), f);
-      EXPECT_EQ(SortedLines(out), kMaturedAtTheirOwnClocks);
+      EXPECT_EQ(PlacedSortedVerdicts(out), kMaturedAtTheirOwnClocks);
     }
   }
 }
@@ -202,9 +184,9 @@ TEST(ProceduralAssertionQueueRun,
                        QueueStatement(directive, "slow", "s") + "\n    end\n";
     SimFixture f;
     std::string out = RunCapture(QueueSource("module", body), f);
-    EXPECT_EQ(SortedLines(out),
-              SortedLines(std::string(kMaturedAtTheirOwnClocks) +
-                          kMaturedAtTheirOwnClocks));
+    EXPECT_EQ(PlacedSortedVerdicts(out),
+              PlacedSortedVerdicts(std::string(kMaturedAtTheirOwnClocks) +
+                                   kMaturedAtTheirOwnClocks));
   }
 }
 

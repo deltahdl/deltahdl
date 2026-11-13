@@ -1,11 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
-#include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_placed_assertion_runs.h"
 
 using namespace delta;
 
@@ -36,23 +35,6 @@ std::string SavedPlaceSource(const std::string& place,
           : place + " w(input logic clk, input logic [3:0] v);\n";
   return header + items + "end" + place + "\nmodule t;\n" + kSavedSignals +
          "  w u(clk, v);\nendmodule\n";
-}
-
-std::string SortedOutput(const std::string& text) {
-  std::vector<std::string> lines;
-  size_t at = 0;
-  while (at < text.size()) {
-    size_t end = text.find('\n', at);
-    std::string line = text.substr(at, end - at);
-    if (!line.starts_with("$finish") && !line.starts_with("cover ")) {
-      lines.push_back(line);
-    }
-    at = end + 1;
-  }
-  std::sort(lines.begin(), lines.end());
-  std::string out;
-  for (const std::string& line : lines) out.append(line).append("\n");
-  return out;
 }
 
 std::string Verdicts(const std::string& directive, const std::string& expr,
@@ -116,7 +98,8 @@ TEST(
             SavedPlaceSource(place, SavedBody(place, directive, row));
         SCOPED_TRACE(src);
         SimFixture f;
-        EXPECT_EQ(SortedOutput(RunCapture(src, f)), Expected(directive, row));
+        EXPECT_EQ(PlacedSortedVerdicts(RunCapture(src, f)),
+                  Expected(directive, row));
       }
     }
   }
@@ -134,7 +117,7 @@ TEST(ProceduralAssertionArgumentsRun,
     SimFixture f;
     bool cover = std::string(directive).starts_with("cover");
     EXPECT_EQ(
-        SortedOutput(RunCapture(src, f)),
+        PlacedSortedVerdicts(RunCapture(src, f)),
         cover ? "p 115\np 315\n" : "f 15\nf 205\nf 215\nf 5\np 115\np 315\n");
   }
 }

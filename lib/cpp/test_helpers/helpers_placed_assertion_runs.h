@@ -110,6 +110,16 @@ inline std::string PlacedSorted(std::vector<std::string> lines) {
   return out;
 }
 
+inline std::string PlacedSortedVerdicts(const std::string& text) {
+  std::vector<std::string> kept;
+  for (const std::string& line : PlacedLines(text)) {
+    if (!line.starts_with("$finish") && !line.starts_with("cover ")) {
+      kept.push_back(line);
+    }
+  }
+  return PlacedSorted(kept);
+}
+
 struct PlacedRun {
   std::string lines;
   std::string out;
