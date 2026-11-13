@@ -572,4 +572,129 @@ TEST(AttachedAutomatic, AnAutomaticByValueInAGenerateBlockIsAccepted) {
   }
 }
 
+constexpr const char* kUnassignedRead =
+    "the local variable 'v' is referenced at a point where it is unassigned";
+
+std::string LocalReadModule(const std::string& body) {
+  return "module m;\n"
+         "  bit clk, a, b;\n"
+         "  function void show(int x); endfunction\n"
+         "  sequence s;\n"
+         "    int v;\n"
+         "    @(posedge clk) " +
+         body +
+         ";\n"
+         "  endsequence\n"
+         "  c1: cover property (s);\n"
+         "endmodule\n";
+}
+
+void ExpectUnassignedReadReported(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, "show(v)");
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kUnassignedRead, line, "16.10"));
+}
+
+void ExpectReadAccepted(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AttachedLocalRead, AReadAheadOfTheAssignmentInTheListIsReported) {
+  ExpectUnassignedReadReported(LocalReadModule("(a, show(v), v = 1)"));
+  ExpectReadAccepted(LocalReadModule("(a, v = 1, show(v))"));
+}
+
+TEST(AttachedLocalRead, AReadOfALocalOneOrOperandLeavesUnassignedIsReported) {
+  ExpectUnassignedReadReported(
+      LocalReadModule("((a, v = 1) or (a ##1 b), show(v))"));
+  ExpectReadAccepted(
+      LocalReadModule("((a, v = 1) or (a ##1 b, v = 2), show(v))"));
+}
+
+TEST(AttachedLocalRead,
+     DISABLED_AReadOfALocalBothAndOrIntersectOperandsAssignIsReported) {
+  for (const char* op : {"and", "intersect"}) {
+    SCOPED_TRACE(op);
+    ExpectUnassignedReadReported(LocalReadModule(std::string("((a, v = 1) ") +
+                                                 op + " (a, v = 2), show(v))"));
+  }
+}
+
+TEST(AttachedLocalRead,
+     AReadOfALocalOneAndOrIntersectOperandAssignsIsAccepted) {
+  for (const char* op : {"and", "intersect"}) {
+    ExpectReadAccepted(LocalReadModule(std::string("((a, v = 1) ") + op +
+                                       " (a ##0 b), show(v))"));
+  }
+}
+
+std::string LocalReadSequence(const std::string& indent,
+                              const std::string& clock,
+                              const std::string& body) {
+  return indent + "sequence s" + (clock.empty() ? "" : "(bit clk, bit a)") +
+         ";\n" + indent + "  int v;\n" + indent + "  " + clock + body + ";\n" +
+         indent + "endsequence\n";
+}
+
+std::string LocalReadIn(const std::string& place, const std::string& body) {
+  const std::string kClocked = "@(posedge clk) ";
+  const std::string kShow = "function void show(int x); endfunction\n";
+  if (place == "interface" || place == "program") {
+    return kShow + place + " el(input logic clk, a);\n" +
+           LocalReadSequence("  ", "", kClocked + body) + "end" + place +
+           "\nmodule m; bit clk, a; el u(clk, a); endmodule\n";
+  }
+  if (place == "checker") {
+    return kShow + "checker el(bit clk, bit a);\n" +
+           LocalReadSequence("  ", "", kClocked + body) +
+           "endchecker\nmodule m; bit clk, a; el u(clk, a); endmodule\n";
+  }
+  if (place == "package") {
+    return "package pk;\n  " + kShow + LocalReadSequence("  ", kClocked, body) +
+           "endpackage\nmodule m; endmodule\n";
+  }
+  if (place == "unit") {
+    return kShow + LocalReadSequence("", kClocked, body) +
+           "module m; endmodule\n";
+  }
+  std::string inner =
+      place == "generate"
+          ? "  if (1) begin : g\n" +
+                LocalReadSequence("    ", "", kClocked + body) + "  end\n"
+          : "  clocking cb @(posedge clk);\n" +
+                LocalReadSequence("    ", "", body) + "  endclocking\n";
+  return kShow + "module m;\n  bit clk, a;\n" + inner + "endmodule\n";
+}
+
+TEST(AttachedLocalRead,
+     AReadAheadOfTheAssignmentInEachDesignElementIsReported) {
+  for (const char* place : {"interface", "program", "checker"}) {
+    SCOPED_TRACE(place);
+    ExpectUnassignedReadReported(LocalReadIn(place, "(a, show(v), v = 1)"));
+  }
+}
+
+TEST(AttachedLocalRead,
+     DISABLED_AReadAheadOfTheAssignmentInEachOuterScopeIsReported) {
+  for (const char* place : {"package", "unit", "generate", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectUnassignedReadReported(LocalReadIn(place, "(a, show(v), v = 1)"));
+  }
+}
+
+TEST(AttachedLocalRead, AReadAfterTheAssignmentInEveryPlaceIsAccepted) {
+  for (const char* place : {"interface", "program", "checker", "package",
+                            "unit", "generate", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectReadAccepted(LocalReadIn(place, "(a, v = 1, show(v))"));
+  }
+}
+
 }  // namespace

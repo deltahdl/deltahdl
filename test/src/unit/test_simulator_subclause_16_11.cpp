@@ -558,4 +558,239 @@ TEST(AttachedReactive, TheBodyReadsTheValuesTheMatchingTickSettled) {
   ExpectLines(out, {{"value 2 ref 3 body 3 blocking 3", 1}});
 }
 
+std::string LocalRun(const std::string& body, const std::string& locals,
+                     const std::string& prelude = "") {
+  SimFixture f;
+  return RunCapture(SequenceTickSource(body, MatchDrive(), prelude, locals), f);
+}
+
+constexpr const char* kIntLocal = "    int v;\n";
+
+TEST(AttachedLocal, ACallSeesTheItemsBeforeItAndNotThoseAfter) {
+  std::string out = LocalRun(
+      "(te1, v = 1, $display(\"first %0d\", v), v = v + 10,"
+      " $display(\"second %0d\", v)) ##1 (te2, $display(\"later %0d\", v))",
+      kIntLocal);
+  ExpectLines(out, {{"first 1", 1}, {"second 11", 1}, {"later 11", 1}});
+}
+
+TEST(AttachedLocal, EachOperatorAheadOfACallIsSeen) {
+  std::string out = LocalRun(
+      "(te1, v = 2, v += 4, $display(\"plus %0d\", v), v++,"
+      " $display(\"inc %0d\", v), --v, $display(\"dec %0d\", v),"
+      " $display(\"sum %0d\", v + 1))",
+      kIntLocal);
+  ExpectLines(out, {{"plus 6", 1}, {"inc 7", 1}, {"dec 6", 1}, {"sum 7", 1}});
+}
+
+TEST(AttachedLocal, AnInitializedLocalIsSeenAheadOfAnyAssignment) {
+  std::string out = LocalRun(
+      "(te1, $display(\"init %0d\", v), v = v + 1, $display(\"next %0d\", v))",
+      "    int v = 5;\n");
+  ExpectLines(out, {{"init 5", 1}, {"next 6", 1}});
+}
+
+TEST(AttachedLocal, DISABLED_EachOrThreadEndingAtOneTickCallsWithItsValue) {
+  std::string out = LocalRun(
+      "((te1, v = 1) or (te1, v = 2), $display(\"same %0d\", v))", kIntLocal);
+  ExpectLines(out, {{"same 1", 1}, {"same 2", 1}, {"same 3", 0}});
+}
+
+TEST(AttachedLocal, DISABLED_EachOrThreadReassigningAnInflowCallsWithItsValue) {
+  std::string out = LocalRun(
+      "((te1, v = 1) ##1 ((te2, v = v + 10) or (te2, v = v + 20)),"
+      " $display(\"inflow %0d\", v))",
+      kIntLocal);
+  ExpectLines(out, {{"inflow 11", 1}, {"inflow 21", 1}, {"inflow 31", 0}});
+}
+
+TEST(AttachedLocal, EachOrThreadEndingAtItsOwnTickCallsWithItsValue) {
+  std::string out = LocalRun(
+      "((te1, v = 1) or (te1 ##1 te2, v = 2),"
+      " $display(\"end %0d at %0t\", v, $time))",
+      kIntLocal);
+  ExpectLines(out, {{"end 1 at 15", 1}, {"end 2 at 25", 1}});
+}
+
+TEST(AttachedLocal, ALocalFlowingOutOfOneAndOrIntersectOperandIsSeen) {
+  std::string out = LocalRun(
+      "((te1, v = 1) and (te1 ##1 te2), $display(\"and %0d at %0t\", v,"
+      " $time)) or (((te1, w = 3) ##1 te2) intersect (te1 ##1 1),"
+      " $display(\"intersect %0d at %0t\", w, $time))",
+      "    int v, w;\n");
+  ExpectLines(out, {{"and 1 at 25", 1}, {"intersect 3 at 25", 1}});
+}
+
+TEST(AttachedLocal, LocalFormalsReachTheCall) {
+  std::string out = LocalRun(
+      "(so(v) ##1 te2, $display(\"out %0d\", v)) or si(4)", kIntLocal,
+      "  sequence so(local output int o); (te1, o = 7); endsequence\n"
+      "  sequence si(local input int i);\n"
+      "    (te1, $display(\"in %0d\", i), i = i + 1, $display(\"in2 %0d\","
+      " i));\n"
+      "  endsequence\n");
+  ExpectLines(out, {{"out 7", 1}, {"in 4", 1}, {"in2 5", 1}});
+}
+
+TEST(AttachedLocal, APropertyLocalReachesACallInItsBody) {
+  std::string out =
+      LocalRun("te5", "",
+               "  property pp;\n"
+               "    int v;\n"
+               "    (te1, v = 9) |-> ##1 (te2, $display(\"prop %0d\", v));\n"
+               "  endproperty\n"
+               "  a1: assert property (@(posedge clk) pp);\n");
+  ExpectLines(out, {{"prop 9", 1}});
+}
+
+TEST(AttachedLocal, EachCalleeKindReceivesTheLocal) {
+  std::string out =
+      LocalRun("(te1, v = 3, fv(v), tv(v), h.mv(v))", kIntLocal,
+               "  function void fv(int x); $display(\"function %0d\", x);"
+               " endfunction\n"
+               "  task tv(int x); $display(\"task %0d\", x); endtask\n"
+               "  class C;\n"
+               "    function void mv(int x); $display(\"method %0d\", x);"
+               " endfunction\n"
+               "  endclass\n"
+               "  C h = new;\n");
+  ExpectLines(out, {{"function 3", 1}, {"task 3", 1}, {"method 3", 1}});
+}
+
+std::string LocalSequence(const std::string& tag, const std::string& name) {
+  return "  sequence " + name +
+         ";\n"
+         "    int v;\n"
+         "    @(posedge clk) (te1, v = 3) ##1 (te2, $display(\"" +
+         tag +
+         " %0d\", v));\n"
+         "  endsequence\n";
+}
+
+std::string LocalElementPlaces() {
+  return "package P;\n"
+         "  sequence ps(logic clk, logic te1, logic te2);\n"
+         "    int v;\n"
+         "    @(posedge clk) (te1, v = 3) ##1 (te2, $display(\"package %0d\","
+         " v));\n"
+         "  endsequence\n"
+         "endpackage\n"
+         "interface ifc(input logic clk, te1, te2);\n" +
+         LocalSequence("interface", "s1") +
+         "  c1: cover property (s1);\n"
+         "endinterface\n"
+         "program pg(input logic clk, te1, te2);\n" +
+         LocalSequence("program", "s2") +
+         "  c2: cover property (s2);\n"
+         "endprogram\n"
+         "checker ck(logic clk, logic te1, logic te2);\n" +
+         LocalSequence("checker", "s3") +
+         "  c3: cover property (s3);\n"
+         "endchecker\n";
+}
+
+void ExpectOnlyValue(const std::string& out, const std::string& tag,
+                     const std::string& value) {
+  size_t right = Occurrences(out, tag + " " + value + "\n");
+  EXPECT_GT(right, 0u) << tag << "\n" << out;
+  EXPECT_EQ(Occurrences(out, tag + " "), right) << tag << "\n" << out;
+}
+
+TEST(AttachedLocal, ALocalReachesTheCallInEachPlace) {
+  std::string prelude =
+      "  ifc i(clk, te1, te2);\n"
+      "  pg p(clk, te1, te2);\n"
+      "  ck k(clk, te1, te2);\n"
+      "  c4: cover property (P::ps(clk, te1, te2));\n"
+      "  clocking cb @(posedge clk);\n"
+      "    sequence sk; int v; (te1, v = 3) ##1 (te2,"
+      " $display(\"clocking %0d\", v)); endsequence\n"
+      "  endclocking\n"
+      "  c5: cover property (cb.sk);\n"
+      "  if (1) begin : g\n" +
+      LocalSequence("generate", "sg") +
+      "    c6: cover property (sg);\n"
+      "  end\n";
+  std::string out = RunStatements(prelude, MatchDrive(), LocalElementPlaces());
+  for (const char* tag :
+       {"package", "interface", "program", "checker", "clocking", "generate"}) {
+    ExpectOnlyValue(out, tag, "3");
+  }
+}
+
+TEST(AttachedLocal, DISABLED_ALocalReachesTheCallInACompilationUnitSequence) {
+  std::string unit =
+      "sequence us(logic clk, logic te1, logic te2);\n"
+      "  int v;\n"
+      "  @(posedge clk) (te1, v = 3) ##1 (te2, $display(\"unit %0d\", v));\n"
+      "endsequence\n";
+  std::string out = RunStatements("  c1: cover property (us(clk, te1, te2));\n",
+                                  MatchDrive(), unit);
+  ExpectOnlyValue(out, "unit", "3");
+}
+
+std::string CallingSequences(const std::string& uses) {
+  return "package P;\n"
+         "  sequence ps(logic c, logic a, logic b); @(posedge c) a ##1 (b,"
+         " $display(\"package\")); endsequence\n"
+         "endpackage\n"
+         "sequence us(logic c, logic a, logic b); @(posedge c) a ##1 (b,"
+         " $display(\"unit\")); endsequence\n"
+         "interface ifc(input logic clk, te1, te2);\n"
+         "  sequence s1; @(posedge clk) te1 ##1 (te2, $display(\"interface\"));"
+         " endsequence\n" +
+         std::string(uses.empty() ? "" : "  c1: cover property (s1);\n") +
+         "endinterface\n"
+         "program pg(input logic clk, te1, te2);\n"
+         "  sequence s2; @(posedge clk) te1 ##1 (te2, $display(\"program\"));"
+         " endsequence\n" +
+         std::string(uses.empty() ? "" : "  c2: cover property (s2);\n") +
+         "endprogram\n"
+         "checker ck(logic clk, logic te1, logic te2);\n"
+         "  sequence s3; @(posedge clk) te1 ##1 (te2, $display(\"checker\"));"
+         " endsequence\n" +
+         std::string(uses.empty() ? "" : "  c3: cover property (s3);\n") +
+         "endchecker\n";
+}
+
+std::string CallingPrelude(const std::string& uses) {
+  return "  ifc i(clk, te1, te2);\n"
+         "  pg p(clk, te1, te2);\n"
+         "  ck k(clk, te1, te2);\n"
+         "  if (1) begin : g\n"
+         "    sequence s4; @(posedge clk) te1 ##1 (te2,"
+         " $display(\"generate\")); endsequence\n" +
+         std::string(uses.empty() ? "" : "    c4: cover property (s4);\n") +
+         "  end\n"
+         "  clocking cb @(posedge clk);\n"
+         "    sequence s5; te1 ##1 (te2, $display(\"clocking\")); endsequence\n"
+         "  endclocking\n"
+         "  property p6; @(posedge clk) te1 ##1 (te2, $display(\"property\"));"
+         " endproperty\n" +
+         uses;
+}
+
+TEST(AttachedEndPoint,
+     DISABLED_ASequenceNothingInstantiatesRunsNoCallAnywhere) {
+  std::string out =
+      RunStatements(CallingPrelude(""), MatchDrive(), CallingSequences(""));
+  for (const char* tag : {"package", "unit", "interface", "program", "checker",
+                          "generate", "clocking", "property"}) {
+    EXPECT_EQ(Occurrences(out, tag), 0u) << tag << out;
+  }
+}
+
+TEST(AttachedEndPoint, DISABLED_AnInstanceInEachPlaceRunsItsCallOncePerMatch) {
+  std::string uses =
+      "  c0: cover property (P::ps(clk, te1, te2));\n"
+      "  c5: cover property (cb.s5);\n"
+      "  c6: cover property (p6);\n";
+  std::string out =
+      RunStatements(CallingPrelude(uses), MatchDrive(), CallingSequences(uses));
+  for (const char* tag : {"package", "interface", "program", "checker",
+                          "generate", "clocking", "property"}) {
+    EXPECT_EQ(Occurrences(out, tag), 1u) << tag << out;
+  }
+}
+
 }  // namespace

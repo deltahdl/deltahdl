@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <vector>
+
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
@@ -587,6 +591,110 @@ TEST(ParameterizedClassStructureTypedefSim,
                        "endmodule\n",
                        f),
             "10\n");
+}
+
+std::string TwoScopeDesign(const std::string& outside,
+                           const std::string& items) {
+  return outside +
+         "module t;\n"
+         "  logic clk = 0, te1 = 0, te2 = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  initial begin\n"
+         "    #12 te1 = 1;\n"
+         "    #10 te1 = 0; te2 = 1;\n"
+         "    #10 te2 = 0;\n"
+         "    #40 $finish;\n"
+         "  end\n" +
+         items + "endmodule\n";
+}
+
+std::string Shown(const std::string& tag) {
+  return "(te2, $display(\"" + tag + " at %0t\", $time))";
+}
+
+std::string AssertionScope(const std::string& head, const std::string& end,
+                           const std::string& kind, const std::string& tag) {
+  std::string decl =
+      kind == "sequence"
+          ? "  sequence s; @(posedge clk) te1 ##1 " + Shown(tag) +
+                "; endsequence\n  c: cover property (s);\n"
+          : "  property s; @(posedge clk) te1 ##1 " + Shown(tag) +
+                "; endproperty\n  c: cover property (s);\n";
+  return head + "\n" + decl + end + "\n";
+}
+
+void ExpectEachTagOnce(const std::string& out,
+                       const std::vector<std::string>& tags) {
+  for (const std::string& tag : tags) {
+    std::string line = tag + " at 25\n";
+    size_t count = 0;
+    for (size_t at = out.find(line); at != std::string::npos;
+         at = out.find(line, at + 1)) {
+      ++count;
+    }
+    EXPECT_EQ(count, 1u) << tag << "\n" << out;
+  }
+}
+
+TEST(ScopeRulesSimulation,
+     DISABLED_LikeNamedSequencesAndPropertiesOfTwoDesignElementsKeepTheirOwn) {
+  for (const char* kind : {"sequence", "property"}) {
+    SCOPED_TRACE(kind);
+    std::string ports = "(input logic clk, te1, te2);";
+    std::string outside =
+        AssertionScope("module a" + ports, "endmodule", kind, "a") +
+        AssertionScope("module b" + ports, "endmodule", kind, "b") +
+        AssertionScope("interface i" + ports, "endinterface", kind, "i") +
+        AssertionScope("program p" + ports, "endprogram", kind, "p") +
+        AssertionScope("checker k(logic clk, logic te1, logic te2);",
+                       "endchecker", kind, "k");
+    SimFixture f;
+    std::string out = RunCapture(TwoScopeDesign(outside,
+                                                "  a ua(clk, te1, te2);\n"
+                                                "  b ub(clk, te1, te2);\n"
+                                                "  i ui(clk, te1, te2);\n"
+                                                "  p up(clk, te1, te2);\n"
+                                                "  k uk(clk, te1, te2);\n"),
+                                 f);
+    ExpectEachTagOnce(out, {"a", "b", "i", "p", "k"});
+  }
+}
+
+TEST(ScopeRulesSimulation,
+     DISABLED_LikeNamedSequencesOfTwoGenerateBlocksAndTheirModuleKeepTheirOwn) {
+  for (const char* kind : {"sequence", "property"}) {
+    SCOPED_TRACE(kind);
+    SimFixture f;
+    std::string out = RunCapture(
+        TwoScopeDesign(
+            "", AssertionScope("  if (1) begin : g1", "  end", kind, "g1") +
+                    AssertionScope("  if (1) begin : g2", "  end", kind, "g2") +
+                    AssertionScope("", "", kind, "m")),
+        f);
+    ExpectEachTagOnce(out, {"g1", "g2", "m"});
+  }
+}
+
+TEST(ScopeRulesSimulation, LikeNamedSequencesOfTwoModulesTriggerTheirOwn) {
+  std::string ports = "(input logic clk, te1, te2);\n";
+  SimFixture f;
+  std::string out = RunCapture(
+      TwoScopeDesign(
+          "module a" + ports +
+              "  sequence s; @(posedge clk) te1 ##1 te2; endsequence\n"
+              "  initial begin wait (s.triggered);"
+              " $display(\"a at %0t\", $time); end\n"
+              "endmodule\n"
+              "module b" +
+              ports +
+              "  sequence s; @(posedge clk) te1; endsequence\n"
+              "  initial begin wait (s.triggered);"
+              " $display(\"b at %0t\", $time); end\n"
+              "endmodule\n",
+          "  a ua(clk, te1, te2);\n  b ub(clk, te1, te2);\n"),
+      f);
+  EXPECT_NE(out.find("a at 25\n"), std::string::npos) << out;
+  EXPECT_NE(out.find("b at 15\n"), std::string::npos) << out;
 }
 
 }  // namespace
