@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -134,6 +135,82 @@ TEST(AlwaysProperty, RangeBeginsAfterItsMinimum) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
   f.ctx.RunFinalBlocks();
   EXPECT_EQ(passes->value.ToUint64(), 2u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"always d", {0, 4}, 0},
+    {"always (c or d)", {4, 0}, 4},
+    {"always c", {1, 3}, 1},
+    {"always [0:1] d", {2, 2}, 2},
+    {"always [0:1] (c or d)", {4, 0}, 4},
+    {"s_always [0:1] (c or d)", {3, 1}, 3},
+    {"s_always [0:2] (c or d)", {2, 2}, 2},
+    {"always [1:2] b", {2, 2}, 2},
+    {"s_always [1:2] b", {1, 3}, 1},
+    {"always [0:0] b", {2, 2}, 2},
+    {"s_always [0:0] b", {2, 2}, 2},
+    {"always [2:2] a", {3, 1}, 3},
+    {"s_always [2:2] a", {1, 3}, 1},
+    {"always [2:$] c", {3, 1}, 3},
+    {"always [1:$] d", {1, 3}, 1},
+    {"a |-> always c", {2, 2}, 2},
+    {"a ##1 b |=> always c", {3, 1}, 3},
+    {"d[*3] #=# always !d", {1, 3}, 1},
+    {"always q(b, c)", {1, 3}, 1}};
+
+TEST(AlwaysProperty, AnAlwaysCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(AlwaysProperty, DISABLED_AnAlwaysCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
+}
+
+TEST(AlwaysProperty, AnOffTickAlwaysFirstAlignsToItsClock) {
+  EXPECT_EQ(SlowClockConsequentCounts("always [0:0] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(SlowClockConsequentCounts("s_always [0:0] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(SlowClockConsequentCounts("always [1:1] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(SlowClockConsequentCounts("s_always [1:1] b"), (PlaceCounts{2, 2}));
+  EXPECT_EQ(SlowClockConsequentCounts("s_always [0:1] b"), (PlaceCounts{2, 2}));
+  EXPECT_EQ(SlowClockConsequentCounts("always b"), (PlaceCounts{2, 2}));
+}
+
+std::string FailureTimes(const std::string& statement) {
+  SimFixture f;
+  return RunCapture(
+      PlacedTop(kPlacedStimulus,
+                "  " + statement + " else $display(\"FAIL at %0t\", $time);\n"),
+      f);
+}
+
+TEST(AlwaysProperty, AnExplicitAlwaysFailsWhereTheImplicitOneDoes) {
+  EXPECT_EQ(FailureTimes("assert property (@(posedge clk) b |-> c)"),
+            "FAIL at 25\n$finish at time 40\n");
+  EXPECT_EQ(
+      FailureTimes("initial assert property (@(posedge clk) always (b |-> c))"),
+      "FAIL at 25\n$finish at time 40\n");
+  EXPECT_EQ(CountThroughTheEnd(PlacedTop(
+                kPlacedStimulus,
+                "  initial assert property (@(posedge clk) always (c or d)) "
+                "$display(\"PASS\"); else $display(\"FAIL\");\n")),
+            (PlaceCounts{1, 0}));
 }
 
 }  // namespace

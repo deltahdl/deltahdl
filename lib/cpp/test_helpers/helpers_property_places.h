@@ -135,3 +135,21 @@ inline void ExpectPropertyCountsInPlace(const std::string& place,
                 place, "cover", property.body, stimulus, declarations)),
             (PlaceCounts{property.covered, 0}));
 }
+
+inline PlaceCounts SlowClockConsequentCounts(const std::string& consequent) {
+  return CountThroughTheEnd(
+      "module t;\n"
+      "  logic clk = 0, slow = 0;\n"
+      "  int tick = 1;\n"
+      "  logic a, b;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always #10 tick = tick + 1;\n"
+      "  initial begin #15 slow = 1; #10 slow = 0; #10 slow = 1; end\n"
+      "  assign a = tick inside {1, 3};\n"
+      "  assign b = tick inside {2, 3};\n"
+      "  assert property (@(posedge clk) a |-> @(posedge slow) " +
+      consequent +
+      ") $display(\"PASS\"); else $display(\"FAIL\");\n"
+      "  initial #40 $finish;\n"
+      "endmodule\n");
+}

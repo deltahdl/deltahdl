@@ -207,30 +207,12 @@ TEST(NexttimeProperty, DISABLED_ANexttimeCountsInACompilationUnitProperty) {
   }
 }
 
-PlaceCounts AlignedCounts(const std::string& consequent) {
-  return CountThroughTheEnd(
-      "module t;\n"
-      "  logic clk = 0, slow = 0;\n"
-      "  int tick = 1;\n"
-      "  logic a, b;\n"
-      "  always #5 clk = ~clk;\n"
-      "  always #10 tick = tick + 1;\n"
-      "  initial begin #15 slow = 1; #10 slow = 0; #10 slow = 1; end\n"
-      "  assign a = tick inside {1, 3};\n"
-      "  assign b = tick inside {2, 3};\n"
-      "  assert property (@(posedge clk) a |-> @(posedge slow) " +
-      consequent +
-      ") $display(\"PASS\"); else $display(\"FAIL\");\n"
-      "  initial #40 $finish;\n"
-      "endmodule\n");
-}
-
 TEST(NexttimeProperty, AnOffTickNexttimeFirstAlignsToItsClock) {
-  EXPECT_EQ(AlignedCounts("nexttime [0] b"), (PlaceCounts{3, 1}));
-  EXPECT_EQ(AlignedCounts("s_nexttime [0] b"), (PlaceCounts{3, 1}));
-  EXPECT_EQ(AlignedCounts("nexttime b"), (PlaceCounts{3, 1}));
-  EXPECT_EQ(AlignedCounts("s_nexttime b"), (PlaceCounts{2, 2}));
-  EXPECT_EQ(AlignedCounts("s_nexttime [1] b"), (PlaceCounts{2, 2}));
+  EXPECT_EQ(SlowClockConsequentCounts("nexttime [0] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(SlowClockConsequentCounts("s_nexttime [0] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(SlowClockConsequentCounts("nexttime b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(SlowClockConsequentCounts("s_nexttime b"), (PlaceCounts{2, 2}));
+  EXPECT_EQ(SlowClockConsequentCounts("s_nexttime [1] b"), (PlaceCounts{2, 2}));
 }
 
 }  // namespace
