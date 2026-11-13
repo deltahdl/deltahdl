@@ -697,4 +697,196 @@ TEST(AttachedLocalRead, AReadAfterTheAssignmentInEveryPlaceIsAccepted) {
   }
 }
 
+constexpr const char* kLocalByValueReport =
+    "an actual holding a local variable shall be passed by value";
+
+constexpr const char* kRefCallees =
+    "task automatic showr(ref int r); endtask\n"
+    "task automatic showc(const ref int r); endtask\n"
+    "task automatic showi(input int r); endtask\n";
+
+std::string LocalRefModule(const std::string& decl) {
+  return std::string(kRefCallees) +
+         "typedef struct { int f; } st_t;\n"
+         "typedef int ia_t[2];\n"
+         "task automatic shows(ref st_t r); endtask\n"
+         "task automatic showa(ref int r[2]); endtask\n"
+         "module m;\n"
+         "  bit clk, a;\n"
+         "  int arr[4];\n"
+         "  int g;\n" +
+         decl + "endmodule\n";
+}
+
+void ExpectLocalByValueReported(const std::string& src,
+                                const std::string& call) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, call);
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kLocalByValueReport, line, "16.11"));
+}
+
+void ExpectLocalByValueAccepted(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+struct LocalRefForm {
+  const char* decl;
+  const char* call;
+};
+
+const LocalRefForm kReportedLocalRefForms[] = {
+    {"  sequence s(local input int v); @(posedge clk) (a, showr(v)) ##1 a;"
+     " endsequence\n",
+     "showr(v)"},
+    {"  property p(local input int v); @(posedge clk) (a, showr(v)) ##1 a;"
+     " endproperty\n",
+     "showr(v)"},
+    {"  property p; int v; @(posedge clk) (a, v = 1, showr(v)) ##1 a;"
+     " endproperty\n",
+     "showr(v)"},
+    {"  sequence s; st_t v; @(posedge clk) (a, v.f = 1, showr(v.f)) ##1 a;"
+     " endsequence\n",
+     "showr(v.f)"},
+    {"  sequence s; ia_t v; @(posedge clk) (a, v[1] = 1, showr(v[1])) ##1 a;"
+     " endsequence\n",
+     "showr(v[1])"},
+    {"  sequence s; int v; @(posedge clk) (a, v = 1, showr(arr[v])) ##1 a;"
+     " endsequence\n",
+     "showr(arr[v])"},
+    {"  sequence s; st_t v; @(posedge clk) (a, v.f = 1, shows(v)) ##1 a;"
+     " endsequence\n",
+     "shows(v)"},
+    {"  sequence s; int v; @(posedge clk) (a, v = 1, showc(v)) ##1 a;"
+     " endsequence\n",
+     "showc(v)"},
+};
+
+TEST(AttachedLocalByValue, ALocalInAReferenceActualOfEachFormIsReported) {
+  for (const LocalRefForm& form : kReportedLocalRefForms) {
+    ExpectLocalByValueReported(LocalRefModule(form.decl), form.call);
+  }
+}
+
+TEST(AttachedLocalByValue, DISABLED_AnUnpackedArrayLocalByReferenceIsReported) {
+  for (const LocalRefForm& form :
+       {LocalRefForm{"  sequence s; int v[2]; @(posedge clk) (a, v[0] = 1,"
+                     " showa(v)) ##1 a; endsequence\n",
+                     "showa(v)"},
+        LocalRefForm{"  sequence s; int v[2]; @(posedge clk) (a, v[1] = 1,"
+                     " showr(v[1])) ##1 a; endsequence\n",
+                     "showr(v[1])"}}) {
+    ExpectLocalByValueReported(LocalRefModule(form.decl), form.call);
+  }
+}
+
+TEST(AttachedLocalByValue, ALocalByValueOrANonLocalByReferenceIsAccepted) {
+  for (const char* decl : {
+           "  sequence s; int v; @(posedge clk) (a, v = 1, showi(v),"
+           " showi(v + 1)) ##1 a; endsequence\n",
+           "  sequence s(local input int v); @(posedge clk) (a, showi(v)) ##1 "
+           "a;"
+           " endsequence\n",
+           "  property p; int v; @(posedge clk) (a, v = 1, showi(v)) ##1 a;"
+           " endproperty\n",
+           "  sequence s; int v[2]; @(posedge clk) (a, v[1] = 1, showi(v[1]))"
+           " ##1 a; endsequence\n",
+           "  sequence s; int v; @(posedge clk) (a, v = 1, showi(v), showr(g),"
+           " showc(g)) ##1 a; endsequence\n",
+       }) {
+    ExpectLocalByValueAccepted(LocalRefModule(decl));
+  }
+}
+
+std::string LocalRefDecl(const std::string& kind, const std::string& clock,
+                         const std::string& call) {
+  std::string body = clock + "(a, v = 1, " + call + ") ##1 a;";
+  if (kind == "sequence")
+    return "  sequence s; int v; " + body + " endsequence\n";
+  return "  property p; int v; " + body + " endproperty\n";
+}
+
+std::string LocalRefElement(const std::string& place, const std::string& decl) {
+  if (place == "checker") {
+    return std::string(kRefCallees) + "checker el(logic clk, logic a);\n" +
+           decl +
+           "endchecker\nmodule m; logic clk, a; el u(clk, a); endmodule\n";
+  }
+  return std::string(kRefCallees) + place + " el(input logic clk, a);\n" +
+         decl + "end" + place +
+         "\nmodule m; logic clk, a; el u(clk, a); endmodule\n";
+}
+
+std::string LocalRefOuter(const std::string& place, const std::string& kind,
+                          const std::string& call) {
+  const std::string kClock = "@(posedge clk) ";
+  if (place == "package") {
+    return "package pk;\n" + std::string(kRefCallees) + "  bit clk, a;\n" +
+           LocalRefDecl(kind, kClock, call) +
+           "endpackage\nmodule m; endmodule\n";
+  }
+  if (place == "unit") {
+    return std::string(kRefCallees) + "bit clk, a;\n" +
+           LocalRefDecl(kind, kClock, call) + "module m; endmodule\n";
+  }
+  std::string inner;
+  if (place == "clocking") {
+    inner = "  clocking cb @(posedge clk);\n" + LocalRefDecl(kind, "", call) +
+            "  endclocking\n";
+  } else {
+    inner = (place == "for generate"
+                 ? "  for (genvar i = 0; i < 1; i++) begin : g\n"
+                 : "  if (1) begin : g\n") +
+            LocalRefDecl(kind, kClock, call) + "  end\n";
+  }
+  return std::string(kRefCallees) + "module m;\n  bit clk, a;\n" + inner +
+         "endmodule\n";
+}
+
+const char* const kLocalRefElements[] = {"interface", "program", "checker"};
+const char* const kLocalRefOuters[] = {"package", "unit", "if generate",
+                                       "for generate", "clocking"};
+const char* const kLocalRefKinds[] = {"sequence", "property"};
+
+TEST(AttachedLocalByValue, ALocalByReferenceInEachDesignElementIsReported) {
+  for (const char* place : kLocalRefElements) {
+    for (const char* kind : kLocalRefKinds) {
+      SCOPED_TRACE(std::string(place) + " " + kind);
+      ExpectLocalByValueReported(
+          LocalRefElement(place,
+                          LocalRefDecl(kind, "@(posedge clk) ", "showr(v)")),
+          "showr(v)");
+    }
+  }
+}
+
+TEST(AttachedLocalByValue,
+     DISABLED_ALocalByReferenceInEachOuterScopeIsReported) {
+  for (const char* place : kLocalRefOuters) {
+    for (const char* kind : kLocalRefKinds) {
+      SCOPED_TRACE(std::string(place) + " " + kind);
+      ExpectLocalByValueReported(LocalRefOuter(place, kind, "showr(v)"),
+                                 "showr(v)");
+    }
+  }
+}
+
+TEST(AttachedLocalByValue, ALocalByValueInEveryPlaceIsAccepted) {
+  for (const char* kind : kLocalRefKinds) {
+    for (const char* place : kLocalRefElements) {
+      ExpectLocalByValueAccepted(LocalRefElement(
+          place, LocalRefDecl(kind, "@(posedge clk) ", "showi(v)")));
+    }
+    for (const char* place : kLocalRefOuters) {
+      ExpectLocalByValueAccepted(LocalRefOuter(place, kind, "showi(v)"));
+    }
+  }
+}
+
 }  // namespace
