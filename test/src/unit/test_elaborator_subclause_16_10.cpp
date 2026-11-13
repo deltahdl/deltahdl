@@ -646,4 +646,174 @@ TEST(UnassignedLocalReads,
   }
 }
 
+constexpr const char* kHierarchicalLocal =
+    "a local variable may not be referenced through a hierarchical name";
+
+constexpr const char* kLocalsHead =
+    "  logic clk, a;\n"
+    "  int z;\n"
+    "  typedef struct packed {logic [3:0] hi;} pair_t;\n"
+    "  sequence s; int v; pair_t q;\n"
+    "    @(posedge clk) (a, v = 1, q = 0) ##1 (v == 1);\n"
+    "  endsequence\n"
+    "  property p; int w; @(posedge clk) (a, w = 1) |-> (w == 1);"
+    " endproperty\n"
+    "  sequence sf(local input int f); @(posedge clk) a ##1 (f == 1);"
+    " endsequence\n"
+    "  property pf(local input int f); @(posedge clk) a |-> (f == 1);"
+    " endproperty\n";
+
+std::string LocalsModule(const std::string& item) {
+  return std::string("module m;\n") + kLocalsHead + "  " + item +
+         "\nendmodule\n";
+}
+
+struct HierarchicalCase {
+  std::string src;
+  const char* at;
+};
+
+void ExpectReportedWhereWritten(const HierarchicalCase& c) {
+  SCOPED_TRACE(c.src);
+  ElabFixture f;
+  ElaborateSrc(c.src, f);
+  uint32_t line = LineHolding(c.src, c.at);
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kHierarchicalLocal, line, "16.10"));
+}
+
+TEST(HierarchicalLocalReference, DISABLED_APathToALocalInTheModuleIsReported) {
+  const HierarchicalCase kCases[] = {
+      {LocalsModule("assert property (@(posedge clk) s ##1 (s.v == 1));"),
+       "s.v"},
+      {LocalsModule("assert property (@(posedge clk) a |-> (p.w == 1));"),
+       "p.w"},
+      {LocalsModule("assert property (@(posedge clk) sf(1) ##1 (sf.f == 1));"),
+       "sf.f"},
+      {LocalsModule("assert property (@(posedge clk) a |-> (pf.f == 1));"),
+       "pf.f"},
+      {LocalsModule("sequence t; @(posedge clk) s ##1 (s.v == 1); endsequence"),
+       "s.v"},
+      {LocalsModule("property r; @(posedge clk) a |-> (p.w == 1); endproperty"),
+       "p.w"},
+      {LocalsModule("initial $display(\"%0d\", s.v);"), "s.v"},
+      {LocalsModule("always @(posedge clk) if (p.w == 1) z = 1;"), "p.w"},
+      {LocalsModule("initial z = sf.f + 1;"), "sf.f"},
+      {LocalsModule("assign z = s.v;"), "s.v"},
+      {LocalsModule("initial s.v = 5;"), "s.v"},
+      {LocalsModule("sequence t; @(posedge clk) (a, s.v = 2) ##1 a;"
+                    " endsequence"),
+       "s.v"},
+      {LocalsModule("initial s.v++;"), "s.v"},
+      {LocalsModule("initial s.v += 1;"), "s.v"},
+      {LocalsModule("initial z = s.v[1];"), "s.v"},
+      {LocalsModule("initial z = s.q.hi;"), "s.q"},
+      {LocalsModule("initial z = m.s.v;"), "m.s.v"},
+      {LocalsModule("initial z = $root.m.s.v;"), "$root.m.s.v"},
+      {LocalsModule("assert property (@(posedge clk) a |-> ($root.m.s.v"
+                    " == 1));"),
+       "$root.m.s.v"},
+  };
+  for (const HierarchicalCase& c : kCases) ExpectReportedWhereWritten(c);
+}
+
+constexpr const char* kLocalSequence =
+    "sequence s; int v; @(posedge clk) (a, v = 1) ##1 (v == 1); endsequence\n";
+
+std::string Instances(const std::string& reads) {
+  return std::string("module u;\n  logic clk, a;\n  int x;\n  ") +
+         kLocalSequence +
+         "endmodule\n"
+         "module n;\n  u u1();\nendmodule\n"
+         "interface ifc;\n  logic clk, a;\n  " +
+         kLocalSequence +
+         "endinterface\n"
+         "program pg(ifc b);\n"
+         "  initial $display(\"%0d\", b.s.v);\n"
+         "endprogram\n"
+         "module m;\n  logic clk, a;\n  int x, z;\n"
+         "  u u1();\n  n n1();\n  ifc i();\n  pg pg1(i);\n" +
+         reads + "endmodule\n";
+}
+
+TEST(HierarchicalLocalReference,
+     DISABLED_APathThroughAnInstanceOrPortIsReported) {
+  const HierarchicalCase kCases[] = {
+      {Instances("  initial z = u1.s.v;\n"), "u1.s.v"},
+      {Instances("  initial z = n1.u1.s.v;\n"), "n1.u1.s.v"},
+      {Instances("  initial z = i.s.v;\n"), "i.s.v"},
+      {Instances(""), "b.s.v"},
+      {Instances("  assert property (@(posedge clk) a |-> (u1.s.v == 1));\n"),
+       "u1.s.v"},
+  };
+  for (const HierarchicalCase& c : kCases) ExpectReportedWhereWritten(c);
+}
+
+TEST(HierarchicalLocalReference, APathToAnOrdinaryVariableOrMethodIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(Instances("  initial z = u1.x + m.x + n1.u1.x;\n"
+                         "  always @(posedge clk) z = u1.s.triggered;\n"
+                         "  always @(posedge clk) z = i.s.triggered;\n"
+                         "  assert property (@(posedge clk) a |-> u1.x);\n"
+                         "  assert property (@(posedge clk) a |->"
+                         " $root.m.x);\n"),
+               f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(HierarchicalLocalReference, DISABLED_APathInEachOtherPlaceIsReported) {
+  const HierarchicalCase kCases[] = {
+      {"checker ck(logic clk, logic a);\n"
+       "  sequence s; int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "  a1: assert property (@(posedge clk) s ##1 (s.v == 1));\n"
+       "endchecker\n"
+       "module m;\n  logic clk, a;\n  ck k1(clk, a);\nendmodule\n",
+       "s.v =="},
+      {"program pg;\n"
+       "  logic clk, a;\n  int z;\n"
+       "  sequence s; int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "  initial z = s.v;\n"
+       "endprogram\n",
+       "s.v;"},
+      {"module m;\n  logic clk, a;\n  int z;\n"
+       "  if (1) begin : g\n"
+       "    sequence s; int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "  end\n"
+       "  initial z = g.s.v;\nendmodule\n",
+       "g.s.v"},
+      {"module m;\n  logic clk, a;\n  int z;\n"
+       "  for (genvar k = 0; k < 2; k++) begin : g\n"
+       "    sequence s; int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "  end\n"
+       "  initial z = g[0].s.v;\nendmodule\n",
+       "g[0].s.v"},
+      {"sequence us(clk, a); int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "module m;\n  int z;\n  initial z = us.v;\nendmodule\n",
+       "us.v;"},
+      {"sequence us(clk, a); int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "module m;\n  int z;\n  initial z = $unit::us.v;\nendmodule\n",
+       "$unit::us.v"},
+      {"package pk;\n"
+       "  sequence s(clk, a); int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "endpackage\n"
+       "module m;\n  int z;\n  initial z = pk::s.v;\nendmodule\n",
+       "pk::s.v"},
+      {"package pk;\n"
+       "  sequence s(clk, a); int v; @(posedge clk) (a, v = 1) ##1 (v == 1);"
+       " endsequence\n"
+       "endpackage\n"
+       "module m;\n  import pk::*;\n  int z;\n  initial z = s.v;\nendmodule\n",
+       "s.v;"},
+  };
+  for (const HierarchicalCase& c : kCases) ExpectReportedWhereWritten(c);
+}
+
 }  // namespace
