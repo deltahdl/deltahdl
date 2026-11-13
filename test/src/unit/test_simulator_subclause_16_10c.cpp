@@ -179,4 +179,36 @@ TEST(OrThreadValues, DISABLED_APackageSequenceKeepsEachThreadsValue) {
   EXPECT_EQ(CoverCount(f, src, "c1:"), 2u);
 }
 
+TEST(MergedFlowValues, ALocalFromOneOperandFlowsOutWithItsValue) {
+  for (const char* op : {"and", "intersect"}) {
+    std::string o = op;
+    ExpectThreadCounts({
+        {"((te1, x = 1) " + o + " (te1, y = 2)) ##1 (x == 1 && y == 2)", 2},
+        {"(te1, x = 0) ##0 (((1, x = 4) ##1 1) " + o +
+             " (1 ##1 1)) ##1 (x == 4)",
+         2},
+        {"(te1, x = 0) ##0 ((1 ##1 1) " + o +
+             " ((1, x = 4) ##1 1)) ##1 (x == 0)",
+         0},
+        {"(te1, x = 5) ##0 ((1 ##1 1) " + o + " (1 ##1 1)) ##1 (x == 5)", 2},
+    });
+  }
+}
+
+TEST(MergedFlowValues, TheShorterOperandOfAndKeepsItsValue) {
+  ExpectThreadCounts({
+      {"((te1, x = 3) and (te1 ##2 1)) ##1 (x == 3)", 2},
+      {"((te1 ##2 1) and (te1, x = 3)) ##1 (x == 3)", 2},
+      {"(te1, x = 0) ##0 ((1, x = 3) and (1 ##2 1)) ##1 (x == 3)", 2},
+      {"(te1, x = 0) ##0 ((1 ##2 1) and (1, x = 3)) ##1 (x == 0)", 0},
+  });
+}
+
+TEST(MergedFlowValues, AnInnerLocalFlowsOutOfWithin) {
+  ExpectThreadCounts({
+      {"((te1, x = 4) within (te1 ##2 1)) ##1 (x == 4)", 2},
+      {"(te1, x = 0) ##0 ((te1, x = 4) within (1 ##2 1)) ##1 (x == 4)", 2},
+  });
+}
+
 }  // namespace

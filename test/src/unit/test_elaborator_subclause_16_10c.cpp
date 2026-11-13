@@ -334,4 +334,176 @@ TEST(OrFlowOut, ATwoSidedOrInEachOuterScopeIsAccepted) {
   }
 }
 
+void ExpectBlockedReadReported(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, "(d == x)");
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnassignedX, line, "16.10"));
+}
+
+std::string Sequence(const std::string& body) {
+  return "sequence s; int x, y; " + body + "; endsequence";
+}
+
+std::string Joined(const char* left, const char* op, const char* right) {
+  std::string out = "(";
+  out += left;
+  out += " ";
+  out += op;
+  out += " ";
+  out += right;
+  out += ")";
+  return out;
+}
+
+const char* const kMergingOperators[] = {"and", "intersect"};
+
+struct BlockedPair {
+  const char* left;
+  const char* right;
+  const char* one_sided_left;
+  const char* one_sided_right;
+  const char* before;
+};
+
+const BlockedPair kBlockedPairs[] = {
+    {"(a, x = d)", "(b, x = 1)", "(a, x = d)", "b", ""},
+    {"(a ##1 (b, x = d, y = 1) ##1 c)", "(e ##1 (1, x = d) ##0 (e == x))",
+     "(a ##1 (b, x = d, y = 1) ##1 c)", "(e ##1 1 ##0 e)", ""},
+    {"(a, x = d)", "(b, x = 1)", "a", "(b, x = 1)", "(c, x = 0) ##1 "},
+    {"(a, x++)", "(b, x += 2)", "(a, x++)", "b", "(c, x = 0) ##1 "},
+    {"((a, x = d) and (b, x = 1))", "c", "((a, x = d) and b)", "c", ""},
+    {"(((a, x = 1) and (b, x = 2)) ##1 c)", "e", "(((a, x = 1) and b) ##1 c)",
+     "e", ""},
+    {"(a ##1 (b, x = d) ##1 c)", "(e, x = 1)", "(a ##1 (b, x = d) ##1 c)", "e",
+     ""},
+};
+
+TEST(MergedFlowOut, DISABLED_ALocalBlockedByAndOrIntersectIsUnassignedAfter) {
+  for (const char* op : kMergingOperators) {
+    for (const BlockedPair& pair : kBlockedPairs) {
+      std::string before = pair.before;
+      ExpectBlockedReadReported(SiblingModule(Sequence(
+          before + Joined(pair.left, op, pair.right) + " ##1 (d == x)")));
+      ExpectBlockedReadReported(SiblingModule(Sequence(
+          before + Joined(pair.right, op, pair.left) + " ##1 (d == x)")));
+      for (const char* consequent : {"|->", "|=>"}) {
+        ExpectBlockedReadReported(
+            SiblingModule("property q; int x, y; " + before +
+                          Joined(pair.left, op, pair.right) + " " + consequent +
+                          " (d == x); endproperty"));
+      }
+    }
+  }
+}
+
+TEST(MergedFlowOut, ALocalFlowingOutOfOneOperandIsAssignedAfter) {
+  for (const char* op : kMergingOperators) {
+    for (const BlockedPair& pair : kBlockedPairs) {
+      std::string before = pair.before;
+      ExpectAccepted(SiblingModule(Sequence(
+          before + Joined(pair.one_sided_left, op, pair.one_sided_right) +
+          " ##1 (d == x)")));
+      ExpectAccepted(SiblingModule(Sequence(
+          before + Joined(pair.one_sided_right, op, pair.one_sided_left) +
+          " ##1 (d == x)")));
+      ExpectAccepted(
+          SiblingModule("property q; int x, y; " + before +
+                        Joined(pair.one_sided_left, op, pair.one_sided_right) +
+                        " |-> (d == x); endproperty"));
+    }
+    ExpectAccepted(
+        SiblingModule(Sequence(Joined("(a ##1 (b, x = d, y = 1) ##1 c)", op,
+                                      "(e ##1 (1, x = d) ##0 (e == x))") +
+                               " ##1 (d == y)")));
+    ExpectAccepted(
+        SiblingModule(Sequence(Joined("(a, x = d)", op, "(b, y = 1)") +
+                               " ##1 (d == x) ##0 (e == y)")));
+    ExpectAccepted(SiblingModule(
+        Sequence("(c, x = 0) ##1 " + Joined("a", op, "b") + " ##1 (d == x)")));
+  }
+}
+
+TEST(MergedFlowOut,
+     DISABLED_ALocalAssignedInBothOperandsOfWithinIsUnassignedAfter) {
+  ExpectBlockedReadReported(SiblingModule(
+      Sequence("((a, x = d) within (b ##1 (c, x = 1) ##1 e)) ##1 (d == x)")));
+  ExpectBlockedReadReported(SiblingModule(
+      Sequence("(c, x = 0) ##1 ((a, x = d) within (b ##1 (c, x = 1) ##1 e)) ##1"
+               " (d == x)")));
+  ExpectBlockedReadReported(SiblingModule(
+      "property q; int x; ((a, x = d) within (b ##1 (c, x = 1) ##1 e)) |->"
+      " (d == x); endproperty"));
+}
+
+TEST(MergedFlowOut, ALocalAssignedInOneOperandOfWithinIsAssignedAfter) {
+  for (const char* body : {
+           "((a, x = d) within (b ##1 c ##1 e)) ##1 (d == x)",
+           "(a within (b ##1 (c, x = 1) ##1 e)) ##1 (d == x)",
+           "(c, x = 0) ##1 ((a, x = d) within (b ##1 c ##1 e)) ##1 (d == x)",
+       }) {
+    ExpectAccepted(SiblingModule(Sequence(body)));
+  }
+}
+
+constexpr const char* kFormalSequences =
+    "sequence so(local output int lv); (a, lv = d); endsequence\n  ";
+
+TEST(MergedFlowOut, DISABLED_ABlockedFormalOrOutputActualIsUnassignedAfter) {
+  for (const char* op : kMergingOperators) {
+    std::string o = op;
+    ExpectBlockedReadReported(
+        SiblingModule("sequence s(local inout int x); ((a, x = d) " + o +
+                      " (b, x = 1)) ##1 (d == x); endsequence"));
+    ExpectBlockedReadReported(
+        SiblingModule(kFormalSequences +
+                      Sequence("(so(x) " + o + " (b, x = 1)) ##1 (d == x)")));
+  }
+}
+
+TEST(MergedFlowOut, AOneSidedFormalOrOutputActualIsAssignedAfter) {
+  for (const char* op : kMergingOperators) {
+    std::string o = op;
+    ExpectAccepted(SiblingModule("sequence s(local inout int x); ((a, x = d) " +
+                                 o + " b) ##1 (d == x); endsequence"));
+    ExpectAccepted(SiblingModule(kFormalSequences +
+                                 Sequence("(so(x) " + o + " b) ##1 (d == x)")));
+  }
+}
+
+constexpr const char* kBlockedSequence =
+    "sequence s; int x; ((a, x = d) and (b, x = 1)) ##1 (d == x);"
+    " endsequence";
+constexpr const char* kBlockedProperty =
+    "property q; int x; ((a, x = d) intersect (b, x = 1)) |-> (d == x);"
+    " endproperty";
+constexpr const char* kOneSidedSequence =
+    "sequence s; int x; ((a, x = d) and b) ##1 (d == x); endsequence";
+
+TEST(MergedFlowOut, DISABLED_ABlockedReadInEachDesignElementIsReported) {
+  for (const char* element : {"interface", "program", "checker"}) {
+    ExpectBlockedReadReported(InElement(element, kBlockedSequence));
+    ExpectBlockedReadReported(InElement(element, kBlockedProperty));
+  }
+  for (const char* place :
+       {"package", "import", "unit", "if", "for", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectBlockedReadReported(InOuterScope(place, kBlockedSequence));
+    ExpectBlockedReadReported(InOuterScope(place, kBlockedProperty));
+  }
+}
+
+TEST(MergedFlowOut, AOneSidedReadInEachPlaceIsAccepted) {
+  for (const char* element : {"interface", "program", "checker"}) {
+    ExpectAccepted(InElement(element, kOneSidedSequence));
+  }
+  for (const char* place :
+       {"package", "import", "unit", "if", "for", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectAccepted(InOuterScope(place, kOneSidedSequence));
+  }
+}
+
 }  // namespace
