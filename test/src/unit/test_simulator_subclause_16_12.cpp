@@ -731,4 +731,128 @@ TEST(DollarActualRun,
   }
 }
 
+constexpr const char* kSequenceActualDeclarations =
+    "  sequence sd(x); x; endsequence\n"
+    "  sequence sm(x, y); x ##1 y; endsequence\n"
+    "  sequence qs(sequence s); s; endsequence\n"
+    "  property pd(x); x; endproperty\n"
+    "  property ps(sequence s); s; endproperty\n"
+    "  property pp(property p); p; endproperty\n"
+    "  property pu(u); u; endproperty\n"
+    "  property pn(sequence s); not s; endproperty\n"
+    "  property pi(sequence s); s |-> b; endproperty\n";
+
+constexpr Grouping kSequenceActualRows[] = {
+    {"ps(sd(a))", "a", nullptr},
+    {"pp(sd(a))", "a", nullptr},
+    {"pu(sd(a))", "a", nullptr},
+    {"ps(sm(a, b))", "a ##1 b", nullptr},
+    {"pp(sm(a, b))", "a ##1 b", nullptr},
+    {"pu(sm(a, b))", "a ##1 b", nullptr},
+    {"pn(sd(a))", "not a", nullptr},
+    {"pi(sm(a, b))", "a ##1 b |-> b", nullptr},
+};
+
+constexpr Grouping kSequenceActualContrasts[] = {
+    {"qs(sd(a))", "a", nullptr},
+    {"pp(pd(a))", "a", nullptr},
+    {"ps(sd(a) ##1 b)", "a ##1 b", nullptr},
+    {"pu(sd(a) ##1 b)", "a ##1 b", nullptr},
+};
+
+TEST(SequenceInstanceActualRun,
+     ANestedSequenceActualCountsAsWrittenInEachPlace) {
+  for (const char* place : kSequenceGroupPlaces) {
+    for (const Grouping& row : kSequenceActualContrasts) {
+      ExpectGroupedInPlace(place, row, kSequenceActualDeclarations);
+    }
+  }
+}
+
+TEST(SequenceInstanceActualRun,
+     DISABLED_ANestedSequenceActualCountsAsWrittenInAPackageProperty) {
+  for (const Grouping& row : kSequenceActualContrasts) {
+    ExpectGroupedInPlace("package property", row, kSequenceActualDeclarations);
+  }
+}
+
+TEST(SequenceInstanceActualRun,
+     DISABLED_ABareSequenceInstanceActualCountsAsItsSequenceInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const Grouping& row : kSequenceActualRows) {
+      ExpectGroupedInPlace(place, row, kSequenceActualDeclarations);
+    }
+  }
+}
+
+TEST(SequenceInstanceActualRun,
+     DISABLED_ADefaultedSequenceInstanceActualCountsAsItsSequenceInEachPlace) {
+  const std::string kDeclarations =
+      std::string(kSequenceActualDeclarations) +
+      "  sequence sz(x = a, y = b); x ##1 y; endsequence\n";
+  for (const char* place : kSequenceGroupPlaces) {
+    for (const char* written : {"ps(sz)", "pp(sz)", "pu(sz)", "ps(sz())"}) {
+      ExpectGroupedInPlace(place, {written, "a ##1 b", nullptr}, kDeclarations);
+    }
+  }
+}
+
+TEST(SequenceInstanceActualRun,
+     DISABLED_ASequenceInstanceActualCountsInACompilationUnitProperty) {
+  for (const Grouping& row : kSequenceActualContrasts) {
+    ExpectGroupedInPlace("unit", row, kSequenceActualDeclarations);
+  }
+  for (const Grouping& row : kSequenceActualRows) {
+    ExpectGroupedInPlace("unit", row, kSequenceActualDeclarations);
+  }
+}
+
+PlaceCounts CountedUnclocked(const std::string& directive,
+                             const std::string& spec, bool in_initial) {
+  const std::string kLine = PlacedDirective(directive, spec);
+  return CountThroughTheEnd(
+      PlacedTop(kGroupedStimulus,
+                std::string(kSequenceActualDeclarations) +
+                    "  sequence sc(x); @(posedge clk) x; endsequence\n" +
+                    (in_initial ? "  initial" + kLine.substr(1) : kLine)));
+}
+
+void ExpectUnclockedLike(const char* written, const char* meant,
+                         bool in_initial) {
+  for (const char* directive : {"assert", "assume", "cover"}) {
+    SCOPED_TRACE(directive);
+    SCOPED_TRACE(written);
+    SCOPED_TRACE(in_initial ? "initial" : "module");
+    const PlaceCounts kMeant = CountedUnclocked(directive, meant, in_initial);
+    EXPECT_EQ(CountedUnclocked(directive, written, in_initial), kMeant);
+    if (std::string(directive) == "assert") {
+      EXPECT_GT(kMeant.passes + kMeant.fails, 0u);
+    }
+  }
+}
+
+TEST(SequenceInstanceActualRun, ASequenceFormalGivenASequenceInstanceRuns) {
+  ExpectUnclockedLike("@(posedge clk) qs(sd(a))", "@(posedge clk) a", true);
+  ExpectUnclockedLike("qs(sc(a))", "@(posedge clk) a", false);
+  ExpectUnclockedLike("qs(sc(a))", "@(posedge clk) a", true);
+}
+
+TEST(SequenceInstanceActualRun,
+     DISABLED_ABareSequenceInstanceActualCountsInAnInitialProcedure) {
+  for (const char* written :
+       {"@(posedge clk) ps(sd(a))", "@(posedge clk) pp(sd(a))",
+        "@(posedge clk) pu(sd(a))"}) {
+    ExpectUnclockedLike(written, "@(posedge clk) a", true);
+  }
+}
+
+TEST(SequenceInstanceActualRun,
+     DISABLED_AClockedSequenceInstanceActualGivesTheLeadingClock) {
+  for (bool in_initial : {false, true}) {
+    for (const char* written : {"ps(sc(a))", "pp(sc(a))", "pu(sc(a))"}) {
+      ExpectUnclockedLike(written, "@(posedge clk) a", in_initial);
+    }
+  }
+}
+
 }  // namespace
