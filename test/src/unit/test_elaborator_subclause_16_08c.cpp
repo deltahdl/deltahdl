@@ -195,17 +195,25 @@ constexpr char kDollar[] =
     "shall be untyped and referenced only as the upper bound of a cycle delay "
     "range or as an actual argument of an instance";
 
-struct DollarForm {
+struct InstanceForm {
   const char* decls;
   const char* call;
 };
 
-std::string DollarUse(const std::string& call) {
+std::string FormUse(const std::string& call) {
   return "a1: assert property (@(posedge clk) " + call + ");";
 }
 
-std::string DollarSource(const DollarForm& form) {
-  return Source(std::string(form.decls) + "\n", DollarUse(form.call));
+const char kFormNames[] =
+    "int z;\n"
+    "  bit c;\n"
+    "  parameter int P = 2;\n"
+    "  localparam int L = 3;\n"
+    "  ";
+
+std::string FormSource(const InstanceForm& form) {
+  return Source(kFormNames + std::string(form.decls) + "\n",
+                FormUse(form.call));
 }
 
 size_t CountReports(const std::vector<Diagnostic>& diags, const char* message) {
@@ -216,7 +224,7 @@ size_t CountReports(const std::vector<Diagnostic>& diags, const char* message) {
   return count;
 }
 
-const DollarForm kDollarForbidden[] = {
+const InstanceForm kDollarForbidden[] = {
     {"sequence s(k); a ##[k:5] b; endsequence", "s($)"},
     {"sequence s(k); a ##k b; endsequence", "s($)"},
     {"sequence s(k); a ##1 b[*k]; endsequence", "s($)"},
@@ -230,7 +238,7 @@ const DollarForm kDollarForbidden[] = {
     {"sequence s(local input int k); a ##[1:k] b; endsequence", "s($)"},
     {"sequence s(k); a ##k b; endsequence", "s(.k($))"}};
 
-const DollarForm kDollarAllowed[] = {
+const InstanceForm kDollarAllowed[] = {
     {"sequence s(k); a ##[5:k] b; endsequence", "s($)"},
     {"sequence s(k); a ##1 b[*1:k]; endsequence", "s($)"},
     {"sequence s(k); a ##1 b[=1:k]; endsequence", "s($)"},
@@ -242,28 +250,28 @@ const DollarForm kDollarAllowed[] = {
      "s($)"},
     {"sequence s(k); a ##[1:k] b; endsequence", "s(.k($))"}};
 
-const DollarForm kDollarOverridden[] = {
+const InstanceForm kDollarOverridden[] = {
     {"sequence s(k = $); a ##k b; endsequence", "s(3)"},
     {"sequence s(int k = $); a ##k b; endsequence", "s(.k(2))"}};
 
 TEST(SequenceDollarActual, EveryForbiddenReferenceIsReported) {
   for (const auto& form : kDollarForbidden) {
     SCOPED_TRACE(form.decls);
-    ExpectReported(DollarSource(form), DollarUse(form.call), kDollar);
+    ExpectReported(FormSource(form), FormUse(form.call), kDollar);
   }
 }
 
 TEST(SequenceDollarActual, EveryAllowedReferenceIsAccepted) {
   for (const auto& form : kDollarAllowed) {
     SCOPED_TRACE(form.decls);
-    ExpectAccepted(DollarSource(form), DollarUse(form.call));
+    ExpectAccepted(FormSource(form), FormUse(form.call));
   }
 }
 
 TEST(SequenceDollarActual, DISABLED_AnOverriddenDefaultDollarIsAccepted) {
   for (const auto& form : kDollarOverridden) {
     SCOPED_TRACE(form.decls);
-    ExpectAccepted(DollarSource(form), DollarUse(form.call));
+    ExpectAccepted(FormSource(form), FormUse(form.call));
   }
 }
 
@@ -271,12 +279,12 @@ TEST(SequenceDollarActual, DISABLED_ADefaultDollarLeftInPlaceIsReportedOnce) {
   for (const char* decls : {"sequence s(int k = $); a ##[1:k] b; endsequence",
                             "sequence s(k = $); a ##1 (b == k); endsequence"}) {
     SCOPED_TRACE(decls);
-    const DollarForm kForm = {decls, "s()"};
-    const std::string kSrc = DollarSource(kForm);
+    const InstanceForm kForm = {decls, "s()"};
+    const std::string kSrc = FormSource(kForm);
     ElabFixture f;
     ElaborateSrc(kSrc, f);
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kDollar,
-                              LineHolding(kSrc, DollarUse("s()")), "16.8"));
+                              LineHolding(kSrc, FormUse("s()")), "16.8"));
     EXPECT_EQ(CountReports(f.diag.Diagnostics(), kDollar), 1u);
   }
 }
@@ -358,6 +366,157 @@ TEST(SequenceDollarActual, AnAllowedInstanceNamedSimplyIsAccepted) {
 TEST(SequenceDollarActual, DISABLED_AnAllowedInstanceNamedThroughAScope) {
   for (const auto& placed : ScopePlaces(kDollarDecl, "good(a, $)")) {
     if (!NamedThroughAScope(placed.place)) continue;
+    SCOPED_TRACE(placed.place);
+    ExpectAccepted(placed.src, placed.use);
+  }
+}
+
+constexpr char kNonConstant[] = "is not an elaboration-time constant";
+
+const char* const kBoundForms[] = {
+    "sequence s(n); a ##[n:5] b; endsequence",
+    "sequence s(n); a ##[1:n] b; endsequence",
+    "sequence s(n); a ##1 b[*n]; endsequence",
+    "sequence s(n); a ##1 b[*1:n]; endsequence",
+    "sequence s(n); a ##1 b[=n]; endsequence",
+    "sequence s(n); a ##1 b[=n:5]; endsequence",
+    "sequence s(n); a ##1 b[=1:n]; endsequence",
+    "sequence s(n); a ##1 b[->n]; endsequence",
+    "sequence s(n); a ##1 b[->n:5]; endsequence",
+    "sequence s(n); a ##1 b[->1:n]; endsequence",
+    "sequence s(n); (a ##1 b)[*n]; endsequence",
+    "sequence s(n); (a ##1 b)[*1:n]; endsequence"};
+
+const char* const kUpperBoundForms[] = {
+    "sequence s(n); a ##[1:n] b; endsequence",
+    "sequence s(n); a ##1 b[*1:n]; endsequence",
+    "sequence s(n); a ##1 b[=1:n]; endsequence",
+    "sequence s(n); a ##1 b[->1:n]; endsequence",
+    "sequence s(n); (a ##1 b)[*1:n]; endsequence"};
+
+TEST(SequenceConstantBound, AVariableActualInEveryBoundIsReported) {
+  for (const char* decls : kBoundForms) {
+    SCOPED_TRACE(decls);
+    const InstanceForm kForm = {decls, "s(z)"};
+    ExpectReported(FormSource(kForm), FormUse(kForm.call), kNonConstant);
+  }
+}
+
+TEST(SequenceConstantBound, AConstantActualInEveryBoundIsAccepted) {
+  for (const char* decls : kBoundForms) {
+    for (const char* call : {"s(2)", "s(P)", "s(L + 1)"}) {
+      SCOPED_TRACE(std::string(decls) + " " + call);
+      const InstanceForm kForm = {decls, call};
+      ExpectAccepted(FormSource(kForm), FormUse(kForm.call));
+    }
+  }
+  for (const char* decls : kUpperBoundForms) {
+    SCOPED_TRACE(decls);
+    const InstanceForm kForm = {decls, "s($)"};
+    ExpectAccepted(FormSource(kForm), FormUse(kForm.call));
+  }
+}
+
+const InstanceForm kNonConstantActuals[] = {
+    {"sequence s(n); a ##[1:n] b; endsequence", "s(z + 1)"},
+    {"sequence s(n); a ##[1:n] b; endsequence", "s(-z)"},
+    {"sequence s(n); a ##1 b[*n]; endsequence", "s(z[1:0])"},
+    {"sequence s(n); a ##1 b[*n]; endsequence", "s(c ? 1 : 2)"},
+    {"sequence s(n = z); a ##[1:n] b; endsequence", "s()"},
+    {"sequence r(n); a ##[1:n] b; endsequence\n"
+     "  sequence s(k); a ##1 r(k); endsequence",
+     "s(z)"},
+    {"sequence r(n); a ##[1:n] b; endsequence\n"
+     "  property q(k); a |-> r(k); endproperty",
+     "q(z)"},
+    {"sequence r(n); a ##[1:n] b; endsequence\n"
+     "  sequence s(k = z); a ##1 r(k); endsequence",
+     "s()"}};
+
+const InstanceForm kConstantActuals[] = {
+    {"sequence s(n); a ##[1:n] b; endsequence", "s(P + 1)"},
+    {"sequence s(n); a ##[1:n] b; endsequence", "s(L * 2)"},
+    {"sequence s(n = P); a ##[1:n] b; endsequence", "s()"},
+    {"sequence s(n = 2); a ##[1:n] b; endsequence", "s()"},
+    {"sequence s(n = z); a ##[1:n] b; endsequence", "s(2)"},
+    {"sequence r(n); a ##[1:n] b; endsequence\n"
+     "  sequence s(k); a ##1 r(k); endsequence",
+     "s(P)"},
+    {"sequence r(n); a ##[1:n] b; endsequence\n"
+     "  property q(k); a |-> r(k); endproperty",
+     "q(2)"},
+    {"sequence r(n); a ##[1:n] b; endsequence\n"
+     "  sequence s(k = P); a ##1 r(k); endsequence",
+     "s()"}};
+
+TEST(SequenceConstantBound, DISABLED_EveryNonConstantActualIsReported) {
+  for (const auto& form : kNonConstantActuals) {
+    SCOPED_TRACE(std::string(form.decls) + " " + form.call);
+    ExpectReported(FormSource(form), FormUse(form.call), kNonConstant);
+  }
+}
+
+TEST(SequenceConstantBound, EveryConstantActualIsAccepted) {
+  for (const auto& form : kConstantActuals) {
+    SCOPED_TRACE(std::string(form.decls) + " " + form.call);
+    ExpectAccepted(FormSource(form), FormUse(form.call));
+  }
+}
+
+std::string BoundTakers() {
+  return std::string(kFormNames) +
+         "sequence s7(n); @(posedge clk) a ##[1:n] b; endsequence\n";
+}
+
+bool AProceduralOrGenerateSite(const std::string& use) {
+  return use.starts_with("initial") || use.starts_with("always") ||
+         use.find("begin : g") != std::string::npos;
+}
+
+TEST(SequenceConstantBound, AVariableActualIsReportedAtMostSites) {
+  for (const auto& use : InstanceSites("s7(z)")) {
+    if (AProceduralOrGenerateSite(use)) continue;
+    ExpectReported(Source(BoundTakers(), use), use, kNonConstant);
+  }
+}
+
+TEST(SequenceConstantBound, DISABLED_AVariableActualIsReportedAtEverySite) {
+  for (const auto& use : InstanceSites("s7(z)")) {
+    if (!AProceduralOrGenerateSite(use)) continue;
+    ExpectReported(Source(BoundTakers(), use), use, kNonConstant);
+  }
+}
+
+TEST(SequenceConstantBound, AParameterActualIsAcceptedAtEverySite) {
+  for (const auto& use : InstanceSites("s7(P)")) {
+    ExpectAccepted(Source(BoundTakers(), use), use);
+  }
+}
+
+const char kBoundDecl[] = "sequence s7(x, n); x ##[1:n] x; endsequence\n";
+
+bool AnInterfaceOrProgram(const std::string& place) {
+  return place == "interface" || place == "program";
+}
+
+TEST(SequenceConstantBound, AVariableActualIsReportedInAnInterfaceOrProgram) {
+  for (const auto& placed : ScopePlaces(kBoundDecl, "s7(a, a)")) {
+    if (!AnInterfaceOrProgram(placed.place)) continue;
+    SCOPED_TRACE(placed.place);
+    ExpectReported(placed.src, placed.use, kNonConstant);
+  }
+}
+
+TEST(SequenceConstantBound, DISABLED_AVariableActualIsReportedInEveryScope) {
+  for (const auto& placed : ScopePlaces(kBoundDecl, "s7(a, a)")) {
+    if (AnInterfaceOrProgram(placed.place)) continue;
+    SCOPED_TRACE(placed.place);
+    ExpectReported(placed.src, placed.use, kNonConstant);
+  }
+}
+
+TEST(SequenceConstantBound, ALiteralActualIsAcceptedInEveryScope) {
+  for (const auto& placed : ScopePlaces(kBoundDecl, "s7(a, 2)")) {
     SCOPED_TRACE(placed.place);
     ExpectAccepted(placed.src, placed.use);
   }
