@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -80,6 +81,37 @@ TEST(SatisfactionLevels, APropertyThatSawABadStateFails) {
   EXPECT_EQ(counts.fails, 1u);
   EXPECT_EQ(counts.passes_at_end, 7u);
   EXPECT_EQ(counts.fails_at_end, 1u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+const PlacedProperty kLevelsInPlace[] = {
+    {"a |-> d", {4, 0}, 4},
+    {"a |-> always (c || d)", {4, 0}, 4},
+    {"c until (a && b)", {3, 1}, 3},
+    {"a |-> s_eventually (b && c)", {3, 1}, 3},
+    {"a |-> strong(##2 c)", {2, 2}, 2},
+    {"c s_until (a && b)", {2, 2}, 2},
+    {"d |-> ##1 c", {3, 1}, 3},
+    {"always (b || d)", {0, 4}, 0}};
+
+TEST(SatisfactionLevels, EachLevelCountsAtTheEndInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kLevelsInPlace) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
+}
+
+TEST(SatisfactionLevels,
+     DISABLED_EachLevelCountsAtTheEndInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kLevelsInPlace) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus);
+  }
 }
 
 }  // namespace
