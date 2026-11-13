@@ -650,4 +650,81 @@ TEST(LocalPlaces, DISABLED_ACompilationUnitLocalHoldsItsValue) {
       {"c1:", "c2:"});
 }
 
+std::string SameTickSource(const std::string& items) {
+  return SequenceCoverSource(
+      "  int cnt = 0;\n"
+      "  always @(posedge clk) cnt <= cnt + 1;\n"
+      "  sequence sub(int y); y == 9; endsequence\n" +
+          items,
+      DriveTicks({{1, 3}}));
+}
+
+TEST(LocalSampledValue, ABooleanAfterZeroDelayReadsTheNewValue) {
+  ExpectEachLabelTwice(
+      SameTickSource(
+          "  sequence s1; int x; @(posedge clk) (te1, x = 7) ##0 (x == 7);"
+          " endsequence\n"
+          "  property p2; int x; @(posedge clk) (te1, x = 7) ##0 (x == 7);"
+          " endproperty\n"
+          "  c1: cover sequence (s1);\n"
+          "  c2: cover property (p2);\n"),
+      {"c1:", "c2:"});
+}
+
+TEST(LocalSampledValue, AnOverlappingConsequentReadsTheNewValue) {
+  std::string src = SameTickSource(
+      "  property p3; int x;\n"
+      "    @(posedge clk) (te1, x = cnt + 7) |-> (x == cnt + 7);\n"
+      "  endproperty\n"
+      "  c1: cover property (p3);\n"
+      "  assert property (p3) else fails++;\n");
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  EXPECT_EQ(CoverCount(f, src, "c1:"), 2u);
+  EXPECT_EQ(VarValue(f, "fails"), 0u);
+}
+
+TEST(LocalSampledValue, APropertyIfAndCaseReadTheNewValue) {
+  ExpectEachLabelTwice(
+      SameTickSource("  property p4; int x;\n"
+                     "    @(posedge clk) (te1, x = 3) |-> if (x == 3) te1"
+                     " else 1'b0;\n"
+                     "  endproperty\n"
+                     "  property p5; int x;\n"
+                     "    @(posedge clk) (te1, x = 3) |->"
+                     " case (x) 3: te1; default: 1'b0; endcase\n"
+                     "  endproperty\n"
+                     "  c1: cover property (p4);\n"
+                     "  c2: cover property (p5);\n"),
+      {"c1:", "c2:"});
+}
+
+TEST(LocalSampledValue, ALaterMatchItemAndAnInstanceReadTheNewValue) {
+  ExpectEachLabelTwice(
+      SameTickSource("  property p6; int x, y;\n"
+                     "    @(posedge clk) (te1, x = 4) ##0 (1, y = x) ##0"
+                     " (y == 4);\n"
+                     "  endproperty\n"
+                     "  property p7; int x;\n"
+                     "    @(posedge clk) (te1, x = 9) ##0 sub(x);\n"
+                     "  endproperty\n"
+                     "  c1: cover property (p6);\n"
+                     "  c2: cover property (p7);\n"),
+      {"c1:", "c2:"});
+}
+
+TEST(LocalSampledValue, AReassignmentReplacesTheEarlierValue) {
+  ExpectEachLabelTwice(
+      SameTickSource("  property p8; int x = 2;\n"
+                     "    @(posedge clk) (te1, x = 6) ##0 (x == 6);\n"
+                     "  endproperty\n"
+                     "  property p9; int x;\n"
+                     "    @(posedge clk) (te1, x = 1) ##1 (1, x = 5) ##0"
+                     " (x == 5);\n"
+                     "  endproperty\n"
+                     "  c1: cover property (p8);\n"
+                     "  c2: cover property (p9);\n"),
+      {"c1:", "c2:"});
+}
+
 }  // namespace
