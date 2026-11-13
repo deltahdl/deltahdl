@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
 #include <iterator>
@@ -13,6 +12,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_tick_bench.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_queues.h"
@@ -466,56 +466,10 @@ TEST(SequenceRepetition, APropertyRepeatingAGroupByARangeIsEvaluated) {
   EXPECT_EQ(fails->value.ToUint64(), 1u);
 }
 
-std::string TickDrive(std::initializer_list<const char*> ticks) {
-  std::string drive;
-  for (const char* tick : ticks) {
-    const std::string kHigh = tick;
-    drive += "    #10";
-    for (const char* name : {"x", "a", "b", "c"}) {
-      drive += std::string(" ") + name + " = " +
-               (kHigh.find(name) != std::string::npos ? "1" : "0") + ";";
-    }
-    drive += "\n";
-  }
-  return drive + "    #10 x = 0; a = 0; b = 0; c = 0;\n";
-}
-
-std::string CountBench(const std::string& outside, const std::string& items,
-                       std::initializer_list<const char*> ticks) {
-  return outside +
-         "module m;\n"
-         "  logic clk = 0, x = 0, a = 0, b = 0, c = 0;\n"
-         "  always #5 clk = ~clk;\n"
-         "  " +
-         items +
-         "\n"
-         "  initial begin\n" +
-         TickDrive(ticks) +
-         "    #20 $finish;\n"
-         "  end\n"
-         "endmodule\n";
-}
-
-std::string LinesTagged(const std::string& output, const std::string& tag) {
-  std::string out;
-  size_t at = 0;
-  while (at < output.size()) {
-    size_t end = output.find('\n', at);
-    if (end == std::string::npos) end = output.size();
-    const std::string kLine = output.substr(at, end - at);
-    if (kLine.rfind(tag, 0) == 0) {
-      out += (out.empty() ? "" : " ") + kLine.substr(tag.size());
-    }
-    at = end + 1;
-  }
-  return out;
-}
-
 std::string CountHits(const std::string& outside, const std::string& items,
-                      std::initializer_list<const char*> ticks,
+                      const std::vector<std::string>& ticks,
                       const std::string& tag = "hit ") {
-  SimFixture f;
-  return LinesTagged(RunCapture(CountBench(outside, items, ticks), f), tag);
+  return TickLines(outside, items, ticks, tag);
 }
 
 std::string CoveredSequence(const std::string& decls, const std::string& body) {

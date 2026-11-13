@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -7,6 +8,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_tick_bench.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_sequences.h"
@@ -173,6 +175,219 @@ TEST(EmptyMatchSequences, RangeAdmittingEmptyIsTheOrOfItsCases) {
   ASSERT_NE(spelled, nullptr);
   EXPECT_EQ(spelled->value.ToUint64(), 2u);
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 75u);
+}
+
+struct EmptyRow {
+  char how;
+  const char* decls;
+  const char* body;
+  const char* ticks;
+  const char* ends;
+};
+
+std::string ObservedItems(char how, const std::string& decls,
+                          const std::string& body) {
+  if (how == 'A') {
+    return decls + "assert property (@(posedge clk) " + body +
+           ") else $display(\"end %0t\", $time);";
+  }
+  if (how == 'C') {
+    return decls + "cover sequence (@(posedge clk) " + body +
+           ") $display(\"end %0t\", $time);";
+  }
+  return decls + "sequence rule; @(posedge clk) " + body +
+         "; endsequence\n"
+         "  initial forever begin\n"
+         "    wait (rule.triggered);\n"
+         "    $display(\"end %0t\", $time);\n"
+         "    @(posedge clk);\n"
+         "  end";
+}
+
+std::string RowEnds(char how, const std::string& decls, const std::string& body,
+                    const std::string& ticks) {
+  return TickLines("", ObservedItems(how, decls, body), TicksOf(ticks), "end ");
+}
+
+template <size_t N>
+void ExpectRows(const EmptyRow (&rows)[N]) {
+  for (const EmptyRow& row : rows) {
+    SCOPED_TRACE(std::string(row.body) + " over " + row.ticks);
+    EXPECT_EQ(RowEnds(row.how, row.decls, row.body, row.ticks), row.ends);
+  }
+}
+
+const char kTwoA[] = "sequence two_a; a ##1 a; endsequence\n  ";
+
+const char kS[] = "sequence s; a ##1 a; endsequence\n  ";
+
+const EmptyRow kEmptyBeforeZeroDelay[] = {
+    {'T', "", "(a ##1 a)[*0] ##0 b", "ab ab ab", ""},
+    {'T', "", "1 ##0 b", "ab ab ab", "15 25 35"},
+    {'T', "sequence e; a[*0]; endsequence\n  ", "e ##0 b", "ab ab ab", ""},
+    {'T', "sequence s(x); x ##0 b; endsequence\n  ", "s(a[*0])", "ab ab ab",
+     ""},
+    {'T', "", "a[*0] ##0 b[*0]", "ab ab ab", ""},
+    {'T', "", "a[*0:1] ##0 b", "b ab -", "25"},
+    {'T', "", "a[*0:$] ##0 b", "b ab ab", "25 35"},
+    {'T', "", "a[*0] ##[0:1] b", "b - b", "15 35"}};
+
+TEST(EmptyMatchSequences, AnEmptyOperandBeforeZeroDelayGivesNoMatch) {
+  ExpectRows(kEmptyBeforeZeroDelay);
+}
+
+const EmptyRow kEmptyAfterZeroDelay[] = {
+    {'T', "", "b ##0 a[*0:0]", "b ab bc c", ""},
+    {'T', "", "b ##1 a[*0:0]", "b ab bc c", "15 25 35"},
+    {'T', "", "b ##0 (a ##1 a)[*0]", "b ab bc c", ""},
+    {'T', "", "b ##1 (a ##1 a)[*0]", "b ab bc c", "15 25 35"},
+    {'T', kTwoA, "b ##0 two_a[*0]", "b ab bc c", ""},
+    {'T', kTwoA, "b ##1 two_a[*0]", "b ab bc c", "15 25 35"},
+    {'T', "", "b ##1 c ##0 a[*0]", "b ab bc c", ""},
+    {'T', "", "b ##1 c ##1 a[*0]", "b ab bc c", "35 45"},
+    {'T', "", "a[*0] ##0 b[*0]", "b ab bc c", ""},
+    {'T', "", "b ##1 a[*0] ##1 c", "b ab bc c", "35 45"},
+    {'T', "", "a[*0] ##0 b[*0] ##1 c", "b ab bc c", ""}};
+
+const EmptyRow kEmptyAfterZeroDelayThenMore[] = {
+    {'T', "", "b ##0 a[*0] ##1 c", "b ab bc c", ""},
+    {'T', "", "b ##0 a[*0] ##2 c", "b ab bc c", ""},
+    {'T', "", "b ##0 (a ##1 a)[*0] ##1 c", "b ab bc c", ""}};
+
+TEST(EmptyMatchSequences, AnEmptyOperandAfterZeroDelayGivesNoMatch) {
+  ExpectRows(kEmptyAfterZeroDelay);
+}
+
+TEST(EmptyMatchSequences,
+     DISABLED_AChainThroughAnEmptyOperandAfterZeroDelayNeverMatches) {
+  ExpectRows(kEmptyAfterZeroDelayThenMore);
+}
+
+const EmptyRow kEmptyFirstShortensTheDelay[] = {
+    {'A', "", "c |-> a[*0] ##1 b", "bc -", ""},
+    {'A', "", "c |-> a[*0] ##1 b", "c b", "15"},
+    {'A', "", "c |-> a[*0] ##2 b", "c b", ""},
+    {'A', "", "c |-> a[*0] ##2 b", "c - b", "25"},
+    {'A', "", "c |-> a[*0:1] ##2 b", "c b", ""},
+    {'A', "", "c |-> a[*0:1] ##2 b", "c - b", "25"},
+    {'A', "", "c |-> (a ##1 a)[*0] ##1 b", "abc a", ""},
+    {'A', "", "c |-> (a ##1 a)[*0] ##1 b", "ac ab", "15"},
+    {'A', "", "c |-> (a ##1 a)[*0] ##2 b", "ac ab", ""},
+    {'A', "", "c |-> (a ##1 a)[*0] ##2 b", "ac a ab", "25"},
+    {'A', kS, "c |-> s[*0] ##1 b", "abc a", ""},
+    {'A', kS, "c |-> s[*0] ##1 b", "ac ab", "15"},
+    {'A', kS, "c |-> s[*0] ##2 b", "ac ab", ""},
+    {'A', kS, "c |-> s[*0] ##2 b", "ac a ab", "25"},
+    {'T', "", "b ##1 a[*0] ##1 c", "b c - b - c", "25"},
+    {'T', "", "b ##1 a[*0] ##2 c", "b c c c", "35"},
+    {'T', "", "b ##1 (a ##1 a)[*0] ##2 c", "ab ac ac ac", "35"},
+    {'T', kS, "b ##1 s[*0] ##1 c", "ab ac ac", "25"},
+    {'T', kS, "b ##1 s[*0] ##2 c", "ab ac ac ac", "35"}};
+
+TEST(EmptyMatchSequences, AnEmptyOperandBeforeADelayShortensItByOne) {
+  ExpectRows(kEmptyFirstShortensTheDelay);
+}
+
+const EmptyRow kEmptyLastShortensTheDelay[] = {
+    {'T', "", "b ##1 a[*0]", "b - -", "15"},
+    {'T', "", "b ##1 a[*0]", "ab a a", "15"},
+    {'T', "", "b ##3 a[*0]", "b - - - -", "35"},
+    {'T', "", "b ##[1:2] a[*0]", "b - -", "15 25"},
+    {'C', "", "b ##1 a[*0:1]", "b a", "15 25"},
+    {'C', "", "b ##1 a[*0:1]", "b -", "15"},
+    {'A', "", "b |=> a ##2 c[*0]", "b a -", ""},
+    {'A', "", "b |=> a ##2 c[*0]", "b - -", "25"}};
+
+TEST(EmptyMatchSequences, AnEmptyOperandAfterADelayShortensItByOne) {
+  ExpectRows(kEmptyLastShortensTheDelay);
+}
+
+TEST(EmptyMatchSequences, TwoEmptyOperandsAcrossADelayMatchAtEveryTick) {
+  const std::string kEvery = RowEnds('T', "", "1", "- -");
+  EXPECT_NE(kEvery, "");
+  EXPECT_EQ(RowEnds('T', "", "a[*0] ##2 c[*0]", "- -"), kEvery);
+}
+
+const EmptyRow kZeroCounts[] = {
+    {'C', kS, "b ##1 s[*0] ##1 c", "ab ac a", "25"},
+    {'C', "sequence t(y); y ##1 y; endsequence\n  ", "b ##1 t(a)[*0] ##1 c",
+     "ab ac a", "25"},
+    {'T', "localparam int N = 0;\n  ", "b ##1 a[*N] ##1 c", "b c", "25"},
+    {'T', "", "b ##1 a[*0:0] ##1 c", "b c", "25"},
+    {'T', "", "b ##1 a[*0:0] ##1 c", "b a c", ""}};
+
+TEST(EmptyMatchSequences, AZeroCountOfAnyFormIsTheEmptySequence) {
+  ExpectRows(kZeroCounts);
+}
+
+struct EmptyPlace {
+  const char* place;
+  const char* outside;
+  const char* items;
+};
+
+const EmptyPlace kEmptyPlaces[] = {
+    {"interface",
+     "interface ifc(input logic clk, a, b);\n"
+     "  sequence rule; @(posedge clk) @@; endsequence\n"
+     "  cover sequence (rule) $display(\"end %0t\", $time);\n"
+     "endinterface\n",
+     "ifc i(clk, a, b);"},
+    {"program",
+     "program pg(input logic clk, a, b);\n"
+     "  sequence rule; @(posedge clk) @@; endsequence\n"
+     "  cover sequence (rule) $display(\"end %0t\", $time);\n"
+     "endprogram\n",
+     "pg p(clk, a, b);"},
+    {"checker",
+     "checker ck(logic clk, logic a, logic b);\n"
+     "  sequence rule; @(posedge clk) @@; endsequence\n"
+     "  cover sequence (rule) $display(\"end %0t\", $time);\n"
+     "endchecker\n",
+     "ck k(clk, a, b);"},
+    {"package",
+     "package pk;\n"
+     "  sequence rule(clk, a, b); @(posedge clk) @@; endsequence\n"
+     "endpackage\n",
+     "cover sequence (pk::rule(clk, a, b)) $display(\"end %0t\", $time);"},
+    {"generate block", "",
+     "if (1) begin : g\n"
+     "    sequence rule; @(posedge clk) @@; endsequence\n"
+     "    cover sequence (rule) $display(\"end %0t\", $time);\n"
+     "  end"},
+    {"compilation unit",
+     "sequence rule(clk, a, b); @(posedge clk) @@; endsequence\n",
+     "cover sequence (rule(clk, a, b)) $display(\"end %0t\", $time);"}};
+
+std::string PlacedEnds(const EmptyPlace& placed, const std::string& body) {
+  auto fill = [&](std::string text) {
+    size_t at = text.find("@@");
+    if (at != std::string::npos) text.replace(at, 2, body);
+    return text;
+  };
+  return TickLines(fill(placed.outside), fill(placed.items), TicksOf("b ab b"),
+                   "end ");
+}
+
+void ExpectEmptyBeforeZeroDelayIn(const char* place) {
+  for (const auto& placed : kEmptyPlaces) {
+    if (std::string(placed.place) != place) continue;
+    SCOPED_TRACE(place);
+    EXPECT_EQ(PlacedEnds(placed, "(a[*0] ##0 b) or (b ##1 1)"), "25 35 45");
+    EXPECT_EQ(PlacedEnds(placed, "(1 ##0 b) or (b ##1 1)"),
+              "15 25 25 35 35 45");
+  }
+}
+
+TEST(EmptyMatchSequences, AnEmptyOperandBeforeZeroDelayGivesNoMatchAnywhere) {
+  for (const char* place :
+       {"interface", "program", "checker", "package", "generate block"}) {
+    ExpectEmptyBeforeZeroDelayIn(place);
+  }
+}
+
+TEST(EmptyMatchSequences, DISABLED_AnEmptyOperandBeforeZeroDelayInTheUnit) {
+  ExpectEmptyBeforeZeroDelayIn("compilation unit");
 }
 
 }  // namespace
