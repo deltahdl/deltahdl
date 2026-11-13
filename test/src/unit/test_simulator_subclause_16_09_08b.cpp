@@ -252,6 +252,29 @@ TEST(FirstMatchPlacement, AsTheLeftOperandOfAnd) {
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
 }
 
+TEST(FirstMatchPlacement, OnTheOtherSideOfAndAndOr) {
+  std::string src = SequenceCoverSource(
+      "  c1: cover sequence (@(posedge clk)"
+      " (te1 ##2 te3) and first_match(te1 ##[1:2] te2));\n"
+      "  c2: cover property (@(posedge clk)"
+      " first_match(te1 ##[1:2] te2) or (te1 ##2 te3));\n",
+      PlacementDrive());
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
+  EXPECT_EQ(CoverCount(f, src, "c2:"), 1u);
+}
+
+TEST(FirstMatchPlacement, DISABLED_AsTheLeftOperandOfABareIntersect) {
+  std::string src = SequenceCoverSource(
+      "  c1: cover sequence (@(posedge clk)"
+      " first_match(te1 ##[1:2] te2) intersect (te1 ##1 1));\n",
+      PlacementDrive());
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
+}
+
 TEST(FirstMatchPlacement, DISABLED_AsAnOperandOfASequenceOperator) {
   std::string src = SequenceCoverSource(
       "  c2: cover sequence (@(posedge clk)"

@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "helpers_sequence_places.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -98,6 +100,35 @@ TEST(AssertionSemanticsParsing, AThroughoutGuardingARangedDelayIsRead) {
     EXPECT_EQ(body->delays[1].max, 4u);
     ASSERT_EQ(body->throughouts.size(), 1u);
     EXPECT_EQ(body->throughouts[0].lead, 1u);
+  }
+}
+
+constexpr const char* kSequenceForBoolean =
+    "a sequence stands where the grammar admits only an expression_or_dist";
+
+TEST(ThroughoutLeftOperand, ASequenceOnTheLeftIsReportedInEveryPlace) {
+  for (const char* left :
+       {"(a ##1 b)", "(a ##0 b)", "a[*2]", "a[*1:2]", "a[->1]", "a[=1:2]",
+        "first_match(a ##1 b)", "(a ##1 b) or (c ##1 d)"}) {
+    SCOPED_TRACE(left);
+    auto r = Parse(InEverySequencePlace("@(posedge clk) " + std::string(left) +
+                                        " throughout (c ##1 c)"));
+    for (uint32_t line : {2u, 3u, 4u, 7u}) {
+      EXPECT_TRUE(ReportedError(r.diags, kSequenceForBoolean, line, "A.2.10"))
+          << line;
+    }
+  }
+}
+
+TEST(ThroughoutLeftOperand, AnExpressionOnTheLeftIsAcceptedInEveryPlace) {
+  for (const char* left :
+       {"a", "(a)", "((a && b))", "!a", "a == b", "a dist {0 := 1, 1 := 1}",
+        "f(a)", "w.triggered", "$rose(a)", "p::B", "u1.v"}) {
+    SCOPED_TRACE(left);
+    auto r = Parse(InEverySequencePlace("@(posedge clk) " + std::string(left) +
+                                        " throughout (c ##1 c)"));
+    ASSERT_NE(r.cu, nullptr);
+    EXPECT_FALSE(r.has_errors);
   }
 }
 
