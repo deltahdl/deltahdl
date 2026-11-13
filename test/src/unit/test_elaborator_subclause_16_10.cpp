@@ -374,4 +374,55 @@ TEST(LocalVariableElaboration, ASignalReachingAClockThroughAnActualIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+struct InitializerReadPair {
+  const char* bad;
+  const char* unassigned;
+  const char* good;
+};
+
+const InitializerReadPair kInitializerReads[] = {
+    {"int u, v = u + 1;", "u", "int u = 1, v = u + 1;"},
+    {"int u; int v = u + 1;", "u", "int u = 2; int v = u * 3;"},
+    {"int v = w, w = 1;", "w", "int w = 1, v = w;"},
+    {"int v = w + 1; int w = 1;", "w", "int w = 1; int v = w + 1;"},
+    {"int v = v + 1;", "v", "int t = 1, v = t + 1;"},
+};
+
+std::string InitializerSource(const std::string& decl) {
+  return "module m;\n"
+         "  bit clk, a;\n"
+         "  sequence s; " +
+         decl +
+         " @(posedge clk) a; endsequence\n"
+         "  property p; " +
+         decl +
+         " @(posedge clk) a; endproperty\n"
+         "endmodule\n";
+}
+
+TEST(LocalInitializerReads,
+     AnInitializerReadingAnUninitializedLocalIsReported) {
+  for (const InitializerReadPair& pair : kInitializerReads) {
+    SCOPED_TRACE(pair.bad);
+    ElabFixture f;
+    ElaborateSrc(InitializerSource(pair.bad), f);
+    const std::string kMessage = std::string("the local variable '") +
+                                 pair.unassigned +
+                                 "' is referenced at a point where it is"
+                                 " unassigned";
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 3, "16.10"));
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "16.10"));
+  }
+}
+
+TEST(LocalInitializerReads,
+     AnInitializerReadingAnEarlierInitializedLocalIsAccepted) {
+  for (const InitializerReadPair& pair : kInitializerReads) {
+    SCOPED_TRACE(pair.good);
+    ElabFixture f;
+    ElaborateSrc(InitializerSource(pair.good), f);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
 }  // namespace

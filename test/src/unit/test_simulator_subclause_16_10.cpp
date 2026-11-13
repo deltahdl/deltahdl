@@ -815,4 +815,23 @@ TEST(LocalAttemptCopies, ALocalFormalReadsTheSampledValueOfItsActual) {
       {"c1:", "c2:"});
 }
 
+TEST(LocalAttemptCopies, AnInitializerTakesAnEarlierLocalsInitialValue) {
+  ExpectThreeCoversAndNoFailure(
+      EdgeCountSource("  property pu; int u = nd, v = u + 10;\n"
+                      "    @(posedge clk) te1 |-> (v == nd + 10);\n"
+                      "  endproperty\n"
+                      "  property pw; int u = nd; int v = u;\n"
+                      "    @(posedge clk) te1 |-> (v == nd);\n"
+                      "  endproperty\n"
+                      "  sequence sw; int u = nd; int w = u * 3;\n"
+                      "    @(posedge clk) te1 ##0 (w == nd * 3);\n"
+                      "  endsequence\n"
+                      "  c1: cover property (pu);\n"
+                      "  c2: cover property (pw);\n"
+                      "  c3: cover property (sw);\n"
+                      "  assert property (pu) else fails++;\n"
+                      "  assert property (pw) else fails++;\n"),
+      {"c1:", "c2:", "c3:"});
+}
+
 }  // namespace
