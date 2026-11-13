@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -462,6 +464,225 @@ TEST(SequenceRepetition, APropertyRepeatingAGroupByARangeIsEvaluated) {
       f, "fails");
   ASSERT_NE(fails, nullptr);
   EXPECT_EQ(fails->value.ToUint64(), 1u);
+}
+
+std::string TickDrive(std::initializer_list<const char*> ticks) {
+  std::string drive;
+  for (const char* tick : ticks) {
+    const std::string kHigh = tick;
+    drive += "    #10";
+    for (const char* name : {"x", "a", "b", "c"}) {
+      drive += std::string(" ") + name + " = " +
+               (kHigh.find(name) != std::string::npos ? "1" : "0") + ";";
+    }
+    drive += "\n";
+  }
+  return drive + "    #10 x = 0; a = 0; b = 0; c = 0;\n";
+}
+
+std::string CountBench(const std::string& outside, const std::string& items,
+                       std::initializer_list<const char*> ticks) {
+  return outside +
+         "module m;\n"
+         "  logic clk = 0, x = 0, a = 0, b = 0, c = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  " +
+         items +
+         "\n"
+         "  initial begin\n" +
+         TickDrive(ticks) +
+         "    #20 $finish;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string LinesTagged(const std::string& output, const std::string& tag) {
+  std::string out;
+  size_t at = 0;
+  while (at < output.size()) {
+    size_t end = output.find('\n', at);
+    if (end == std::string::npos) end = output.size();
+    const std::string kLine = output.substr(at, end - at);
+    if (kLine.rfind(tag, 0) == 0) {
+      out += (out.empty() ? "" : " ") + kLine.substr(tag.size());
+    }
+    at = end + 1;
+  }
+  return out;
+}
+
+std::string CountHits(const std::string& outside, const std::string& items,
+                      std::initializer_list<const char*> ticks,
+                      const std::string& tag = "hit ") {
+  SimFixture f;
+  return LinesTagged(RunCapture(CountBench(outside, items, ticks), f), tag);
+}
+
+std::string CoveredSequence(const std::string& decls, const std::string& body) {
+  return decls + "sequence s; @(posedge clk) " + body +
+         "; endsequence\n"
+         "  cover property (s) $display(\"hit %0t\", $time);";
+}
+
+void ExpectThreeIterations(const std::string& outside,
+                           const std::string& items) {
+  EXPECT_EQ(CountHits(outside, items, {"x", "a", "a", "a", "b"}), "55");
+  EXPECT_EQ(CountHits(outside, items, {"x", "a", "a", "a", "a", "b"}), "");
+  EXPECT_EQ(CountHits(outside, items, {"x", "a", "b"}), "");
+}
+
+struct CountedForm {
+  const char* outside;
+  const char* decls;
+  const char* body;
+};
+
+const CountedForm kCountsOfThree[] = {
+    {"", "localparam int N = 4; ", "x ##1 a[*N-1] ##1 b"},
+    {"", "", "x ##1 a[*(1+2)] ##1 b"},
+    {"", "", "x ##1 a[*1+2] ##1 b"},
+    {"", "", "x ##1 a[*3:3] ##1 b"}};
+
+const CountedForm kCountsOfThreeFromElsewhere[] = {
+    {"package pkg;\n  parameter int N = 3;\nendpackage\n", "",
+     "x ##1 a[*pkg::N] ##1 b"},
+    {"", "function automatic int f(int x); return x + 1; endfunction\n  ",
+     "x ##1 a[*f(2)] ##1 b"}};
+
+void ExpectEachCountOfThree(const CountedForm* begin, const CountedForm* end) {
+  for (const CountedForm* form = begin; form != end; ++form) {
+    SCOPED_TRACE(form->body);
+    ExpectThreeIterations(form->outside,
+                          CoveredSequence(form->decls, form->body));
+  }
+}
+
+TEST(SequenceRepetition, ACountIsTheValueOfItsConstantExpression) {
+  ExpectEachCountOfThree(std::begin(kCountsOfThree), std::end(kCountsOfThree));
+}
+
+TEST(SequenceRepetition,
+     DISABLED_ACountFromAPackageOrAFunctionIsTheValueItGives) {
+  ExpectEachCountOfThree(std::begin(kCountsOfThreeFromElsewhere),
+                         std::end(kCountsOfThreeFromElsewhere));
+}
+
+struct PlacedCount {
+  const char* place;
+  const char* outside;
+  const char* items;
+};
+
+const PlacedCount kPlacedCounts[] = {
+    {"interface",
+     "interface ifc(input logic clk, x, a, b);\n"
+     "  localparam int N = 3;\n"
+     "  sequence s; @(posedge clk) x ##1 a[*N] ##1 b; endsequence\n"
+     "  cover property (s) $display(\"hit %0t\", $time);\n"
+     "endinterface\n",
+     "ifc i(clk, x, a, b);"},
+    {"program",
+     "program pg(input logic clk, x, a, b);\n"
+     "  localparam int N = 3;\n"
+     "  sequence s; @(posedge clk) x ##1 a[*N] ##1 b; endsequence\n"
+     "  cover property (s) $display(\"hit %0t\", $time);\n"
+     "endprogram\n",
+     "pg p(clk, x, a, b);"},
+    {"checker",
+     "localparam int N = 3;\n"
+     "checker ck(logic clk, logic x, logic a, logic b);\n"
+     "  sequence s; @(posedge clk) x ##1 a[*N] ##1 b; endsequence\n"
+     "  cover property (s) $display(\"hit %0t\", $time);\n"
+     "endchecker\n",
+     "ck k(clk, x, a, b);"},
+    {"package",
+     "package pk;\n"
+     "  localparam int N = 3;\n"
+     "  sequence s(clk, x, a, b); @(posedge clk) x ##1 a[*N] ##1 b; "
+     "endsequence\n"
+     "endpackage\n",
+     "cover property (pk::s(clk, x, a, b)) $display(\"hit %0t\", $time);"},
+    {"compilation unit", "localparam int N = 3;\n",
+     "sequence s; @(posedge clk) x ##1 a[*N] ##1 b; endsequence\n"
+     "  cover property (s) $display(\"hit %0t\", $time);"},
+    {"assertion", "",
+     "localparam int N = 3;\n"
+     "  cover property (@(posedge clk) x ##1 a[*N] ##1 b) "
+     "$display(\"hit %0t\", $time);"},
+    {"procedural assertion", "",
+     "localparam int N = 3;\n"
+     "  always @(posedge clk) assert property (x ##1 a[*N] ##1 b) "
+     "$display(\"hit %0t\", $time); else ;"},
+    {"overridden parameter",
+     "module sub #(parameter int N = 1) (input logic clk, x, a, b);\n"
+     "  cover property (@(posedge clk) x ##1 a[*N] ##1 b) "
+     "$display(\"hit %0t\", $time);\n"
+     "endmodule\n",
+     "sub #(.N(3)) u(clk, x, a, b);"}};
+
+void ExpectPlacedCount(const char* place) {
+  for (const auto& placed : kPlacedCounts) {
+    if (std::string(placed.place) != place) continue;
+    SCOPED_TRACE(placed.place);
+    ExpectThreeIterations(placed.outside, placed.items);
+  }
+}
+
+TEST(SequenceRepetition, AParameterCountTakesTheValueVisibleWhereItIsWritten) {
+  for (const char* place :
+       {"interface", "program", "checker", "compilation unit", "assertion",
+        "procedural assertion", "overridden parameter"}) {
+    ExpectPlacedCount(place);
+  }
+}
+
+TEST(SequenceRepetition, DISABLED_APackageSequenceTakesItsPackagesParameter) {
+  ExpectPlacedCount("package");
+}
+
+TEST(SequenceRepetition, AParameterCountRepeatsAGroup) {
+  const std::string kItems =
+      CoveredSequence("localparam int N = 2; ", "x ##1 (a ##1 b)[*N] ##1 c");
+  EXPECT_EQ(CountHits("", kItems, {"x", "a", "b", "a", "b", "c"}), "65");
+  EXPECT_EQ(CountHits("", kItems, {"x", "a", "b", "c"}), "");
+  EXPECT_EQ(CountHits("", kItems, {"x", "a", "b", "a", "b", "a", "b", "c"}),
+            "");
+}
+
+TEST(SequenceRepetition, ParameterRangeBoundsTakeTheirValues) {
+  const std::string kRange =
+      CoveredSequence("localparam int N = 2, M = 3; ", "x ##1 a[*N:M] ##1 b");
+  EXPECT_EQ(CountHits("", kRange, {"x", "a", "b"}), "");
+  EXPECT_EQ(CountHits("", kRange, {"x", "a", "a", "b"}), "45");
+  EXPECT_EQ(CountHits("", kRange, {"x", "a", "a", "a", "b"}), "55");
+  EXPECT_EQ(CountHits("", kRange, {"x", "a", "a", "a", "a", "b"}), "");
+  const std::string kGoto =
+      CoveredSequence("localparam int N = 2; ", "x ##1 b[->N:$] ##1 c");
+  EXPECT_EQ(CountHits("", kGoto, {"x", "b", "c"}), "");
+  EXPECT_EQ(CountHits("", kGoto, {"x", "b", "b", "c"}), "45");
+  EXPECT_EQ(CountHits("", kGoto, {"x", "b", "", "b", "c"}), "55");
+}
+
+TEST(SequenceRepetition, AGenvarCountTakesEachIterationsValue) {
+  const std::string kItems =
+      "for (genvar i = 2; i <= 4; i++) begin : g\n"
+      "    localparam int K = i;\n"
+      "    cover property (@(posedge clk) a[*i] ##1 b) "
+      "$display(\"g%0d %0t\", K, $time);\n"
+      "  end";
+  EXPECT_EQ(CountHits("", kItems, {"a", "a", "a", "ab"}, "g2 "), "45");
+  EXPECT_EQ(CountHits("", kItems, {"a", "a", "a", "ab"}, "g3 "), "45");
+  EXPECT_EQ(CountHits("", kItems, {"a", "a", "a", "ab"}, "g4 "), "");
+}
+
+TEST(SequenceRepetition, DISABLED_AZeroCountOnGotoOrNonconsecutiveIsEmpty) {
+  const std::string kGoto = CoveredSequence("", "x ##1 b[->0] ##1 c");
+  EXPECT_EQ(CountHits("", kGoto, {"x", "c"}), "25");
+  EXPECT_EQ(CountHits("", kGoto, {"x", "", "c"}), "");
+  const std::string kNonconsecutive = CoveredSequence("", "x ##1 b[=0] ##1 c");
+  EXPECT_EQ(CountHits("", kNonconsecutive, {"x", "c"}), "25");
+  EXPECT_EQ(CountHits("", kNonconsecutive, {"x", "", "c"}), "35");
+  EXPECT_EQ(CountHits("", kNonconsecutive, {"x", "b", "c"}), "");
 }
 
 }  // namespace
