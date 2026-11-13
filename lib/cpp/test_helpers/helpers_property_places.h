@@ -1,5 +1,7 @@
 #pragma once
 
+#include <gtest/gtest.h>
+
 #include <cstddef>
 #include <iostream>
 #include <sstream>
