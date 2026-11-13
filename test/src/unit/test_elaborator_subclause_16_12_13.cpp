@@ -234,25 +234,6 @@ TEST(EventuallyRangeElaboration, AParameterOverriddenToAFiniteValueIsAccepted) {
   ExpectOperandAccepted(OverriddenParameterSource("s_eventually", "$"));
 }
 
-using SourceExpectation = void (*)(const std::string&);
-
-void ExpectInEachPlace(const std::string& spec, SourceExpectation expect) {
-  for (const char* place : kOperandStatementPlaces) {
-    SCOPED_TRACE(std::string(place) + " statement " + spec);
-    expect(
-        OperandIn(place, "a1: assert property (@(posedge clk) " + spec + ");"));
-  }
-  for (const char* place : kOperandDeclarationPlaces) {
-    SCOPED_TRACE(std::string(place) + " declaration " + spec);
-    expect(OperandIn(place,
-                     "property q; @(posedge clk) " + spec + "; endproperty"));
-  }
-}
-
-void ExpectGrammarReported(const std::string& src) {
-  ExpectOperandReported(src, "the grammar admits", "A.2.10");
-}
-
 TEST(EventuallyRangeElaboration,
      DISABLED_AWeakEventuallyWithoutARangeIsReportedInEachPlace) {
   ExpectInEachPlace("eventually a", ExpectGrammarReported);
