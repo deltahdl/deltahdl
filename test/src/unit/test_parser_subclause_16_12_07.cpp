@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "fixture_parser.h"
+#include "helpers_property_spec_places.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
@@ -132,42 +133,11 @@ TEST(AssertionSemanticsParsing,
   EXPECT_NE(bl->assert_expr->text, kPlaceholder);
 }
 
-constexpr const char* kImplicationPlaces[] = {
-    "module",  "procedural", "generate", "interface", "program",
-    "checker", "property",   "package",  "unit"};
-
-std::string ImplicationIn(const std::string& place, const std::string& spec) {
-  const std::string kSignals = "  logic clk; bit a, b, c, d;\n";
-  const std::string kAssertion =
-      "  a1: assert property (@(posedge clk) " + spec + ");\n";
-  if (place == "procedural") {
-    return "module m;\n" + kSignals +
-           "  always @(posedge clk) assert property (" + spec +
-           ");\nendmodule\n";
-  }
-  if (place == "generate") {
-    return "module m;\n" + kSignals + "  if (1) begin : g" +
-           kAssertion.substr(1) + "  end\nendmodule\n";
-  }
-  if (place == "interface" || place == "program" || place == "checker") {
-    return place + " m;\n" + kSignals + kAssertion + "end" + place + "\n";
-  }
-  const std::string kDeclared = "  property q; " + spec + "; endproperty\n";
-  if (place == "property") {
-    return "module m;\n" + kSignals + kDeclared + "endmodule\n";
-  }
-  if (place == "package") {
-    return "package pk;\n" + kSignals + kDeclared + "endpackage\n";
-  }
-  if (place == "unit") return "\n" + kSignals + kDeclared;
-  return "module m;\n" + kSignals + kAssertion + "endmodule\n";
-}
-
 constexpr const char* kPropertyForSequence =
     "a property stands where the grammar admits only a sequence";
 
 TEST(AssertionSemanticsParsing, APropertyAsTheAntecedentIsReportedInEachPlace) {
-  for (const char* place : kImplicationPlaces) {
+  for (const char* place : kPropertySpecPlaces) {
     for (const char* spec :
          {"(a |-> b) |-> c", "(a |=> b) |=> c", "(not a) |-> b",
           "(a until b) |=> c", "(nexttime a) |-> b", "(always a) |=> b",
@@ -175,14 +145,14 @@ TEST(AssertionSemanticsParsing, APropertyAsTheAntecedentIsReportedInEachPlace) {
           "(s_eventually a) |=> b", "(if (a) b) |-> c",
           "(accept_on (a) b) |=> c", "strong(a ##1 b) |-> c"}) {
       SCOPED_TRACE(std::string(place) + " " + spec);
-      auto r = Parse(ImplicationIn(place, spec));
+      auto r = Parse(PropertySpecIn(place, spec));
       EXPECT_TRUE(ReportedError(r.diags, kPropertyForSequence, 3, "A.2.10"));
     }
   }
 }
 
 TEST(AssertionSemanticsParsing, ASequenceAsTheAntecedentIsReadInEachPlace) {
-  for (const char* place : kImplicationPlaces) {
+  for (const char* place : kPropertySpecPlaces) {
     for (const char* spec :
          {"a |-> c", "a |=> c", "(a) |-> c", "(a ##1 b) |-> c",
           "a ##[1:2] b |=> c", "(a or b) |-> c", "(a and b) |=> c",
@@ -191,7 +161,7 @@ TEST(AssertionSemanticsParsing, ASequenceAsTheAntecedentIsReadInEachPlace) {
           "(a ##1 b) within (c ##1 d) |=> a", "a ##0 b[*2] |-> ##[3:8] c",
           "a dist {1 := 1} |-> b"}) {
       SCOPED_TRACE(std::string(place) + " " + spec);
-      auto r = Parse(ImplicationIn(place, spec));
+      auto r = Parse(PropertySpecIn(place, spec));
       EXPECT_FALSE(r.has_errors);
     }
   }
@@ -199,14 +169,14 @@ TEST(AssertionSemanticsParsing, ASequenceAsTheAntecedentIsReadInEachPlace) {
 
 TEST(AssertionSemanticsParsing,
      AnImplicationAsASequenceOperandIsReportedInEachPlace) {
-  for (const char* place : kImplicationPlaces) {
+  for (const char* place : kPropertySpecPlaces) {
     for (const char* spec :
          {"(a |-> b) ##1 c", "a ##1 (b |=> c)", "(a |-> b)[*2]",
           "(a |=> b)[=1]", "(a |-> b) intersect c", "a within (b |=> c)",
           "a throughout (b |-> c)", "first_match(a |-> b)", "strong(a |=> b)",
           "weak(a |-> b)", "(a |-> b, d = 1)", "(a ##1 b |-> c) ##0 d"}) {
       SCOPED_TRACE(std::string(place) + " " + spec);
-      auto r = Parse(ImplicationIn(place, spec));
+      auto r = Parse(PropertySpecIn(place, spec));
       EXPECT_TRUE(ReportedError(r.diags, "the grammar admits", 3, "A.2.10"));
     }
   }
@@ -214,7 +184,7 @@ TEST(AssertionSemanticsParsing,
 
 TEST(AssertionSemanticsParsing,
      AnImplicationAsAPropertyOperandIsReadInEachPlace) {
-  for (const char* place : kImplicationPlaces) {
+  for (const char* place : kPropertySpecPlaces) {
     for (const char* spec :
          {"a |-> b |=> c", "a |=> (b |-> c)", "not (a |-> b)",
           "(a |-> b) and c", "(a |=> b) or (c |-> d)", "always (a |-> b)",
@@ -223,7 +193,7 @@ TEST(AssertionSemanticsParsing,
           "accept_on (d) a |=> b", "(a |-> b) implies (c |=> d)",
           "a #-# (b |-> c)", "a |-> ##[1:5] b && c"}) {
       SCOPED_TRACE(std::string(place) + " " + spec);
-      auto r = Parse(ImplicationIn(place, spec));
+      auto r = Parse(PropertySpecIn(place, spec));
       EXPECT_FALSE(r.has_errors);
     }
   }

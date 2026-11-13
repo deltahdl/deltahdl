@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_properties.h"
@@ -140,6 +141,42 @@ TEST(ImpliesIffProperty, ASequenceOperandIsDecidedWhereItMatchesOrCannot) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 3u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {{"a implies c", {2, 2}, 2},
+                                            {"a iff b", {2, 2}, 2},
+                                            {"a iff c", {0, 4}, 0},
+                                            {"a ##1 b implies c", {3, 1}, 3},
+                                            {"a implies b ##1 c", {3, 1}, 3},
+                                            {"(a |-> b) iff d", {2, 2}, 2},
+                                            {"q(d, b) implies c", {3, 1}, 3},
+                                            {"a iff q(d, b)", {1, 3}, 1},
+                                            {"a ##1 b iff b ##1 c", {2, 2}, 2}};
+
+TEST(ImpliesIffProperty, ImpliesAndIffCountInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(ImpliesIffProperty,
+     DISABLED_ImpliesAndIffCountInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
 }
 
 }  // namespace
