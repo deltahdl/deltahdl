@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/sequence_degeneracy.h"
 #include "elaborator/sequence_match_attach.h"
 #include "fixture_elaborator.h"
@@ -591,6 +592,277 @@ TEST(EmptyMatchItem, AnItemOnANonemptySequenceInEachOuterScopeIsAccepted) {
     SCOPED_TRACE(place);
     ExpectNoErrors(EmptyItemIn(place, "a ##1 b[*0:1], $display(\"hit\")"));
   }
+}
+
+constexpr const char* kPassingReport =
+    "an actual shall be passed by value as an input or by reference";
+
+bool PassingReportedAt(const std::vector<Diagnostic>& diags, uint32_t line,
+                       uint32_t column) {
+  for (const Diagnostic& d : diags) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line &&
+        d.loc.column == column &&
+        d.message.find(kPassingReport) != std::string::npos) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void ExpectPassingReported(const std::string& src, const std::string& call) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, call);
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kPassingReport, line, "16.11"));
+}
+
+struct CalleeKind {
+  const char* outside;
+  const char* items;
+  const char* call;
+};
+
+const CalleeKind kCalleeKinds[] = {
+    {"", "task automatic t(@D int v); endtask", "t(count)"},
+    {"", "function automatic void f(@D int v); endfunction", "f(count)"},
+    {"", "class C; task t(@D int v); endtask endclass\n  C h = new;",
+     "h.t(count)"},
+    {"",
+     "class C; function void f(@D int v); endfunction endclass\n"
+     "  C h = new;",
+     "h.f(count)"},
+    {"", "class C; static task t(@D int v); endtask endclass", "C::t(count)"},
+    {"package Q; task automatic t(@D int v); endtask endpackage\n", "",
+     "Q::t(count)"},
+    {"package Q; task automatic t(@D int v); endtask endpackage\n",
+     "import Q::t;", "t(count)"},
+    {"package Q; task automatic t(@D int v); endtask endpackage\n",
+     "import Q::*;", "t(count)"},
+    {"task automatic ut(@D int v); endtask\n", "", "ut(count)"},
+    {"", "function automatic int nf(@D int v); return 0; endfunction",
+     "nf(count)"},
+};
+
+std::string WithDirection(std::string text, const std::string& direction) {
+  for (size_t at = text.find("@D"); at != std::string::npos;
+       at = text.find("@D")) {
+    text.replace(at, 2, direction);
+  }
+  return text;
+}
+
+std::string CalleeModule(const CalleeKind& kind, const std::string& direction) {
+  return WithDirection(kind.outside, direction) +
+         "module m;\n"
+         "  bit clk, a;\n"
+         "  int count;\n"
+         "  " +
+         WithDirection(kind.items, direction) +
+         "\n"
+         "  sequence s; @(posedge clk) (a, " +
+         kind.call +
+         ") ##1 a; endsequence\n"
+         "endmodule\n";
+}
+
+TEST(AttachedArgumentPassing, AnOutputOrInoutFormalOfEachCalleeKindIsReported) {
+  for (const CalleeKind& kind : kCalleeKinds) {
+    for (const char* direction : {"output", "inout"}) {
+      ExpectPassingReported(CalleeModule(kind, direction), kind.call);
+    }
+  }
+}
+
+TEST(AttachedArgumentPassing,
+     AnInputOrReferenceFormalOfEachCalleeKindIsAccepted) {
+  for (const CalleeKind& kind : kCalleeKinds) {
+    for (const char* direction : {"input", "ref", "const ref"}) {
+      std::string src = CalleeModule(kind, direction);
+      SCOPED_TRACE(src);
+      ElabFixture f;
+      ElaborateSrc(src, f);
+      EXPECT_FALSE(f.diag.HasErrors());
+    }
+  }
+}
+
+std::string BindingModule(const std::string& call) {
+  return "module m;\n"
+         "  bit clk, a;\n"
+         "  int count;\n"
+         "  task automatic t3(input int x, input int z = 0, output int y);"
+         " y = x; endtask\n"
+         "  task automatic t2(input int x, output int y); y = x; endtask\n"
+         "  task automatic tr(input int x, ref int r); endtask\n"
+         "  sequence s; @(posedge clk) (a, " +
+         call +
+         ") ##1 a; endsequence\n"
+         "endmodule\n";
+}
+
+void ExpectReportedAtCount(const std::string& call) {
+  std::string src = BindingModule(call);
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, call);
+  ASSERT_NE(line, 0u);
+  size_t start = src.find(call);
+  size_t line_start = src.rfind('\n', start) + 1;
+  size_t count_at = src.find("count", start);
+  size_t one_at = src.find('1', start);
+  EXPECT_TRUE(
+      PassingReportedAt(f.diag.Diagnostics(), line,
+                        static_cast<uint32_t>(count_at - line_start + 1)));
+  EXPECT_FALSE(
+      PassingReportedAt(f.diag.Diagnostics(), line,
+                        static_cast<uint32_t>(one_at - line_start + 1)));
+}
+
+TEST(AttachedArgumentPassing, APositionalOutputActualIsReportedAtTheActual) {
+  ExpectReportedAtCount("t3(1, , count)");
+  ExpectReportedAtCount("t2(1, count)");
+}
+
+TEST(AttachedArgumentPassing,
+     DISABLED_ANamedOutputActualIsReportedAtTheActual) {
+  ExpectReportedAtCount("t3(.y(count), .x(1))");
+  ExpectReportedAtCount("t2(.y(count), .x(1))");
+  ExpectReportedAtCount("t2(.x(1), .y(count))");
+}
+
+TEST(AttachedArgumentPassing, NamedInputAndReferenceActualsAreAccepted) {
+  for (const char* call :
+       {"tr(.x(count), .r(count))", "tr(.r(count), .x(1))"}) {
+    std::string src = BindingModule(call);
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+std::vector<const char*> CheckedPlaces() {
+  return {"interface", "program", "checker", "property", "assertion", "always"};
+}
+
+std::vector<const char*> OuterPlaces() {
+  return {"package sequence",   "package property",  "unit sequence",
+          "unit property",      "generate sequence", "generate property",
+          "generate assertion", "generate always",   "clocking sequence",
+          "clocking property"};
+}
+
+struct PlaceParts {
+  std::string tasks =
+      "task automatic tout(output int v); v = 1; endtask\n"
+      "task automatic tio(inout int v); v++; endtask\n"
+      "task automatic tin(input int v); endtask\n";
+  std::string vars = "  bit clk, a;\n  int count;\n";
+  std::string group;
+  std::string seq;
+  std::string prop;
+};
+
+PlaceParts PartsFor(const std::string& call) {
+  PlaceParts parts;
+  parts.group = "(a, " + call + ") ##1 a";
+  parts.seq = "  sequence s; @(posedge clk) " + parts.group + "; endsequence\n";
+  parts.prop =
+      "  property p; @(posedge clk) " + parts.group + "; endproperty\n";
+  return parts;
+}
+
+std::string ElementPlace(const std::string& place, const PlaceParts& x) {
+  if (place == "interface" || place == "program") {
+    return x.tasks + place + " el;\n" + x.vars + x.seq + "end" + place +
+           "\nmodule m; el u(); endmodule\n";
+  }
+  if (place == "checker") {
+    return x.tasks + "checker el(bit clk, bit a);\n  int count;\n" + x.seq +
+           "endchecker\nmodule m;\n  bit clk, a;\n  el u(clk, a);\n"
+           "endmodule\n";
+  }
+  std::string item = x.prop;
+  if (place == "assertion") {
+    item = "  assert property (@(posedge clk) " + x.group + ");\n";
+  } else if (place == "always") {
+    item = "  always @(posedge clk) assert property (" + x.group + ");\n";
+  }
+  return x.tasks + "module m;\n" + x.vars + item + "endmodule\n";
+}
+
+std::string GenerateItem(const std::string& place, const PlaceParts& x) {
+  if (place == "generate sequence") return x.seq;
+  if (place == "generate property") return x.prop;
+  if (place == "generate assertion") {
+    return "    assert property (@(posedge clk) " + x.group + ");\n";
+  }
+  return "    always @(posedge clk) assert property (" + x.group + ");\n";
+}
+
+std::string OuterPlace(const std::string& place, const PlaceParts& x) {
+  bool sequence = place.find("sequence") != std::string::npos;
+  if (place.rfind("package", 0) == 0) {
+    return "package pk;\n" + x.tasks + x.vars + (sequence ? x.seq : x.prop) +
+           "endpackage\nmodule m; endmodule\n";
+  }
+  if (place.rfind("unit", 0) == 0) {
+    return x.tasks + x.vars + (sequence ? x.seq : x.prop) +
+           "module m; endmodule\n";
+  }
+  if (place.rfind("generate", 0) == 0) {
+    return x.tasks + "module m;\n" + x.vars + "  if (1) begin : g\n" +
+           GenerateItem(place, x) + "  end\nendmodule\n";
+  }
+  const std::string kBody =
+      sequence ? "    sequence s; " + x.group + "; endsequence\n"
+               : "    property p; " + x.group + "; endproperty\n";
+  return x.tasks + "module m;\n" + x.vars + "  clocking cb @(posedge clk);\n" +
+         kBody + "  endclocking\nendmodule\n";
+}
+
+std::string PassingPlace(const std::string& place, const std::string& call) {
+  PlaceParts parts = PartsFor(call);
+  for (const char* element : CheckedPlaces()) {
+    if (place == element) return ElementPlace(place, parts);
+  }
+  return OuterPlace(place, parts);
+}
+
+void ExpectPlacesReportedAndAccepted(const std::vector<const char*>& places) {
+  for (const char* place : places) {
+    SCOPED_TRACE(place);
+    ExpectPassingReported(PassingPlace(place, "tout(count)"), "tout(count)");
+    ExpectPassingReported(PassingPlace(place, "tio(count)"), "tio(count)");
+  }
+}
+
+void ExpectPlacesAccepted(const std::vector<const char*>& places) {
+  for (const char* place : places) {
+    std::string src = PassingPlace(place, "tin(count)");
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+TEST(AttachedArgumentPassing, AnOutputActualInEachDesignElementIsReported) {
+  ExpectPlacesReportedAndAccepted(CheckedPlaces());
+}
+
+TEST(AttachedArgumentPassing,
+     DISABLED_AnOutputActualInEachOuterScopeIsReported) {
+  ExpectPlacesReportedAndAccepted(OuterPlaces());
+}
+
+TEST(AttachedArgumentPassing, AnInputActualInEveryPlaceIsAccepted) {
+  ExpectPlacesAccepted(CheckedPlaces());
+  ExpectPlacesAccepted(OuterPlaces());
 }
 
 }  // namespace
