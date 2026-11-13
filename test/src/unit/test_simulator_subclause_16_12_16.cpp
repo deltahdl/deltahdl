@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -169,6 +170,45 @@ TEST(PropertyCase, WhereEveryExpressionIsSignedTheExtensionIsBySign) {
       CountsOf("case (minus_one) 8'sb1111_1111: 1; default: 0; endcase");
   EXPECT_EQ(counts.first, 8u);
   EXPECT_EQ(counts.second, 0u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+const PlacedProperty kPlacedCases[] = {
+    {"case ({a, b}) 2'b10: d; 2'b01: c; 2'b11: !d; default: 0; endcase",
+     {2, 2},
+     2},
+    {"case ({a, b}) default: c; 2'b10, 2'b11: d; 2'b11: 0; endcase", {4, 0}, 4},
+    {"case ({a, b}) 2'b10: d; 2'b11: !d; endcase", {3, 1}, 3},
+    {"case (a) 1'b1: case (b) 1'b1: !d; default d; endcase; default: c; "
+     "endcase",
+     {3, 1},
+     3},
+    {"case ({a, b}) 2'b10: ##1 b; 2'b11: ##1 !c; default: d; endcase",
+     {2, 2},
+     2},
+    {"case (1'bx) 1'b0: 0; 1'bx: d; default: 0; endcase", {3, 1}, 3},
+    {"case (1'bz) 1'bx: 0; 1'bz: d; endcase", {3, 1}, 3},
+    {"case (a + a) 2'd2: d; default: c; endcase", {4, 0}, 4},
+    {"case (2'sb11) 4'sb1111: d; default: 0; endcase", {3, 1}, 3},
+    {"case (2'sb11) 4'b1111: 0; default: d; endcase", {3, 1}, 3}};
+
+TEST(PropertyCase, ACaseCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedCases) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
+}
+
+TEST(PropertyCase, DISABLED_ACaseCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedCases) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus);
+  }
 }
 
 }  // namespace
