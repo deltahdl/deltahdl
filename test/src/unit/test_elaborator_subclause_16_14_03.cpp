@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "fixture_elaborator.h"
+#include "helpers_nested_assertions.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -178,6 +180,66 @@ TEST(CoverPassStatement, RejectsConcurrentAssertInRandsequenceCodeBlock) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "concurrent assert, assume, or cover statement", 3,
                             "16.14.3"));
+}
+
+constexpr const char* kCoverNestingReport =
+    "the pass statement of a cover statement may not include a concurrent "
+    "assert, assume, or cover statement";
+
+std::vector<std::string> CoverOuters() {
+  return {"x1: cover property (@(posedge clk) a) ",
+          "x1: cover sequence (@(posedge clk) a) "};
+}
+
+void ExpectCoverNestingReportedIn(const auto& places,
+                                  const std::vector<std::string>& forms,
+                                  bool procedural) {
+  ExpectNestingReportedIn(places, forms, procedural, kCoverNestingReport,
+                          "16.14.3");
+}
+
+constexpr const char* kCoverModuleOnly[] = {"module"};
+
+TEST(CoverPassStatement,
+     EachConcurrentStatementInAModuleLevelPassStatementIsReportedInEachPlace) {
+  ExpectCoverNestingReportedIn(
+      kNestingPlaces, NestingForms(CoverOuters(), kNestedConcurrent), false);
+}
+
+TEST(CoverPassStatement, AModuleLevelNestingAtAnyDepthIsReported) {
+  ExpectCoverNestingReportedIn(kCoverModuleOnly,
+                               NestingDepthForms(CoverOuters()), false);
+}
+
+TEST(CoverPassStatement,
+     DISABLED_EachConcurrentStatementInAProceduralPassStatementIsReported) {
+  ExpectCoverNestingReportedIn(
+      kCoverModuleOnly, NestingForms(CoverOuters(), kNestedConcurrent), true);
+}
+
+TEST(CoverPassStatement,
+     DISABLED_AProceduralNestingAtAnyDepthInEachProcedureIsReported) {
+  ExpectNestingReportedInEachProcedure(NestingDepthForms(CoverOuters()),
+                                       kCoverNestingReport, "16.14.3");
+}
+
+TEST(CoverPassStatement,
+     DISABLED_AProceduralNestingIsReportedInEachOtherPlace) {
+  std::vector<std::string> forms =
+      NestingForms(CoverOuters(), kNestedConcurrent);
+  ExpectCoverNestingReportedIn(kNestingDesignUnits, forms, true);
+  ExpectCoverNestingReportedIn(kNestingGenerateBlocks, forms, true);
+}
+
+TEST(CoverPassStatement,
+     AnOrdinaryOrImmediatePassStatementIsAcceptedInEachPlace) {
+  std::vector<std::string> forms =
+      NestingForms(CoverOuters(), kNestedImmediate);
+  for (const std::string& outer : CoverOuters()) {
+    forms.push_back(outer + "$display(\"hit\");");
+    forms.push_back(outer + "begin if (b) $display(\"hit\"); end");
+  }
+  ExpectNestingAcceptedEverywhere(forms);
 }
 
 }  // namespace

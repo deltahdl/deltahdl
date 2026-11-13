@@ -1,11 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <string>
-#include <vector>
 
-#include "fixture_simulator.h"
+#include "helpers_placed_assertion_runs.h"
 
 using namespace delta;
 
@@ -19,134 +17,18 @@ constexpr const char* kActionSignals =
     "  int marker = -1;\n"
     "  always @(posedge clk) marker = $time;\n";
 
-constexpr const char* kActionPorts = "(input logic clk, a, d, e)";
-
-constexpr const char* kActionPlaces[] = {"module",   "always",    "initial",
-                                         "generate", "interface", "program",
-                                         "checker"};
-
-std::string Indented(const std::string& lines, const std::string& prefix,
-                     const std::string& suffix) {
-  std::string out;
-  size_t at = 0;
-  while (at < lines.size()) {
-    size_t end = lines.find('\n', at);
-    out.append("  ").append(prefix).append(lines, at, end - at);
-    out.append(suffix).append("\n");
-    at = end + 1;
-  }
-  return out;
-}
-
-std::string ActionTop(const std::string& items, const std::string& controls) {
-  std::string out = "module t;\n" + std::string(kActionSignals) + items;
-  if (!controls.empty()) out += "  initial begin " + controls + " end\n";
-  return out + "endmodule\n";
-}
+constexpr PlacedDesign kActionDesign = {
+    kActionSignals, "(input logic clk, a, d, e)", "clk, a, d, e"};
 
 std::string ActionSource(const std::string& place, const std::string& items,
                          const std::string& declarations = "",
                          const std::string& controls = "") {
-  std::string decl = Indented(declarations, "", "");
-  if (place == "module")
-    return ActionTop(decl + Indented(items, "", ""), controls);
-  if (place == "always") {
-    return ActionTop(decl + Indented(items, "always @(posedge clk) ", ""),
-                     controls);
-  }
-  if (place == "initial") {
-    return ActionTop(decl + Indented(items, "initial begin #12; ", " end"),
-                     controls);
-  }
-  if (place == "generate") {
-    return ActionTop(
-        "  if (1) begin : g\n" + decl + Indented(items, "", "") + "  end\n",
-        controls);
-  }
-  std::string header = place == "checker" ? "checker w(clk, a, d, e);\n"
-                                          : place + " w" + kActionPorts + ";\n";
-  return header + decl + Indented(items, "", "") + "end" + place + "\n" +
-         ActionTop("  w u(clk, a, d, e);\n", controls);
+  return PlacedSource(kActionDesign, place, items, declarations, controls);
 }
-
-std::string ScopeOf(const std::string& place) {
-  if (place == "generate") return "t.g";
-  if (place == "interface" || place == "program" || place == "checker") {
-    return "t.u";
-  }
-  return "t";
-}
-
-std::vector<std::string> LinesOf(const std::string& text) {
-  std::vector<std::string> lines;
-  size_t at = 0;
-  while (at < text.size()) {
-    size_t end = text.find('\n', at);
-    if (end == std::string::npos) end = text.size();
-    if (end > at) lines.push_back(text.substr(at, end - at));
-    at = end + 1;
-  }
-  return lines;
-}
-
-std::string WithoutLocation(const std::string& line) {
-  if (line.empty() || line[0] != '[') return line;
-  size_t open = line.find(" (");
-  size_t close = line.find(')', open);
-  if (open == std::string::npos || close == std::string::npos) return line;
-  return line.substr(0, open) + line.substr(close + 1);
-}
-
-std::string Sorted(std::vector<std::string> lines) {
-  std::sort(lines.begin(), lines.end());
-  std::string out;
-  for (const std::string& line : lines) out += line + "\n";
-  return out;
-}
-
-struct ActionRun {
-  std::string lines;
-  std::string out;
-};
-
-ActionRun RunActions(const std::string& src) {
-  SimFixture f;
-  testing::internal::CaptureStderr();
-  std::string out = RunCapture(src, f);
-  std::string err = testing::internal::GetCapturedStderr();
-  std::vector<std::string> kept;
-  for (const std::string& line : LinesOf(out + err)) {
-    if (line.starts_with("$finish")) continue;
-    kept.push_back(WithoutLocation(line));
-  }
-  return {Sorted(kept), out};
-}
-
-std::string Expected(const std::string& text, const std::string& scope) {
-  std::string out = text;
-  for (size_t at = out.find('%'); at != std::string::npos;
-       at = out.find('%', at + scope.size())) {
-    out.replace(at, 1, scope);
-  }
-  return Sorted(LinesOf(out));
-}
-
-struct PlacedRow {
-  const char* items;
-  const char* everywhere;
-  const char* in_initial;
-};
 
 void ExpectLinesInEachPlace(const PlacedRow& row,
                             const std::string& declarations = "") {
-  for (const char* place : kActionPlaces) {
-    SCOPED_TRACE(std::string(place) + ": " + row.items);
-    const char* want = std::string(place) == "initial" && row.in_initial
-                           ? row.in_initial
-                           : row.everywhere;
-    EXPECT_EQ(RunActions(ActionSource(place, row.items, declarations)).lines,
-              Expected(want, ScopeOf(place)));
-  }
+  ExpectPlacedLinesInEachPlace(kActionDesign, row, declarations);
 }
 
 TEST(AssertDefaultReport,
@@ -221,31 +103,31 @@ constexpr ControlRow kControls[] = {
 TEST(AssertDefaultReport, EachControlThatSuppressesTheFailureSilencesIt) {
   for (const ControlRow& row : kControls) {
     SCOPED_TRACE(row.controls);
-    EXPECT_EQ(RunActions(
-                  ActionSource("module", kTwoDefaultFailures, "", row.controls))
-                  .lines,
-              Expected(row.reports, "t"));
+    EXPECT_EQ(
+        RunPlaced(ActionSource("module", kTwoDefaultFailures, "", row.controls))
+            .lines,
+        PlacedExpected(row.reports, "t"));
   }
 }
 
 TEST(AssertDefaultReport, FailOffSilencesTheDefaultReportInEachPlace) {
-  for (const char* place : kActionPlaces) {
+  for (const char* place : kAssertionPlaces) {
     SCOPED_TRACE(place);
-    EXPECT_EQ(RunActions(ActionSource(place, kTwoDefaultFailures, "",
-                                      "$assertfailoff;"))
+    EXPECT_EQ(RunPlaced(ActionSource(place, kTwoDefaultFailures, "",
+                                     "$assertfailoff;"))
                   .lines,
               "");
   }
 }
 
 TEST(AssertDefaultReport, AScopedFailOffSilencesOnlyThatScope) {
-  EXPECT_EQ(RunActions(ActionSource("module",
-                                    "a1: assert property (@(posedge clk) a);\n"
-                                    "if (1) begin : g ga: assert property "
-                                    "(@(posedge clk) a); end\n",
-                                    "", "$assertfailoff(0, t.g);"))
+  EXPECT_EQ(RunPlaced(ActionSource("module",
+                                   "a1: assert property (@(posedge clk) a);\n"
+                                   "if (1) begin : g ga: assert property "
+                                   "(@(posedge clk) a); end\n",
+                                   "", "$assertfailoff(0, t.g);"))
                 .lines,
-            Expected("[15] ERROR t.a1: Assertion failed.\n", "t"));
+            PlacedExpected("[15] ERROR t.a1: Assertion failed.\n", "t"));
 }
 
 TEST(AssertSeverityTask, EachSeverityTaskInAFailStatementReportsItsSeverity) {
@@ -290,27 +172,29 @@ TEST(AssertSeverityTask, EachSeverityTaskInAPassStatementReportsItsSeverity) {
 }
 
 TEST(AssertSeverityTask, EachOfSeveralTasksInOneActionBlockReportsInOrder) {
-  for (const char* place : kActionPlaces) {
+  for (const char* place : kAssertionPlaces) {
     SCOPED_TRACE(place);
-    ActionRun run = RunActions(
+    PlacedRun run = RunPlaced(
         ActionSource(place,
                      "m2: assert property (@(posedge clk) a) "
                      "else begin $warning(\"m-w\"); $info(\"m-i\"); end\n"));
-    std::string scope = ScopeOf(place);
-    EXPECT_EQ(run.lines,
-              Expected("[15] WARNING %.m2: m-w\n[15] INFO %.m2: m-i\n", scope));
+    std::string scope = PlacedScope(place);
+    EXPECT_EQ(
+        run.lines,
+        PlacedExpected("[15] WARNING %.m2: m-w\n[15] INFO %.m2: m-i\n", scope));
     EXPECT_LT(run.out.find("m-w"), run.out.find("m-i"));
   }
 }
 
 TEST(AssertSeverityTask, AFatalInAFailStatementEndsTheRunInEachPlace) {
-  for (const char* place : kActionPlaces) {
+  for (const char* place : kAssertionPlaces) {
     for (const char* directive : {"assert", "assume"}) {
       SCOPED_TRACE(std::string(place) + " " + directive);
-      ActionRun run = RunActions(ActionSource(
+      PlacedRun run = RunPlaced(ActionSource(
           place, "f1: " + std::string(directive) +
                      " property (@(posedge clk) a) else $fatal(1, \"f1\");\n"));
-      EXPECT_EQ(run.lines, Expected("[15] FATAL %.f1: f1\n", ScopeOf(place)));
+      EXPECT_EQ(run.lines,
+                PlacedExpected("[15] FATAL %.f1: f1\n", PlacedScope(place)));
       EXPECT_NE(run.out.find("$finish at time 15\n"), std::string::npos);
     }
   }
@@ -341,8 +225,8 @@ constexpr FatalRow kFatalForms[] = {
 TEST(AssertSeverityTask, EachFatalFormEndsTheRunAsItsFinishNumberSays) {
   for (const FatalRow& row : kFatalForms) {
     SCOPED_TRACE(row.items);
-    ActionRun run = RunActions(ActionSource("module", row.items));
-    EXPECT_EQ(run.lines, Expected(row.report, "t"));
+    PlacedRun run = RunPlaced(ActionSource("module", row.items));
+    EXPECT_EQ(run.lines, PlacedExpected(row.report, "t"));
     std::string ending = row.ending;
     size_t from = run.out.find("$finish");
     EXPECT_EQ(from == std::string::npos ? "" : run.out.substr(from), ending);
@@ -363,8 +247,9 @@ constexpr const char* kDelayedTask =
 
 void ExpectDelayedTaskIn(const char* place) {
   SCOPED_TRACE(place);
-  EXPECT_EQ(RunActions(ActionSource(place, kDelayedTask, "time ft;\n")).lines,
-            Expected("[18] ERROR %.dl: failed at 15\n", ScopeOf(place)));
+  EXPECT_EQ(
+      RunPlaced(ActionSource(place, kDelayedTask, "time ft;\n")).lines,
+      PlacedExpected("[18] ERROR %.dl: failed at 15\n", PlacedScope(place)));
 }
 
 TEST(AssertSeverityTask, ATaskAfterADelayInAProcedureReportsWhenItRuns) {
