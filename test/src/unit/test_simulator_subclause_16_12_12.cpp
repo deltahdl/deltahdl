@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -165,6 +166,49 @@ TEST(UntilProperty, TheFirstOperandFailingBeforeTheSecondHoldsFails) {
   ASSERT_NE(needs_b, nullptr);
   EXPECT_EQ(needs_b->value.ToUint64(), 0u);
   EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 4u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"d until c", {4, 0}, 4},
+    {"d s_until c", {4, 0}, 4},
+    {"d until_with c", {2, 2}, 2},
+    {"d s_until_with c", {2, 2}, 2},
+    {"c until a", {4, 0}, 4},
+    {"c s_until a", {3, 1}, 3},
+    {"c until_with a", {1, 3}, 1},
+    {"c s_until_with a", {0, 4}, 0},
+    {"b until d", {3, 1}, 3},
+    {"b until_with d", {2, 2}, 2},
+    {"(a |-> b) until c", {3, 1}, 3},
+    {"c until (a |-> b)", {3, 1}, 3},
+    {"a |-> (d s_until_with c)", {3, 1}, 3},
+    {"q(a, c) s_until_with b", {1, 3}, 1},
+    {"strong(d[*1:$] ##0 c)", {2, 2}, 2},
+    {"strong(c[*1:$] ##0 a)", {0, 4}, 0}};
+
+TEST(UntilProperty, AnUntilCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(UntilProperty, DISABLED_AnUntilCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
 }
 
 }  // namespace
