@@ -762,6 +762,7 @@ struct PlaceParts {
       "task automatic tio(inout int v); v++; endtask\n"
       "task automatic tin(input int v); endtask\n";
   std::string vars = "  bit clk, a;\n  int count;\n";
+  std::string checker_vars = "  int count;\n";
   std::string group;
   std::string seq;
   std::string prop;
@@ -782,7 +783,7 @@ std::string ElementPlace(const std::string& place, const PlaceParts& x) {
            "\nmodule m; el u(); endmodule\n";
   }
   if (place == "checker") {
-    return x.tasks + "checker el(bit clk, bit a);\n  int count;\n" + x.seq +
+    return x.tasks + "checker el(bit clk, bit a);\n" + x.checker_vars + x.seq +
            "endchecker\nmodule m;\n  bit clk, a;\n  el u(clk, a);\n"
            "endmodule\n";
   }
@@ -863,6 +864,112 @@ TEST(AttachedArgumentPassing,
 TEST(AttachedArgumentPassing, AnInputActualInEveryPlaceIsAccepted) {
   ExpectPlacesAccepted(CheckedPlaces());
   ExpectPlacesAccepted(OuterPlaces());
+}
+
+constexpr const char* kChandleReport =
+    "a variable passed by value shall be of a type an assertion may use";
+
+PlaceParts ChandleParts(const std::string& call) {
+  PlaceParts parts = PartsFor(call);
+  parts.tasks =
+      "function automatic void fc(input chandle c); endfunction\n"
+      "function automatic void fi(input int c); endfunction\n";
+  parts.vars = "  bit clk, a;\n  int count;\n  chandle h;\n";
+  parts.checker_vars = "  int count;\n  chandle h;\n";
+  return parts;
+}
+
+std::string ChandlePlace(const std::string& place, const std::string& call) {
+  PlaceParts parts = ChandleParts(call);
+  for (const char* element : CheckedPlaces()) {
+    if (place == element) return ElementPlace(place, parts);
+  }
+  return OuterPlace(place, parts);
+}
+
+std::string ChandleModule(const std::string& call) {
+  return "module m;\n"
+         "  bit clk, a;\n"
+         "  int count;\n"
+         "  chandle h;\n"
+         "  chandle ha[2];\n"
+         "  function automatic void fc(input chandle c); endfunction\n"
+         "  function automatic void fn(chandle c); endfunction\n"
+         "  function automatic void fi(input int c); endfunction\n"
+         "  task automatic tc(input chandle c); endtask\n"
+         "  task automatic ti(input int c); endtask\n"
+         "  function automatic void fr(ref chandle c); endfunction\n"
+         "  function automatic void fcr(const ref chandle c); endfunction\n"
+         "  class C;\n"
+         "    function void mf(input chandle c); endfunction\n"
+         "    task mt(input chandle c); endtask\n"
+         "    function void mfi(input int c); endfunction\n"
+         "    task mti(input int c); endtask\n"
+         "  endclass\n"
+         "  C o = new;\n"
+         "  sequence s; @(posedge clk) (a, " +
+         call +
+         ") ##1 a; endsequence\n"
+         "endmodule\n";
+}
+
+void ExpectChandleReported(const std::string& src, const std::string& call) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, call);
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kChandleReport, line, "16.11"));
+}
+
+void ExpectChandleAccepted(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(AttachedByValueType, AChandleToAnInputOfEachSubroutineKindIsReported) {
+  for (const char* call :
+       {"fc(h)", "fn(h)", "tc(h)", "o.mf(h)", "o.mt(h)", "fc(ha[0])"}) {
+    ExpectChandleReported(ChandleModule(call), call);
+  }
+}
+
+TEST(AttachedByValueType, AnIntInputOrAChandleReferenceIsAccepted) {
+  for (const char* call :
+       {"fi(count)", "ti(count)", "o.mfi(count)", "o.mti(count)", "fr(h)",
+        "fcr(h)", "$display(\"%d\", count)"}) {
+    ExpectChandleAccepted(ChandleModule(call));
+  }
+}
+
+TEST(AttachedByValueType, DISABLED_AChandleSystemTaskArgumentIsReported) {
+  ExpectChandleReported(ChandleModule("$display(\"%p\", h)"),
+                        "$display(\"%p\", h)");
+}
+
+TEST(AttachedByValueType, AChandleInEachDesignElementIsReported) {
+  for (const char* place : CheckedPlaces()) {
+    SCOPED_TRACE(place);
+    ExpectChandleReported(ChandlePlace(place, "fc(h)"), "fc(h)");
+  }
+}
+
+TEST(AttachedByValueType, DISABLED_AChandleInEachOuterScopeIsReported) {
+  for (const char* place : OuterPlaces()) {
+    SCOPED_TRACE(place);
+    ExpectChandleReported(ChandlePlace(place, "fc(h)"), "fc(h)");
+  }
+}
+
+TEST(AttachedByValueType, AnIntInEveryPlaceIsAccepted) {
+  for (const auto& places : {CheckedPlaces(), OuterPlaces()}) {
+    for (const char* place : places) {
+      ExpectChandleAccepted(ChandlePlace(place, "fi(count)"));
+    }
+  }
 }
 
 }  // namespace
