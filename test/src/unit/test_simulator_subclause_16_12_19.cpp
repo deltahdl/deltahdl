@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -103,6 +104,43 @@ TEST(LocalPropertyFormals, ALocalFormalTakesItsDeclaredType) {
   EXPECT_EQ(write.passes, 7u);
   EXPECT_EQ(write.fails, 1u);
   EXPECT_EQ(write.fail_time, 55u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedLocalFormals =
+    "  property pl(local input bit v); ##1 (b == v); endproperty\n"
+    "  property pi(local bit v); ##1 (b == v); endproperty\n"
+    "  property pn(bit v); ##1 (b == v); endproperty\n"
+    "  property pw(local input bit v); (1, v = !v) ##1 (b == v); "
+    "endproperty\n"
+    "  property ph(local input bit v, w); ##1 (c == w); endproperty\n"
+    "  property pd(local input bit v = 1); ##1 (b == v); endproperty\n";
+
+const PlacedProperty kLocalFormalsInPlace[] = {
+    {"pl(a)", {2, 2}, 1}, {"pi(a)", {2, 2}, 1},    {"pn(a)", {3, 1}, 2},
+    {"pw(a)", {3, 1}, 2}, {"ph(a, d)", {3, 1}, 2}, {"pl(.v(a))", {2, 2}, 1},
+    {"pd(a)", {2, 2}, 1}};
+
+TEST(LocalPropertyFormals, AnInputLocalFormalCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kLocalFormalsInPlace) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedLocalFormals);
+    }
+  }
+}
+
+TEST(LocalPropertyFormals,
+     DISABLED_AnInputLocalFormalCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kLocalFormalsInPlace) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedLocalFormals);
+  }
 }
 
 }  // namespace
