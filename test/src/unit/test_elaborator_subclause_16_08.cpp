@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -292,6 +295,126 @@ TEST(SequenceFlattening, DISABLED_AnInstanceWhoseFlattenedSequenceIsIllegal) {
       f.diag.Diagnostics(),
       "the flattened sequence of this instance of \"s_f\" is not legal", 4,
       "16.8"));
+}
+
+struct JudgedName {
+  std::string form;
+  std::string outside;
+  std::string items;
+  std::string prefix;
+};
+
+const char kJudgedTakers[] =
+    "sequence so(x, m); x ##1 (x == m); endsequence\n"
+    "  sequence sr(x, m); x ##[1:m] x; endsequence\n"
+    "  sequence sd(x, d); x ##d x; endsequence";
+
+std::vector<JudgedName> JudgedNames() {
+  const std::string kTakers = kJudgedTakers;
+  return {
+      {"simple name", "", kTakers, ""},
+      {"package scope", "package pk;\n  " + kTakers + "\nendpackage\n", "",
+       "pk::"},
+      {"design element's name", "", kTakers, "top."},
+      {"interface instance",
+       "interface ifc;\n  " + kTakers + "\nendinterface\n", "ifc u();", "u."},
+      {"clocking block", "",
+       "clocking cb @(posedge clk);\n    " + kTakers + "\n  endclocking",
+       "cb."},
+      {"generate block", "", "if (1) begin : g\n    " + kTakers + "\n  end",
+       "g."}};
+}
+
+std::string JudgedSource(const std::string& outside, const std::string& items,
+                         const std::string& prefix) {
+  return outside +
+         "module top;\n"
+         "  logic clk, a;\n"
+         "  int v;\n"
+         "  parameter K = $;\n"
+         "  " +
+         items + "\n  a1: assert property (@(posedge clk) " + prefix +
+         "so(a, $));\n  a2: assert property (@(posedge clk) " + prefix +
+         "sr(a, $));\n  a3: assert property (@(posedge clk) " + prefix +
+         "sr(a, K));\n  a4: assert property (@(posedge clk) " + prefix +
+         "sd(a, v));\n  a5: assert property (@(posedge clk) " + prefix +
+         "sd(a, 2));\n"
+         "endmodule\n";
+}
+
+void ExpectJudgedByItsDeclaration(const std::string& src) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "shall be untyped and referenced only as the upper "
+                            "bound of a cycle delay range",
+                            LineHolding(src, "a1:"), "16.8"));
+  EXPECT_FALSE(ErrorOnLine(diags, LineHolding(src, "a2:")));
+  EXPECT_FALSE(ErrorOnLine(diags, LineHolding(src, "a3:")));
+  EXPECT_TRUE(ReportedError(diags, "is not an elaboration-time constant",
+                            LineHolding(src, "a4:"), "16.8"));
+  EXPECT_FALSE(ErrorOnLine(diags, LineHolding(src, "a5:")));
+}
+
+TEST(SequenceInstanceName, ASimpleNameIsJudgedByItsDeclaration) {
+  ExpectJudgedByItsDeclaration(JudgedSource("", kJudgedTakers, ""));
+}
+
+TEST(SequenceInstanceName, DISABLED_EveryNameIsJudgedByItsDeclaration) {
+  for (const auto& named : JudgedNames()) {
+    SCOPED_TRACE(named.form);
+    ExpectJudgedByItsDeclaration(
+        JudgedSource(named.outside, named.items, named.prefix));
+  }
+}
+
+TEST(SequenceInstanceName, DISABLED_TheUnitScopeIsJudgedByItsDeclaration) {
+  ExpectJudgedByItsDeclaration(
+      JudgedSource(std::string(kJudgedTakers) + "\n", "", "$unit::"));
+}
+
+const char kHiddenTaker[] =
+    "package pk;\n"
+    "  sequence s(x); x; endsequence\n"
+    "endpackage\n"
+    "module top;\n"
+    "  logic clk, a;\n"
+    "  @@\n"
+    "  cover property (@(posedge clk) s(a));\n"
+    "endmodule\n";
+
+std::string HiddenTakerWith(const std::string& import) {
+  std::string src = kHiddenTaker;
+  return src.replace(src.find("@@"), 2, import);
+}
+
+TEST(SequenceInstanceName, DISABLED_AnUnimportedPackageSequenceIsUnresolved) {
+  ElabFixture f;
+  const std::string kSrc = HiddenTakerWith("");
+  ElaborateSrc(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unresolved identifier 's'",
+                            7, "23.9"));
+}
+
+TEST(SequenceInstanceName, DISABLED_AnUndeclaredNameWithActualsIsUnresolved) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  logic clk, a;\n"
+      "  cover property (@(posedge clk) nosuch(a));\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unresolved identifier 'nosuch'", 3, "23.9"));
+}
+
+TEST(SequenceInstanceName, AnImportedPackageSequenceResolves) {
+  for (const char* import : {"import pk::*;", "import pk::s;"}) {
+    ElabFixture f;
+    ElaborateSrc(HiddenTakerWith(import), f);
+    EXPECT_FALSE(f.has_errors) << import;
+  }
 }
 
 }  // namespace
