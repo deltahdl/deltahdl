@@ -9,6 +9,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_properties.h"
@@ -158,6 +159,60 @@ TEST(ImplicationProperty, ConsequentIsAnyProperty) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 4u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 0u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {{"a |-> c", {2, 2}, 2},
+                                            {"a |=> c", {4, 0}, 4},
+                                            {"a ##1 1 |-> c", {4, 0}, 4},
+                                            {"a ##1 b |-> c", {4, 0}, 4},
+                                            {"a ##1 b |=> c", {3, 1}, 3},
+                                            {"a ##1 b ##1 1 |-> c", {3, 1}, 3},
+                                            {"d ##[0:1] b |-> c", {2, 2}, 2},
+                                            {"b[*0:1] ##1 1 |-> c", {1, 3}, 1},
+                                            {"b[*0] ##1 1 |-> c", {2, 2}, 2},
+                                            {"a |-> b ##1 c", {3, 1}, 3},
+                                            {"a |-> not (b ##1 c)", {3, 1}, 3},
+                                            {"a |=> b |=> c", {3, 1}, 3},
+                                            {"d |-> q(b, c)", {3, 1}, 3},
+                                            {"d ##0 b[*2] |-> c", {3, 1}, 3},
+                                            {"d |-> b[*2] |-> c", {3, 1}, 3}};
+
+TEST(ImplicationProperty, AnImplicationCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+const PlacedProperty kEmptyMatchProperties[] = {{"b[*0:1] |=> c", {1, 3}, 1},
+                                                {"b[*0] |=> c", {2, 2}, 2}};
+
+TEST(ImplicationProperty,
+     DISABLED_AnEmptyMatchStartsANonoverlappedConsequentAtItsTickInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kEmptyMatchProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
+}
+
+TEST(ImplicationProperty,
+     DISABLED_AnImplicationCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
 }
 
 }  // namespace
