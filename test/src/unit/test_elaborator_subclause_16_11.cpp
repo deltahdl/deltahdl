@@ -309,4 +309,18 @@ TEST(AttachedSubroutineCall, AnImportedDpiCalleeIsChecked) {
                             5, "16.11"));
 }
 
+TEST(AttachedTaskElaboration, ADpiImportedTaskIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "import \"DPI-C\" task dt(input int v);\n"
+      "module m;\n"
+      "  logic clk, a, b;\n"
+      "  int k;\n"
+      "  import \"DPI-C\" task dm(input int v);\n"
+      "  c1: cover property (@(posedge clk) (a ##1 b, dt(k), dm(k)));\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
