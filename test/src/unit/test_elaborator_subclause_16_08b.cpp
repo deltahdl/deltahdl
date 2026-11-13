@@ -260,4 +260,147 @@ TEST(SequenceCycle, DISABLED_OnlyTheSequencesOnTheCycleAreNamed) {
   }
 }
 
+constexpr char kOmitted[] =
+    "sequence instance omits an actual argument for a formal that has no "
+    "default";
+
+const char kOmitTakers[] =
+    "sequence s(x, y); x ##1 y; endsequence\n"
+    "  sequence sd(x, y = b); x ##1 y; endsequence\n"
+    "  sequence sa(x = a, y = b); x ##1 y; endsequence\n"
+    "  sequence d(q); a ##1 q; endsequence\n";
+
+std::string OmitSource(const std::string& use) {
+  return "module m;\n"
+         "  bit clk, a, b;\n"
+         "  " +
+         std::string(kOmitTakers) + "  " + use + "\nendmodule\n";
+}
+
+void ExpectOmissionReported(const std::string& src, const std::string& use) {
+  SCOPED_TRACE(use);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOmitted,
+                            LineHolding(src, use), "16.8"));
+}
+
+void ExpectNoOmission(const std::string& src, const std::string& use) {
+  SCOPED_TRACE(use);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), LineHolding(src, use)));
+}
+
+const char* const kShortInAnAssertion[] = {
+    "assert property (@(posedge clk) s(a));",
+    "assume property (@(posedge clk) s(a));",
+    "cover property (@(posedge clk) s(a));",
+    "cover sequence (@(posedge clk) s(a));",
+    "restrict property (@(posedge clk) s(a));",
+    "always @(posedge clk) assert property (s(a));",
+    "sequence t; s(a); endsequence",
+    "property p; s(a); endproperty",
+    "assert property (@(posedge clk) a |-> s(a));",
+    "assert property (@(posedge clk) d(s(a)));",
+    "sequence dd(q = s(a)); q; endsequence",
+    "initial wait (s(a).triggered);",
+    "sequence u; @(posedge clk) a ##1 s(a).matched; endsequence",
+    "initial @(s(a, )) $display(\"x\");",
+    "initial @(s(, b)) $display(\"x\");",
+    "initial @(s(.x(a))) $display(\"x\");",
+    "assert property (@(posedge clk) s(.x(a)));",
+    "initial @(s(.x(a), .y())) $display(\"x\");",
+    "initial @(s) $display(\"x\");",
+    "assert property (@(posedge clk) s);",
+    "assert property (@(posedge clk) s(a, ));",
+    "cover property (@(posedge clk) s(, b));",
+    "assert property (@(posedge clk) s(.x(a), .y()));"};
+
+TEST(SequenceActualOmission, AShortEventControlInAModuleIsReported) {
+  const std::string kUse = "initial @(s(a)) $display(\"x\");";
+  ExpectOmissionReported(OmitSource(kUse), kUse);
+}
+
+TEST(SequenceActualOmission, DISABLED_EveryOtherOmissionIsReported) {
+  for (const char* use : kShortInAnAssertion) {
+    ExpectOmissionReported(OmitSource(use), use);
+  }
+}
+
+const char kShortEvent[] = "initial @(s(a)) $display(\"x\");";
+
+struct OmitPlace {
+  std::string place;
+  std::string src;
+  std::string use;
+};
+
+std::vector<OmitPlace> OmitPlaces() {
+  const std::string kTakers = kOmitTakers;
+  const std::string kEvent = kShortEvent;
+  const std::string kAssert = "assert property (@(posedge clk) s(a));";
+  return {
+      {"interface",
+       "interface ifc;\n  bit clk, a, b;\n  " + kTakers + "  " + kEvent +
+           "\nendinterface\n"
+           "module m;\n  ifc i();\nendmodule\n",
+       kEvent},
+      {"program",
+       "program pg;\n  bit clk, a, b;\n  " + kTakers + "  " + kEvent +
+           "\nendprogram\n",
+       kEvent},
+      {"generate block",
+       "module m;\n  bit clk, a, b;\n  if (1) begin : g\n    " + kTakers +
+           "    " + kEvent + "\n  end\nendmodule\n",
+       kEvent},
+      {"package sequence",
+       "package pk;\n  sequence s(x, y); x ##1 y; endsequence\nendpackage\n"
+       "module m;\n  bit clk, a, b;\n  initial @(pk::s(a)) $display(\"x\");\n"
+       "endmodule\n",
+       "initial @(pk::s(a))"},
+      {"checker",
+       "checker ck(bit clk, bit a, bit b);\n  " + kTakers + "  " + kAssert +
+           "\nendchecker\n"
+           "module m;\n  bit clk, a, b;\n  ck k(clk, a, b);\nendmodule\n",
+       kAssert}};
+}
+
+TEST(SequenceActualOmission, AShortEventControlInAnInterfaceOrProgram) {
+  for (const auto& placed : OmitPlaces()) {
+    if (placed.place != "interface" && placed.place != "program") continue;
+    SCOPED_TRACE(placed.place);
+    ExpectOmissionReported(placed.src, placed.use);
+  }
+}
+
+TEST(SequenceActualOmission, DISABLED_EveryOtherPlaceReportsAnOmission) {
+  for (const auto& placed : OmitPlaces()) {
+    if (placed.place == "interface" || placed.place == "program") continue;
+    SCOPED_TRACE(placed.place);
+    ExpectOmissionReported(placed.src, placed.use);
+  }
+}
+
+TEST(SequenceActualOmission, EveryFormalGivenOrDefaultedIsAccepted) {
+  for (const char* use :
+       {"initial @(sd(a)) $display(\"x\");",
+        "initial @(sd(a, )) $display(\"x\");",
+        "initial @(sd(.x(a))) $display(\"x\");",
+        "initial @(sd(.x(a), .y())) $display(\"x\");",
+        "initial @(sa) $display(\"x\");", "initial @(s(a, b)) $display(\"x\");",
+        "assert property (@(posedge clk) sd(a));",
+        "assert property (@(posedge clk) sd(a, ));",
+        "assert property (@(posedge clk) sd(.x(a)));",
+        "assert property (@(posedge clk) sd(.x(a), .y()));",
+        "assert property (@(posedge clk) sa);",
+        "assert property (@(posedge clk) sd(a, a));",
+        "assert property (@(posedge clk) sd(.x(a), .y(a)));",
+        "assert property (@(posedge clk) s(.y(b), .x(a)));",
+        "sequence t; s(a, b); endsequence",
+        "initial wait (s(a, b).triggered);"}) {
+    ExpectNoOmission(OmitSource(use), use);
+  }
+}
+
 }  // namespace

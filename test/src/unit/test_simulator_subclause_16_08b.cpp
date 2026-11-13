@@ -217,4 +217,33 @@ TEST(SequenceInstanceUse, DISABLED_TheUnitScopeServesEveryUse) {
                     EveryUse("$unit::s(clk, b, a)")));
 }
 
+const char kDefaulted[] =
+    "sequence sd(x, y = b); x ##1 y; endsequence\n"
+    "  sequence sa(x = b, y = a); x ##1 y; endsequence\n  ";
+
+TEST(SequenceActualBinding,
+     AnOmittedActualTakesTheDefaultAndAGivenOneReplacesIt) {
+  const std::string kSrc = InstanceBench(
+      "", kDefaulted + Covered("short", "sd(a)") + "\n  " +
+              Covered("slot", "sd(a, )") + "\n  " +
+              Covered("named", "sd(.x(a))") + "\n  " +
+              Covered("emptyn", "sd(.x(a), .y())") + "\n  " +
+              Covered("all", "sa()") + "\n  " + Covered("over", "sd(a, a)") +
+              "\n  " + Covered("overn", "sd(.x(a), .y(a))") + "\n  " +
+              Covered("overs", "sa(.y(b))"));
+  ExpectLines(kSrc, "short ", "25 35 45");
+  ExpectLines(kSrc, "slot ", "25 35 45");
+  ExpectLines(kSrc, "named ", "25 35 45");
+  ExpectLines(kSrc, "emptyn ", "25 35 45");
+  ExpectLines(kSrc, "all ", "35");
+  ExpectLines(kSrc, "over ", "15 25 35");
+  ExpectLines(kSrc, "overn ", "15 25 35");
+  ExpectLines(kSrc, "overs ", "35 45 55 65");
+}
+
+TEST(SequenceActualBinding, DISABLED_AnInstanceWithNoListTakesEveryDefault) {
+  ExpectLines(InstanceBench("", kDefaulted + Covered("all", "sa")), "all ",
+              "35");
+}
+
 }  // namespace
