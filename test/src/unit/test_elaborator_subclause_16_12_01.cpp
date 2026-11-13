@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "elaborator/property_instantiation.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -296,6 +299,200 @@ TEST(PropertyInstantiation, DisableIffPropertyAcceptedAsWholeAssertionSpec) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+constexpr const char* kDisableIffOperandReport =
+    "has a disable iff clause and cannot be used as an operand of a property "
+    "operator";
+
+constexpr const char* kLeafWithDisableIff =
+    "  property leaf; disable iff (rst) a |-> b; endproperty\n";
+constexpr const char* kLeafWithoutDisableIff =
+    "  property leaf; a |-> b; endproperty\n";
+
+const char* const kOperandUses[] = {
+    "not leaf",
+    "leaf or b",
+    "b or leaf",
+    "leaf implies b",
+    "b implies leaf",
+    "leaf iff b",
+    "a |-> leaf",
+    "a |=> leaf",
+    "a #-# leaf",
+    "a #=# leaf",
+    "if (a) leaf",
+    "if (a) b else leaf",
+    "case (a) 1'b1: leaf; default: b; endcase",
+    "leaf until b",
+    "b until leaf",
+    "leaf until_with b",
+    "leaf s_until_with b",
+    "always leaf",
+    "always [1:2] leaf",
+    "s_always [1:2] leaf",
+    "eventually [1:2] leaf",
+    "s_eventually [1:2] leaf",
+    "nexttime leaf",
+    "nexttime [2] leaf",
+    "s_nexttime leaf",
+    "accept_on (a) leaf",
+    "reject_on (a) leaf",
+    "sync_accept_on (a) leaf",
+    "sync_reject_on (a) leaf",
+};
+
+std::string OperandModule(const std::string& leaf, const std::string& use) {
+  return "module m;\n"
+         "  logic clk;\n"
+         "  bit a, b, rst;\n" +
+         leaf + "  property outer; @(posedge clk) " + use +
+         "; endproperty\n"
+         "endmodule\n";
+}
+
+void ExpectDisableIffOperandReported(const std::string& src,
+                                     const std::string& marker) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, marker);
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kDisableIffOperandReport,
+                            line, "16.12.1"));
+}
+
+void ExpectInstanceAccepted(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PropertyInstanceOperand, ADisableIffInstanceUnderEachOperatorIsReported) {
+  for (const char* use : kOperandUses) {
+    ExpectDisableIffOperandReported(OperandModule(kLeafWithDisableIff, use),
+                                    "property outer;");
+  }
+}
+
+TEST(PropertyInstanceOperand,
+     AnInstanceWithoutDisableIffUnderEachOperatorIsAccepted) {
+  for (const char* use : kOperandUses) {
+    ExpectInstanceAccepted(OperandModule(kLeafWithoutDisableIff, use));
+  }
+}
+
+TEST(PropertyInstanceOperand,
+     DISABLED_ADisableIffInstanceInParenthesesIsReported) {
+  ExpectDisableIffOperandReported(OperandModule(kLeafWithDisableIff, "(leaf)"),
+                                  "property outer;");
+}
+
+TEST(PropertyInstanceOperand, ADisableIffInstanceUnderALeadingClockIsAccepted) {
+  ExpectInstanceAccepted(OperandModule(kLeafWithDisableIff, "leaf"));
+  ExpectInstanceAccepted(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a, b, rst;\n" +
+      std::string(kLeafWithDisableIff) +
+      "  a1: assert property (@(posedge clk) leaf);\n"
+      "  always @(posedge clk) a2: assert property (leaf);\n"
+      "endmodule\n");
+}
+
+TEST(PropertyInstanceOperand, ADisableIffInstanceWithArgumentsIsReported) {
+  ExpectDisableIffOperandReported(
+      "module m;\n"
+      "  logic clk;\n"
+      "  bit a, b, rst;\n"
+      "  property leaf(x, y); disable iff (rst) x |-> y; endproperty\n"
+      "  property outer; @(posedge clk) a |-> leaf(a, b); endproperty\n"
+      "endmodule\n",
+      "property outer;");
+}
+
+std::string OperandIn(const std::string& place, const std::string& leaf,
+                      const std::string& use) {
+  std::string decl =
+      leaf + "  property outer; @(posedge clk) " + use + "; endproperty\n";
+  if (place == "assertion") {
+    return "module m;\n  logic clk;\n  bit a, b, rst;\n" + leaf +
+           "  a1: assert property (@(posedge clk) " + use + ");\nendmodule\n";
+  }
+  if (place == "procedural") {
+    return "module m;\n  logic clk;\n  bit a, b, rst;\n" + leaf +
+           "  always @(posedge clk) a1: assert property (" + use +
+           ");\nendmodule\n";
+  }
+  if (place == "interface" || place == "program") {
+    return place + " el(input logic clk, a, b, rst);\n" + decl + "end" + place +
+           "\nmodule m; logic clk, a, b, rst; el u(clk, a, b, rst); "
+           "endmodule\n";
+  }
+  if (place == "checker") {
+    return "checker el(logic clk, logic a, logic b, logic rst);\n" + decl +
+           "endchecker\nmodule m; logic clk, a, b, rst; el u(clk, a, b, rst);"
+           " endmodule\n";
+  }
+  if (place == "package") {
+    return "package pk;\n  bit clk, a, b, rst;\n" + decl +
+           "endpackage\nmodule m; endmodule\n";
+  }
+  if (place == "unit") {
+    return "bit clk, a, b, rst;\n" + decl + "module m; endmodule\n";
+  }
+  if (place == "package instance") {
+    return "package pk;\n  bit a, b, rst;\n" + leaf +
+           "endpackage\nmodule m;\n  logic clk;\n  bit a, b;\n"
+           "  property outer; @(posedge clk) " +
+           std::string(use).replace(std::string(use).find("leaf"), 4,
+                                    "pk::leaf") +
+           "; endproperty\nendmodule\n";
+  }
+  return "module m;\n  logic clk;\n  bit a, b, rst;\n  if (1) begin : g\n" +
+         decl + "  end\nendmodule\n";
+}
+
+const char* const kCheckedOperandPlaces[] = {"assertion",        "interface",
+                                             "program",          "checker",
+                                             "package instance", "generate"};
+const char* const kUncheckedOperandPlaces[] = {"procedural", "package", "unit"};
+
+TEST(PropertyInstanceOperand,
+     ADisableIffInstanceAsAnOperandInEachPlaceIsReported) {
+  for (const char* place : kCheckedOperandPlaces) {
+    SCOPED_TRACE(place);
+    std::string src = OperandIn(place, kLeafWithDisableIff, "a |-> leaf");
+    ExpectDisableIffOperandReported(
+        src,
+        std::string(place) == "package instance" ? "|-> pk::leaf" : "|-> leaf");
+  }
+}
+
+TEST(PropertyInstanceOperand,
+     DISABLED_ADisableIffInstanceAsAnOperandOutsideTheCheckedPlacesIsReported) {
+  for (const char* place : kUncheckedOperandPlaces) {
+    SCOPED_TRACE(place);
+    std::string src = OperandIn(place, kLeafWithDisableIff, "a |-> leaf");
+    ExpectDisableIffOperandReported(
+        src,
+        std::string(place) == "package instance" ? "|-> pk::leaf" : "|-> leaf");
+  }
+}
+
+TEST(PropertyInstanceOperand,
+     AnInstanceWithoutDisableIffInEachPlaceIsAccepted) {
+  for (const char* place : kCheckedOperandPlaces) {
+    SCOPED_TRACE(place);
+    ExpectInstanceAccepted(
+        OperandIn(place, kLeafWithoutDisableIff, "a |-> leaf"));
+  }
+  for (const char* place : kUncheckedOperandPlaces) {
+    SCOPED_TRACE(place);
+    ExpectInstanceAccepted(
+        OperandIn(place, kLeafWithoutDisableIff, "a |-> leaf"));
+  }
 }
 
 }  // namespace
