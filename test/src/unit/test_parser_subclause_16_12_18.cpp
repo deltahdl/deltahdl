@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -234,6 +236,128 @@ TEST(TypedPropertyFormalParsing, AUserDefinedTypeEndsAPropertyRun) {
   ASSERT_EQ(item->prop_formal_is_property.size(), 2u);
   EXPECT_TRUE(item->prop_formal_is_property[0]);
   EXPECT_FALSE(item->prop_formal_is_property[1]);
+}
+
+constexpr const char* kPropertyFormalPlaces[] = {
+    "module",  "interface", "program",  "checker",
+    "package", "generate",  "clocking", "unit"};
+
+std::string PropertyFormalIn(const std::string& place,
+                             const std::string& body) {
+  const std::string kSignals =
+      "  bit clk, a, b; sequence s(z); z; endsequence sequence st(sequence "
+      "z); z; endsequence property r(property z); z; endproperty\n";
+  const std::string kDeclared =
+      "property p(property q); " + body + "; endproperty";
+  if (place == "unit") return "\n" + kSignals + "  " + kDeclared + "\n";
+  std::string line = "  " + kDeclared;
+  if (place == "generate") line = "  if (1) begin : g " + kDeclared + " end";
+  if (place == "clocking") {
+    line = "  clocking cb @(posedge clk); " + kDeclared + " endclocking";
+  }
+  std::string unit =
+      place == "generate" || place == "clocking" ? "module" : place;
+  return unit + " m;\n" + kSignals + line + "\nend" + unit + "\n";
+}
+
+constexpr const char* kPropertyFormalReference =
+    "a 'property'-typed formal argument may not be referenced";
+
+void ExpectPropertyFormalReported(const char* place, const char* body) {
+  SCOPED_TRACE(std::string(place) + " " + body);
+  auto r = Parse(PropertyFormalIn(place, body));
+  EXPECT_TRUE(ReportedError(r.diags, kPropertyFormalReference, 3, "16.12.18"));
+}
+
+TEST(TypedPropertyFormalParsing,
+     AnImplicationAntecedentIsReportedInEachPlaceAndNesting) {
+  for (const char* place : kPropertyFormalPlaces) {
+    for (const char* body :
+         {"q |-> b", "q |=> b", "b |-> (q |=> b)", "not (q |-> b)",
+          "if (a) (q |-> b)", "if (a) b else (q |=> b)"}) {
+      ExpectPropertyFormalReported(place, body);
+    }
+  }
+}
+
+TEST(TypedPropertyFormalParsing,
+     DISABLED_ASequenceOrExpressionPositionIsReportedInEachPlace) {
+  for (const char* place : kPropertyFormalPlaces) {
+    for (const char* body : {"(q) |-> b",
+                             "(q) |=> b",
+                             "q #-# b",
+                             "q #=# b",
+                             "q ##1 b",
+                             "b ##1 q",
+                             "q ##[1:2] b",
+                             "b ##[1:2] q",
+                             "##1 q",
+                             "q intersect b",
+                             "b intersect q",
+                             "q within b",
+                             "b within q",
+                             "b throughout q",
+                             "q [*2]",
+                             "q [=2]",
+                             "q [->1]",
+                             "strong(q)",
+                             "weak(q)",
+                             "first_match(q)",
+                             "bit v; (q, v = 1) ##1 b",
+                             "q && b",
+                             "b || q",
+                             "!q",
+                             "q == b",
+                             "if (q) b",
+                             "case (q) 1'b1: b; endcase",
+                             "accept_on (q) b",
+                             "reject_on (q) b",
+                             "sync_accept_on (q) b",
+                             "sync_reject_on (q) b",
+                             "disable iff (q) b",
+                             "@(q) b",
+                             "$rose(q)",
+                             "q.triggered",
+                             "q.matched",
+                             "s(q)",
+                             "st(q)"}) {
+      ExpectPropertyFormalReported(place, body);
+    }
+  }
+}
+
+TEST(TypedPropertyFormalParsing, APropertyPositionIsAcceptedInEachPlace) {
+  for (const char* place : kPropertyFormalPlaces) {
+    for (const char* body : {"q",
+                             "b |-> q",
+                             "b |=> q",
+                             "not q",
+                             "q and b",
+                             "b or q",
+                             "q implies b",
+                             "b iff q",
+                             "q until b",
+                             "b s_until q",
+                             "q until_with b",
+                             "b s_until_with q",
+                             "always q",
+                             "s_always [1:2] q",
+                             "eventually [1:2] q",
+                             "s_eventually q",
+                             "nexttime q",
+                             "s_nexttime [2] q",
+                             "b #-# q",
+                             "b #=# q",
+                             "if (a) q else b",
+                             "case (a) 1'b1: q; default: b; endcase",
+                             "accept_on (a) q",
+                             "sync_reject_on (a) q",
+                             "r(q)"}) {
+      SCOPED_TRACE(std::string(place) + " " + body);
+      auto r = Parse(PropertyFormalIn(place, body));
+      EXPECT_FALSE(r.has_errors);
+    }
+  }
 }
 
 }  // namespace

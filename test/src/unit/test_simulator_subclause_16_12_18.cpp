@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/variable.h"
 
 using namespace delta;
@@ -147,6 +148,78 @@ TEST(TypedPropertyFormals, ASequenceFormalMayStandAsAnAntecedent) {
   auto counts = CountsOfTyped("p_seq(go ##1 b)");
   EXPECT_EQ(counts.first, 6u);
   EXPECT_EQ(counts.second, 2u);
+}
+
+std::pair<uint64_t, uint64_t> CountsWithDeclaration(
+    const std::string& declaration, const std::string& spec) {
+  SimFixture f;
+  auto* passes =
+      RunAndFindVar(TypedSource(declaration + "  p: assert property (" + spec +
+                                ") passes++; else fails++;\n"),
+                    f, "passes");
+  if (passes == nullptr) return {~0ull, ~0ull};
+  return {passes->value.ToUint64(),
+          f.ctx.FindVariable("fails")->value.ToUint64()};
+}
+
+TEST(TypedPropertyFormals,
+     DISABLED_ADefaultActualOfAPropertyFormalRunsAsIfWritten) {
+  const std::string kDeclaration =
+      "  property p_def(property q = b ##1 c); @(posedge clk) q; "
+      "endproperty\n";
+  auto defaulted = CountsWithDeclaration(kDeclaration, "p_def");
+  EXPECT_EQ(defaulted, CountsOfTyped("p_id(b ##1 c)"));
+  EXPECT_EQ(defaulted, CountsWithDeclaration(kDeclaration, "p_def(b ##1 c)"));
+  EXPECT_NE(defaulted, CountsWithDeclaration(kDeclaration, "p_def(c)"));
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedTypedProperties =
+    "  property pp(property q); q; endproperty\n"
+    "  property pn(property q); not q; endproperty\n"
+    "  property ps(sequence s); s |-> d; endproperty\n"
+    "  property pe(event e, property q); @(e) q; endproperty\n"
+    "  property pb(bit x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kTypedFormalsInPlace[] = {
+    {"pp(d)", {3, 1}, 3},
+    {"pp(a ##1 b)", {1, 3}, 1},
+    {"pp(c or nexttime a)", {2, 2}, 2},
+    {"pp(@(posedge clk) a)", {2, 2}, 2},
+    {"pp(.q(a ##1 b))", {1, 3}, 1},
+    {"pn(b)", {2, 2}, 2},
+    {"ps(a ##1 b)", {4, 0}, 4},
+    {"pb(c, d)", {3, 1}, 3},
+    {"pb(2'b10, d)", {4, 0}, 4}};
+
+TEST(TypedPropertyFormals, ATypedFormalCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kTypedFormalsInPlace) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedTypedProperties);
+    }
+  }
+}
+
+TEST(TypedPropertyFormals,
+     DISABLED_AnEventFormalClocksItsBodyUnderALeadingClockInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    ExpectPropertyCountsInPlace(place, {"pe(posedge clk, d)", {3, 1}, 3},
+                                kPlacedStimulus, kPlacedTypedProperties);
+  }
+}
+
+TEST(TypedPropertyFormals,
+     DISABLED_ATypedFormalCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kTypedFormalsInPlace) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedTypedProperties);
+  }
 }
 
 }  // namespace
