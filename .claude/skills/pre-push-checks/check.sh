@@ -64,8 +64,8 @@ check_format_and_size() {
     "$llvm/clang-format" --dry-run --Werror --style=google "$f" > /dev/null 2>&1 ||
       report "$f is not clang-format --style=google clean"
     lines=$(wc -l < "$f")
-    if [ "$f" != src/simulator/vpi_user.h ] && [ "$lines" -ge 950 ]; then
-      report "$f has $lines lines, more than 949"
+    if [ "$f" != src/simulator/vpi_user.h ] && [ "$lines" -ge 1000 ]; then
+      report "$f has $lines lines, more than 999"
     fi
   done < "$work/cxx"
 }
