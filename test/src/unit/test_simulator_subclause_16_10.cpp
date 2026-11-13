@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_sampling_bench.h"
 #include "helpers_sequence_ticks.h"
 #include "simulator/variable.h"
 
@@ -413,6 +414,43 @@ TEST(SequenceLocals, AGroupPerformsItsItemsAtEachMatchOfAnInstance) {
                kPrelude);
   ExpectOneEnd("(s, x += 1)[*2] ##1 (x == 2)", "    int x = 0;\n",
                {{1, 3}, {2, 4}}, 45, kPrelude);
+}
+
+TEST(SequenceLocals, DISABLED_ARealLocalHoldsItsInitialValue) {
+  for (const char* type : {"real", "shortreal", "realtime"}) {
+    const std::string kLocals = std::string("    ") + type + " x = 2.5;\n";
+    for (const char* check : {"(x == 2.5)", "(x > 2.0)", "(x < 3.0)"}) {
+      ExpectOneEndAfterTe2(check, kLocals);
+    }
+  }
+}
+
+TEST(SequenceLocals, DISABLED_ARealLocalHoldsAMatchItemsValue) {
+  ExpectOneEndAtFour("(te2, x = 2.5) ##1 (x == 2.5)", "    real x;\n");
+  ExpectOneEndAtFour("(te2, x = 2.5) ##1 (x > 2.0)", "    real x;\n");
+}
+
+TEST(SequenceLocals, DISABLED_ARealLocalConvertsToAnIntegralOne) {
+  ExpectOneEndAfterTe2("(y == 3)", "    real x = 2.5;\n    int y = x;\n");
+}
+
+std::string RealPropertySource(const std::string& check) {
+  return "module top;\n"
+         "  logic clk = 0, c = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  property pr; real x; (c, x = 2.5) |-> " +
+         check +
+         "; endproperty\n"
+         "  assert property (@(posedge clk) pr) else $display(\"fail %0t\", "
+         "$time);\n"
+         "  initial begin #10 c = 1; #10 c = 0; #20 $finish; end\n"
+         "endmodule\n";
+}
+
+TEST(SequenceLocals, DISABLED_ARealPropertyLocalHoldsItsValue) {
+  ExpectLines(RealPropertySource("(x == 2.5)"), "fail ", "");
+  ExpectLines(RealPropertySource("(x > 2.0)"), "fail ", "");
+  ExpectLines(RealPropertySource("(x != 2.5)"), "fail ", "15");
 }
 
 }  // namespace

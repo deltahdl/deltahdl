@@ -31,13 +31,20 @@ inline std::string FilledForm(std::string src, std::string_view form) {
   return src;
 }
 
+struct FormalReport {
+  std::string_view message;
+  std::string_view subclause = "16.8.1";
+  std::string_view at = "@@";
+  int times = 1;
+};
+
 inline int FormalReportsAt(const std::vector<Diagnostic>& diags,
-                           std::string_view message, uint32_t line) {
+                           const FormalReport& report, uint32_t line) {
   int count = 0;
   for (const auto& diag : diags) {
     if (diag.severity == DiagSeverity::kError && diag.loc.line == line &&
-        diag.subclause == "16.8.1" &&
-        diag.message.find(message) != std::string::npos) {
+        diag.subclause == report.subclause &&
+        diag.message.find(report.message) != std::string::npos) {
       ++count;
     }
   }
@@ -53,16 +60,22 @@ inline void ExpectFormAccepted(const std::string& marked,
   EXPECT_FALSE(f.has_errors) << kSrc;
 }
 
-inline void ExpectFormReported(const std::string& marked, std::string_view form,
-                               std::string_view message,
-                               std::string_view at = "@@", int times = 1) {
+inline void ExpectReportedAs(const std::string& marked, std::string_view form,
+                             const FormalReport& report) {
   const std::string kSrc = FilledForm(marked, form);
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(kSrc, f);
-  EXPECT_EQ(
-      FormalReportsAt(f.diag.Diagnostics(), message, LineHolding(marked, at)),
-      times)
+  EXPECT_EQ(FormalReportsAt(f.diag.Diagnostics(), report,
+                            LineHolding(marked, report.at)),
+            report.times)
       << kSrc;
+}
+
+inline void ExpectFormReported(const std::string& marked, std::string_view form,
+                               std::string_view message,
+                               std::string_view at = "@@", int times = 1) {
+  ExpectReportedAs(marked, form,
+                   {.message = message, .at = at, .times = times});
 }
 
 struct PlacedSource {
