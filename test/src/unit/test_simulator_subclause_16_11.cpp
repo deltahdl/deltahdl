@@ -430,4 +430,132 @@ TEST(AttachedEndPoint,
                     {"generate at 15", 1}});
 }
 
+constexpr const char* kSuspendingTasks =
+    "  logic go = 0;\n"
+    "  initial #40 go = 1;\n"
+    "  task tslow(string tag);\n"
+    "    $display(\"%s start at %0t\", tag, $time);\n"
+    "    #12 $display(\"%s done at %0t\", tag, $time);\n"
+    "  endtask\n"
+    "  task twait;\n"
+    "    $display(\"wait start at %0t\", $time);\n"
+    "    @(posedge clk) $display(\"wait done at %0t\", $time);\n"
+    "  endtask\n"
+    "  task tcond;\n"
+    "    wait (go) $display(\"cond done at %0t\", $time);\n"
+    "  endtask\n"
+    "  class C;\n"
+    "    task m;\n"
+    "      #3 $display(\"method done at %0t\", $time);\n"
+    "    endtask\n"
+    "  endclass\n"
+    "  C h = new;\n";
+
+TEST(AttachedSuspension, ASuspendingTaskInAnActionBlockRunsToItsEnd) {
+  std::string out =
+      RunStatements(std::string(kSuspendingTasks) +
+                        "  c1: cover property (@(posedge clk) te1 ##1 te2)"
+                        " tslow(\"action\");\n",
+                    MatchDrive());
+  ExpectLines(out, {{"action start at 25", 1}, {"action done at 37", 1}});
+}
+
+TEST(AttachedSuspension, DISABLED_ASuspendingAttachedTaskRunsToItsEnd) {
+  std::string out =
+      RunStatements(std::string(kSuspendingTasks) +
+                        "  c1: cover property (@(posedge clk) (te1 ##1 te2,"
+                        " tslow(\"slow\"), twait, tcond, h.m));\n"
+                        "  c2: cover property (@(posedge clk) te1 ##1 te2)"
+                        " tslow(\"action\");\n",
+                    MatchDrive());
+  ExpectLines(out, {{"slow start at 25", 1},
+                    {"wait start at 25", 1},
+                    {"slow done at 37", 1},
+                    {"action done at 37", 1},
+                    {"wait done at 35", 1},
+                    {"cond done at 40", 1},
+                    {"method done at 28", 1}});
+  EXPECT_LT(out.find("slow start at 25"), out.find("wait start at 25"));
+}
+
+TEST(AttachedSuspension, DISABLED_ASuspendingTaskInEachPlaceRunsToItsEnd) {
+  std::string outside =
+      "package pk;\n"
+      "  task tq(string tag);\n"
+      "    #12 $display(\"%s done at %0t\", tag, $time);\n"
+      "  endtask\n"
+      "endpackage\n"
+      "interface ifc(input logic clk, te1, te2);\n"
+      "  c1: cover property (@(posedge clk) (te1 ##1 te2,"
+      " pk::tq(\"interface\")));\n"
+      "endinterface\n"
+      "program pg(input logic clk, te1, te2);\n"
+      "  c2: cover property (@(posedge clk) (te1 ##1 te2,"
+      " pk::tq(\"program\")));\n"
+      "endprogram\n"
+      "checker ck(logic clk, logic te1, logic te2);\n"
+      "  c3: cover property (@(posedge clk) (te1 ##1 te2,"
+      " pk::tq(\"checker\")));\n"
+      "endchecker\n";
+  std::string out = RunStatements(
+      "  ifc i(clk, te1, te2);\n"
+      "  pg p(clk, te1, te2);\n"
+      "  ck k(clk, te1, te2);\n"
+      "  sequence sa; @(posedge clk) te1 ##1 (te2, pk::tq(\"assert\"));"
+      " endsequence\n"
+      "  sequence sc; @(posedge clk) te1 ##1 (te2, pk::tq(\"cover\"));"
+      " endsequence\n"
+      "  sequence ss; @(posedge clk) te1 ##1 (te2, pk::tq(\"sequence\"));"
+      " endsequence\n"
+      "  a1: assert property (sa) else;\n"
+      "  c4: cover property (sc);\n"
+      "  c5: cover sequence (ss);\n"
+      "  c6: cover property (@(posedge clk) (te1 ##1 te2,"
+      " pk::tq(\"module\")));\n",
+      MatchDrive(), outside);
+  ExpectLines(out, {{"interface done at 37", 1},
+                    {"program done at 37", 1},
+                    {"checker done at 37", 1},
+                    {"assert done at 37", 1},
+                    {"cover done at 37", 1},
+                    {"sequence done at 37", 1},
+                    {"module done at 37", 1}});
+}
+
+TEST(AttachedSuspension, ThePassActionAndALaterMatchDoNotWait) {
+  std::string out = RunStatements(
+      std::string(kSuspendingTasks) +
+          "  c1: cover property (@(posedge clk) (te1 ##1 te2,"
+          " tslow(\"slow\"))) $display(\"pass at %0t\", $time);\n",
+      DriveTicks({{2, 3}, {3, 4}}));
+  ExpectLines(out, {{"slow start at 25", 1},
+                    {"pass at 25", 1},
+                    {"slow start at 35", 1},
+                    {"pass at 35", 1}});
+}
+
+TEST(AttachedSuspension,
+     DISABLED_ACallSuspendedByAnEarlierMatchDoesNotHoldALaterOne) {
+  std::string out =
+      RunStatements(std::string(kSuspendingTasks) +
+                        "  c1: cover property (@(posedge clk) (te1 ##1 te2,"
+                        " tslow(\"slow\")));\n",
+                    DriveTicks({{2, 3}, {3, 4}}));
+  ExpectLines(out, {{"slow done at 37", 1}, {"slow done at 47", 1}});
+}
+
+TEST(AttachedReactive, TheBodyReadsTheValuesTheMatchingTickSettled) {
+  std::string prelude = kCountingK;
+  prelude +=
+      "  int j = 0;\n"
+      "  always @(posedge clk) j = j + 1;\n"
+      "  task automatic show(int v, ref int r);\n"
+      "    $display(\"value %0d ref %0d body %0d blocking %0d\", v, r, k,"
+      " j);\n"
+      "  endtask\n"
+      "  c1: cover property (@(posedge clk) (te1 ##1 te2, show(k, k)));\n";
+  std::string out = RunStatements(prelude, MatchDrive());
+  ExpectLines(out, {{"value 2 ref 3 body 3 blocking 3", 1}});
+}
+
 }  // namespace
