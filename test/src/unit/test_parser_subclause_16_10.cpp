@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -531,6 +532,117 @@ TEST(AssertionVariableType, AnExplicitTypeWithoutVarIsAccepted) {
   for (const ImplicitPair& pair : kWithoutVarPairs) {
     SCOPED_TRACE(pair.explicit_type);
     auto r = Parse(Filled(kModuleBodies, pair.explicit_type));
+    EXPECT_FALSE(r.has_errors);
+  }
+}
+
+constexpr const char* kChandleType =
+    "an assertion variable may not be declared of type chandle";
+constexpr const char* kEventType =
+    "an assertion variable may not be declared of type event";
+
+constexpr const char* kTypedefBodies =
+    "module m;\n"
+    "  logic clk, a;\n"
+    "  typedef chandle ch_t;\n"
+    "  typedef event ev_t;\n"
+    "  class C; int f; endclass\n"
+    "  sequence s; @@ @(posedge clk) a; endsequence\n"
+    "  property p; @@ @(posedge clk) a; endproperty\n"
+    "endmodule\n";
+
+struct DisallowedType {
+  const char* decl;
+  const char* message;
+};
+
+void ExpectReportedInBothBodies(const DisallowedType& c) {
+  SCOPED_TRACE(c.decl);
+  auto r = Parse(Filled(kTypedefBodies, c.decl));
+  EXPECT_TRUE(ReportedError(r.diags, c.message, 6, "16.10"));
+  EXPECT_TRUE(ReportedError(r.diags, c.message, 7, "16.10"));
+}
+
+TEST(AssertionVariableType, AChandleWrittenOutIsReported) {
+  for (const DisallowedType& c : {DisallowedType{"chandle h;", kChandleType},
+                                  {"var chandle h;", kChandleType},
+                                  {"chandle h [2];", kChandleType}}) {
+    ExpectReportedInBothBodies(c);
+  }
+}
+
+TEST(AssertionVariableType, DISABLED_AChandleThroughATypedefIsReported) {
+  ExpectReportedInBothBodies({"ch_t h;", kChandleType});
+}
+
+TEST(AssertionVariableType, DISABLED_AnEventIsReported) {
+  for (const DisallowedType& c : {DisallowedType{"event e;", kEventType},
+                                  {"var event e;", kEventType},
+                                  {"ev_t e;", kEventType},
+                                  {"event e [2];", kEventType}}) {
+    ExpectReportedInBothBodies(c);
+  }
+}
+
+size_t ErrorCount(const std::vector<Diagnostic>& diags) {
+  size_t n = 0;
+  for (const Diagnostic& diag : diags) {
+    if (diag.severity == DiagSeverity::kError) ++n;
+  }
+  return n;
+}
+
+TEST(AssertionVariableType, AnIntegralLocalBesideAChandleGoesUnreported) {
+  auto r = Parse(Filled(kTypedefBodies, "int n; chandle h; bit b;"));
+  EXPECT_EQ(ErrorCount(r.diags), 2u);
+}
+
+TEST(AssertionVariableType,
+     DISABLED_AnIntegralLocalBesideAnEventGoesUnreported) {
+  auto r = Parse(Filled(kTypedefBodies, "bit b; event e; logic l;"));
+  EXPECT_TRUE(ReportedError(r.diags, kEventType, 6, "16.10"));
+  EXPECT_TRUE(ReportedError(r.diags, kEventType, 7, "16.10"));
+  EXPECT_EQ(ErrorCount(r.diags), 2u);
+}
+
+TEST(AssertionVariableType, AChandleIsReportedInEveryPlace) {
+  for (const DeclPlace& place : kDeclPlaces) {
+    SCOPED_TRACE(place.text);
+    auto r = Parse(Filled(place.text, "chandle h;"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, kChandleType, place.sequence_line, "16.10"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, kChandleType, place.property_line, "16.10"));
+  }
+}
+
+TEST(AssertionVariableType, DISABLED_AnEventIsReportedInEveryPlace) {
+  for (const DeclPlace& place : kDeclPlaces) {
+    SCOPED_TRACE(place.text);
+    auto r = Parse(Filled(place.text, "event e;"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, kEventType, place.sequence_line, "16.10"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, kEventType, place.property_line, "16.10"));
+  }
+}
+
+TEST(AssertionVariableType, EveryOtherKindOfTypeIsAccepted) {
+  for (const char* decl : {"real r;", "shortreal r;", "realtime r;",
+                           "string st;", "C h;", "int d [];", "int q [$];",
+                           "int aa [int];", "int w [2];", "byte q [$];"}) {
+    SCOPED_TRACE(decl);
+    auto r = Parse(Filled(kTypedefBodies, decl));
+    EXPECT_FALSE(r.has_errors);
+  }
+}
+
+TEST(AssertionVariableType, DISABLED_AnInlineAggregateOrEnumTypeIsAccepted) {
+  for (const char* decl :
+       {"struct {int f;} t;", "struct packed {bit [3:0] f;} t;",
+        "union {int i; byte b;} t;", "enum {A, B} t;"}) {
+    SCOPED_TRACE(decl);
+    auto r = Parse(Filled(kTypedefBodies, decl));
     EXPECT_FALSE(r.has_errors);
   }
 }

@@ -6,6 +6,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_sampling_bench.h"
+#include "helpers_sequence_covers.h"
 #include "helpers_sequence_ticks.h"
 #include "simulator/variable.h"
 
@@ -451,6 +452,106 @@ TEST(SequenceLocals, DISABLED_ARealPropertyLocalHoldsItsValue) {
   ExpectLines(RealPropertySource("(x == 2.5)"), "fail ", "");
   ExpectLines(RealPropertySource("(x > 2.0)"), "fail ", "");
   ExpectLines(RealPropertySource("(x != 2.5)"), "fail ", "15");
+}
+
+std::string TypedLocalSource(const std::string& items) {
+  return SequenceCoverSource("  class C; int f; endclass\n" + items,
+                             DriveTicks({{1}, {2}}));
+}
+
+void ExpectEachCoverOnce(const std::string& src, int covers) {
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  for (int i = 1; i <= covers; ++i) {
+    std::string label = "c" + std::to_string(i) + ":";
+    EXPECT_EQ(CoverCount(f, src, label), 1u) << label;
+  }
+}
+
+TEST(TypedLocals, DISABLED_RealLocalsReadInABoolean) {
+  ExpectEachCoverOnce(
+      TypedLocalSource(
+          "  property pr; real r;\n"
+          "    @(posedge clk) (te1, r = 1.5) ##1 (te2 && r > 1.25);\n"
+          "  endproperty\n"
+          "  property ps; shortreal r;\n"
+          "    @(posedge clk) (te1, r = 2.5) ##1 (te2 && r > 2.25);\n"
+          "  endproperty\n"
+          "  property pt; realtime l_t;\n"
+          "    @(posedge clk) (te1, l_t = $realtime) ##1"
+          " (te2 && $realtime - l_t == 10.0);\n"
+          "  endproperty\n"
+          "  c1: cover property (pr);\n"
+          "  c2: cover property (ps);\n"
+          "  c3: cover property (pt);\n"),
+      3);
+}
+
+TEST(TypedLocals, AClassHandleReadInABoolean) {
+  ExpectEachCoverOnce(
+      TypedLocalSource(
+          "  property ph; C h;\n"
+          "    @(posedge clk) (te1, h = null) ##1 (te2 && h == null);\n"
+          "  endproperty\n"
+          "  c1: cover property (ph);\n"),
+      1);
+}
+
+TEST(TypedLocals, DISABLED_AStringLocalReadInABoolean) {
+  ExpectEachCoverOnce(
+      TypedLocalSource(
+          "  property pg; string st;\n"
+          "    @(posedge clk) (te1, st = \"go\") ##1 (te2 && st == \"go\");\n"
+          "  endproperty\n"
+          "  c1: cover property (pg);\n"),
+      1);
+}
+
+TEST(TypedLocals, DISABLED_VariableSizeArrayLocalsReadInABoolean) {
+  ExpectEachCoverOnce(
+      TypedLocalSource(
+          "  property pd; int d [];\n"
+          "    @(posedge clk) (te1, d = '{3, 4}) ##1 (te2 && d[1] == 4);\n"
+          "  endproperty\n"
+          "  property pq; int q [$];\n"
+          "    @(posedge clk) (te1, q = '{5, 6, 7}) ##1"
+          " (te2 && q.size() == 3);\n"
+          "  endproperty\n"
+          "  property pa; int aa [int];\n"
+          "    @(posedge clk) (te1, aa = '{1: 8}) ##1 (te2 && aa[1] == 8);\n"
+          "  endproperty\n"
+          "  c1: cover property (pd);\n"
+          "  c2: cover property (pq);\n"
+          "  c3: cover property (pa);\n"),
+      3);
+}
+
+TEST(TypedLocals, DISABLED_UnpackedLocalsInAPropertyBodyAreEvaluated) {
+  ExpectEachCoverOnce(
+      TypedLocalSource(
+          "  property pw; int w [2];\n"
+          "    @(posedge clk) (te1, w[0] = 3) ##1 (te2 && w[0] == 3);\n"
+          "  endproperty\n"
+          "  property pb; byte bq [$];\n"
+          "    @(posedge clk) (te1, bq = '{9}) ##1 (te2 && bq[0] == 9);\n"
+          "  endproperty\n"
+          "  c1: cover property (pw);\n"
+          "  c2: cover property (pb);\n"),
+      2);
+}
+
+TEST(TypedLocals, DISABLED_UnpackedLocalsInASequenceBodyKeepItsClock) {
+  ExpectEachCoverOnce(
+      TypedLocalSource(
+          "  sequence sw; int w [2];\n"
+          "    @(posedge clk) (te1, w[0] = 3) ##1 (te2 && w[0] == 3);\n"
+          "  endsequence\n"
+          "  sequence sb; byte bq [$];\n"
+          "    @(posedge clk) (te1, bq = '{9}) ##1 (te2 && bq[0] == 9);\n"
+          "  endsequence\n"
+          "  c1: cover property (sw);\n"
+          "  c2: cover property (sb);\n"),
+      2);
 }
 
 }  // namespace
