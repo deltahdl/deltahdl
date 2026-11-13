@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -318,6 +319,40 @@ TEST(AssertionSemanticsParsing, AClockedBooleanSpecWithoutItsSemicolonIsKept) {
   EXPECT_NE(decl->prop_disable_iff, nullptr);
   ASSERT_NE(decl->prop_body_expr, nullptr);
   EXPECT_EQ(decl->prop_body_expr->kind, ExprKind::kBinary);
+}
+
+using PropertyKind = PropertyExprNode::Kind;
+
+bool IsIffOf(const PropertyExprNode* node, PropertyKind lhs, PropertyKind rhs) {
+  return node != nullptr && node->kind == PropertyKind::kIff &&
+         node->operands.size() == 2 && node->operands[0]->kind == lhs &&
+         node->operands[1]->kind == rhs;
+}
+
+TEST(OperatorPrecedenceParsing, AChainOfIffGroupsToTheRightUnderEachDirective) {
+  const std::pair<const char*, ModuleItemKind> kDirectives[] = {
+      {"assert", ModuleItemKind::kAssertProperty},
+      {"assume", ModuleItemKind::kAssumeProperty},
+      {"cover", ModuleItemKind::kCoverProperty}};
+  const std::pair<const char*, PropertyKind> kOperands[] = {
+      {"a iff b iff c", PropertyKind::kBoolean},
+      {"not a iff not b iff not c", PropertyKind::kNot},
+      {"nexttime a iff nexttime b iff nexttime c", PropertyKind::kNexttime}};
+  for (const auto& [directive, kind] : kDirectives) {
+    for (const auto& [spec, operand] : kOperands) {
+      SCOPED_TRACE(std::string(directive) + " " + spec);
+      auto r = Parse(std::string("module m;\n  logic clk, a, b, c;\n  ") +
+                     directive + " property (@(posedge clk) " + spec +
+                     ");\nendmodule\n");
+      ASSERT_FALSE(r.has_errors);
+      auto* item = FindItemByKind(r, kind);
+      ASSERT_NE(item, nullptr);
+      ASSERT_NE(item->body, nullptr);
+      const PropertyExprNode* root = item->body->assert_property;
+      ASSERT_TRUE(IsIffOf(root, operand, PropertyKind::kIff));
+      EXPECT_TRUE(IsIffOf(root->operands[1], operand, operand));
+    }
+  }
 }
 
 }  // namespace

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <iterator>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -407,6 +408,229 @@ TEST(DisableConditionRun,
      DISABLED_APulseBetweenTicksDisablesTheAttemptInACompilationUnitProperty) {
   for (const PlacedProperty& property : kDisabledInFlight) {
     ExpectPropertyCountsInPlace("unit", property, kPulseInFlight);
+  }
+}
+
+constexpr const char* kGroupedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+struct Grouping {
+  const char* written;
+  const char* meant;
+  const char* other;
+};
+
+void ExpectGroupedInPlace(const std::string& place, const Grouping& grouping,
+                          const std::string& declarations = "") {
+  bool differs = grouping.other == nullptr;
+  for (const char* directive : {"assert", "assume", "cover"}) {
+    SCOPED_TRACE(place + " " + directive + " " + grouping.written);
+    const PlaceCounts kMeant = CountThroughTheEnd(PropertyPlaceSource(
+        place, directive, grouping.meant, kGroupedStimulus, declarations));
+    EXPECT_EQ(CountThroughTheEnd(
+                  PropertyPlaceSource(place, directive, grouping.written,
+                                      kGroupedStimulus, declarations)),
+              kMeant);
+    if (std::string(directive) == "assert") {
+      EXPECT_GT(kMeant.passes + kMeant.fails, 0u);
+    }
+    if (grouping.other != nullptr &&
+        CountThroughTheEnd(PropertyPlaceSource(place, directive, grouping.other,
+                                               kGroupedStimulus,
+                                               declarations)) != kMeant) {
+      differs = true;
+    }
+  }
+  EXPECT_TRUE(differs) << place << ": " << grouping.written
+                       << " counts alike under both groupings";
+}
+
+constexpr const char* kGroupDeclarations =
+    "  sequence g_within; 1 ##1 c within 1 ##2 1; endsequence\n"
+    "  sequence g_isect; a ##[1:2] 1 intersect 1 ##1 c; endsequence\n"
+    "  sequence g_or; c ##1 d or a; endsequence\n"
+    "  sequence g_inner; b ##1 c within a ##1 b; endsequence\n"
+    "  sequence g_outer; a ##1 b within 1 ##3 1; endsequence\n"
+    "  sequence g_pair; 1 ##1 b intersect a ##1 1; endsequence\n";
+
+constexpr const char* kSequenceGroupPlaces[] = {
+    "module",  "procedural", "generate",       "interface",
+    "program", "checker",    "module property"};
+
+const Grouping kSequenceRows[] = {
+    {"d throughout b within a ##1 b ##2 c",
+     "(d throughout b) within (a ##1 b ##2 c)",
+     "d throughout (b within a ##1 b ##2 c)"},
+    {"a ##1 b intersect c ##1 d or a", "((a ##1 b) intersect (c ##1 d)) or a",
+     "(a ##1 b) intersect g_or"},
+    {"1'b1 throughout d throughout a ##1 b",
+     "1'b1 throughout (d throughout (a ##1 b))", nullptr},
+    {"a ##1 d ##1 b", "(a ##1 d) ##1 b", nullptr},
+    {"1 ##1 b intersect a ##1 1 intersect d ##1 d", "g_pair intersect d ##1 d",
+     nullptr},
+    {"a ##1 b and d ##1 c and d", "((a ##1 b) and (d ##1 c)) and d", nullptr},
+    {"a ##1 c or b ##1 c or c", "((a ##1 c) or (b ##1 c)) or c", nullptr}};
+
+const Grouping kUnevaluatedSequenceRows[] = {
+    {"a ##[1:2] 1 intersect 1 ##1 c within 1 ##2 1",
+     "a ##[1:2] 1 intersect g_within", "g_isect within 1 ##2 1"},
+    {"b ##1 c within a ##1 b within 1 ##3 1", "g_inner within 1 ##3 1",
+     "b ##1 c within g_outer"}};
+
+void ExpectSequenceRowsInEachPlace(const Grouping* first,
+                                   const Grouping* last) {
+  for (const char* place : kSequenceGroupPlaces) {
+    for (const Grouping* grouping = first; grouping != last; ++grouping) {
+      ExpectGroupedInPlace(place, *grouping, kGroupDeclarations);
+    }
+  }
+}
+
+TEST(OperatorPrecedenceRun, EachSequenceRowGroupsAsTheTableSaysInEachPlace) {
+  ExpectSequenceRowsInEachPlace(std::begin(kSequenceRows),
+                                std::end(kSequenceRows));
+}
+
+TEST(OperatorPrecedenceRun,
+     DISABLED_IntersectOverWithinAndAChainOfWithinGroupInEachPlace) {
+  ExpectSequenceRowsInEachPlace(std::begin(kUnevaluatedSequenceRows),
+                                std::end(kUnevaluatedSequenceRows));
+}
+
+std::string DeclaredSequence(const char* body) {
+  return std::string(kGroupDeclarations) + "  sequence s; " + body +
+         "; endsequence\n";
+}
+
+void ExpectSequenceDeclarationGroupedInPlace(const std::string& place,
+                                             const Grouping& grouping) {
+  for (const char* directive : {"assert", "cover"}) {
+    SCOPED_TRACE(place + " " + directive + " " + grouping.written);
+    const PlaceCounts kExpected = CountThroughTheEnd(
+        PropertyPlaceSource(place, directive, "s", kGroupedStimulus,
+                            DeclaredSequence(grouping.meant)));
+    EXPECT_EQ(CountThroughTheEnd(
+                  PropertyPlaceSource(place, directive, "s", kGroupedStimulus,
+                                      DeclaredSequence(grouping.written))),
+              kExpected);
+    if (std::string(directive) == "assert") {
+      EXPECT_GT(kExpected.passes + kExpected.fails, 0u);
+    }
+  }
+}
+
+void ExpectSequenceDeclarationsGrouped(const Grouping* first,
+                                       const Grouping* last) {
+  for (const char* place : kSequenceGroupPlaces) {
+    for (const Grouping* grouping = first; grouping != last; ++grouping) {
+      ExpectSequenceDeclarationGroupedInPlace(place, *grouping);
+    }
+  }
+}
+
+TEST(OperatorPrecedenceRun, ASequenceDeclarationGroupsAsTheTableSays) {
+  ExpectSequenceDeclarationsGrouped(std::begin(kSequenceRows),
+                                    std::end(kSequenceRows));
+}
+
+TEST(OperatorPrecedenceRun,
+     DISABLED_ASequenceDeclarationOfIntersectOverWithinOrChainedWithinGroups) {
+  ExpectSequenceDeclarationsGrouped(std::begin(kUnevaluatedSequenceRows),
+                                    std::end(kUnevaluatedSequenceRows));
+}
+
+const Grouping kPropertyRows[] = {
+    {"not b and a", "a and not b", "not (b ##0 a)"},
+    {"nexttime a and b", "(nexttime a) and b", "nexttime (a and b)"},
+    {"nexttime a or c", "(nexttime a) or c", "nexttime (a or c)"},
+    {"s_nexttime c and a", "(s_nexttime c) and a", "s_nexttime (c and a)"},
+    {"s_nexttime b or a", "(s_nexttime b) or a", "s_nexttime (b or a)"},
+    {"nexttime [1] b and a", "(nexttime [1] b) and a",
+     "nexttime [1] (b and a)"},
+    {"s_nexttime [1] b or a", "(s_nexttime [1] b) or a",
+     "s_nexttime [1] (b or a)"},
+    {"nexttime a and d and not c", "((nexttime a) and d) and not c", nullptr},
+    {"nexttime a or b or c", "((nexttime a) or b) or c", nullptr},
+    {"a or b iff c", "(a or b) iff c", "a or (b iff c)"},
+    {"a and b iff d", "(a and b) iff d", "a and (b iff d)"},
+    {"a iff b iff c", "a iff (b iff c)", nullptr},
+    {"a iff b until c", "(a iff b) until c", "a iff (b until c)"},
+    {"a iff b s_until c", "(a iff b) s_until c", "a iff (b s_until c)"},
+    {"a iff b until_with c", "(a iff b) until_with c",
+     "a iff (b until_with c)"},
+    {"a iff b s_until_with c", "(a iff b) s_until_with c",
+     "a iff (b s_until_with c)"},
+    {"c implies a implies b", "c implies (a implies b)",
+     "(c implies a) implies b"},
+    {"b until c until a", "b until (c until a)", "(b until c) until a"},
+    {"a until b implies c", "a until (b implies c)", "(a until b) implies c"},
+    {"d implies b s_until a", "d implies (b s_until a)",
+     "(d implies b) s_until a"},
+    {"a |=> b implies c", "a |=> (b implies c)", "(a |=> b) implies c"},
+    {"d |-> b s_until a", "d |-> (b s_until a)", "(d |-> b) s_until a"},
+    {"d |=> b until a", "d |=> (b until a)", "(d |=> b) until a"},
+    {"c |-> a until_with b", "c |-> (a until_with b)",
+     "(c |-> a) until_with b"},
+    {"c |=> b s_until_with a", "c |=> (b s_until_with a)",
+     "(c |=> b) s_until_with a"},
+    {"a |-> b and d", "a |-> (b and d)", "(a |-> b) and d"},
+    {"a |=> b or c", "a |=> (b or c)", "(a |=> b) or c"},
+    {"a |-> b |-> c", "a |-> (b |-> c)", nullptr},
+    {"a |-> b |=> c", "a |-> (b |=> c)", nullptr},
+    {"d |=> b #-# c", "d |=> (b #-# c)", nullptr},
+    {"d |-> b #=# c", "d |-> (b #=# c)", nullptr},
+    {"always a or b", "always (a or b)", "(always a) or b"},
+    {"s_always [0:1] d and c", "s_always [0:1] (d and c)",
+     "(s_always [0:1] d) and c"},
+    {"eventually [0:1] a and c", "eventually [0:1] (a and c)",
+     "(eventually [0:1] a) and c"},
+    {"s_eventually b and a", "s_eventually (b and a)",
+     "(s_eventually b) and a"},
+    {"accept_on (c) a and b", "accept_on (c) (a and b)",
+     "(accept_on (c) a) and b"},
+    {"reject_on (a) c or b", "reject_on (a) (c or b)",
+     "(reject_on (a) c) or b"},
+    {"sync_accept_on (b) a implies c", "sync_accept_on (b) (a implies c)",
+     "(sync_accept_on (b) a) implies c"},
+    {"sync_reject_on (b) d |-> c", "sync_reject_on (b) (d |-> c)", nullptr},
+    {"case (a) 1'b1: b and d; default: c or b; endcase",
+     "case (a) 1'b1: (b and d); default: (c or b); endcase", nullptr},
+    {"b or always [0:1] d and a", "b or always [0:1] (d and a)",
+     "b or ((always [0:1] d) and a)"},
+    {"b or always 1'b1 and a", "b or always (1'b1 and a)",
+     "b or ((always 1'b1) and a)"},
+    {"c and s_eventually b or a", "c and s_eventually (b or a)",
+     "(c and (s_eventually b)) or a"},
+    {"if (d) c else b and a", "if (d) c else (b and a)",
+     "(if (d) c else b) and a"},
+    {"a || b ##1 c", "(a || b) ##1 c", nullptr},
+    {"!a and b", "(!a) and b", nullptr},
+    {"a -> b |-> c", "(a -> b) |-> c", nullptr},
+    {"a ? b : c ##1 d", "(a ? b : c) ##1 d", nullptr},
+    {"a && b or c", "(a && b) or c", nullptr}};
+
+TEST(OperatorPrecedenceRun, EachPropertyRowGroupsAsTheTableSaysInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const Grouping& grouping : kPropertyRows) {
+      ExpectGroupedInPlace(place, grouping);
+    }
+  }
+}
+
+TEST(OperatorPrecedenceRun,
+     DISABLED_EachPropertyRowGroupsAsTheTableSaysInACompilationUnitProperty) {
+  for (const Grouping& grouping : kPropertyRows) {
+    ExpectGroupedInPlace("unit", grouping);
+  }
+}
+
+TEST(OperatorPrecedenceRun, DISABLED_AParenthesizedNotGroupsAsTheTableSays) {
+  for (const char* place : kPropertyPlaces) {
+    ExpectGroupedInPlace(place,
+                         {"not a and b", "(not a) and b", "not (a and b)"});
   }
 }
 
