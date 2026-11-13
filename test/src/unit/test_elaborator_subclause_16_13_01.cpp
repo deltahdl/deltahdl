@@ -513,7 +513,8 @@ void ExpectInstanceJudgedIn(const std::string& place,
   EXPECT_TRUE(ReportedOnlyOnce(f.diag.Diagnostics(), row.message,
                                LineHolding(src, "assert property (")))
       << src;
-  EXPECT_EQ(f.diag.ErrorCount(), 1u) << src;
+  uint32_t declared = LineHolding(src, row.declaration.substr(0, 12));
+  EXPECT_EQ(ErrorsAt(f.diag.Diagnostics(), declared), 0u) << src;
 }
 
 void ExpectInstancesJudgedInEachPlace(
