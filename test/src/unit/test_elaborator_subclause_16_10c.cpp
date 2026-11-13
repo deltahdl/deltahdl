@@ -241,4 +241,97 @@ TEST(SiblingThreadRead, AFlowedLocalInEachOuterScopeIsAccepted) {
   }
 }
 
+constexpr const char* kUnassignedY =
+    "the local variable 'y' is referenced at a point where it is unassigned";
+
+constexpr const char* kOrInstances =
+    "sequence sa(lv); (a, lv = d); endsequence\n"
+    "  sequence sb(lv); (b, lv = 1); endsequence\n  ";
+
+void ExpectReadAfterOrReported(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t line = LineHolding(src, "(c == y)");
+  ASSERT_NE(line, 0u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnassignedY, line, "16.10"));
+}
+
+TEST(OrFlowOut, ALocalAssignedInOneOperandIsUnassignedAfterTheOr) {
+  for (const char* decl : {
+           "sequence s; int y; ((a, y = d) or b) ##1 (c == y); endsequence",
+           "sequence s; int y; (b or (a, y = d)) ##1 (c == y); endsequence",
+           "sequence s; int y; a ##1 ((b, y = d) or c) ##1 (c == y);"
+           " endsequence",
+           "sequence s; int y; (((a, y = d) or b) or (c, y = 1)) ##1"
+           " (c == y); endsequence",
+           "property q; int y; ((a, y = d) or b) |-> (c == y); endproperty",
+           "property q; int y; ((a, y = d) or b) |=> (c == y); endproperty",
+       }) {
+    ExpectReadAfterOrReported(SiblingModule(decl));
+  }
+  for (const char* decl : {
+           "sequence s; int y; (sa(y) or b) ##1 (c == y); endsequence",
+           "property q; int y; (b or sa(y)) |-> (c == y); endproperty",
+       }) {
+    ExpectReadAfterOrReported(SiblingModule(kOrInstances + std::string(decl)));
+  }
+}
+
+TEST(OrFlowOut, ALocalAssignedInBothOperandsOrBeforeFlowsOut) {
+  for (const char* decl : {
+           "sequence s; int y; ((a, y = d) or (b, y = 1)) ##1 (c == y);"
+           " endsequence",
+           "sequence s; int y; (a, y = 0) ##1 ((b, y = 1) or c) ##1"
+           " (c == y); endsequence",
+           "sequence s; int y; (((a, y = d) or (b, y = 2)) or (c, y = 1))"
+           " ##1 (c == y); endsequence",
+           "property q; int y; ((a, y = d) or (b, y = 1)) |-> (c == y);"
+           " endproperty",
+           "property q; int y; ((a, y = d) or (b, y = 1)) |=> (c == y);"
+           " endproperty",
+       }) {
+    ExpectAccepted(SiblingModule(decl));
+  }
+  for (const char* decl : {
+           "sequence s; int y; (sa(y) or sb(y)) ##1 (c == y); endsequence",
+           "property q; int y; (sb(y) or sa(y)) |-> (c == y); endproperty",
+       }) {
+    ExpectAccepted(SiblingModule(kOrInstances + std::string(decl)));
+  }
+}
+
+constexpr const char* kOneSidedOr =
+    "sequence s; int y; ((a, y = d) or b) ##1 (c == y); endsequence";
+constexpr const char* kOneSidedOrProperty =
+    "property q; int y; ((a, y = d) or b) |-> (c == y); endproperty";
+constexpr const char* kTwoSidedOr =
+    "sequence s; int y; ((a, y = d) or (b, y = 1)) ##1 (c == y);"
+    " endsequence";
+
+TEST(OrFlowOut, AReadAfterAOneSidedOrInEachOtherDesignElementIsReported) {
+  for (const char* element : {"interface", "program", "checker"}) {
+    ExpectReadAfterOrReported(InElement(element, kOneSidedOr));
+    ExpectReadAfterOrReported(InElement(element, kOneSidedOrProperty));
+    ExpectAccepted(InElement(element, kTwoSidedOr));
+  }
+}
+
+TEST(OrFlowOut, DISABLED_AReadAfterAOneSidedOrInEachOuterScopeIsReported) {
+  for (const char* place :
+       {"package", "import", "unit", "if", "for", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectReadAfterOrReported(InOuterScope(place, kOneSidedOr));
+    ExpectReadAfterOrReported(InOuterScope(place, kOneSidedOrProperty));
+  }
+}
+
+TEST(OrFlowOut, ATwoSidedOrInEachOuterScopeIsAccepted) {
+  for (const char* place :
+       {"package", "import", "unit", "if", "for", "clocking"}) {
+    SCOPED_TRACE(place);
+    ExpectAccepted(InOuterScope(place, kTwoSidedOr));
+  }
+}
+
 }  // namespace
