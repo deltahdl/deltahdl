@@ -525,4 +525,166 @@ TEST(NamedSequenceInstance, DISABLED_ACompilationUnitEmptyListInstanceRuns) {
       "initial #20 $unit::b = 1;\n  " + EmptyListAssertion("s()")));
 }
 
+std::string PositionBench(const std::string& outside,
+                          const std::string& items) {
+  return outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1, b = 0;\n"
+         "  logic [1:0] v;\n"
+         "  assign v = {b, a};\n"
+         "  always #5 clk = ~clk;\n"
+         "  " +
+         items +
+         "\n"
+         "  initial begin #22 b = 1; #20 a = 0; #30 $finish; end\n"
+         "endmodule\n";
+}
+
+std::string Shown(const std::string& tag, const std::string& prop) {
+  return "cover property (" + prop + ") $display(\"" + tag + " %0t\", $time);";
+}
+
+TEST(SequenceFormalPosition, EachPositionTakesItsActualInAModule) {
+  const std::string kSrc =
+      PositionBench("",
+                    "sequence sq(q); a ##1 q; endsequence\n"
+                    "  sequence se(e); @(e) a; endsequence\n"
+                    "  sequence sx(x); x[0] ##1 x[1]; endsequence\n"
+                    "  sequence inner(z); a ##1 z; endsequence\n"
+                    "  sequence outer(y); inner(y); endsequence\n  " +
+                        Shown("sq", "@(posedge clk) sq(b ##1 a)") + "\n  " +
+                        Shown("edge", "se(negedge clk)") + "\n  " +
+                        Shown("either", "se(posedge clk or negedge clk)") +
+                        "\n  " + Shown("any", "se(clk)") + "\n  " +
+                        Shown("sx", "@(posedge clk) sx(v)") + "\n  " +
+                        Shown("outer", "@(posedge clk) outer(b ##1 a)"));
+  ExpectLines(kSrc, "sq ", "35");
+  ExpectLines(kSrc, "edge ", "10 20 30 40");
+  ExpectLines(kSrc, "either ", "5 10 15 20 25 30 35 40");
+  ExpectLines(kSrc, "any ", "5 10 15 20 25 30 35 40");
+  ExpectLines(kSrc, "sx ", "25 35 45");
+  ExpectLines(kSrc, "outer ", "35");
+}
+
+TEST(SequenceFormalPosition, EachPositionTakesAnUntypedFormalsDefault) {
+  const std::string kSrc = PositionBench(
+      "",
+      "sequence sq(q = b ##1 a); a ##1 q; endsequence\n"
+      "  sequence se(e = negedge clk); @(e) a; endsequence\n"
+      "  sequence sr(hi = $); a ##[1:hi] (b && !a); endsequence\n  " +
+          Shown("sq", "@(posedge clk) sq()") + "\n  " + Shown("edge", "se()") +
+          "\n  " + Shown("sr", "@(posedge clk) sr()"));
+  ExpectLines(kSrc, "sq ", "35");
+  ExpectLines(kSrc, "edge ", "10 20 30 40");
+  ExpectLines(kSrc, "sr ", "45 45 45 45");
+}
+
+const char kClockless[] =
+    "sequence sq(q, p); p ##1 q; endsequence\n"
+    "  sequence sx(x); x[0] ##1 x[1]; endsequence\n"
+    "  sequence sqt(untyped p, sequence q); p ##1 q; endsequence";
+
+const char kEventTakers[] =
+    "\n  sequence se(e, p); @(e) p; endsequence\n"
+    "  sequence set(event e, untyped p); @(e) p; endsequence";
+
+std::string FormalOnly() { return std::string(kClockless) + kEventTakers; }
+
+std::string ClocklessCovers(const std::string& prefix) {
+  return Shown("sq", "@(posedge clk) " + prefix + "sq(b ##1 a, a)") + "\n  " +
+         Shown("sx", "@(posedge clk) " + prefix + "sx(v)") + "\n  " +
+         Shown("sqt", "@(posedge clk) " + prefix + "sqt(a, b ##1 a)");
+}
+
+std::string FormalOnlyCovers(const std::string& prefix) {
+  return ClocklessCovers(prefix) + "\n  " +
+         Shown("se", prefix + "se(negedge clk, a)") + "\n  " +
+         Shown("set", prefix + "set(negedge clk, a)");
+}
+
+void ExpectEveryClocklessPosition(const std::string& src) {
+  ExpectLines(src, "sq ", "35");
+  ExpectLines(src, "sx ", "25 35 45");
+  ExpectLines(src, "sqt ", "35");
+}
+
+void ExpectEveryFormalOnlyPosition(const std::string& src) {
+  ExpectEveryClocklessPosition(src);
+  ExpectLines(src, "se ", "10 20 30 40");
+  ExpectLines(src, "set ", "10 20 30 40");
+}
+
+struct PositionPlace {
+  std::string place;
+  std::string outside;
+  std::string items;
+};
+
+std::vector<PositionPlace> WorkingPositionPlaces() {
+  const std::string kDecls = FormalOnly();
+  const std::string kUnitPorts =
+      "(input logic clk, a, b, input logic [1:0] v);";
+  return {{"module", "", kDecls + "\n  " + FormalOnlyCovers("")},
+          {"package by import", "package pk;\n  " + kDecls + "\nendpackage\n",
+           "import pk::*;\n  " + FormalOnlyCovers("")},
+          {"package by name", "package pk;\n  " + kDecls + "\nendpackage\n",
+           FormalOnlyCovers("pk::")},
+          {"program",
+           "program pg" + kUnitPorts + "\n  " + kDecls + "\n  " +
+               FormalOnlyCovers("") + "\nendprogram\n",
+           "pg p(clk, a, b, v);"},
+          {"checker",
+           "checker ck(logic clk, logic a, logic b, logic [1:0] v);\n  " +
+               kDecls + "\n  " + FormalOnlyCovers("") + "\nendchecker\n",
+           "ck k(clk, a, b, v);"},
+          {"generate", "",
+           "if (1) begin : g\n    " + kDecls + "\n    " + FormalOnlyCovers("") +
+               "\n  end"}};
+}
+
+TEST(SequenceFormalPosition, EachPositionTakesItsActualWhereverDeclared) {
+  for (const auto& placed : WorkingPositionPlaces()) {
+    SCOPED_TRACE(placed.place);
+    ExpectEveryFormalOnlyPosition(PositionBench(placed.outside, placed.items));
+  }
+}
+
+std::vector<PositionPlace> NamedThroughAScope() {
+  const std::string kDecls = FormalOnly();
+  return {{"package by name", "package pk;\n  " + kDecls + "\nendpackage\n",
+           FormalOnlyCovers("pk::")},
+          {"interface instance",
+           "interface ifc(input logic clk);\n  " + kDecls + "\nendinterface\n",
+           "ifc u(clk);\n  " + FormalOnlyCovers("u.")},
+          {"clocking block", "",
+           "clocking cb @(posedge clk);\n    " + std::string(kClockless) +
+               "\n  endclocking\n  " + ClocklessCovers("cb.")}};
+}
+
+TEST(SequenceFormalPosition,
+     DISABLED_EachPositionTakesItsActualThroughAnInstance) {
+  for (const auto& placed : NamedThroughAScope()) {
+    if (placed.place == "package by name") continue;
+    SCOPED_TRACE(placed.place);
+    const std::string kSrc = PositionBench(placed.outside, placed.items);
+    if (placed.place == "clocking block") {
+      ExpectEveryClocklessPosition(kSrc);
+    } else {
+      ExpectEveryFormalOnlyPosition(kSrc);
+    }
+  }
+}
+
+TEST(SequenceFormalPosition, AnExpressionActualReachesThroughAScope) {
+  for (const auto& placed : NamedThroughAScope()) {
+    SCOPED_TRACE(placed.place);
+    ExpectLines(PositionBench(placed.outside, placed.items), "sx ", "25 35 45");
+  }
+}
+
+TEST(SequenceFormalPosition, DISABLED_EachPositionTakesItsActualInTheUnit) {
+  ExpectEveryFormalOnlyPosition(
+      PositionBench(FormalOnly() + "\n", FormalOnlyCovers("")));
+}
+
 }  // namespace
