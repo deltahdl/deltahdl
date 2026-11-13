@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_sampling_bench.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -441,6 +443,86 @@ TEST(NamedSequenceInstance, AnInstanceReadsALocalInWhoseScopeItStands) {
       "  cover property (s_l) c1++;\n"
       "  cover property (s_m) c2++;\n");
   EXPECT_NE(out.find("c1=9 c2=0\n"), std::string::npos) << out;
+}
+
+std::string EmptyListBench(const std::string& outside,
+                           const std::string& items) {
+  return outside +
+         "module top;\n"
+         "  logic clk = 0, a = 1, b = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  " +
+         items +
+         "\n"
+         "  initial begin #20 b = 1; #30 $finish; end\n"
+         "endmodule\n";
+}
+
+std::string EmptyListAssertion(const std::string& instance) {
+  return "assert property (@(posedge clk) " + instance +
+         ") $display(\"pass %0t\", $time); else $display(\"fail %0t\", "
+         "$time);";
+}
+
+void ExpectRunsAsTheBody(const std::string& src) {
+  ExpectLines(src, "pass ", "25 35 45");
+  ExpectLines(src, "fail ", "15");
+}
+
+TEST(NamedSequenceInstance, AnEmptyListInstanceMatchesWhereItsBodyDoes) {
+  for (const char* decl : {"sequence s(); a ##1 b; endsequence",
+                           "sequence s; a ##1 b; endsequence"}) {
+    for (const char* instance : {"s()", "s"}) {
+      ExpectRunsAsTheBody(EmptyListBench(
+          "", std::string(decl) + "\n  " + EmptyListAssertion(instance)));
+    }
+  }
+}
+
+struct EmptyListPlace {
+  std::string place;
+  std::string outside;
+  std::string items;
+};
+
+std::vector<EmptyListPlace> EmptyListPlaces() {
+  const std::string kDecl = "sequence s(); a ##1 b; endsequence";
+  const std::string kHere = EmptyListAssertion("s()");
+  const std::string kVars = "  bit a = 1, b = 0;\n  " + kDecl + "\n";
+  return {
+      {"interface",
+       "interface ifc(input logic clk, a, b);\n  " + kDecl + "\nendinterface\n",
+       "ifc i(clk, a, b);\n  " + EmptyListAssertion("i.s()")},
+      {"program",
+       "program pg(input logic clk, a, b);\n  " + kDecl + "\n  " + kHere +
+           "\nendprogram\n",
+       "pg p(clk, a, b);"},
+      {"clocking block", "",
+       "clocking cb @(posedge clk);\n    " + kDecl + "\n  endclocking\n  " +
+           EmptyListAssertion("cb.s()")},
+      {"package by name", "package pk;\n" + kVars + "endpackage\n",
+       "initial #20 pk::b = 1;\n  " + EmptyListAssertion("pk::s()")},
+      {"package by import", "package pk;\n" + kVars + "endpackage\n",
+       "import pk::s;\n  initial #20 pk::b = 1;\n  " + kHere},
+      {"checker",
+       "checker ck(logic clk, logic a, logic b);\n  " + kDecl + "\n  " + kHere +
+           "\nendchecker\n",
+       "ck k(clk, a, b);"},
+      {"generate", "",
+       "if (1) begin : g\n    " + kDecl + "\n    " + kHere + "\n  end"}};
+}
+
+TEST(NamedSequenceInstance, EveryPlaceRunsAnEmptyListInstanceAsItsBody) {
+  for (const auto& placed : EmptyListPlaces()) {
+    SCOPED_TRACE(placed.place);
+    ExpectRunsAsTheBody(EmptyListBench(placed.outside, placed.items));
+  }
+}
+
+TEST(NamedSequenceInstance, DISABLED_ACompilationUnitEmptyListInstanceRuns) {
+  ExpectRunsAsTheBody(EmptyListBench(
+      "bit a = 1, b = 0;\nsequence s(); a ##1 b; endsequence\n",
+      "initial #20 $unit::b = 1;\n  " + EmptyListAssertion("s()")));
 }
 
 }  // namespace

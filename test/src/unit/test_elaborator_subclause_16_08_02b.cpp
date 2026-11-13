@@ -131,6 +131,38 @@ TEST(LocalFormalActualAssigned, AnAssignedPropertyActualIsAccepted) {
   }
 }
 
+const char kActualPlace[] =
+    "sequence sub(local input int x); a ##1 (x == 1); endsequence\n"
+    "  sequence top; int v; @@; endsequence";
+
+constexpr FormalReport kUnassignedActualInTop = {
+    .message = kUnassignedActual.message,
+    .subclause = "16.8.2",
+    .at = "sequence top"};
+
+TEST(LocalFormalActualAssigned, AModuleOrUnitReportsAnUnassignedActual) {
+  for (const auto& placed : InEveryDeclarationPlace(kActualPlace, "")) {
+    if (InAModuleOrUnit(placed)) {
+      ExpectReportedAs(placed.source, "sub(v)", kUnassignedActualInTop);
+    }
+  }
+}
+
+TEST(LocalFormalActualAssigned,
+     DISABLED_EveryOtherPlaceReportsAnUnassignedActual) {
+  for (const auto& placed : InEveryDeclarationPlace(kActualPlace, "")) {
+    if (!InAModuleOrUnit(placed)) {
+      ExpectReportedAs(placed.source, "sub(v)", kUnassignedActualInTop);
+    }
+  }
+}
+
+TEST(LocalFormalActualAssigned, EveryPlaceAcceptsAnAssignedActual) {
+  for (const auto& placed : InEveryDeclarationPlace(kActualPlace, "")) {
+    ExpectFormAccepted(placed.source, "(1, v = 0) ##1 sub(v)");
+  }
+}
+
 constexpr FormalReport kUnassignedOutput = {
     .message = "is referenced at a point where it is unassigned",
     .subclause = "16.10"};

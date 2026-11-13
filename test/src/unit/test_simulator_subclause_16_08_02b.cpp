@@ -377,4 +377,17 @@ TEST(LocalFormalInitialValue, DISABLED_ARealInputHoldsItsActual) {
               "hit ", "25");
 }
 
+TEST(LocalFormalInitialValue,
+     DISABLED_EveryPlaceGivesAPropertyBodyLocalTheFormal) {
+  for (const auto& placed : AttemptPlaces(
+           "property sub(untyped d, local input int lv); int g = lv; 1 ##2 "
+           "(d == g); endproperty",
+           "assert property (@(posedge clk) c |-> @sub(do1, data)) else "
+           "$display(\"fail %0t\", $time);")) {
+    if (placed.place == "compilation unit") continue;
+    ExpectLines(AttemptBench(placed.items, kOverlap, placed.outside), "fail ",
+                "");
+  }
+}
+
 }  // namespace

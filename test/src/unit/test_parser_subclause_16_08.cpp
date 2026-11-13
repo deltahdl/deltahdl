@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -529,6 +530,82 @@ TEST(SequenceDeclaration, APortListEndingInsideAFormalsTypeIsReported) {
       "module m;\n"
       "  sequence s(my_t [3");
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 2, "16.8"));
+}
+
+ModuleItem* FindSequenceIn(const std::vector<ModuleItem*>& items) {
+  for (auto* item : items) {
+    if (item->kind == ModuleItemKind::kSequenceDecl && item->name == "s") {
+      return item;
+    }
+    for (const auto* nested : {&item->gen_body, &item->clocking_decls}) {
+      if (auto* found = FindSequenceIn(*nested)) return found;
+    }
+  }
+  return nullptr;
+}
+
+ModuleItem* FindSequenceS(const ParseResult& r) {
+  for (const auto* units :
+       {&r.cu->modules, &r.cu->interfaces, &r.cu->programs, &r.cu->checkers}) {
+    for (auto* unit : *units) {
+      if (auto* found = FindSequenceIn(unit->items)) return found;
+    }
+  }
+  for (auto* pkg : r.cu->packages) {
+    if (auto* found = FindSequenceIn(pkg->items)) return found;
+  }
+  return FindSequenceIn(r.cu->cu_items);
+}
+
+const char* const kEmptyListPlaces[] = {
+    "module m;\n  sequence s(); a ##1 b; endsequence\nendmodule\n",
+    "interface ifc;\n  sequence s(); a ##1 b; endsequence\nendinterface\n",
+    "program pg;\n  sequence s(); a ##1 b; endsequence\nendprogram\n",
+    ("module m;\n  clocking cb @(posedge clk);\n    sequence s(); a ##1 b; "
+     "endsequence\n  endclocking\nendmodule\n"),
+    "package pk;\n  sequence s(); a ##1 b; endsequence\nendpackage\n",
+    "sequence s(); a ##1 b; endsequence\n",
+    "checker ck;\n  sequence s(); a ##1 b; endsequence\nendchecker\n",
+    ("module m;\n  if (1) begin : g\n    sequence s(); a ##1 b; endsequence\n"
+     "  end\nendmodule\n"),
+    ("module m;\n  for (genvar i = 0; i < 2; i++) begin : g\n    sequence s(); "
+     "a ##1 b; endsequence\n  end\nendmodule\n")};
+
+TEST(SequenceDeclarationParsing, EmptyParenthesesDeclareNoFormalsAnywhere) {
+  for (const char* src : kEmptyListPlaces) {
+    SCOPED_TRACE(src);
+    auto r = Parse(src);
+    ASSERT_NE(r.cu, nullptr);
+    EXPECT_FALSE(r.has_errors);
+    auto* seq = FindSequenceS(r);
+    ASSERT_NE(seq, nullptr);
+    EXPECT_TRUE(seq->prop_formals.empty());
+  }
+}
+
+TEST(SequenceDeclarationParsing, NoParenthesesDeclareNoFormals) {
+  auto r = Parse("module m;\n  sequence s; a ##1 b; endsequence\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* seq = FindSequenceS(r);
+  ASSERT_NE(seq, nullptr);
+  EXPECT_TRUE(seq->prop_formals.empty());
+}
+
+TEST(SequenceDeclarationParsing, ALoneCommaInThePortListIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  sequence s(,);\n"
+      "    a;\n"
+      "  endsequence\n"
+      "  sequence t();\n"
+      "    a;\n"
+      "  endsequence\n"
+      "endmodule\n");
+  const char* const kNoFormal =
+      "sequence port item names a formal_port_identifier";
+  EXPECT_TRUE(ReportedError(r.diags, kNoFormal, 2, "A.2.10"));
+  EXPECT_FALSE(ReportedError(r.diags, kNoFormal, 5, "A.2.10"));
 }
 
 }  // namespace
