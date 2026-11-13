@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -127,6 +128,78 @@ TEST(PropertyIfElse, IfElseBindsLoosest) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 2, 4};\n"
+    "  assign b = tick inside {1, 4};\n"
+    "  assign c = tick inside {2};\n"
+    "  assign d = tick inside {1};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"if (a) b", {3, 1}, 3},
+    {"if (a) b else d", {2, 2}, 2},
+    {"if (a) b ##1 c else d", {2, 2}, 1},
+    {"if (a) (b |-> c) else not c", {2, 2}, 2},
+    {"if (a) q(c, b) else not c", {3, 1}, 3},
+    {"if (a && !b) c else d", {2, 2}, 2},
+    {"if (b dist {1 := 1}) a else d", {2, 2}, 2},
+};
+
+TEST(PropertyIfElse, AnIfElseCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(PropertyIfElse, DISABLED_AnIfElseCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
+}
+
+std::string ConditionSource(const std::string& condition) {
+  return "module t;\n"
+         "  logic clk = 0;\n"
+         "  int tick = 1;\n"
+         "  logic c, d, cx;\n"
+         "  logic [1:0] v;\n"
+         "  int passes = 0;\n"
+         "  int fails = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  always #10 tick = tick + 1;\n"
+         "  assign c = tick inside {2};\n"
+         "  assign d = tick inside {1};\n"
+         "  assign v = tick == 2 ? 2'b10 : 2'b00;\n"
+         "  assign cx = tick == 2 ? 1'bx : 1'b0;\n"
+         "  p: assert property (@(posedge clk) if (" +
+         condition +
+         ") c else d) passes++; else fails++;\n"
+         "  initial #40 $finish;\n"
+         "endmodule\n";
+}
+
+TEST(PropertyIfElse, AVectorConditionIsTrueWhereItIsNonzero) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(ConditionSource("v"), f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 2u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+TEST(PropertyIfElse, AnUnknownConditionTakesTheElseBranch) {
+  SimFixture f;
+  auto* passes = RunAndFindVar(ConditionSource("cx"), f, "passes");
+  ASSERT_NE(passes, nullptr);
+  EXPECT_EQ(passes->value.ToUint64(), 1u);
+  EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 3u);
 }
 
 }  // namespace
