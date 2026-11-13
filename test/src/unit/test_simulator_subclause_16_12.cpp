@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -309,6 +311,103 @@ TEST(DeclaringProperties, AFormalStandsForAPropertyExpr) {
                 "  assert property (@(posedge clk) p_expr(##1 a)) p2++;\n"
                 "    else f2++;\n"),
             "10 0 5 5\n");
+}
+
+constexpr const char* kPulseInFlight =
+    "  assign a = tick inside {1};\n"
+    "  assign b = tick inside {4};\n"
+    "  assign c = 0;\n"
+    "  initial begin d = 0; #20 d = 1; #2 d = 0; end\n";
+
+const PlacedProperty kDisabledInFlight[] = {
+    {"disable iff (d) a |=> ##2 b", {3, 0}, 3},
+    {"disable iff (d) a |=> ##2 c", {3, 0}, 3},
+    {"disable iff (d) a ##3 b", {0, 3}, 0}};
+
+TEST(DisableConditionRun,
+     DISABLED_APulseBetweenTicksDisablesTheAttemptInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kDisabledInFlight) {
+      ExpectPropertyCountsInPlace(place, property, kPulseInFlight);
+    }
+  }
+}
+
+const PlacedProperty kNotDisabledInFlight[] = {
+    {"a |=> ##2 b", {4, 0}, 4},
+    {"a |=> ##2 c", {3, 1}, 3},
+    {"disable iff (1'b0) a |=> ##2 c", {3, 1}, 3},
+    {"a ##3 b", {1, 3}, 1},
+    {"disable iff (1'b0) a ##3 b", {1, 3}, 1}};
+
+TEST(DisableConditionRun, AFormNotDisabledCountsOnThePulseWaveformInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kNotDisabledInFlight) {
+      ExpectPropertyCountsInPlace(place, property, kPulseInFlight);
+    }
+  }
+}
+
+constexpr const char* kTwoAttempts =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign c = 0;\n";
+
+TEST(DisableConditionRun,
+     DISABLED_APulseDisablesOnlyTheAttemptInFlightInEachPlace) {
+  const std::string kStimulus =
+      std::string(kTwoAttempts) +
+      "  initial begin d = 0; #27 d = 1; #2 d = 0; end\n";
+  for (const char* place : kPropertyPlaces) {
+    ExpectPropertyCountsInPlace(place, {"disable iff (d) a |=> c", {2, 1}, 2},
+                                kStimulus);
+  }
+}
+
+TEST(DisableConditionRun, APulseBeforeAnAttemptStartsLeavesItAloneInEachPlace) {
+  const std::string kStimulus =
+      std::string(kTwoAttempts) +
+      "  initial begin d = 0; #20 d = 1; #2 d = 0; end\n";
+  for (const char* place : kPropertyPlaces) {
+    ExpectPropertyCountsInPlace(place, {"disable iff (d) a |=> c", {2, 2}, 2},
+                                kStimulus);
+  }
+}
+
+constexpr const char* kDefaultDisablePlaces[] = {"module",   "procedural",
+                                                 "generate", "interface",
+                                                 "program",  "module property"};
+
+TEST(
+    DisableConditionRun,
+    DISABLED_ADefaultDisableIffPulseBetweenTicksDisablesTheAttemptInEachPlace) {
+  for (const char* place : kDefaultDisablePlaces) {
+    ExpectPropertyCountsInPlace(place, {"a |=> ##2 c", {3, 0}, 3},
+                                kPulseInFlight, "  default disable iff d;\n");
+  }
+}
+
+size_t CoverSequenceHits(const std::string& seq) {
+  return CountThroughTheEnd(
+             PlacedTop(kPulseInFlight, "  cover sequence (@(posedge clk) " +
+                                           seq + ") $display(\"PASS\");\n"))
+      .passes;
+}
+
+TEST(DisableConditionRun, ACoverSequenceWithoutADisableConditionMatches) {
+  EXPECT_EQ(CoverSequenceHits("a ##3 b"), 1u);
+  EXPECT_EQ(CoverSequenceHits("disable iff (1'b0) a ##3 b"), 1u);
+}
+
+TEST(DisableConditionRun,
+     DISABLED_APulseBetweenTicksDisablesACoverSequenceAttempt) {
+  EXPECT_EQ(CoverSequenceHits("disable iff (d) a ##3 b"), 0u);
+}
+
+TEST(DisableConditionRun,
+     DISABLED_APulseBetweenTicksDisablesTheAttemptInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kDisabledInFlight) {
+    ExpectPropertyCountsInPlace("unit", property, kPulseInFlight);
+  }
 }
 
 }  // namespace
