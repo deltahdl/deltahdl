@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sva_engine_sequences.h"
@@ -199,6 +200,77 @@ TEST(AbortProperty, TheOutermostOfNestedAbortsTakesPrecedence) {
   ASSERT_NE(reject_outer, nullptr);
   EXPECT_EQ(reject_outer->value.ToUint64(), 0u);
   EXPECT_EQ(g.ctx.FindVariable("fails")->value.ToUint64(), 8u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"accept_on (b) c", {3, 1}, 3},
+    {"reject_on (b) c", {1, 3}, 1},
+    {"sync_accept_on (b) c", {3, 1}, 3},
+    {"sync_reject_on (b) c", {1, 3}, 1},
+    {"not (accept_on (b) not c)", {1, 3}, 1},
+    {"not (sync_accept_on (b) not c)", {1, 3}, 1},
+    {"reject_on (a) (d |=> d)", {1, 3}, 1},
+    {"accept_on (a) (d |=> !d)", {4, 0}, 4},
+    {"sync_accept_on (!d) (b |=> b)", {4, 0}, 4},
+    {"sync_reject_on (!d) (b |=> b)", {2, 2}, 2},
+    {"accept_on (a) reject_on (b) c", {3, 1}, 3},
+    {"reject_on (b) accept_on (a) c", {2, 2}, 2},
+    {"sync_accept_on (a) sync_reject_on (b) c", {3, 1}, 3},
+    {"sync_reject_on (b) sync_accept_on (a) c", {2, 2}, 2},
+    {"(accept_on (a) c) and (reject_on (b) d)", {1, 3}, 1},
+    {"(accept_on (a) !d) or (reject_on (b) !c)", {3, 1}, 3},
+    {"not (accept_on (a) b)", {1, 3}, 1},
+    {"a |-> reject_on (b) c", {2, 2}, 2},
+    {"accept_on (b) q(a, c)", {3, 1}, 3},
+    {"accept_on ($sampled(b)) c", {3, 1}, 3},
+    {"accept_on (b dist {1 := 1}) c", {3, 1}, 3}};
+
+TEST(AbortProperty, AnAbortCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+const PlacedProperty kSampledValueAborts[] = {
+    {"accept_on ($past(b, 1, 1, @(posedge clk))) c", {3, 1}, 3},
+    {"sync_accept_on ($past(b, 1, 1, @(posedge clk))) c", {3, 1}, 3},
+    {"accept_on ($rose(b, @(posedge clk))) c", {2, 2}, 2},
+    {"sync_accept_on ($rose(b, @(posedge clk))) c", {2, 2}, 2},
+    {"reject_on ($rose(b, @(posedge clk))) d", {2, 2}, 2},
+    {"sync_reject_on ($rose(b, @(posedge clk))) d", {2, 2}, 2},
+    {"reject_on ($fell(!d, @(posedge clk))) b", {2, 2}, 2},
+    {"sync_reject_on ($fell(!d, @(posedge clk))) b", {2, 2}, 2},
+    {"accept_on ($stable(d, @(posedge clk))) c", {3, 1}, 3},
+    {"sync_accept_on ($stable(d, @(posedge clk))) c", {3, 1}, 3},
+    {"reject_on ($changed(d, @(posedge clk))) d", {2, 2}, 2},
+    {"sync_reject_on ($changed(d, @(posedge clk))) d", {2, 2}, 2}};
+
+TEST(AbortProperty,
+     DISABLED_ASampledValueFunctionInAnAbortConditionTakesItsValue) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kSampledValueAborts) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
+}
+
+TEST(AbortProperty, DISABLED_AnAbortCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
 }
 
 }  // namespace
