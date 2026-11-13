@@ -376,4 +376,145 @@ TEST(WholeLocalActual, DISABLED_ALocalInsideAnActualIsReportedInEveryPlace) {
   }
 }
 
+constexpr const char* kUnassignedV1 =
+    "the local variable 'v1' is referenced at a point where it is unassigned";
+
+constexpr const char* kTriggeredSequences =
+    "  sequence sub(lv); (a, lv = d); endsequence\n"
+    "  sequence sub_or(lv); ((a, lv = d) or b); endsequence\n"
+    "  sequence sub_both(lv); ((a, lv = d) or (b, lv = 1)); endsequence\n";
+
+std::string TriggeredBody(const std::string& before, const std::string& app,
+                          bool read) {
+  std::string body = "  sequence t; int v1;\n    " + before + app;
+  if (read) body += "\n    ##1 (b == v1)";
+  return body + ";\n  endsequence\n";
+}
+
+std::string TriggeredPlace(const std::string& place, const std::string& body) {
+  std::string decls = std::string(kTriggeredSequences) + body;
+  const std::string kUser =
+      "module m;\n  logic clk, a, b, c;\n  int d;\n  e e1(clk, a, b, c";
+  if (place == "module") {
+    return "module m;\n  logic clk, a, b, c;\n  int d;\n" + decls +
+           "endmodule\n";
+  }
+  if (place == "interface") {
+    return "interface e(input logic clk, a, b, c);\n  int d;\n" + decls +
+           "endinterface\n" + kUser + ");\nendmodule\n";
+  }
+  if (place == "program") {
+    return "program e(input logic clk, a, b, c);\n  int d;\n" + decls +
+           "endprogram\n" + kUser + ");\nendmodule\n";
+  }
+  if (place == "checker") {
+    return "checker e(logic clk, logic a, logic b, logic c, int d);\n" + decls +
+           "endchecker\n" + kUser + ", d);\nendmodule\n";
+  }
+  return "package e;\n  logic a, b, c;\n  int d;\n" + decls +
+         "endpackage\nmodule m;\n  import e::*;\nendmodule\n";
+}
+
+const char* const kNotMaximal[] = {
+    "!sub(v1).triggered",          "(sub(v1).triggered && b)",
+    "(sub(v1).triggered || b)",    "(sub(v1).triggered ? b : c)",
+    "(c ? sub(v1).triggered : b)", "(c ? b : sub(v1).triggered)",
+    "(sub(v1).triggered == b)",    "sub_or(v1).triggered",
+};
+
+const char* const kFlowingOut[] = {
+    "sub(v1).triggered",
+    "(sub(v1).triggered)",
+};
+
+void ExpectReadReportedAndActualNot(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  uint32_t actual = LineHolding(src, ".triggered");
+  uint32_t read = LineHolding(src, "(b == v1)");
+  ASSERT_NE(actual, 0u);
+  ASSERT_NE(read, 0u);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kUnassignedV1, read, "16.10"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), kUnassignedV1, actual, "16.10"));
+}
+
+void ExpectAccepted(const std::string& src) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(TriggeredLocalFlow, DISABLED_ANonFlowingApplicationReportsOnlyTheRead) {
+  for (const char* place :
+       {"module", "interface", "program", "checker", "package"}) {
+    for (const char* app : kNotMaximal) {
+      ExpectReadReportedAndActualNot(
+          TriggeredPlace(place, TriggeredBody("c ##1 ", app, true)));
+    }
+  }
+}
+
+TEST(TriggeredLocalFlow,
+     DISABLED_ANonFlowingApplicationReadByNothingIsAccepted) {
+  for (const char* place :
+       {"module", "interface", "program", "checker", "package"}) {
+    for (const char* app : kNotMaximal) {
+      ExpectAccepted(
+          TriggeredPlace(place, TriggeredBody("c ##1 ", app, false)));
+    }
+  }
+}
+
+TEST(TriggeredLocalFlow, AFlowingApplicationIsReadAfterward) {
+  for (const char* place :
+       {"module", "interface", "program", "checker", "package"}) {
+    for (const char* app : kFlowingOut) {
+      ExpectAccepted(TriggeredPlace(place, TriggeredBody("c ##1 ", app, true)));
+    }
+  }
+}
+
+TEST(TriggeredLocalFlow, DISABLED_AFormalAssignedInBothOperandsOfAnOrFlowsOut) {
+  for (const char* place :
+       {"module", "interface", "program", "checker", "package"}) {
+    ExpectAccepted(TriggeredPlace(
+        place, TriggeredBody("c ##1 ", "sub_both(v1).triggered", true)));
+  }
+}
+
+TEST(TriggeredLocalFlow, ALocalAssignedBeforeIsReadAfterAnyApplication) {
+  for (const char* place :
+       {"module", "interface", "program", "checker", "package"}) {
+    for (const char* app : kNotMaximal) {
+      ExpectAccepted(
+          TriggeredPlace(place, TriggeredBody("(c, v1 = 0) ##1 ", app, true)));
+    }
+  }
+}
+
+TEST(TriggeredLocalFlow, DISABLED_AnAntecedentApplicationReportsOnlyTheRead) {
+  ExpectReadReportedAndActualNot(TriggeredPlace("module",
+                                                "  property q; int v1;\n"
+                                                "    c ##1 !sub(v1).triggered\n"
+                                                "    |-> (b == v1);\n"
+                                                "  endproperty\n"));
+}
+
+TEST(TriggeredLocalFlow, AFlowingOrAssignedAntecedentIsReadInTheConsequent) {
+  for (const char* body : {"  property q; int v1;\n"
+                           "    c ##1 sub(v1).triggered\n"
+                           "    |-> (b == v1);\n"
+                           "  endproperty\n",
+                           "  property q; int v1;\n"
+                           "    (c, v1 = 0) ##1 !sub(v1).triggered\n"
+                           "    |-> (b == v1);\n"
+                           "  endproperty\n"}) {
+    ExpectAccepted(TriggeredPlace("module", body));
+  }
+}
+
 }  // namespace

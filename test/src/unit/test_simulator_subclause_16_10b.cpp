@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_sequence_covers.h"
@@ -313,6 +315,60 @@ TEST(LocalThroughInstance, TheLastOfSeveralAssignmentsFlowsOut) {
                  "  endsequence\n"
                  "  c1: cover sequence (sm);\n"),
       1);
+}
+
+std::string KeptValueSource(const std::vector<std::string>& apps,
+                            const std::string& expected) {
+  std::string items =
+      "  sequence sub(lv); (te2, lv = 5); endsequence\n"
+      "  sequence sub_or(lv); ((te2, lv = 5) or te3); endsequence\n";
+  for (size_t i = 0; i < apps.size(); ++i) {
+    std::string n = std::to_string(i + 1);
+    items += "  sequence s";
+    items += n;
+    items += "; int v1;\n    @(posedge clk) (te1, v1 = 9) ##1 ";
+    items += apps[i];
+    items += " ##1 (v1 == ";
+    items += expected;
+    items += ");\n  endsequence\n  c";
+    items += n;
+    items += ": cover sequence (s";
+    items += n;
+    items += ");\n";
+  }
+  return SequenceCoverSource(items, DriveTicks({{1, 5}, {2, 6}, {2, 6}}));
+}
+
+TEST(TriggeredKeptValue, ANonFlowingApplicationLeavesTheEarlierValue) {
+  const std::vector<std::string> kApps = {
+      "(sub(v1).triggered && te3)",    "(sub(v1).triggered || te3)",
+      "(sub(v1).triggered ? te3 : 0)", "(te3 ? sub(v1).triggered : 0)",
+      "(sub(v1).triggered == te3)",    "!(sub(v1).triggered && !te3)",
+  };
+  std::string src = KeptValueSource(kApps, "9");
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  for (size_t i = 1; i <= kApps.size(); ++i) {
+    std::string label = "c" + std::to_string(i) + ":";
+    EXPECT_EQ(CoverCount(f, src, label), 2u) << label;
+  }
+}
+
+TEST(TriggeredKeptValue,
+     DISABLED_AnInstanceTheLocalDoesNotFlowOutOfLeavesTheEarlierValue) {
+  std::string src = KeptValueSource({"sub_or(v1).triggered"}, "9");
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  EXPECT_EQ(CoverCount(f, src, "c1:"), 2u);
+}
+
+TEST(TriggeredKeptValue, AFlowingApplicationTakesTheInstancesValue) {
+  std::string src =
+      KeptValueSource({"sub(v1).triggered", "(sub(v1).triggered)"}, "5");
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  EXPECT_EQ(CoverCount(f, src, "c1:"), 2u);
+  EXPECT_EQ(CoverCount(f, src, "c2:"), 2u);
 }
 
 }  // namespace
