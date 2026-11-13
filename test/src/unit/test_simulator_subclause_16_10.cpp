@@ -727,4 +727,92 @@ TEST(LocalSampledValue, AReassignmentReplacesTheEarlierValue) {
       {"c1:", "c2:"});
 }
 
+std::string EdgeCountSource(const std::string& items) {
+  return SequenceCoverSource(
+      "  int cnt = 0, shadow = 0, nd = 0;\n"
+      "  always @(posedge clk) begin cnt = cnt + 1; shadow <= cnt; end\n"
+      "  always @(negedge clk) nd = nd + 1;\n" +
+          items,
+      DriveTicks({{1, 2, 3}}));
+}
+
+void ExpectThreeCoversAndNoFailure(const std::string& src,
+                                   std::initializer_list<const char*> labels) {
+  SimFixture f;
+  RunSequenceDesign(src, f);
+  for (const char* label : labels) {
+    EXPECT_EQ(CoverCount(f, src, label), 3u) << label;
+  }
+  EXPECT_EQ(VarValue(f, "fails"), 0u);
+}
+
+TEST(LocalAttemptCopies, OverlappingAttemptsInitializeTheirOwnCopies) {
+  ExpectThreeCoversAndNoFailure(
+      EdgeCountSource(
+          "  property pa; int x = nd;\n"
+          "    @(posedge clk) te1 |-> ##2 (x == nd - 2);\n"
+          "  endproperty\n"
+          "  sequence si; int x = nd; ##2 (x == nd - 2); endsequence\n"
+          "  property pb; @(posedge clk) te1 |-> si; endproperty\n"
+          "  property pi; int x = nd; ##2 (x == nd - 2); endproperty\n"
+          "  property pc; @(posedge clk) te1 |-> pi; endproperty\n"
+          "  c1: cover property (pa);\n"
+          "  c2: cover property (pb);\n"
+          "  c3: cover property (pc);\n"
+          "  assert property (pa) else fails++;\n"
+          "  assert property (pb) else fails++;\n"
+          "  assert property (pc) else fails++;\n"),
+      {"c1:", "c2:", "c3:"});
+}
+
+TEST(LocalAttemptCopies,
+     DISABLED_OverlappingAttemptsInitializeFromTheSampledValue) {
+  ExpectThreeCoversAndNoFailure(
+      EdgeCountSource(
+          "  property pa; int x = cnt;\n"
+          "    @(posedge clk) te1 |-> ##2 (x == shadow - 2);\n"
+          "  endproperty\n"
+          "  sequence si; int x = cnt; ##2 (x == shadow - 2); endsequence\n"
+          "  property pb; @(posedge clk) te1 |-> si; endproperty\n"
+          "  property pi; int x = cnt; ##2 (x == shadow - 2); endproperty\n"
+          "  property pc; @(posedge clk) te1 |-> pi; endproperty\n"
+          "  c1: cover property (pa);\n"
+          "  c2: cover property (pb);\n"
+          "  c3: cover property (pc);\n"
+          "  assert property (pa) else fails++;\n"
+          "  assert property (pb) else fails++;\n"
+          "  assert property (pc) else fails++;\n"),
+      {"c1:", "c2:", "c3:"});
+}
+
+TEST(LocalAttemptCopies, DISABLED_ABodyInitializerReadsTheSampledValue) {
+  ExpectThreeCoversAndNoFailure(
+      EdgeCountSource(
+          "  sequence sd; int x = cnt; @(posedge clk) te1 ##0 (x == shadow);"
+          " endsequence\n"
+          "  sequence se; @(posedge clk) sd.triggered; endsequence\n"
+          "  property pf; int x = cnt;\n"
+          "    @(posedge clk) te1 |-> (x == shadow);\n"
+          "  endproperty\n"
+          "  c1: cover property (sd);\n"
+          "  c2: cover property (se);\n"
+          "  c3: cover property (pf);\n"
+          "  assert property (pf) else fails++;\n"),
+      {"c1:", "c2:", "c3:"});
+}
+
+TEST(LocalAttemptCopies, ALocalFormalReadsTheSampledValueOfItsActual) {
+  ExpectThreeCoversAndNoFailure(
+      EdgeCountSource("  sequence sg(local input int a);\n"
+                      "    @(posedge clk) te1 ##0 (a == shadow);\n"
+                      "  endsequence\n"
+                      "  property ph(local input int a);\n"
+                      "    @(posedge clk) te1 |-> (a == shadow);\n"
+                      "  endproperty\n"
+                      "  c1: cover property (sg(cnt));\n"
+                      "  c2: cover property (ph(cnt));\n"
+                      "  assert property (ph(cnt)) else fails++;\n"),
+      {"c1:", "c2:"});
+}
+
 }  // namespace
