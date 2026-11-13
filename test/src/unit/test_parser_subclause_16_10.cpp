@@ -386,4 +386,153 @@ TEST(LocalVariableParsing, ALocalBesideTheClockingEventIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+constexpr const char* kImplicitType =
+    "an assertion variable shall be declared with an explicit data type";
+
+std::string Filled(const char* text, const std::string& decl) {
+  std::string out = text;
+  for (size_t at = out.find("@@"); at != std::string::npos;
+       at = out.find("@@", at + decl.size())) {
+    out.replace(at, 2, decl);
+  }
+  return out;
+}
+
+struct DeclPlace {
+  const char* text;
+  int sequence_line;
+  int property_line;
+};
+
+constexpr const char* kModuleBodies =
+    "module m;\n"
+    "  logic clk, a;\n"
+    "  sequence s; @@ @(posedge clk) a; endsequence\n"
+    "  property p; @@ @(posedge clk) a; endproperty\n"
+    "endmodule\n";
+
+const DeclPlace kDeclPlaces[] = {
+    {kModuleBodies, 3, 4},
+    {"interface i;\n"
+     "  logic clk, a;\n"
+     "  sequence s; @@ @(posedge clk) a; endsequence\n"
+     "  property p; @@ @(posedge clk) a; endproperty\n"
+     "endinterface\n",
+     3, 4},
+    {"program pr;\n"
+     "  logic clk, a;\n"
+     "  sequence s; @@ @(posedge clk) a; endsequence\n"
+     "  property p; @@ @(posedge clk) a; endproperty\n"
+     "endprogram\n",
+     3, 4},
+    {"checker ck(logic clk, logic a);\n"
+     "  sequence s; @@ @(posedge clk) a; endsequence\n"
+     "  property p; @@ @(posedge clk) a; endproperty\n"
+     "endchecker\n",
+     2, 3},
+    {"package pk;\n"
+     "  sequence s; @@ @(posedge 1'b1) 1'b1; endsequence\n"
+     "  property p; @@ @(posedge 1'b1) 1'b1; endproperty\n"
+     "endpackage\n",
+     2, 3},
+    {"module m;\n"
+     "  logic clk, a;\n"
+     "  if (1) begin : g\n"
+     "    sequence s; @@ @(posedge clk) a; endsequence\n"
+     "    property p; @@ @(posedge clk) a; endproperty\n"
+     "  end\n"
+     "endmodule\n",
+     4, 5},
+    {"module m;\n"
+     "  logic clk, a;\n"
+     "  clocking cb @(posedge clk);\n"
+     "    sequence s; @@ a; endsequence\n"
+     "    property p; @@ a; endproperty\n"
+     "  endclocking\n"
+     "endmodule\n",
+     4, 5},
+    {"sequence s; @@ @(posedge 1'b1) 1'b1; endsequence\n"
+     "property p; @@ @(posedge 1'b1) 1'b1; endproperty\n",
+     1, 2},
+};
+
+struct ImplicitPair {
+  const char* implicit;
+  const char* explicit_type;
+};
+
+const ImplicitPair kImplicitPairs[] = {
+    {"var v;", "var logic v;"},
+    {"var signed v;", "var logic signed v;"},
+    {"var unsigned v;", "var bit unsigned v;"},
+    {"var [3:0] v;", "var logic [3:0] v;"},
+    {"var [1:0][3:0] v;", "var logic [1:0][3:0] v;"},
+    {"var signed [3:0] v;", "var logic signed [3:0] v;"},
+    {"var v = 1;", "var logic v = 1;"},
+    {"var signed [3:0] v = 2;", "var logic signed [3:0] v = 2;"},
+    {"var [3:0] v, u = 1;", "var logic [3:0] v, u = 1;"},
+    {"int n; var v;", "int n; var logic v;"},
+};
+
+TEST(AssertionVariableType, DISABLED_AnImplicitTypeAfterVarIsReported) {
+  for (const ImplicitPair& pair : kImplicitPairs) {
+    SCOPED_TRACE(pair.implicit);
+    auto r = Parse(Filled(kModuleBodies, pair.implicit));
+    EXPECT_TRUE(ReportedError(r.diags, kImplicitType, 3, "16.10"));
+    EXPECT_TRUE(ReportedError(r.diags, kImplicitType, 4, "16.10"));
+  }
+}
+
+TEST(AssertionVariableType, TheNearestExplicitTypeAfterVarIsAccepted) {
+  for (const ImplicitPair& pair : kImplicitPairs) {
+    SCOPED_TRACE(pair.explicit_type);
+    auto r = Parse(Filled(kModuleBodies, pair.explicit_type));
+    EXPECT_FALSE(r.has_errors);
+  }
+}
+
+TEST(AssertionVariableType, DISABLED_AnImplicitTypeIsReportedInEveryPlace) {
+  for (const DeclPlace& place : kDeclPlaces) {
+    SCOPED_TRACE(place.text);
+    auto r = Parse(Filled(place.text, "var v;"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, kImplicitType, place.sequence_line, "16.10"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, kImplicitType, place.property_line, "16.10"));
+  }
+}
+
+TEST(AssertionVariableType, AnExplicitTypeIsAcceptedInEveryPlace) {
+  for (const DeclPlace& place : kDeclPlaces) {
+    SCOPED_TRACE(place.text);
+    auto r = Parse(Filled(place.text, "var logic v;"));
+    EXPECT_FALSE(r.has_errors);
+  }
+}
+
+const ImplicitPair kWithoutVarPairs[] = {
+    {"signed [3:0] v;", "logic signed [3:0] v;"},
+    {"[3:0] v;", "logic [3:0] v;"},
+    {"signed v;", "logic signed v;"},
+};
+
+TEST(AssertionVariableType, AnImplicitTypeWithoutVarIsNotADeclaration) {
+  for (const ImplicitPair& pair : kWithoutVarPairs) {
+    SCOPED_TRACE(pair.implicit);
+    auto r = Parse(Filled(kModuleBodies, pair.implicit));
+    constexpr char kNotAdmitted[] =
+        "this declaration's body is not one the grammar admits";
+    EXPECT_TRUE(ReportedError(r.diags, kNotAdmitted, 3, "A.2.10"));
+    EXPECT_TRUE(ReportedError(r.diags, kNotAdmitted, 4, "A.2.10"));
+  }
+}
+
+TEST(AssertionVariableType, AnExplicitTypeWithoutVarIsAccepted) {
+  for (const ImplicitPair& pair : kWithoutVarPairs) {
+    SCOPED_TRACE(pair.explicit_type);
+    auto r = Parse(Filled(kModuleBodies, pair.explicit_type));
+    EXPECT_FALSE(r.has_errors);
+  }
+}
+
 }  // namespace
