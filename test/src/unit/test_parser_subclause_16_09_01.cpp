@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <iterator>
+#include <string>
 
+#include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/sequence_operator_precedence.h"
 
@@ -63,6 +66,42 @@ TEST(SequenceOperatorPrecedence, TokenMappingRejectsNonOperator) {
   SequenceOperator op = SequenceOperator::kRepetition;
   EXPECT_FALSE(SequenceOperatorFromToken(TokenKind::kPlus, &op));
   EXPECT_FALSE(SequenceOperatorFromToken(TokenKind::kKwProperty, &op));
+}
+
+ParseResult ParseCover(const std::string& body) {
+  return Parse(
+      "module m;\n  logic clk, a, b;\n  cover property (@(posedge clk) " +
+      body + ");\nendmodule\n");
+}
+
+TEST(SequenceOperatorPrecedence, ARepetitionLeftOfThroughoutIsReported) {
+  auto r = ParseCover("a[*2] throughout b ##1 b");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a sequence stands where the grammar admits only an expression_or_dist",
+      3, "A.2.10"));
+}
+
+TEST(SequenceOperatorPrecedence, ARepetitionRightOfThroughoutIsAccepted) {
+  auto r = ParseCover("a throughout b[*2]");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(SequenceOperatorPrecedence, ABracketDirectlyAfterABracketIsReported) {
+  for (const char* body : {"a[*2][*3]", "a[=2][*2]", "a[->1][*2]"}) {
+    SCOPED_TRACE(body);
+    auto r = ParseCover(body);
+    EXPECT_TRUE(
+        ReportedError(r.diags, "is not one the grammar admits", 3, "A.2.10"));
+  }
+}
+
+TEST(SequenceOperatorPrecedence, AParenthesizedRepetitionTakesABracket) {
+  for (const char* body : {"(a[*2])[*3]", "(a[=2])[*2]", "(a[->1])[*2]"}) {
+    SCOPED_TRACE(body);
+    auto r = ParseCover(body);
+    EXPECT_FALSE(r.has_errors);
+  }
 }
 
 }  // namespace
