@@ -109,23 +109,41 @@ inline std::string DefaultClockedSource(const std::string& place,
   return unit + PlacedTop(stimulus, "  w u(clk, a, b, c, d);\n");
 }
 
+inline std::string DeclaredInUnitSource(const std::string& place,
+                                        const std::string& directive,
+                                        const std::string& body,
+                                        const std::string& stimulus,
+                                        const std::string& declarations) {
+  std::string unit = place.substr(0, place.find(' '));
+  std::string header = unit == "checker"
+                           ? "checker w(clk, a, b, c, d);\n"
+                           : unit + " w(input logic clk, a, b, c, d);\n";
+  return header + declarations + "  property P; @(posedge clk) " + body +
+         "; endproperty\n" + PlacedDirective(directive, "P") + "end" + unit +
+         "\n" + PlacedTop(stimulus, "  w u(clk, a, b, c, d);\n");
+}
+
 inline std::string ClockedPlaceSource(const std::string& place,
                                       const std::string& directive,
                                       const std::string& body,
-                                      const std::string& stimulus) {
+                                      const std::string& stimulus,
+                                      const std::string& declarations = "") {
   if (place == "clocked procedural") {
     return PlacedTop(
         stimulus,
-        "  always @(posedge clk)" +
+        declarations + "  always @(posedge clk)" +
             PlacedDirective(directive, "@(posedge clk) " + body).substr(1));
   }
   if (place.starts_with("default ")) {
     return DefaultClockedSource(
         place, stimulus,
-        "  default clocking cb @(posedge clk); endclocking\n" +
+        declarations + "  default clocking cb @(posedge clk); endclocking\n" +
             PlacedDirective(directive, body));
   }
-  return PropertyPlaceSource(place, directive, body, stimulus);
+  if (place == "interface property" || place == "checker property") {
+    return DeclaredInUnitSource(place, directive, body, stimulus, declarations);
+  }
+  return PropertyPlaceSource(place, directive, body, stimulus, declarations);
 }
 
 inline size_t CountedLines(const std::string& out, const std::string& tag) {

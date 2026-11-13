@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "elaborator/clock_flow.h"
+#include "fixture_elaborator.h"
 
 using namespace delta;
 
@@ -134,6 +135,51 @@ TEST(ClockFlow, DisableConditionHasNoClockWhenNoneInScope) {
 
 TEST(ClockFlow, JuxtaposedIdenticalClockingEventsKeepThatClock) {
   EXPECT_EQ(JuxtaposedClockingEvent("c", "c"), "c");
+}
+
+std::string JuxtaposedDeclarationIn(const std::string& place,
+                                    const std::string& declaration) {
+  std::string line = "  " + declaration + "\n";
+  std::string use = "  cover property (s);\n";
+  std::string instance =
+      "module m;\n  logic c0, c1, a, b;\n  w u(c0, c1, a, b);\nendmodule\n";
+  if (place == "module") {
+    return "module m;\n  logic c0, c1, a, b;\n" + line + use + "endmodule\n";
+  }
+  if (place == "interface") {
+    return "interface w(input logic c0, c1, a, b);\n" + line + use +
+           "endinterface\n" + instance;
+  }
+  if (place == "checker") {
+    return "checker w(c0, c1, a, b);\n" + line + use + "endchecker\n" +
+           instance;
+  }
+  return "package pk;\n  logic c0, c1, a, b;\n" + line +
+         "endpackage\nmodule m;\n  cover property (pk::s);\nendmodule\n";
+}
+
+void ExpectEachJuxtapositionAcceptedIn(const std::string& place) {
+  for (const char* op : {"intersect", "and", "or", "within"}) {
+    for (const char* clock : {"@(posedge c0) @(posedge c1)", "@(posedge c1)"}) {
+      std::string src =
+          JuxtaposedDeclarationIn(place, std::string("sequence s; ") + clock +
+                                             " a " + op + " b; endsequence");
+      SCOPED_TRACE(src);
+      ElabFixture f;
+      ElaborateSrc(src, f);
+      EXPECT_EQ(f.diag.ErrorCount(), 0u);
+    }
+  }
+}
+
+TEST(ClockFlow, AJuxtapositionBeforeABranchingOperatorIsOneClockInAPackage) {
+  ExpectEachJuxtapositionAcceptedIn("package");
+}
+
+TEST(ClockFlow,
+     DISABLED_AJuxtapositionBeforeABranchingOperatorIsOneClockInADesignUnit) {
+  for (const char* place : {"module", "interface", "checker"})
+    ExpectEachJuxtapositionAcceptedIn(place);
 }
 
 }  // namespace

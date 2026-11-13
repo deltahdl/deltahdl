@@ -219,16 +219,6 @@ constexpr const char* kMulticlockPlaces[] = {
 std::string MulticlockPlaceSource(const std::string& place,
                                   const std::string& directive,
                                   const std::string& body) {
-  if (place.ends_with(" property") && place != "module property") {
-    std::string unit = place.substr(0, place.size() - 9);
-    std::string items = "  property P; @(posedge clk) " + body +
-                        "; endproperty\n" + PlacedDirective(directive, "P");
-    std::string header = unit == "checker"
-                             ? "checker w(clk, a, b, c, d);\n"
-                             : unit + " w(input logic clk, a, b, c, d);\n";
-    return header + items + "end" + unit + "\n" +
-           PlacedTop(kMulticlockStimulus, "  w u(clk, a, b, c, d);\n");
-  }
   return ClockedPlaceSource(place, directive, body, kMulticlockStimulus);
 }
 
