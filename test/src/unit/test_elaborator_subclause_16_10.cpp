@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -422,6 +425,224 @@ TEST(LocalInitializerReads,
     ElabFixture f;
     ElaborateSrc(InitializerSource(pair.good), f);
     EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+constexpr const char* kUnassignedX =
+    "the local variable 'x' is referenced at a point where it is unassigned";
+
+std::string WithInitializer(const std::string& text, const char* init) {
+  std::string out = text;
+  size_t at = out.find("%I");
+  if (at != std::string::npos) out.replace(at, 2, init);
+  return out;
+}
+
+std::string FlowModule(const std::string& decl) {
+  return "module m;\n"
+         "  logic clk, a, b, c;\n"
+         "  logic [3:0] v;\n"
+         "  " +
+         decl + "\nendmodule\n";
+}
+
+void ExpectEachReadReported(std::initializer_list<const char*> decls) {
+  for (const char* decl : decls) {
+    SCOPED_TRACE(decl);
+    ElabFixture f;
+    ElaborateSrc(FlowModule(WithInitializer(decl, "")), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnassignedX, 4, "16.10"));
+  }
+}
+
+void ExpectEachReadAccepted(std::initializer_list<const char*> decls) {
+  for (const char* decl : decls) {
+    SCOPED_TRACE(decl);
+    ElabFixture f;
+    ElaborateSrc(FlowModule(WithInitializer(decl, " = 1")), f);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+#define SEQ(body) "sequence s; int x%I, y; @(posedge clk) " body "; endsequence"
+#define PROP(body) \
+  "property p; int x%I, y; @(posedge clk) " body "; endproperty"
+
+const std::initializer_list<const char*> kSequenceReads = {
+    SEQ("a ##1 (b == x)"),   SEQ("(a, x--)"),          SEQ("(a, ++x)"),
+    SEQ("(a, --x)"),         SEQ("(a, x += 1)"),       SEQ("(a, x -= 1)"),
+    SEQ("(a, x *= 2)"),      SEQ("(a, x /= 2)"),       SEQ("(a, x %= 2)"),
+    SEQ("(a, x &= 1)"),      SEQ("(a, x |= 1)"),       SEQ("(a, x ^= 1)"),
+    SEQ("(a, x <<= 1)"),     SEQ("(a, x >>= 1)"),      SEQ("(a, x <<<= 1)"),
+    SEQ("(a, x >>>= 1)"),    SEQ("(a, y = x, x = 1)"), SEQ("a ##1 v[x]"),
+    SEQ("(a, $display(x))"),
+};
+
+const std::initializer_list<const char*> kPropertyReads = {
+    PROP("(b == x) |-> a"),         PROP("a |-> (b == x)"),
+    PROP("a |-> b ##1 (c == x)"),   PROP("a |-> not (c == x)"),
+    PROP("a |-> (c == x) or b"),    PROP("(a, x--) |-> b"),
+    PROP("(a, ++x) |-> b"),         PROP("(a, --x) |-> b"),
+    PROP("(a, x++) |-> b"),         PROP("(a, x += 1) |-> b"),
+    PROP("(a, x -= 1) |-> b"),      PROP("(a, x *= 2) |-> b"),
+    PROP("(a, x /= 2) |-> b"),      PROP("(a, x %= 2) |-> b"),
+    PROP("(a, x &= 1) |-> b"),      PROP("(a, x |= 1) |-> b"),
+    PROP("(a, x ^= 1) |-> b"),      PROP("(a, x <<= 1) |-> b"),
+    PROP("(a, x >>= 1) |-> b"),     PROP("(a, x <<<= 1) |-> b"),
+    PROP("(a, x >>>= 1) |-> b"),    PROP("a |-> (b ##1 c, x -= 1)"),
+    PROP("a |-> strong((b, x++))"), PROP("a |-> (b, x++) ##1 c"),
+};
+
+const std::initializer_list<const char*> kGroupOperands = {
+    PROP("a |-> (b, x++)"),         PROP("a |=> (b, x += 1)"),
+    PROP("a |-> (b, y = x)"),       PROP("(b, x %= 2)"),
+    PROP("not (b, x++)"),           PROP("if (a) (b, x++) else c"),
+    PROP("if (a) c else (b, x++)"), PROP("a #-# (b, x++)"),
+    PROP("a #=# (b, x++)"),         PROP("nexttime (b, x++)"),
+    PROP("(b, x++) and c"),         PROP("(b, x++) or c"),
+    PROP("a |-> ((b, x++))"),
+};
+
+#undef SEQ
+#undef PROP
+
+TEST(UnassignedLocalReads, EachSequenceReadIsReported) {
+  ExpectEachReadReported(kSequenceReads);
+}
+
+TEST(UnassignedLocalReads, EachSequenceReadOfAnInitializedLocalIsAccepted) {
+  ExpectEachReadAccepted(kSequenceReads);
+}
+
+TEST(UnassignedLocalReads, EachPropertyReadIsReported) {
+  ExpectEachReadReported(kPropertyReads);
+}
+
+TEST(UnassignedLocalReads, EachPropertyReadOfAnInitializedLocalIsAccepted) {
+  ExpectEachReadAccepted(kPropertyReads);
+}
+
+TEST(UnassignedLocalReads,
+     DISABLED_AGroupStandingAsAPropertyOperandIsReported) {
+  ExpectEachReadReported(kGroupOperands);
+}
+
+TEST(UnassignedLocalReads,
+     AGroupStandingAsAPropertyOperandOfAnInitializedLocalIsAccepted) {
+  ExpectEachReadAccepted(kGroupOperands);
+}
+
+TEST(UnassignedLocalReads, AReadAfterAnEarlierAssignmentIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      FlowModule("sequence s; int x;\n"
+                 "    @(posedge clk) (a, x = 1) ##1 (b, x += 1, ++x, x--)"
+                 " ##1 v[x] ##1 (a, $display(x)) ##1 (c == x);\n"
+                 "  endsequence\n"
+                 "  property p; int x;\n"
+                 "    @(posedge clk) (a, x = 1, x *= 2) |-> (b, x <<<= 1)"
+                 " ##1 (c == x);\n"
+                 "  endproperty"),
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+struct FlowPlace {
+  const char* text;
+};
+
+const FlowPlace kFlowPlaces[] = {
+    {"program pg(input logic clk, a, b);\n"
+     "  sequence s; int x%I; @(posedge clk) a ##1 (b == x); endsequence\n"
+     "  property p; int x%I; @(posedge clk) a |-> (b == x); endproperty\n"
+     "endprogram\n"
+     "module m; logic clk, a, b; pg u(clk, a, b); endmodule\n"},
+    {"interface ifc(input logic clk, a, b);\n"
+     "  sequence s; int x%I; @(posedge clk) a ##1 (b == x); endsequence\n"
+     "  property p; int x%I; @(posedge clk) a |-> (b == x); endproperty\n"
+     "endinterface\n"
+     "module m; logic clk, a, b; ifc u(clk, a, b); endmodule\n"},
+    {"checker ck(logic clk, logic a, logic b);\n"
+     "  sequence s; int x%I; @(posedge clk) a ##1 (b == x); endsequence\n"
+     "  property p; int x%I; @(posedge clk) a |-> (b == x); endproperty\n"
+     "endchecker\n"
+     "module m; logic clk, a, b; ck u(clk, a, b); endmodule\n"},
+};
+
+const FlowPlace kUncheckedFlowPlaces[] = {
+    {"package pk;\n"
+     "  sequence s(clk, a, b); int x%I; @(posedge clk) a ##1 (b == x);"
+     " endsequence\n"
+     "  property p(clk, a, b); int x%I; @(posedge clk) a |-> (b == x);"
+     " endproperty\n"
+     "endpackage\n"
+     "module m; endmodule\n"},
+    {"package pk;\n"
+     "  sequence s(clk, a, b); int x%I; @(posedge clk) a ##1 (b == x);"
+     " endsequence\n"
+     "  property p(clk, a, b); int x%I; @(posedge clk) a |-> (b == x);"
+     " endproperty\n"
+     "endpackage\n"
+     "module m; import pk::*; logic clk, a, b;\n"
+     "  assert property (p(clk, a, b));\n"
+     "endmodule\n"},
+    {"module m; logic clk, a, b;\n"
+     "  if (1) begin : g\n"
+     "    sequence s; int x%I; @(posedge clk) a ##1 (b == x); endsequence\n"
+     "    property p; int x%I; @(posedge clk) a |-> (b == x); endproperty\n"
+     "    assert property (p);\n"
+     "  end\n"
+     "endmodule\n"},
+    {"sequence s(clk, a, b); int x%I; @(posedge clk) a ##1 (b == x);"
+     " endsequence\n"
+     "property p(clk, a, b); int x%I; @(posedge clk) a |-> (b == x);"
+     " endproperty\n"
+     "module m; endmodule\n"},
+};
+
+std::string PlaceSource(const char* text, const char* init) {
+  return WithInitializer(WithInitializer(text, init), init);
+}
+
+void ExpectBothDeclarationsReported(const char* text) {
+  SCOPED_TRACE(text);
+  const std::string kSrc = PlaceSource(text, "");
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  uint32_t sequence_line = LineHolding(kSrc, "sequence s");
+  uint32_t property_line = LineHolding(kSrc, "property p");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnassignedX, sequence_line,
+                            "16.10"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kUnassignedX, property_line,
+                            "16.10"));
+}
+
+void ExpectBothDeclarationsAccepted(const char* text) {
+  SCOPED_TRACE(text);
+  ElabFixture f;
+  ElaborateSrc(PlaceSource(text, " = 1"), f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(UnassignedLocalReads, AReadInAProgramInterfaceOrCheckerIsReported) {
+  for (const FlowPlace& place : kFlowPlaces) {
+    ExpectBothDeclarationsReported(place.text);
+  }
+}
+
+TEST(UnassignedLocalReads, AReadOfAnInitializedLocalInEachPlaceIsAccepted) {
+  for (const FlowPlace& place : kFlowPlaces) {
+    ExpectBothDeclarationsAccepted(place.text);
+  }
+  for (const FlowPlace& place : kUncheckedFlowPlaces) {
+    ExpectBothDeclarationsAccepted(place.text);
+  }
+}
+
+TEST(UnassignedLocalReads,
+     DISABLED_AReadInAPackageGenerateBlockOrCompilationUnitIsReported) {
+  for (const FlowPlace& place : kUncheckedFlowPlaces) {
+    ExpectBothDeclarationsReported(place.text);
   }
 }
 
