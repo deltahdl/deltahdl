@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -134,6 +135,50 @@ TEST(PropertyConjunction, AndBindsTighterThanOr) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 3u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 4};\n  assign b = tick inside {1, 2};\n  "
+    "assign c = tick inside {2, 3};\n  assign d = tick inside {1, 4};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"a and b", {1, 3}, 1},
+    {"(b |-> c) and (a or c)", {3, 1}, 3},
+    {"(a ##1 c) and d", {2, 2}, 1},
+    {"strong(a ##1 c) and d", {1, 3}, 1},
+    {"q(b, c) and (a or c)", {3, 1}, 3},
+};
+
+TEST(PropertyConjunction, AConjunctionCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(PropertyConjunction,
+     DISABLED_AConjunctionCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
+}
+
+TEST(PropertyConjunction,
+     DISABLED_AParenthesizedConjunctionOfBooleansCountsInEachPlace) {
+  const PlacedProperty kParenthesized[] = {{"(a and b)", {1, 3}, 1},
+                                           {"((a and b))", {1, 3}, 1},
+                                           {"not (a and b)", {3, 1}, 3}};
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kParenthesized) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
 }
 
 }  // namespace

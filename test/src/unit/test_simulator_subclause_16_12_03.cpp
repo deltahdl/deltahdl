@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sva_engine_sequences.h"
@@ -113,6 +115,78 @@ TEST(NegationProperty, TwoNegationsCancel) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 3u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 2, 4};\n  assign b = tick inside {2};\n  "
+    "assign c = tick inside {3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"not c", {3, 1}, 3},
+    {"not (a |-> b)", {2, 2}, 2},
+    {"not weak(a ##1 b)", {2, 2}, 2},
+    {"not not c", {1, 3}, 1},
+    {"not (c |-> a)", {1, 3}, 1},
+    {"not q(a, b)", {2, 2}, 2},
+};
+
+TEST(NegationProperty, ANegationCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(NegationProperty, DISABLED_ANegationCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
+}
+
+constexpr const char* kStoppedClock =
+    "module t;\n"
+    "  logic clk = 0, a = 0, b = 0;\n"
+    "  int p1 = 0, f1 = 0, p2 = 0, f2 = 0;\n"
+    "  a1: assert property (@clk not a ##1 b) p1++; else f1++;\n"
+    "  a2: assert property (@clk not strong(a ##1 b)) p2++; else f2++;\n"
+    "  initial begin\n"
+    "    #5 clk = 1;\n"
+    "    #5 clk = 0;\n"
+    "    #2 a = 1;\n"
+    "    #3 clk = 1;\n"
+    "    #15 $finish;\n"
+    "  end\n"
+    "endmodule\n";
+
+uint64_t Value(SimFixture& f, const char* name) {
+  auto* variable = f.ctx.FindVariable(name);
+  return variable == nullptr ? ~0ull : variable->value.ToUint64();
+}
+
+TEST(NegationProperty, TheNegatedWeakSequenceFailsWhenTheClockStops) {
+  SimFixture f;
+  RunAndFindVar(kStoppedClock, f, "p1");
+  EXPECT_EQ(Value(f, "p1"), 2u);
+  EXPECT_EQ(Value(f, "f1"), 0u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(Value(f, "p1"), 2u);
+  EXPECT_EQ(Value(f, "f1"), 1u);
+  EXPECT_EQ(Value(f, "f2"), 0u);
+}
+
+TEST(NegationProperty,
+     DISABLED_TheNegatedStrongSequenceHoldsWhenTheClockStops) {
+  SimFixture f;
+  RunAndFindVar(kStoppedClock, f, "p2");
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(Value(f, "p2"), 3u);
+  EXPECT_EQ(Value(f, "f2"), 0u);
 }
 
 }  // namespace

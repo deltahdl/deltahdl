@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -106,6 +107,48 @@ TEST(PropertyDisjunction, NotBindsTighterThanOr) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 4};\n  assign b = tick inside {2};\n  assign "
+    "c = tick inside {3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"a or b", {3, 1}, 3},         {"(a |-> b) or c", {2, 2}, 2},
+    {"(a ##1 b) or c", {3, 1}, 2}, {"strong(a ##1 b) or c", {2, 2}, 2},
+    {"not a or b", {2, 2}, 2},     {"q(a, b) or c", {2, 2}, 2},
+};
+
+TEST(PropertyDisjunction, ADisjunctionCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(PropertyDisjunction,
+     DISABLED_ADisjunctionCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
+}
+
+TEST(PropertyDisjunction,
+     DISABLED_AParenthesizedDisjunctionOfBooleansCountsInEachPlace) {
+  const PlacedProperty kParenthesized[] = {{"(a or b)", {3, 1}, 3},
+                                           {"((a or b))", {3, 1}, 3},
+                                           {"not (b or c)", {2, 2}, 2}};
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kParenthesized) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
+    }
+  }
 }
 
 }  // namespace
