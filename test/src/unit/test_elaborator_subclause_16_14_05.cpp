@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
+#include "helpers_nested_assertions.h"
 
 using namespace delta;
 
@@ -189,6 +193,46 @@ TEST(AssertionStatementElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+constexpr const char* kAlwaysFormKinds[] = {
+    "assert property (@(posedge clk) a) $display(\"p\"); else $display(\"f\");",
+    "assume property (@(posedge clk) a) $display(\"p\"); else $display(\"f\");",
+    "cover property (@(posedge clk) a) $display(\"p\");",
+    "cover sequence (@(posedge clk) a) $display(\"p\");",
+    "restrict property (@(posedge clk) a);"};
+
+constexpr const char* kAlwaysFormPlaces[] = {"module", "if generate",
+                                             "for generate", "interface"};
+
+void ExpectAlwaysFormElaboratesCleanly(const std::string& prefix) {
+  for (const char* place : kAlwaysFormPlaces) {
+    for (const char* kind : kAlwaysFormKinds) {
+      std::string src = NestingSource(place, "always " + prefix + kind);
+      SCOPED_TRACE(src);
+      ElabFixture f;
+      ElaborateSrc(src, f);
+      for (const Diagnostic& diag : f.diag.Diagnostics()) {
+        ADD_FAILURE() << "line " << diag.loc.line << ": " << diag.message;
+      }
+    }
+  }
+}
+
+TEST(AssertionStatementElaboration,
+     TheAlwaysFormOfEachKindElaboratesWithoutAReportInEachPlace) {
+  ExpectAlwaysFormElaboratesCleanly("");
+}
+
+TEST(AssertionStatementElaboration,
+     DISABLED_TheAlwaysFormOfALabelledStatementIsTheStaticStatement) {
+  ExpectAlwaysFormElaboratesCleanly("x1: ");
+}
+
+TEST(AssertionStatementElaboration,
+     DISABLED_TheAlwaysFormOfAStatementWithAnAttributeIsTheStaticStatement) {
+  ExpectAlwaysFormElaboratesCleanly("(* x *) ");
+  ExpectAlwaysFormElaboratesCleanly("x1: (* x *) ");
 }
 
 }  // namespace

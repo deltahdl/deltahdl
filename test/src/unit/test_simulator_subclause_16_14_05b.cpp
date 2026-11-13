@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_placed_assertion_runs.h"
 #include "simulator/cover_results.h"
 
 using namespace delta;
@@ -120,6 +121,81 @@ TEST(StaticConcurrentAssertionRun,
   EXPECT_EQ(Count(f, "covered"), 3u);
   EXPECT_EQ(Count(f, "passes"), 7u);
   EXPECT_EQ(Count(f, "fails"), 1u);
+}
+
+constexpr const char* kAttemptSignals =
+    "  logic clk = 0, a = 1, b = 0;\n"
+    "  always #5 clk = ~clk;\n"
+    "  initial begin #10 b = 1; #10 a = 0; #10 a = 1; b = 0;\n"
+    "    #10 a = 0; b = 1; #10 b = 0; end\n"
+    "  initial #60 $finish;\n";
+
+constexpr PlacedDesign kAttemptDesign = {
+    kAttemptSignals, "(input logic clk, a, b)", "clk, a, b"};
+
+std::string AttemptItems(const std::string& lead, const std::string& clock) {
+  std::string spec = "(" + clock + "a ##1 b)";
+  auto label = [&lead](const char* name) {
+    return lead.empty() ? std::string(name) + ": " : std::string();
+  };
+  auto shown = [](const char* tag, const char* verdict) {
+    return std::string(" $display(\"") + tag + " " + verdict +
+           " %0t\", $time);";
+  };
+  return lead + label("x1") + "assert property " + spec + shown("x1", "pass") +
+         " else" + shown("x1", "fail") + "\n" + lead + label("x2") +
+         "assume property " + spec + shown("x2", "pass") + " else" +
+         shown("x2", "fail") + "\n" + lead + label("x3") + "cover property " +
+         spec + shown("x3", "pass") + "\n" + lead + label("x4") +
+         "cover sequence " + spec + shown("x4", "pass") + "\n" + lead +
+         label("x5") + "restrict property " + spec + ";\n";
+}
+
+constexpr const char* kEveryTickVerdicts =
+    "x1 pass 15\nx1 pass 25\nx1 fail 25\nx1 pass 45\nx1 fail 45\nx1 fail 55\n"
+    "x2 pass 15\nx2 pass 25\nx2 fail 25\nx2 pass 45\nx2 fail 45\nx2 fail 55\n"
+    "x3 pass 15\nx3 pass 25\nx3 pass 45\n"
+    "x4 pass 15\nx4 pass 25\nx4 pass 45\n";
+
+constexpr const char* kOneAttemptVerdicts =
+    "x1 pass 25\nx2 pass 25\nx3 pass 25\nx4 pass 25\n";
+
+TEST(StaticConcurrentAssertionRun,
+     EachKindStartsAnAttemptAtEveryLeadingClockInEachPlace) {
+  std::string items = AttemptItems("", "@(posedge clk) ");
+  ExpectPlacedLinesInEachPlace(
+      kAttemptDesign, {items.c_str(), kEveryTickVerdicts, kOneAttemptVerdicts});
+}
+
+TEST(StaticConcurrentAssertionRun,
+     EachKindClockedByDefaultClockingStartsAnAttemptAtEveryTickInEachPlace) {
+  std::string items = AttemptItems("", "");
+  ExpectPlacedLinesInEachPlace(
+      kAttemptDesign, {items.c_str(), kEveryTickVerdicts, kOneAttemptVerdicts},
+      "default clocking @(posedge clk); endclocking\n");
+}
+
+constexpr const char* kAlwaysFormPlaces[] = {"module", "generate", "interface"};
+
+TEST(StaticConcurrentAssertionRun,
+     TheAlwaysFormOfEachKindIsTheBareFormInEachPlace) {
+  for (const char* place : kAlwaysFormPlaces) {
+    for (const char* clock : {"@(posedge clk) ", ""}) {
+      SCOPED_TRACE(std::string(place) + " " + clock);
+      std::string declarations =
+          *clock ? "" : "default clocking @(posedge clk); endclocking\n";
+      std::string bare =
+          RunPlaced(PlacedSource(kAttemptDesign, place, AttemptItems("", clock),
+                                 declarations))
+              .lines;
+      std::string always_form =
+          RunPlaced(PlacedSource(kAttemptDesign, place,
+                                 AttemptItems("always ", clock), declarations))
+              .lines;
+      EXPECT_EQ(bare, PlacedExpected(kEveryTickVerdicts, ""));
+      EXPECT_EQ(always_form, bare);
+    }
+  }
 }
 
 }  // namespace
