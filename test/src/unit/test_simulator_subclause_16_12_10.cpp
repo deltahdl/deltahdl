@@ -8,6 +8,7 @@
 #include "common/source_mgr.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_properties.h"
@@ -162,6 +163,74 @@ TEST(NexttimeProperty, ZeroIndexIsTheCurrentTick) {
   ASSERT_NE(passes, nullptr);
   EXPECT_EQ(passes->value.ToUint64(), 2u);
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
+}
+
+constexpr const char* kPlacedStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  assign b = tick inside {2, 3};\n"
+    "  assign c = tick inside {2, 4};\n"
+    "  assign d = tick inside {1, 2, 3};\n";
+
+constexpr const char* kPlacedDeclarations =
+    "  property q(x, y); x |-> y; endproperty\n";
+
+const PlacedProperty kPlacedProperties[] = {
+    {"nexttime c", {3, 1}, 3},
+    {"s_nexttime c", {2, 2}, 2},
+    {"nexttime [1] c", {3, 1}, 3},
+    {"s_nexttime [1] c", {2, 2}, 2},
+    {"nexttime [2] b", {3, 1}, 3},
+    {"s_nexttime [2] b", {1, 3}, 1},
+    {"nexttime [0] b", {2, 2}, 2},
+    {"s_nexttime [0] b", {2, 2}, 2},
+    {"nexttime always d", {1, 3}, 1},
+    {"s_nexttime always d", {0, 4}, 0},
+    {"nexttime s_eventually b", {3, 1}, 3},
+    {"s_nexttime s_eventually b", {2, 2}, 2},
+    {"a |-> s_nexttime [2] b", {3, 1}, 3},
+    {"nexttime (b |-> c)", {3, 1}, 3},
+    {"nexttime q(b, c)", {3, 1}, 3}};
+
+TEST(NexttimeProperty, ANexttimeCountsInEachPlace) {
+  for (const char* place : kPropertyPlaces) {
+    for (const PlacedProperty& property : kPlacedProperties) {
+      ExpectPropertyCountsInPlace(place, property, kPlacedStimulus,
+                                  kPlacedDeclarations);
+    }
+  }
+}
+
+TEST(NexttimeProperty, DISABLED_ANexttimeCountsInACompilationUnitProperty) {
+  for (const PlacedProperty& property : kPlacedProperties) {
+    ExpectPropertyCountsInPlace("unit", property, kPlacedStimulus,
+                                kPlacedDeclarations);
+  }
+}
+
+PlaceCounts AlignedCounts(const std::string& consequent) {
+  return CountThroughTheEnd(
+      "module t;\n"
+      "  logic clk = 0, slow = 0;\n"
+      "  int tick = 1;\n"
+      "  logic a, b;\n"
+      "  always #5 clk = ~clk;\n"
+      "  always #10 tick = tick + 1;\n"
+      "  initial begin #15 slow = 1; #10 slow = 0; #10 slow = 1; end\n"
+      "  assign a = tick inside {1, 3};\n"
+      "  assign b = tick inside {2, 3};\n"
+      "  assert property (@(posedge clk) a |-> @(posedge slow) " +
+      consequent +
+      ") $display(\"PASS\"); else $display(\"FAIL\");\n"
+      "  initial #40 $finish;\n"
+      "endmodule\n");
+}
+
+TEST(NexttimeProperty, AnOffTickNexttimeFirstAlignsToItsClock) {
+  EXPECT_EQ(AlignedCounts("nexttime [0] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(AlignedCounts("s_nexttime [0] b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(AlignedCounts("nexttime b"), (PlaceCounts{3, 1}));
+  EXPECT_EQ(AlignedCounts("s_nexttime b"), (PlaceCounts{2, 2}));
+  EXPECT_EQ(AlignedCounts("s_nexttime [1] b"), (PlaceCounts{2, 2}));
 }
 
 }  // namespace
