@@ -1,10 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
 #include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sequences.h"
 #include "simulator/variable.h"
@@ -201,6 +203,156 @@ TEST(MulticlockedProperty, OverlappingImplicationHasNoTickFromTheEnd) {
 TEST(MulticlockedProperty, IfBranchHasNoTickFromCondition) {
   const std::vector<uint64_t> kBranchTicks = {10, 20, 30};
   EXPECT_EQ(MulticlockedIfBranchEvalTick(40, kBranchTicks), kNoMulticlockTick);
+}
+
+constexpr const char* kMulticlockStimulus =
+    "  assign a = tick inside {1, 3};\n"
+    "  initial begin b = 1; #8 b = 0; #4 b = 1; #10 b = 0; #5 b = 1; #5 b = 0; "
+    "end\n"
+    "  assign c = tick inside {1, 2, 3};\n"
+    "  assign d = tick == 1;\n";
+
+constexpr const char* kMulticlockPlaces[] = {
+    "module",  "generate",        "interface",          "program",
+    "checker", "module property", "interface property", "checker property"};
+
+std::string MulticlockPlaceSource(const std::string& place,
+                                  const std::string& directive,
+                                  const std::string& body) {
+  if (place.ends_with(" property") && place != "module property") {
+    std::string unit = place.substr(0, place.size() - 9);
+    std::string items = "  property P; @(posedge clk) " + body +
+                        "; endproperty\n" + PlacedDirective(directive, "P");
+    std::string header = unit == "checker"
+                             ? "checker w(clk, a, b, c, d);\n"
+                             : unit + " w(input logic clk, a, b, c, d);\n";
+    return header + items + "end" + unit + "\n" +
+           PlacedTop(kMulticlockStimulus, "  w u(clk, a, b, c, d);\n");
+  }
+  return ClockedPlaceSource(place, directive, body, kMulticlockStimulus);
+}
+
+template <typename Places, typename Rows>
+void ExpectMulticlockCountsIn(const Places& places, const Rows& rows) {
+  ExpectCountsInEachPlace(places, rows, MulticlockPlaceSource);
+}
+
+template <typename Rows>
+void ExpectMulticlockCountsInEachPlace(const Rows& rows) {
+  ExpectMulticlockCountsIn(kMulticlockPlaces, rows);
+  ExpectMulticlockCountsIn(kDefaultClockedPlaces, rows);
+}
+
+constexpr PlacedProperty kImplicationsAcrossClocks[] = {
+    {"a |=> @(negedge clk) b", {3, 1}, 3},
+    {"d |=> @(negedge clk) b", {3, 1}, 3},
+    {"d |=> @(clk) b", {3, 1}, 3},
+    {"d |-> @(negedge clk) b", {3, 1}, 3},
+    {"a && !d |-> @(clk) b", {3, 1}, 3},
+    {"a ##1 b |=> @(negedge clk) !b", {3, 1}, 3},
+    {"d |=> @(negedge clk) !b ##2 b", {4, 0}, 4},
+    {"d ##1 @(negedge clk) !b ##2 b", {1, 3}, 1}};
+
+constexpr PlacedProperty kBooleansAcrossClocks[] = {
+    {"c |-> (@(posedge clk) a) and (@(negedge clk) b)", {2, 2}, 2},
+    {"a && !d |-> (@(posedge clk) a) and (@(clk) !b)", {4, 0}, 4},
+    {"c |-> (@(posedge clk) !a) or (@(negedge clk) b)", {3, 1}, 3},
+    {"d |-> (@(posedge clk) !a) or (@(negedge clk) b)", {3, 1}, 3},
+    {"d |-> not (@(negedge clk) b)", {4, 0}, 4},
+    {"c |-> not (@(negedge clk) b)", {2, 2}, 2},
+    {"a && !d |-> not (@(clk) b)", {4, 0}, 4},
+    {"c |-> (@(negedge clk) b) implies (@(posedge clk) a)", {3, 1}, 3},
+    {"d |-> (@(posedge clk) a) implies (@(clk) b)", {4, 0}, 4},
+    {"d |-> (@(posedge clk) a) iff (@(clk) b)", {4, 0}, 4},
+    {"d |-> (@(posedge clk) a) and (@(negedge clk) !b ##2 b)", {4, 0}, 4},
+    {"d |-> (@(posedge clk) !a) or (@(negedge clk) !b ##2 b)", {4, 0}, 4},
+    {"d |-> not (@(negedge clk) !b ##2 b)", {3, 1}, 3}};
+
+constexpr PlacedProperty kIfsAcrossClocks[] = {
+    {"if (a) @(negedge clk) b", {3, 1}, 3},
+    {"if (a && !d) @(clk) !b", {4, 0}, 4},
+    {"if (d) @(negedge clk) !b ##2 b", {4, 0}, 4},
+    {"if (a) @(negedge clk) b else @(clk) !b", {2, 2}, 2},
+    {"if (!a || d) 1 else @(clk) !b", {4, 0}, 4}};
+
+constexpr PlacedProperty kImpliesAndIffAcrossClocks[] = {
+    {"c |-> (@(posedge clk) a) implies (@(negedge clk) b)", {3, 1}, 3},
+    {"c |-> (@(posedge clk) a) iff (@(negedge clk) b)", {2, 2}, 2},
+    {"d |-> (@(posedge clk) a) iff (@(negedge clk) b)", {3, 1}, 3},
+    {"d |-> (@(posedge clk) a) implies (@(negedge clk) !b ##2 b)", {4, 0}, 4},
+    {"d |-> (@(posedge clk) a) iff (@(negedge clk) !b ##2 b)", {4, 0}, 4}};
+
+constexpr PlacedProperty kBooleanConsequentsOfNonoverlapping[] = {
+    {"d |=> (@(negedge clk) !b) and (@(posedge clk) b)", {4, 0}, 4},
+    {"d |=> (@(negedge clk) b) and (@(posedge clk) b)", {3, 1}, 3},
+    {"a |=> (@(negedge clk) !b) and (@(posedge clk) b)", {3, 1}, 3},
+    {"d |=> (@(negedge clk) b) or (@(posedge clk) !b)", {3, 1}, 3},
+    {"d |=> not (@(negedge clk) b)", {4, 0}, 4},
+    {"d |=> (@(posedge clk) b) implies (@(negedge clk) b)", {3, 1}, 3},
+    {"d |=> (@(posedge clk) b) iff (@(negedge clk) b)", {3, 1}, 3}};
+
+constexpr PlacedProperty kFirstTicksInTheAttemptsTimeStep[] = {
+    {"d |-> @(clk) b", {4, 0}, 4},
+    {"a |-> @(clk) b", {3, 1}, 3},
+    {"d |-> (@(posedge clk) !a) or (@(clk) b)", {4, 0}, 4},
+    {"d |-> not (@(clk) b)", {3, 1}, 3},
+    {"if (d) @(clk) b", {4, 0}, 4},
+    {"if (d) @(clk) b else a", {2, 2}, 2},
+    {"if (!d) a else @(clk) b", {2, 2}, 2},
+    {"d ##0 @(clk) b", {1, 3}, 1}};
+
+TEST(MulticlockedPropertyRun,
+     AnImplicationAwaitsTheConsequentClocksNearestTickInEachPlace) {
+  ExpectMulticlockCountsInEachPlace(kImplicationsAcrossClocks);
+}
+
+TEST(MulticlockedPropertyRun,
+     ABooleanOperatorReadsEachOperandOnItsOwnClockInEachPlace) {
+  ExpectMulticlockCountsInEachPlace(kBooleansAcrossClocks);
+}
+
+TEST(MulticlockedPropertyRun,
+     AnIfReadsItsBranchAtTheBranchClocksNearestTickInEachPlace) {
+  ExpectMulticlockCountsInEachPlace(kIfsAcrossClocks);
+}
+
+TEST(MulticlockedPropertyRun,
+     DISABLED_ImpliesAndIffReadTheOtherClocksOperandAtItsNearestTick) {
+  ExpectMulticlockCountsInEachPlace(kImpliesAndIffAcrossClocks);
+}
+
+TEST(MulticlockedPropertyRun,
+     DISABLED_ANonoverlappingConsequentStartsEachOperandAtItsClocksNextTick) {
+  ExpectMulticlockCountsInEachPlace(kBooleanConsequentsOfNonoverlapping);
+}
+
+TEST(MulticlockedPropertyRun,
+     DISABLED_AClocksFirstTickInTheAttemptsTimeStepIsCoincident) {
+  ExpectMulticlockCountsInEachPlace(kFirstTicksInTheAttemptsTimeStep);
+}
+
+template <typename Places>
+void ExpectEveryAcceptedRowIn(const Places& places) {
+  ExpectMulticlockCountsIn(places, kImplicationsAcrossClocks);
+  ExpectMulticlockCountsIn(places, kBooleansAcrossClocks);
+  ExpectMulticlockCountsIn(places, kIfsAcrossClocks);
+}
+
+TEST(MulticlockedPropertyRun,
+     DISABLED_AMulticlockedPropertyCountsInAClockedProcedure) {
+  ExpectEveryAcceptedRowIn(
+      std::initializer_list<const char*>{"clocked procedural"});
+}
+
+TEST(MulticlockedPropertyRun,
+     DISABLED_AMulticlockedPropertyCountsInAPackageProperty) {
+  ExpectEveryAcceptedRowIn(
+      std::initializer_list<const char*>{"package property"});
+}
+
+TEST(MulticlockedPropertyRun,
+     DISABLED_AMulticlockedPropertyCountsInACompilationUnitProperty) {
+  ExpectEveryAcceptedRowIn(std::initializer_list<const char*>{"unit"});
 }
 
 }  // namespace

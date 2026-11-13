@@ -27,57 +27,20 @@ constexpr const char* kStaticPlaces[] = {
     "module",  "generate",        "interface",      "program",
     "checker", "module property", "module sequence"};
 
-std::string DefaultClocked(const std::string& place, const std::string& items) {
-  if (place == "default module") return PlacedTop(kEdgeStimulus, items);
-  std::string unit =
-      place == "default checker"
-          ? "checker w(clk, a, b, c, d);\n" + items + "endchecker\n"
-          : place.substr(8) + " w(input logic clk, a, b, c, d);\n" + items +
-                "end" + place.substr(8) + "\n";
-  return unit + PlacedTop(kEdgeStimulus, "  w u(clk, a, b, c, d);\n");
-}
-
 std::string JoinSource(const std::string& place, const std::string& directive,
                        const std::string& body) {
-  if (place == "clocked procedural") {
-    return PlacedTop(
-        kEdgeStimulus,
-        "  always @(posedge clk)" +
-            PlacedDirective(directive, "@(posedge clk) " + body).substr(1));
-  }
   if (place == "module sequence") {
     return PlacedTop(kEdgeStimulus, "  sequence S; @(posedge clk) " + body +
                                         "; endsequence\n" +
                                         PlacedDirective(directive, "S"));
   }
-  if (place.starts_with("default ")) {
-    return DefaultClocked(
-        place, "  default clocking cb @(posedge clk); endclocking\n" +
-                   PlacedDirective(directive, body));
-  }
-  return PropertyPlaceSource(place, directive, body, kEdgeStimulus);
+  return ClockedPlaceSource(place, directive, body, kEdgeStimulus);
 }
 
 template <typename Places, typename Rows>
 void ExpectJoinsIn(const Places& places, const Rows& rows) {
-  for (const char* name : places) {
-    std::string place = name;
-    for (const PlacedProperty& row : rows) {
-      for (const char* directive : {"assert", "assume"}) {
-        SCOPED_TRACE(place + " " + directive + " " + row.body);
-        EXPECT_EQ(CountThroughTheEnd(JoinSource(place, directive, row.body)),
-                  row.asserted);
-      }
-      SCOPED_TRACE(place + " cover " + row.body);
-      EXPECT_EQ(CountThroughTheEnd(JoinSource(place, "cover", row.body)),
-                (PlaceCounts{row.covered, 0}));
-    }
-  }
+  ExpectCountsInEachPlace(places, rows, JoinSource);
 }
-
-constexpr const char* kDefaultClockedPlaces[] = {
-    "default module", "default interface", "default program",
-    "default checker"};
 
 TEST(MulticlockSequenceRun, AJoinMovesToTheSecondClocksTickInEachPlace) {
   ExpectJoinsIn(kStaticPlaces, kJoinsToAnotherClock);

@@ -93,6 +93,41 @@ inline std::string PropertyPlaceSource(const std::string& place,
   return declared + PlacedTop(stimulus, PlacedDirective(directive, formal));
 }
 
+constexpr const char* kDefaultClockedPlaces[] = {
+    "default module", "default interface", "default program",
+    "default checker"};
+
+inline std::string DefaultClockedSource(const std::string& place,
+                                        const std::string& stimulus,
+                                        const std::string& items) {
+  if (place == "default module") return PlacedTop(stimulus, items);
+  std::string unit =
+      place == "default checker"
+          ? "checker w(clk, a, b, c, d);\n" + items + "endchecker\n"
+          : place.substr(8) + " w(input logic clk, a, b, c, d);\n" + items +
+                "end" + place.substr(8) + "\n";
+  return unit + PlacedTop(stimulus, "  w u(clk, a, b, c, d);\n");
+}
+
+inline std::string ClockedPlaceSource(const std::string& place,
+                                      const std::string& directive,
+                                      const std::string& body,
+                                      const std::string& stimulus) {
+  if (place == "clocked procedural") {
+    return PlacedTop(
+        stimulus,
+        "  always @(posedge clk)" +
+            PlacedDirective(directive, "@(posedge clk) " + body).substr(1));
+  }
+  if (place.starts_with("default ")) {
+    return DefaultClockedSource(
+        place, stimulus,
+        "  default clocking cb @(posedge clk); endclocking\n" +
+            PlacedDirective(directive, body));
+  }
+  return PropertyPlaceSource(place, directive, body, stimulus);
+}
+
 inline size_t CountedLines(const std::string& out, const std::string& tag) {
   size_t count = 0;
   std::string line = tag + "\n";
@@ -134,6 +169,24 @@ inline void ExpectPropertyCountsInPlace(const std::string& place,
   EXPECT_EQ(CountThroughTheEnd(PropertyPlaceSource(
                 place, "cover", property.body, stimulus, declarations)),
             (PlaceCounts{property.covered, 0}));
+}
+
+template <typename Places, typename Rows, typename Source>
+void ExpectCountsInEachPlace(const Places& places, const Rows& rows,
+                             const Source& source) {
+  for (const char* name : places) {
+    std::string place = name;
+    for (const PlacedProperty& row : rows) {
+      for (const char* directive : {"assert", "assume"}) {
+        SCOPED_TRACE(place + " " + directive + " " + row.body);
+        EXPECT_EQ(CountThroughTheEnd(source(place, directive, row.body)),
+                  row.asserted);
+      }
+      SCOPED_TRACE(place + " cover " + row.body);
+      EXPECT_EQ(CountThroughTheEnd(source(place, "cover", row.body)),
+                (PlaceCounts{row.covered, 0}));
+    }
+  }
 }
 
 inline PlaceCounts SlowClockConsequentCounts(const std::string& consequent) {
