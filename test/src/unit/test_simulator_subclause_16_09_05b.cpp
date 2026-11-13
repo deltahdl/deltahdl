@@ -1,14 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <string>
-#include <string_view>
 
 #include "fixture_simulator.h"
-#include "helpers_reported_error.h"
+#include "helpers_sequence_covers.h"
 #include "helpers_sequence_ticks.h"
-#include "simulator/cover_results.h"
-#include "simulator/cover_statement.h"
 
 using namespace delta;
 
@@ -16,7 +12,6 @@ namespace {
 
 constexpr const char* kRangeAnd = "(te1 ##[1:5] te2) and (te3 ##2 te4 ##2 te5)";
 constexpr const char* kFixedAnd = "(te1 ##2 te2) and (te3 ##2 te4 ##2 te5)";
-constexpr uint64_t kNoRecord = ~uint64_t{0};
 
 std::string RangeDrive() {
   return DriveTicks(
@@ -27,93 +22,55 @@ std::string FixedDrive() {
   return DriveTicks({{1, 2, 8}, {10, 12, 13}, {2, 3, 8}, {4, 10}, {6, 12}});
 }
 
-std::string AndSource(const std::string& items, const std::string& drive,
-                      const std::string& outside = "") {
-  return outside +
-         "module t;\n"
-         "  logic clk = 0;\n"
-         "  logic te1 = 0, te2 = 0, te3 = 0, te4 = 0, te5 = 0;\n"
-         "  int fails = 0;\n"
-         "  int at = 0;\n"
-         "  always #5 clk = ~clk;\n" +
-         items + "  initial begin\n" + drive +
-         "    #10 $finish;\n"
-         "  end\n"
-         "endmodule\n";
-}
-
-void RunDesign(const std::string& src, SimFixture& f) {
-  auto* design = ElaborateSrc(src, f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-}
-
-uint64_t CoverCount(SimFixture& f, const std::string& src,
-                    std::string_view label) {
-  uint32_t line = LineHolding(src, label);
-  for (const auto& record : f.ctx.ConcurrentCovers().Results()) {
-    if (record.line != line) continue;
-    return record.category == CoverStatementCategory::kSequence
-               ? record.matched
-               : record.succeeded;
-  }
-  return kNoRecord;
-}
-
-uint64_t VarValue(SimFixture& f, std::string_view name) {
-  auto* var = f.ctx.FindVariable(name);
-  return var == nullptr ? kNoRecord : var->value.ToUint64();
-}
-
 TEST(SequenceAndMatches, DISABLED_EachPairOfOperandMatchesIsAMatch) {
   std::string items = "  sequence s_and; ";
   items += kRangeAnd;
   items += "; endsequence\n  c1: cover sequence (@(posedge clk) ";
   items += kRangeAnd;
   items += ");\n  c2: cover sequence (@(posedge clk) s_and);\n";
-  std::string src = AndSource(items, RangeDrive());
+  std::string src = SequenceCoverSource(items, RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 5u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 5u);
 }
 
 TEST(SequenceAndMatches, ARangeOperandAloneCountsEveryMatch) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover sequence (@(posedge clk) te1 ##[1:5] te2);\n", RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 5u);
 }
 
 TEST(SequenceAndMatches, DISABLED_SwappedOperandsPairEveryMatch) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover sequence (@(posedge clk)"
       " (te3 ##2 te4 ##2 te5) and (te1 ##[1:5] te2));\n",
       RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 5u);
 }
 
 TEST(SequenceAndMatches, DISABLED_ABooleanOperandPairsWithEveryRangeMatch) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover sequence (@(posedge clk) (te1 ##[1:5] te2) and te1)"
       " at = $time;\n",
       RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 5u);
   EXPECT_EQ(VarValue(f, "at"), 125u);
 }
 
 TEST(SequenceAndMatches, DISABLED_TwoRangeOperandsPairEveryMatch) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover sequence (@(posedge clk)"
       " (te1 ##[1:2] te2) and (te3 ##[1:2] te2));\n",
       RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 4u);
 }
 
@@ -127,9 +84,9 @@ TEST(SequenceAndMatches, DISABLED_EachMatchContinuesTheChainAfterIt) {
   items +=
       ") ##1 te2);\n"
       "  c3: cover sequence (@(posedge clk) te3 ##0 s_and ##1 te2);\n";
-  std::string src = AndSource(items, RangeDrive());
+  std::string src = SequenceCoverSource(items, RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 4u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 4u);
   EXPECT_EQ(CoverCount(f, src, "c3:"), 4u);
@@ -147,9 +104,9 @@ TEST(SequenceAndMatches, ASingleMatchContinuesTheChainAfterIt) {
       ") ##1 te2);\n"
       "  c3: cover sequence (@(posedge clk) te3 ##0 s_and ##1 te2);\n"
       "  c4: cover sequence (@(posedge clk) te1 ##0 s_and ##1 te1);\n";
-  std::string src = AndSource(items, FixedDrive());
+  std::string src = SequenceCoverSource(items, FixedDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
   EXPECT_EQ(VarValue(f, "at"), 125u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 1u);
@@ -158,11 +115,11 @@ TEST(SequenceAndMatches, ASingleMatchContinuesTheChainAfterIt) {
 }
 
 TEST(SequenceAndMatches, AnOperandOpeningWithADelayStartsAtTheAttempt) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover sequence (@(posedge clk) te3 and ##1 te4) at = $time;\n",
       RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
   EXPECT_EQ(VarValue(f, "at"), 35u);
 }
@@ -177,82 +134,64 @@ std::string OutsideSequences() {
 }
 
 TEST(SequenceAndMatches, APackageSequenceMatchesOnceAnAttempt) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover property (@(posedge clk) pk::s_and(te1, te2, te3, te4,"
       " te5));\n",
       RangeDrive(), OutsideSequences());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
 }
 
 TEST(SequenceAndMatches,
      DISABLED_ACompilationUnitSequenceMatchesOnceAnAttempt) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c2: cover property (@(posedge clk) u_and(te1, te2, te3, te4,"
       " te5));\n",
       RangeDrive(), OutsideSequences());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 1u);
 }
 
 TEST(SequenceAndMatches, DISABLED_ASequenceOutsideAModulePairsEveryMatch) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       "  c1: cover sequence (@(posedge clk) pk::s_and(te1, te2, te3, te4,"
       " te5));\n"
       "  c2: cover sequence (@(posedge clk) u_and(te1, te2, te3, te4,"
       " te5));\n",
       RangeDrive(), OutsideSequences());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 5u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 5u);
 }
 
 std::string DesignElementsSource(const std::string& directive) {
-  std::string body = "(@(posedge clk) ";
-  body += kRangeAnd;
-  body += ");\n";
-  std::string outside =
-      "interface ifc(input logic clk, te1, te2, te3, te4, te5);\n"
-      "  i1: ";
-  outside += directive + body;
-  outside +=
-      "endinterface\n"
-      "program pg(input logic clk, te1, te2, te3, te4, te5);\n"
-      "  p1: ";
-  outside += directive + body;
-  outside +=
-      "endprogram\n"
-      "checker ck(logic clk, logic te1, logic te2, logic te3, logic te4,"
-      " logic te5);\n"
-      "  k1: ";
-  outside += directive + body;
-  outside += "endchecker\n";
-  return AndSource(
-      "  ifc i(clk, te1, te2, te3, te4, te5);\n"
-      "  pg p(clk, te1, te2, te3, te4, te5);\n"
-      "  ck k(clk, te1, te2, te3, te4, te5);\n",
-      RangeDrive(), outside);
+  std::string statement = directive + "(@(posedge clk) ";
+  statement += kRangeAnd;
+  statement += ");\n";
+  return DesignElementCoverSource(statement, RangeDrive());
 }
 
 TEST(SequenceAndMatches, EveryDesignElementMatchesOnceAnAttempt) {
   std::string src = DesignElementsSource("cover property ");
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "i1:"), 1u);
   EXPECT_EQ(CoverCount(f, src, "p1:"), 1u);
   EXPECT_EQ(CoverCount(f, src, "k1:"), 1u);
+  EXPECT_EQ(CoverCount(f, src, "g1:"), 1u);
 }
 
 TEST(SequenceAndMatches, DISABLED_EveryDesignElementPairsEveryMatch) {
   std::string src = DesignElementsSource("cover sequence ");
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "i1:"), 5u);
   EXPECT_EQ(CoverCount(f, src, "p1:"), 5u);
   EXPECT_EQ(CoverCount(f, src, "k1:"), 5u);
+  EXPECT_EQ(CoverCount(f, src, "g1:"), 5u);
 }
 
 std::string InstanceOperands() {
@@ -265,19 +204,20 @@ std::string InstanceOperands() {
 }
 
 TEST(SequenceAndMatches, AProceduralAssertionOfInstancesMatchesOnce) {
-  std::string src = AndSource(InstanceOperands() +
-                                  "  always @(posedge clk) begin\n"
-                                  "    c1: cover property (sa(te1, te2) and"
-                                  " sb(te3, te4, te5));\n"
-                                  "  end\n",
-                              RangeDrive());
+  std::string src =
+      SequenceCoverSource(InstanceOperands() +
+                              "  always @(posedge clk) begin\n"
+                              "    c1: cover property (sa(te1, te2) and"
+                              " sb(te3, te4, te5));\n"
+                              "  end\n",
+                          RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
 }
 
 TEST(SequenceAndMatches, EveryKindOfOperandMatchesOnceAnAttempt) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       InstanceOperands() +
           "  c1: cover property (@(posedge clk) sa(te1, te2) and"
           " sb(te3, te4, te5));\n"
@@ -285,14 +225,14 @@ TEST(SequenceAndMatches, EveryKindOfOperandMatchesOnceAnAttempt) {
           "  c3: cover property (@(posedge clk) sm);\n",
       RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 1u);
   EXPECT_EQ(CoverCount(f, src, "c3:"), 1u);
 }
 
 TEST(SequenceAndMatches, DISABLED_EveryKindOfOperandPairsEveryMatch) {
-  std::string src = AndSource(
+  std::string src = SequenceCoverSource(
       InstanceOperands() +
           "  c1: cover sequence (@(posedge clk) sa(te1, te2) and"
           " sb(te3, te4, te5));\n"
@@ -300,7 +240,7 @@ TEST(SequenceAndMatches, DISABLED_EveryKindOfOperandPairsEveryMatch) {
           "  c3: cover sequence (@(posedge clk) sm);\n",
       RangeDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 5u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 5u);
   EXPECT_EQ(CoverCount(f, src, "c3:"), 5u);
@@ -319,9 +259,9 @@ TEST(SequenceAndImplication, AnAntecedentAttemptFailsOnce) {
       items += " 1'b0) else fails++;\n";
     }
   }
-  std::string src = AndSource(items, FixedDrive());
+  std::string src = SequenceCoverSource(items, FixedDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(VarValue(f, "fails"), 4u);
 }
 
@@ -338,9 +278,9 @@ TEST(SequenceAndImplication, AConsequentNeedsBothOperands) {
         " property (@(posedge clk) te1 && te3 |=>"
         " (te3 ##1 te4) and (##1 te4 ##2 te5)) else fails++;\n";
   }
-  std::string src = AndSource(items, FixedDrive());
+  std::string src = SequenceCoverSource(items, FixedDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(VarValue(f, "fails"), 4u);
 }
 
@@ -355,9 +295,9 @@ TEST(SequenceAndImplication, ACoverOfAnImplicationSucceedsWhereBothMatch) {
       ");\n"
       "  c4: cover property (@(posedge clk) te1 && te3 |=>"
       " (te3 ##1 te4) and (##1 te4 ##2 te5));\n";
-  std::string src = AndSource(items, FixedDrive());
+  std::string src = SequenceCoverSource(items, FixedDrive());
   SimFixture f;
-  RunDesign(src, f);
+  RunSequenceDesign(src, f);
   EXPECT_EQ(CoverCount(f, src, "c1:"), 1u);
   EXPECT_EQ(CoverCount(f, src, "c2:"), 1u);
   EXPECT_EQ(CoverCount(f, src, "c3:"), 1u);
