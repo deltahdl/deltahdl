@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
@@ -212,6 +214,64 @@ TEST(AssertionParsing, InferredClockDefaultOnAUserDefinedTypeIsRejected) {
                             "$inferred_clock default requires an untyped or "
                             "event formal argument",
                             3, "16.14.7"));
+}
+
+void ExpectTypedClockRejected(const std::string& decl) {
+  std::string src =
+      "module m;\n"
+      "  typedef logic [1:0] my_t;\n" +
+      decl + "endmodule\n";
+  SCOPED_TRACE(src);
+  auto r = Parse(src);
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "$inferred_clock default requires an untyped or "
+                            "event formal argument",
+                            3, "16.14.7"));
+}
+
+TEST(AssertionParsing,
+     InferredClockDefaultOnAnIntOrBitPropertyFormalIsRejected) {
+  for (const char* type : {"int", "bit"}) {
+    ExpectTypedClockRejected("  property p(" + std::string(type) +
+                             " e = $inferred_clock); 1'b1; endproperty\n");
+  }
+}
+
+TEST(AssertionParsing, InferredClockDefaultOnACarriedPropertyFormalIsRejected) {
+  ExpectTypedClockRejected(
+      "  property p(logic d, e = $inferred_clock); d; endproperty\n");
+}
+
+TEST(AssertionParsing, InferredClockDefaultOnALocalInputFormalIsRejected) {
+  ExpectTypedClockRejected(
+      "  property p(local input logic e = $inferred_clock); 1'b1; "
+      "endproperty\n");
+}
+
+TEST(AssertionParsing, InferredClockDefaultOnATypedSequenceFormalIsRejected) {
+  for (const char* type : {"int", "my_t", "sequence"}) {
+    ExpectTypedClockRejected("  sequence s(" + std::string(type) +
+                             " e = $inferred_clock); 1'b1; endsequence\n");
+  }
+}
+
+TEST(AssertionParsing,
+     DISABLED_InferredClockDefaultOnAnImplicitlyTypedFormalIsRejected) {
+  for (const char* type : {"[3:0]", "signed"}) {
+    ExpectTypedClockRejected("  property p(" + std::string(type) +
+                             " e = $inferred_clock); 1'b1; endproperty\n");
+    ExpectTypedClockRejected("  sequence s(" + std::string(type) +
+                             " e = $inferred_clock); 1'b1; endsequence\n");
+  }
+}
+
+TEST(AssertionParsing, InferredDisableDefaultOnATypedFormalIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  property p(logic r = $inferred_disable); !r; endproperty\n"
+              "  sequence s(bit r = $inferred_disable); !r; endsequence\n"
+              "endmodule\n"));
 }
 
 }  // namespace

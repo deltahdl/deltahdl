@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_placed_assertion_runs.h"
 
 using namespace delta;
 
@@ -152,6 +154,185 @@ TEST(InferredClockingFunctionsRun, AnOrJoinedInferredClockKeepsEachEvent) {
 TEST(InferredClockingFunctionsRun, AnEdgelessGuardedInferredClockStandsIn) {
   EXPECT_NE(RunInferredClockCase("clk iff en").find("c1=11 c2=11\n"),
             std::string::npos);
+}
+
+std::string Verdicts(const std::string& name) {
+  return "    $display(\"" + name + " passed at %0d\", $time);\n" +
+         "  else $display(\"" + name + " failed at %0d\", $time);\n";
+}
+
+std::string FlowSource(const std::string& clocking, const std::string& items) {
+  return "module t;\n"
+         "  logic clk1 = 0, clk2 = 0, a = 1, b = 1, rst = 0;\n"
+         "  always #5 clk1 = ~clk1;\n"
+         "  always #7 clk2 = ~clk2;\n"
+         "  default clocking @(" +
+         clocking +
+         "); endclocking\n"
+         "  property inner(e = $inferred_clock); @(e) b; endproperty\n"
+         "  sequence sinner(e = $inferred_clock); @(e) b; endsequence\n" +
+         items +
+         "  initial begin #15 rst = 1; #5 b = 0; #3 b = 1; #2 rst = 0; end\n"
+         "  initial #60 $finish;\n"
+         "endmodule\n";
+}
+
+void ExpectFlowVerdicts(const std::string& src,
+                        const std::vector<std::string>& want) {
+  SCOPED_TRACE(src);
+  SimFixture f;
+  std::string out = RunCapture(src, f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  EXPECT_EQ(PlacedSortedVerdicts(out), PlacedSorted(want));
+}
+
+std::vector<std::string> Clk2Verdicts() {
+  return {"x passed at 7", "x failed at 21", "x passed at 35",
+          "x passed at 49"};
+}
+
+std::vector<std::string> Clk2NextVerdicts() {
+  return {"x failed at 21", "x passed at 35", "x passed at 49"};
+}
+
+void ExpectNestedVerdicts(const std::string& property,
+                          const std::vector<std::string>& want) {
+  ExpectFlowVerdicts(
+      FlowSource("negedge clk1",
+                 "  x: assert property (" + property + ")\n" + Verdicts("x")),
+      want);
+}
+
+TEST(InferredClockingFunctionsRun,
+     AContainersOwnDefaultClockingStandsInForTheDefault) {
+  for (std::string kind : {"interface", "program", "checker"}) {
+    std::string src = kind == "checker"
+                          ? "checker w(clk1, clk2, b);\n"
+                          : kind + " w(input logic clk1, clk2, b);\n";
+    src.append(
+        "  default clocking @(posedge clk2); endclocking\n"
+        "  property inner(e = $inferred_clock); @(e) b; endproperty\n"
+        "  x: assert property (inner)\n");
+    src.append(Verdicts("x")).append("end").append(kind).append("\n");
+    src.append(FlowSource("negedge clk1", "  w u(clk1, clk2, b);\n"));
+    ExpectFlowVerdicts(src, Clk2Verdicts());
+  }
+}
+
+TEST(InferredClockingFunctionsRun,
+     AnImportedPropertyTakesTheInstantiatingModulesDefaults) {
+  ExpectFlowVerdicts(
+      "package pk;\n"
+      "  property pp(x, e = $inferred_clock, d = $inferred_disable);\n"
+      "    @(e) disable iff (d) x;\n"
+      "  endproperty\n"
+      "endpackage\n" +
+          FlowSource("posedge clk2",
+                     "  import pk::*;\n"
+                     "  default disable iff rst;\n"
+                     "  x: assert property (pp(b))\n" +
+                         Verdicts("x")),
+      {"x passed at 7", "x passed at 35", "x passed at 49"});
+}
+
+TEST(InferredClockingFunctionsRun,
+     AnAssumeOrRestrictTakesTheDefaultsAtTheStatement) {
+  ExpectFlowVerdicts(
+      FlowSource("posedge clk2", "  x: assume property (inner)\n" +
+                                     Verdicts("x") +
+                                     "  restrict property (sinner);\n"),
+      Clk2Verdicts());
+}
+
+TEST(
+    InferredClockingFunctionsRun,
+    DISABLED_APropertyInstanceAfterAnOverlappingImplicationTakesTheFlowingClock) {
+  ExpectNestedVerdicts("@(posedge clk2) a |-> inner", Clk2Verdicts());
+}
+
+TEST(
+    InferredClockingFunctionsRun,
+    DISABLED_APropertyInstanceAfterANonOverlappingImplicationTakesTheFlowingClock) {
+  ExpectNestedVerdicts("@(posedge clk2) a |=> inner", Clk2NextVerdicts());
+}
+
+TEST(InferredClockingFunctionsRun,
+     DISABLED_ASequenceInstanceAfterAnImplicationTakesTheFlowingClock) {
+  ExpectNestedVerdicts("@(posedge clk2) a |-> sinner", Clk2Verdicts());
+}
+
+TEST(InferredClockingFunctionsRun,
+     ASequenceInstanceAfterACycleDelayTakesTheFlowingClock) {
+  ExpectNestedVerdicts("@(posedge clk2) a ##1 sinner", Clk2NextVerdicts());
+}
+
+TEST(InferredClockingFunctionsRun,
+     ANestedInstanceWhoseBodyWritesNoClockTakesTheFlowingClock) {
+  ExpectFlowVerdicts(
+      FlowSource("negedge clk1",
+                 "  property inner3(e = $inferred_clock); b; endproperty\n"
+                 "  x: assert property (@(posedge clk2) a |-> inner3)\n" +
+                     Verdicts("x")),
+      Clk2Verdicts());
+}
+
+TEST(InferredClockingFunctionsRun,
+     DISABLED_ANestedInstancesInferredDisableIsTheDefaultAtTheInstance) {
+  ExpectFlowVerdicts(
+      FlowSource("negedge clk1",
+                 "  default disable iff rst;\n"
+                 "  sequence sdis(r = $inferred_disable); b || r; endsequence\n"
+                 "  x: assert property (@(posedge clk2) disable iff (1'b0)\n"
+                 "    a ##1 sdis)\n" +
+                     Verdicts("x")),
+      {"x passed at 21", "x passed at 35", "x passed at 49"});
+}
+
+TEST(InferredClockingFunctionsRun,
+     DISABLED_APropertyInstanceUnderNotTakesTheFlowingClock) {
+  ExpectFlowVerdicts(
+      FlowSource("negedge clk1",
+                 "  property innerneg(e = $inferred_clock); @(e) !b; "
+                 "endproperty\n"
+                 "  x: assert property (@(posedge clk2) not innerneg)\n" +
+                     Verdicts("x")),
+      Clk2Verdicts());
+}
+
+TEST(InferredClockingFunctionsRun,
+     DISABLED_APropertyInstanceUnderAndOrOrTakesTheFlowingClock) {
+  for (const char* property :
+       {"@(posedge clk2) (a and inner)", "@(posedge clk2) (1'b0 or inner)"}) {
+    ExpectNestedVerdicts(property, Clk2Verdicts());
+  }
+}
+
+TEST(InferredClockingFunctionsRun,
+     DISABLED_AnOuterPropertyAssertedInANestedModuleTakesItsClock) {
+  ExpectFlowVerdicts(
+      FlowSource("negedge clk1",
+                 "  module n;\n"
+                 "    default clocking @(posedge clk2); endclocking\n"
+                 "    x: assert property (inner)\n" +
+                     Verdicts("x") +
+                     "  endmodule\n"
+                     "  n u();\n"),
+      Clk2Verdicts());
+}
+
+TEST(InferredClockingFunctionsRun,
+     DISABLED_AMulticlockedBodysLeftOutClockTakesTheDefaultClocking) {
+  ExpectFlowVerdicts(
+      FlowSource(
+          "negedge clk1",
+          "  property p_multiclock(clkw, clkx = $inferred_clock, clky,\n"
+          "                        w, x, y, z);\n"
+          "    @clkw w ##1 @clkx x |=> @clky y ##1 z;\n"
+          "  endproperty\n"
+          "  x: assert property (p_multiclock(negedge clk2, , posedge clk1,\n"
+          "                                   a, b, a, b))\n" +
+              Verdicts("x")),
+      {"x passed at 35", "x passed at 45"});
 }
 
 }  // namespace
