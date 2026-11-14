@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"
+#include "simulator/cover_results.h"
 
 using namespace delta;
 
@@ -28,6 +30,18 @@ std::string RunAssertions(const std::string& items,
                           const std::string& before = "") {
   SimFixture f;
   return RunCapture(AssertionSource(items, before), f);
+}
+
+std::string RunReports(const std::string& items,
+                       const std::string& before = "") {
+  SimFixture f;
+  testing::internal::CaptureStderr();
+  std::string out = RunCapture(AssertionSource(items, before), f);
+  out += testing::internal::GetCapturedStderr();
+  f.ctx.RunFinalBlocks();
+  std::ostringstream covers;
+  ReportConcurrentCoverResults(f.ctx.ConcurrentCovers(), covers);
+  return out + covers.str();
 }
 
 TEST(ConcurrentAssertionStatements,
@@ -182,6 +196,90 @@ TEST(ConcurrentAssertionStatements,
       "  end\n");
   EXPECT_EQ(out.find("covered at"), out.rfind("covered at"));
   EXPECT_NE(out.find("t.ib.cs covered at 15\n"), std::string::npos);
+}
+
+TEST(ConcurrentAssertionStatements,
+     AnUnlabelledAssertOrAssumeIsReportedUnderItsScopeAndLine) {
+  std::string out = RunReports(
+      "  assert property (@(posedge clk) a);\n"
+      "  assume property (@(posedge clk) a);\n"
+      "  assert property (@(posedge clk) a);\n");
+  EXPECT_NE(out.find("[15] ERROR t (<test>:5): Assertion failed.\n"),
+            std::string::npos);
+  EXPECT_NE(out.find("[15] ERROR t (<test>:6): Assertion failed.\n"),
+            std::string::npos);
+  EXPECT_NE(out.find("[15] ERROR t (<test>:7): Assertion failed.\n"),
+            std::string::npos);
+}
+
+TEST(ConcurrentAssertionStatements,
+     AnUnlabelledAssertIsReportedUnderItsInterfaceCheckerOrProgram) {
+  std::string out = RunReports(
+      "  bus_if bus(clk, a);\n"
+      "  chk u_chk(clk, a);\n"
+      "  program prog;\n"
+      "    assert property (@(posedge clk) a);\n"
+      "  endprogram\n",
+      "interface bus_if(input logic clk, f);\n"
+      "  assert property (@(posedge clk) f);\n"
+      "endinterface\n"
+      "checker chk(logic clk, logic g);\n"
+      "  assert property (@(posedge clk) g);\n"
+      "endchecker\n");
+  EXPECT_NE(out.find("[15] ERROR t.bus (<test>:2): Assertion failed.\n"),
+            std::string::npos);
+  EXPECT_NE(out.find("[15] ERROR t.u_chk (<test>:5): Assertion failed.\n"),
+            std::string::npos);
+  EXPECT_NE(out.find("[15] ERROR t.prog (<test>:14): Assertion failed.\n"),
+            std::string::npos);
+}
+
+TEST(ConcurrentAssertionStatements,
+     AnUnlabelledStatementInAGenerateBlockOrProcedureIsNamedByThatBlock) {
+  std::string out = RunReports(
+      "  if (1) begin : g\n"
+      "    assert property (@(posedge clk) a);\n"
+      "    assert property (@(posedge clk) a) else $display(\"%m g fail\");\n"
+      "    cover property (@(posedge clk) !a);\n"
+      "    cover sequence (@(posedge clk) !a);\n"
+      "  end\n"
+      "  always @(posedge clk) begin : p\n"
+      "    assert property (a);\n"
+      "    assert property (a) else $display(\"%m p fail\");\n"
+      "    cover property (!a);\n"
+      "  end\n");
+  for (const char* line :
+       {"[15] ERROR t.g (<test>:6): Assertion failed.\n", "t.g g fail\n",
+        "[15] ERROR t.p (<test>:12): Assertion failed.\n", "t.p p fail\n",
+        "cover property t.g (line 8): attempted 4, succeeded 1",
+        "cover sequence t.g (line 9): attempted 4, matched 1",
+        "cover property t.p (line 14): attempted 4, succeeded 1"}) {
+    EXPECT_NE(out.find(line), std::string::npos) << line;
+  }
+}
+
+TEST(ConcurrentAssertionStatements,
+     AHierarchicalNameReachesALabelInABlockOrAnInstance) {
+  std::string out = RunReports(
+      "  bus_if bus(clk, a);\n"
+      "  chk u_chk(clk, a);\n"
+      "  if (1) begin : g2\n"
+      "    lbl: assert property (@(posedge clk) a);\n"
+      "  end\n"
+      "  always @(posedge clk) begin : p2\n"
+      "    lbl: assert property (a);\n"
+      "  end\n"
+      "  kept: assert property (@(posedge clk) a);\n"
+      "  initial $assertoff(0, t.g2.lbl, t.p2.lbl, t.bus.lbl, t.u_chk.lbl);\n",
+      "interface bus_if(input logic clk, f);\n"
+      "  lbl: assert property (@(posedge clk) f);\n"
+      "endinterface\n"
+      "checker chk(logic clk, logic g);\n"
+      "  lbl: assert property (@(posedge clk) g);\n"
+      "endchecker\n");
+  EXPECT_NE(out.find("[15] ERROR t.kept (<test>:19): Assertion failed.\n"),
+            std::string::npos);
+  EXPECT_EQ(out.find("lbl"), std::string::npos);
 }
 
 TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
