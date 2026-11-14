@@ -3,25 +3,14 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_clock_resolution_runs.h"
 
 using namespace delta;
 
 namespace {
 
 std::string Design(const std::string& module) {
-  return module +
-         "module t;\n"
-         "  logic clk = 0;\n"
-         "  logic a = 0, b = 0;\n"
-         "  always #5 clk = ~clk;\n"
-         "  m u1(a, b, clk);\n"
-         "  initial begin\n"
-         "    #12 a = 1;\n"
-         "    #10 a = 0; b = 1;\n"
-         "    #12 b = 0;\n"
-         "    #6 $finish;\n"
-         "  end\n"
-         "endmodule\n";
+  return ClockResolutionDesign(module);
 }
 
 TEST(ClockResolutionRun, EachRuleClocksItsStatement) {

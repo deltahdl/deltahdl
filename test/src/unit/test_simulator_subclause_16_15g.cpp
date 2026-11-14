@@ -3,6 +3,7 @@
 #include <string>
 
 #include "helpers_disable_iff_runs.h"
+#include "helpers_report_times.h"
 
 using namespace delta;
 
