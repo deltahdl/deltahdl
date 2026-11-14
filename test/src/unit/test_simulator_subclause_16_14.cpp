@@ -107,6 +107,83 @@ TEST(ConcurrentAssertionStatements, AStatementStandsInAProgram) {
   EXPECT_EQ(out, "t.prog.pr_named failed at 15\n$finish at time 40\n");
 }
 
+TEST(ConcurrentAssertionStatements, AStatementStandsInACaseGenerateBlock) {
+  std::string out = RunAssertions(
+      "  case (1)\n"
+      "    1: begin : g1\n"
+      "      c1: assert property (@(posedge clk) a)\n"
+      "        else $display(\"%m failed at %0d\", $time);\n"
+      "    end\n"
+      "  endcase\n");
+  EXPECT_EQ(out, "t.g1.c1 failed at 15\n$finish at time 40\n");
+}
+
+TEST(ConcurrentAssertionStatements,
+     AnAlwaysLatchQueuesAnInstanceEachTimeItRuns) {
+  std::string out = RunAssertions(
+      "  logic en = 0, q;\n"
+      "  initial #12 en = 1;\n"
+      "  always_latch begin : lb\n"
+      "    if (en) q = a;\n"
+      "    la: assert property (@(posedge clk) a)\n"
+      "      else $display(\"%m failed at %0d\", $time);\n"
+      "  end\n");
+  EXPECT_EQ(out,
+            "t.lb.la failed at 15\nt.lb.la failed at 15\n"
+            "$finish at time 40\n");
+}
+
+TEST(ConcurrentAssertionStatements,
+     AStatementInAForkOfAnAlwaysProcedureIsAttempted) {
+  std::string out = RunAssertions(
+      "  always @(posedge clk) begin : fb\n"
+      "    fork\n"
+      "      fa: assert property (@(posedge clk) a)\n"
+      "        else $display(\"fa failed at %0d\", $time);\n"
+      "    join\n"
+      "  end\n");
+  EXPECT_EQ(out, "fa failed at 15\n$finish at time 40\n");
+}
+
+TEST(ConcurrentAssertionStatements,
+     AStatementStandsInAnAlwaysProcedureOfAnInterface) {
+  std::string out =
+      RunAssertions("  w bus(clk, a);\n",
+                    "interface w(input logic clk, f);\n"
+                    "  always @(posedge clk) begin : ip\n"
+                    "    ia: assert property (f)\n"
+                    "      else $display(\"%m failed at %0d\", $time);\n"
+                    "  end\n"
+                    "endinterface\n");
+  EXPECT_EQ(out, "t.bus.ip.ia failed at 15\n$finish at time 40\n");
+}
+
+TEST(ConcurrentAssertionStatements,
+     AStatementInAProgramsInitialProcedureIsAttemptedOnce) {
+  std::string out =
+      RunAssertions("  p pr(clk, a);\n",
+                    "program p(input logic clk, f);\n"
+                    "  initial begin : pi\n"
+                    "    pa: assert property (@(posedge clk) f)\n"
+                    "      $display(\"%m passed at %0d\", $time);\n"
+                    "      else $display(\"%m failed at %0d\", $time);\n"
+                    "    #30;\n"
+                    "  end\n"
+                    "endprogram\n");
+  EXPECT_EQ(out, "t.pr.pi.pa passed at 5\n");
+}
+
+TEST(ConcurrentAssertionStatements,
+     ACoverSequenceInAnInitialProcedureIsAttemptedOnce) {
+  std::string out = RunAssertions(
+      "  initial begin : ib\n"
+      "    cs: cover sequence (@(posedge clk) a ##1 !a)\n"
+      "      $display(\"%m covered at %0d\", $time);\n"
+      "  end\n");
+  EXPECT_EQ(out.find("covered at"), out.rfind("covered at"));
+  EXPECT_NE(out.find("t.ib.cs covered at 15\n"), std::string::npos);
+}
+
 TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
   std::string out = RunAssertions(
       "  initial begin : waiting\n"

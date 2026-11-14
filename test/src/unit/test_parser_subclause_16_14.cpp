@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "common/diagnostic.h"
@@ -196,6 +197,113 @@ TEST(ConcurrentAssertionPlacement, InAFinalProcedureIsReported) {
       "  end\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 4, "16.14"));
+}
+
+TEST(ConcurrentAssertionPlacement, InAStaticClassMethodIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  class C;\n"
+      "    static function void f();\n"
+      "      restrict property (@(posedge clk) x);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 5, "16.14"));
+}
+
+struct PlacedStatement {
+  const char* src;
+  uint32_t line;
+};
+
+TEST(ConcurrentAssertionPlacement,
+     InASubroutineOutsideAModuleIsReportedWhereverDeclared) {
+  const PlacedStatement kCases[] = {
+      {"interface w;\n"
+       "  logic clk; bit x;\n"
+       "  task run();\n"
+       "    assert property (@(posedge clk) x);\n"
+       "  endtask\n"
+       "endinterface\n",
+       4},
+      {"interface w;\n"
+       "  logic clk; bit x;\n"
+       "  function void chk();\n"
+       "    cover property (@(posedge clk) x);\n"
+       "  endfunction\n"
+       "endinterface\n",
+       4},
+      {"program w;\n"
+       "  logic clk; bit x;\n"
+       "  task run();\n"
+       "    assume property (@(posedge clk) x);\n"
+       "  endtask\n"
+       "endprogram\n",
+       4},
+      {"program w;\n"
+       "  logic clk; bit x;\n"
+       "  function void chk();\n"
+       "    cover sequence (@(posedge clk) x);\n"
+       "  endfunction\n"
+       "endprogram\n",
+       4},
+      {"package w;\n"
+       "  logic clk; bit x;\n"
+       "  task run();\n"
+       "    restrict property (@(posedge clk) x);\n"
+       "  endtask\n"
+       "endpackage\n",
+       4},
+      {"package w;\n"
+       "  logic clk; bit x;\n"
+       "  function void chk();\n"
+       "    assert property (@(posedge clk) x);\n"
+       "  endfunction\n"
+       "endpackage\n",
+       4},
+      {"checker w(logic clk, bit x);\n"
+       "  function void chk();\n"
+       "    cover property (@(posedge clk) x);\n"
+       "  endfunction\n"
+       "endchecker\n",
+       3},
+      {"logic clk; bit x;\n"
+       "task run();\n"
+       "  assert property (@(posedge clk) x);\n"
+       "endtask\n",
+       3},
+      {"logic clk; bit x;\n"
+       "function void chk();\n"
+       "  assume property (@(posedge clk) x);\n"
+       "endfunction\n",
+       3},
+  };
+  for (const PlacedStatement& c : kCases) {
+    auto r = Parse(c.src);
+    EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, c.line, "16.14"))
+        << c.src;
+  }
+}
+
+TEST(ConcurrentAssertionPlacement, DISABLED_AsAClassItemIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic clk; bit x;\n"
+      "  class C;\n"
+      "    assert property (@(posedge clk) x);\n"
+      "    assume property (@(posedge clk) x);\n"
+      "    cover property (@(posedge clk) x);\n"
+      "    cover sequence (@(posedge clk) x);\n"
+      "    restrict property (@(posedge clk) x);\n"
+      "  endclass\n"
+      "endmodule\n");
+  for (uint32_t line = 4; line <= 8; ++line) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "an assertion statement is not an item of a class", line,
+        "A.1.9"))
+        << line;
+  }
 }
 
 TEST(ConcurrentAssertionPlacement, InACoverPassStatementIsLeftToItsOwnRule) {

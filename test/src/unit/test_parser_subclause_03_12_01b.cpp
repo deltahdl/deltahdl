@@ -30,6 +30,21 @@ TEST(CompilationUnitItems, ModuleItemOutsideEveryDesignElement) {
       {"logic clk, a;\n"
        "assert property (@(posedge clk) a);\n",
        2},
+      {"logic clk, a;\n"
+       "assume property (@(posedge clk) a);\n",
+       2},
+      {"logic clk, a;\n"
+       "cover property (@(posedge clk) a);\n",
+       2},
+      {"logic clk, a;\n"
+       "cover sequence (@(posedge clk) a);\n",
+       2},
+      {"logic clk, a;\n"
+       "restrict property (@(posedge clk) a);\n",
+       2},
+      {"logic clk, a;\n"
+       "a1: assert property (@(posedge clk) a);\n",
+       2},
       {"defparam top.u.P = 2;\n", 1},
       {"wire a, b;\n"
        "alias a = b;\n",
