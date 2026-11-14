@@ -6,26 +6,14 @@
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_disable_iff_runs.h"
 
 using namespace delta;
 
 namespace {
 
 std::string Design(const std::string& modules, const std::string& instances) {
-  return modules +
-         "module t;\n"
-         "  logic clk = 0;\n"
-         "  logic a = 1, b = 0, rst = 0, rst1 = 0;\n"
-         "  always #5 clk = ~clk;\n" +
-         instances +
-         "  initial begin\n"
-         "    #12 rst = 1;\n"
-         "    #6 rst = 0;\n"
-         "    #14 rst1 = 1;\n"
-         "    #6 rst1 = 0;\n"
-         "    #2 $finish;\n"
-         "  end\n"
-         "endmodule\n";
+  return DisableIffDesign(modules, instances);
 }
 
 const char* const kWithDefault =
@@ -126,6 +114,39 @@ TEST(DisableIffResolutionRun,
   EXPECT_EQ(out,
             "a_leaf failed at 15\na_leaf failed at 25\n"
             "a_leaf failed at 35\na_gen failed at 35\n$finish at time 40\n");
+}
+
+TEST(DisableIffResolutionRun, ADefaultsBinaryOperatorOperandIsEvaluatedWhole) {
+  SimFixture f;
+  std::string out =
+      RunCapture(Design("module m(input logic a, b, clk, rst, rst1);\n"
+                        "  default disable iff rst || rst1;\n"
+                        "  a_or: assert property (@(posedge clk) a |=> b)\n"
+                        "    else $display(\"a_or failed at %0d\", $time);\n"
+                        "endmodule\n",
+                        "  m u(a, b, clk, rst, rst1);\n"),
+                 f);
+  EXPECT_EQ(out, "$finish at time 40\n");
+}
+
+TEST(DisableIffResolutionRun,
+     DISABLED_ADefaultsDistOperandDisablesWhereTheValueIsInItsSet) {
+  SimFixture f;
+  std::string out =
+      RunCapture(Design("module d0(input logic a, b, clk, rst1);\n"
+                        "  default disable iff rst1 dist {0 := 1};\n"
+                        "  a_d0: assert property (@(posedge clk) a |=> b)\n"
+                        "    else $display(\"a_d0 failed at %0d\", $time);\n"
+                        "endmodule\n"
+                        "module d1(input logic a, b, clk, rst);\n"
+                        "  default disable iff rst dist {[1:2] :/ 1};\n"
+                        "  a_d1: assert property (@(posedge clk) a |=> b)\n"
+                        "    else $display(\"a_d1 failed at %0d\", $time);\n"
+                        "endmodule\n",
+                        "  d0 u0(a, b, clk, rst1);\n"
+                        "  d1 u1(a, b, clk, rst);\n"),
+                 f);
+  EXPECT_EQ(out, "a_d1 failed at 35\n$finish at time 40\n");
 }
 
 std::string SortedResolutionLines(const std::string& default_decl) {
