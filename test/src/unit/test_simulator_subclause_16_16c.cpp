@@ -386,4 +386,74 @@ TEST(WrittenClockOverDefaultRun, AWrittenClockInAnInitialProcedure) {
   EXPECT_EQ(ReportTimes(out, "n2"), "30");
 }
 
+std::string MulticlockedItems() {
+  return "  sequence sm; a ##1 @(negedge clk) !b; endsequence\n"
+         "  property pm; a |=> @(negedge clk) b; endproperty\n" +
+         Covering("m1", "a ##1 @(negedge clk) !b") +
+         Covering("m2", "a ##1 @(negedge clk) !b", "cover sequence") +
+         Covering("m3", "sm") + Failing("m4", "a |=> @(negedge clk) b") +
+         Failing("m5", "a |=> @(negedge clk) b", "assume") +
+         Failing("m6", "pm");
+}
+
+void ExpectDefaultLeadsMulticlocked(const Scope& scope,
+                                    const std::string& open = "",
+                                    const std::string& close = "") {
+  SimFixture f;
+  std::string out = RunScope(scope, open + MulticlockedItems() + close, f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty()) << scope.keyword << open;
+  for (const char* label : {"m1", "m2", "m3", "m4", "m5", "m6"}) {
+    EXPECT_EQ(ReportTimes(out, label), "20") << scope.keyword << open << label;
+  }
+}
+
+TEST(InheritedDefaultMulticlockRun, EachMulticlockedFormInAModule) {
+  ExpectDefaultLeadsMulticlocked(kModule);
+}
+
+TEST(InheritedDefaultMulticlockRun, AnInterfaceProgramOrCheckersDefault) {
+  ExpectDefaultLeadsMulticlocked(kInterface);
+  ExpectDefaultLeadsMulticlocked(kProgram);
+  ExpectDefaultLeadsMulticlocked(kChecker);
+}
+
+TEST(InheritedDefaultMulticlockRun, DISABLED_AGenerateBlocksOwnDefault) {
+  SimFixture f;
+  std::string out =
+      RunCapture(ClockResolutionDesign(
+                     "module m(input logic a, b, clk);\n"
+                     "  default clocking mc @(negedge clk); endclocking\n"
+                     "  if (1) begin : g\n"
+                     "    default clocking gc @(posedge clk); endclocking\n" +
+                     Covering("g1", "a ##1 @(negedge clk) !b") +
+                     "  end\n"
+                     "endmodule\n"),
+                 f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "g1"), "20");
+}
+
+TEST(InheritedDefaultMulticlockRun, DISABLED_TheClausesA6Shape) {
+  SimFixture f;
+  std::string out = RunScope(kModule,
+                             "  property q5n; @(negedge clk) !b; endproperty\n"
+                             "  property q6; !a and q5n; endproperty\n" +
+                                 Failing("a6", "$fell(a) |=> q6"),
+                             f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "a6"), "30");
+}
+
+TEST(InheritedDefaultMulticlockRun, AnOverlappingImplicationUnderTheDefault) {
+  SimFixture f;
+  std::string out =
+      RunCapture(ClockResolutionDesign(
+                     "module m(input logic a, b, clk);\n"
+                     "  default clocking dc @(negedge clk); endclocking\n" +
+                     Failing("o1", "a |-> @(posedge clk) !b") + "endmodule\n"),
+                 f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "o1"), "25");
+}
+
 }  // namespace

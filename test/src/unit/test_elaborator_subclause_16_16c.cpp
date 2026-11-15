@@ -328,4 +328,15 @@ TEST(DeterminedClockElaboration,
                             6, "16.16.1"));
 }
 
+TEST(DeterminedClockElaboration, AMulticlockedRestrictInheritsTheDefault) {
+  ElabFixture f;
+  Elaborate(
+      "module m(input logic a, b, clk);\n"
+      "  default clocking dc @(posedge clk); endclocking\n"
+      "  restrict property (a |=> @(negedge clk) b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 }  // namespace
