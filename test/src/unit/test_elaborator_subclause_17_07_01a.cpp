@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_checker_elab.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -332,6 +334,90 @@ TEST(CheckerVariableAssignment,
       f.diag.Diagnostics(),
       "a blocking assignment cannot target free checker variable 'x'", 4,
       "17.7.1"));
+}
+
+void ExpectCheckerAccepted(const std::string& items) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic clk, input logic en, input logic a);\n" + items +
+          "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
+}
+
+std::string InEveryGeneratePosition(const std::string& item) {
+  return "  if (1) begin : gi\n"
+         "    bit c;\n" +
+         item +
+         "  end\n"
+         "  if (0) begin : gn\n"
+         "  end else begin : ge\n"
+         "    bit c;\n" +
+         item +
+         "  end\n"
+         "  for (genvar k = 0; k < 2; k++) begin : gf\n"
+         "    bit c;\n" +
+         item +
+         "  end\n"
+         "  case (1)\n"
+         "    1: begin : gc\n"
+         "      bit c;\n" +
+         item +
+         "    end\n"
+         "  endcase\n";
+}
+
+TEST(CheckerVariableAssignment, NonblockingAssignmentInAlwaysCombElaborates) {
+  ExpectCheckerAccepted(
+      "  logic n1;\n"
+      "  always_comb n1 <= a;\n");
+}
+
+TEST(CheckerVariableAssignment, NonblockingAssignmentInAlwaysLatchElaborates) {
+  ExpectCheckerAccepted(
+      "  logic n2;\n"
+      "  always_latch if (en) n2 <= a;\n");
+}
+
+TEST(CheckerVariableAssignment,
+     NonblockingAssignmentToAFreeVariableInAlwaysCombAndLatchElaborates) {
+  ExpectCheckerAccepted(
+      "  rand bit x, y;\n"
+      "  always_comb x <= a;\n"
+      "  always_latch if (en) y <= a;\n");
+}
+
+TEST(CheckerVariableAssignment,
+     ContinuousAssignmentInEveryGeneratePositionElaborates) {
+  ExpectCheckerAccepted(InEveryGeneratePosition("    assign c = a;\n"));
+}
+
+TEST(CheckerVariableAssignment,
+     BlockingAlwaysCombInEveryGeneratePositionElaborates) {
+  ExpectCheckerAccepted(InEveryGeneratePosition("    always_comb c = a;\n"));
+}
+
+TEST(CheckerVariableAssignment,
+     BlockingAlwaysLatchInEveryGeneratePositionElaborates) {
+  ExpectCheckerAccepted(
+      InEveryGeneratePosition("    always_latch if (en) c = a;\n"));
+}
+
+TEST(CheckerVariableAssignment,
+     NonblockingAlwaysCombInEveryGeneratePositionElaborates) {
+  ExpectCheckerAccepted(InEveryGeneratePosition("    always_comb c <= a;\n"));
+}
+
+TEST(CheckerVariableAssignment,
+     NonblockingAlwaysLatchInEveryGeneratePositionElaborates) {
+  ExpectCheckerAccepted(
+      InEveryGeneratePosition("    always_latch if (en) c <= a;\n"));
+}
+
+TEST(CheckerVariableAssignment,
+     NonblockingAlwaysFfInEveryGeneratePositionElaborates) {
+  ExpectCheckerAccepted(
+      InEveryGeneratePosition("    always_ff @(posedge clk) c <= a;\n"));
 }
 
 }  // namespace

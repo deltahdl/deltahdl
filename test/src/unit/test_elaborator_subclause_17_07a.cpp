@@ -75,7 +75,7 @@ TEST(CheckerVariables, FreeVariablesSplitIntoActiveAndRandomlyInitialized) {
       "  always_ff @(posedge clk) a <= !a;\n"
       "  always_ff @(posedge clk) s[0] <= 1'b1;\n"
       "  always_ff @(posedge clk) p.x <= 1'b1;\n"
-      "  always_comb {b, c} = 2'b01;\n"
+      "  always_ff @(posedge clk) {b, c} <= 2'b01;\n"
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
