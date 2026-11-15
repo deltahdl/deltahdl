@@ -108,4 +108,189 @@ TEST(ExpectPlacementRun, AGenerateBlockInitialProcedure) {
                kPassingExpect + "    end\n  end\n");
 }
 
+std::string ExpectOn(const std::string& condition) {
+  return "expect (@(posedge clk) " + condition +
+         ") $display(\"pass at %0d\", $time);\n"
+         "      else $display(\"fail at %0d\", $time);\n";
+}
+
+TEST(ExpectAutomaticReadRun, ALocalOfAnAutomaticTask) {
+  PassesAt("25", "    t();\n",
+           "  task automatic t();\n    int v = 2;\n    " +
+               ExpectOn("data == v") + "  endtask\n");
+}
+
+TEST(ExpectAutomaticReadRun, AnAutomaticInABlockOfAnInitialProcedure) {
+  PassesAt("25",
+           "    begin\n      automatic int v = 2;\n      " +
+               ExpectOn("data == v") + "    end\n",
+           "");
+}
+
+TEST(ExpectAutomaticReadRun, AForLoopVariableAtEachIteration) {
+  SimFixture f;
+  std::string out = RunCapture(
+      ExpectDesign("    for (int i = 2; i <= 3; i++)\n"
+                   "      expect (@(posedge clk) data == i)\n"
+                   "        $display(\"i=%0d pass at %0d\", i, $time);\n"
+                   "        else $display(\"i=%0d fail at %0d\", i, $time);\n"),
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out, "i=2 pass at 25\ni=3 pass at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectAutomaticReadRun, AnAutomaticInAForkBranch) {
+  PassesAt("25",
+           "    fork\n      begin\n        automatic int v = 2;\n        " +
+               ExpectOn("data == v") + "      end\n    join\n",
+           "");
+}
+
+TEST(ExpectAutomaticReadRun, EachSpawnedBranchReadsItsOwnIterationsCopy) {
+  SimFixture f;
+  std::string out = RunCapture(
+      ExpectDesign("    for (int i = 2; i <= 4; i++)\n"
+                   "      fork\n"
+                   "        automatic int k = i;\n"
+                   "        expect (@(posedge clk) ##[0:5] data == k)\n"
+                   "          $display(\"k=%0d pass at %0d\", k, $time);\n"
+                   "      join_none\n"),
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(out,
+            "k=2 pass at 25\nk=3 pass at 35\nk=4 pass at 45\n"
+            "$finish at time 210\n");
+}
+
+constexpr const char* kCounter =
+    "  int cv = 0;\n  always @(posedge clk) cv <= cv + 1;\n";
+
+TEST(ExpectAutomaticReadRun,
+     DISABLED_AClassMethodArgumentBesideAStaticOperand) {
+  PassesAt("25", "    h.t(2);\n",
+           std::string(kCounter) + "  class C;\n    task t(int v);\n      " +
+               ExpectOn("cv == v") + "    endtask\n  endclass\n  C h = new;\n");
+}
+
+TEST(ExpectAutomaticReadRun, AnInterfaceAutomaticTaskArgument) {
+  PassesAt("25", "    u.it(2);\n",
+           "  interface ifc;\n    task automatic it(int v);\n      " +
+               ExpectOn("data == v") +
+               "    endtask\n  endinterface\n  ifc u();\n");
+}
+
+TEST(ExpectAutomaticReadRun, AProgramAutomaticTaskArgument) {
+  PassesAt("25", "",
+           "  program pr;\n    task automatic pt(int v);\n      " +
+               ExpectOn("data == v") +
+               "    endtask\n    initial begin\n      #20;\n      pt(2);\n"
+               "      #200;\n    end\n  endprogram\n");
+}
+
+TEST(ExpectAutomaticReadRun, AnArgumentPassedToANamedPropertysFormal) {
+  PassesAt("25", "    tp(2);\n",
+           "  property pw(int x);\n    @(posedge clk) data == x;\n"
+           "  endproperty\n"
+           "  task automatic tp(int v);\n"
+           "    expect (pw(v)) $display(\"pass at %0d\", $time);\n"
+           "      else $display(\"fail at %0d\", $time);\n"
+           "  endtask\n");
+}
+
+constexpr const char* kAdvanceSv =
+    "    fork\n      forever @(posedge clk) sv <= sv + 1;\n    join_none\n";
+
+TEST(ExpectStaticReadRun, DISABLED_ALocalOfAStaticTask) {
+  PassesAt("25", "    st();\n",
+           std::string("  task st();\n    int sv;\n") + kAdvanceSv + "    " +
+               ExpectOn("sv == 0") + "  endtask\n");
+}
+
+TEST(ExpectStaticReadRun, DISABLED_AStaticLocalOfAnAutomaticTask) {
+  PassesAt("25", "    ta();\n",
+           std::string("  task automatic ta();\n    static int sv = 0;\n") +
+               kAdvanceSv + "    " + ExpectOn("sv == 0") + "  endtask\n");
+}
+
+TEST(ExpectStaticReadRun, AnInterfaceVariableFromItsInitial) {
+  PassesAt("25", "",
+           "  interface ifc;\n    int iv = 0;\n"
+           "    always @(posedge clk) iv <= iv + 1;\n"
+           "    initial begin\n      #20;\n      " +
+               ExpectOn("iv == 2") + "    end\n  endinterface\n  ifc u();\n");
+}
+
+TEST(ExpectStaticReadRun, AnInterfaceVariableFromItsAutomaticTask) {
+  PassesAt("25", "    u.it();\n",
+           "  interface ifc;\n    int iv = 0;\n"
+           "    always @(posedge clk) iv <= iv + 1;\n"
+           "    task automatic it();\n      " +
+               ExpectOn("iv == 2") +
+               "    endtask\n  endinterface\n  ifc u();\n");
+}
+
+TEST(ExpectStaticReadRun, AProgramVariableFromItsInitial) {
+  PassesAt("25", "",
+           "  program pr;\n    int pv;\n    assign pv = data;\n"
+           "    initial begin\n      #20;\n      " +
+               ExpectOn("pv == 2") + "      #200;\n    end\n  endprogram\n");
+}
+
+TEST(ExpectStaticReadRun, AProgramVariableFromItsAutomaticTask) {
+  PassesAt("25", "",
+           "  program pr;\n    int pv;\n    assign pv = data;\n"
+           "    task automatic pt();\n      " +
+               ExpectOn("pv == 2") +
+               "    endtask\n    initial begin\n      #20;\n      pt();\n"
+               "      #200;\n    end\n  endprogram\n");
+}
+
+TEST(ExpectStaticReadRun, ACompilationUnitVariable) {
+  PassesAt("25", "    " + ExpectOn("uv == 2"),
+           "  always @(posedge clk) uv <= uv + 1;\n", "int uv = 0;\n");
+}
+
+constexpr const char* kPackageCounter =
+    "package pk;\n  int pv = 0;\nendpackage\n";
+
+TEST(ExpectStaticReadRun, AnImportedPackageVariable) {
+  PassesAt("25", "    " + ExpectOn("pv == 2"),
+           "  import pk::*;\n  always @(posedge clk) pv <= pv + 1;\n",
+           kPackageCounter);
+}
+
+TEST(ExpectStaticReadRun, DISABLED_APackageVariableWrittenWithItsPrefix) {
+  PassesAt("25", "    " + ExpectOn("pk::pv == 2"),
+           "  always @(posedge clk) pk::pv <= pk::pv + 1;\n", kPackageCounter);
+}
+
+TEST(ExpectStaticReadRun, DISABLED_AGenerateBlockVariableFromItsInitial) {
+  PassesAt("25", "",
+           "  if (1) begin : g\n    int gv = 0;\n"
+           "    always @(posedge clk) gv <= gv + 1;\n"
+           "    initial begin\n      #20;\n      " +
+               ExpectOn("gv == 2") + "    end\n  end\n");
+}
+
+TEST(ExpectStaticReadRun, DISABLED_AModuleVariableFromAClassMethodTask) {
+  PassesAt("25", "    h.t();\n",
+           std::string(kCounter) + "  class C;\n    task t();\n      " +
+               ExpectOn("cv == 2") + "    endtask\n  endclass\n  C h = new;\n");
+}
+
+constexpr const char* kStaticProperty =
+    "  class C;\n    static int sp = 0;\n    task t();\n      "
+    "expect (@(posedge clk) sp == 2) $display(\"pass at %0d\", $time);\n"
+    "        else $display(\"fail at %0d\", $time);\n"
+    "    endtask\n  endclass\n  C h = new;\n"
+    "  always @(posedge clk) C::sp <= C::sp + 1;\n";
+
+TEST(ExpectStaticReadRun, DISABLED_AStaticClassPropertyFromAMethod) {
+  PassesAt("25", "    h.t();\n", kStaticProperty);
+}
+
+TEST(ExpectStaticReadRun, DISABLED_AStaticClassPropertyByItsClassName) {
+  PassesAt("25", "    " + ExpectOn("C::sp == 2"), kStaticProperty);
+}
+
 }  // namespace
