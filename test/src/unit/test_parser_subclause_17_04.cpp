@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 
 using namespace delta;
@@ -47,6 +51,31 @@ TEST_F(VerifyParseTest, CheckerContextInferenceOmittedOptionalArgs) {
   ASSERT_EQ(unit->checkers.size(), 1u);
   ASSERT_EQ(unit->modules.size(), 1u);
   EXPECT_EQ(unit->modules[0]->name, "m");
+}
+
+TEST(CheckerContextDefault, DISABLED_APartOfACheckerFormalsDefaultIsReported) {
+  for (const char* formal : {"logic r = $inferred_disable || sig",
+                             "untyped clock = $inferred_clock or sig",
+                             "untyped clock = $inferred_clock ##1 sig"}) {
+    SCOPED_TRACE(formal);
+    auto r = Parse("checker c(logic sig,\n  " + std::string(formal) +
+                   ");\nendchecker\n");
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "an inferred clocking or disable function must "
+                              "be the entire default value of a formal "
+                              "argument",
+                              2, "16.14.7"));
+  }
+}
+
+TEST(CheckerContextDefault, AWholeCheckerFormalDefaultIsAccepted) {
+  auto r = Parse(
+      "checker c(logic sig,\n"
+      "  untyped clock = $inferred_clock,\n"
+      "  logic r = $inferred_disable);\n"
+      "endchecker\n");
+  EXPECT_FALSE(ErrorOnLine(r.diags, 2));
+  EXPECT_FALSE(ErrorOnLine(r.diags, 3));
 }
 
 }  // namespace

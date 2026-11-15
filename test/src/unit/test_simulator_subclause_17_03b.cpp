@@ -269,4 +269,40 @@ TEST(CheckerImplicitConnectionRun, APackageCheckerBindsTheSameWay) {
   EXPECT_EQ(Counts(src, "u2"), kBoundToA);
 }
 
+constexpr const char* kEventInner =
+    "checker inner(logic sig, event clock);\n"
+    "  int pass = 0, fail = 0;\n"
+    "  a1: assert property (@clock sig) pass++; else fail++;\n"
+    "endchecker\n";
+
+std::string EventOuter(const std::string& formal, const std::string& instance,
+                       const std::string& actual) {
+  return std::string(kEventInner) + "checker outer(logic s, " + formal +
+         ");\n" + instance +
+         "endchecker\n"
+         "module top;\n"
+         "  logic clk = 0, a = 1;\n"
+         "  always #5 clk = ~clk;\n"
+         "  initial begin #16 a = 0; #8 a = 1; #28 $finish; end\n"
+         "  outer o(a, " +
+         actual + ");\nendmodule\n";
+}
+
+const std::pair<uint64_t, uint64_t> kOnFallingEdges{4, 1};
+
+TEST(CheckerEventActualRun, AnEdgeOfALogicFormalClocksANestedChecker) {
+  EXPECT_EQ(Counts(EventOuter("logic ck", "  inner k(s, negedge ck);\n", "clk"),
+                   "o.k"),
+            kOnFallingEdges);
+}
+
+TEST(CheckerEventActualRun, DISABLED_AnEventFormalClocksANestedChecker) {
+  for (const char* instance :
+       {"  inner k(s, c);\n", "  inner k(.sig(s), .clock(c));\n"}) {
+    SCOPED_TRACE(instance);
+    EXPECT_EQ(Counts(EventOuter("event c", instance, "negedge clk"), "o.k"),
+              kOnFallingEdges);
+  }
+}
+
 }  // namespace
