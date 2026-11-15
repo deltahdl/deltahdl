@@ -166,4 +166,60 @@ TEST(ExpectDefaultErrorRun, EachPlaceReportsItOnce) {
       1);
 }
 
+ErrorRun RunArms(const std::string& body) {
+  return RunCountingErrors(ExpectDesign(body, "  int n = 0;\n"));
+}
+
+TEST(ExpectActionArmRun, AnElseClauseOnlySucceedingRunsNothing) {
+  ErrorRun run = RunArms(
+      "    expect (@(posedge clk) a ##1 b)\n"
+      "      else $display(\"fail at %0d\", $time);\n"
+      "    $display(\"after at %0d\", $time);\n");
+  EXPECT_EQ(run.errors, 0);
+  EXPECT_EQ(run.out, "after at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectActionArmRun, AVacuousSuccessRunsThePassStatement) {
+  ErrorRun run = RunArms(
+      "    expect (@(posedge clk) c |-> b)\n"
+      "      $display(\"pass at %0d\", $time);\n"
+      "      else $display(\"fail at %0d\", $time);\n");
+  EXPECT_EQ(run.errors, 0);
+  EXPECT_EQ(run.out, "pass at 25\n$finish at time 210\n");
+}
+
+TEST(ExpectActionArmRun, ABlockAsThePassStatementRunsInOrder) {
+  ErrorRun run = RunArms(
+      "    expect (@(posedge clk) a ##1 b) begin\n"
+      "      n = 1;\n"
+      "      $display(\"pass n=%0d at %0d\", n, $time);\n"
+      "      n = 2;\n"
+      "      $display(\"pass n=%0d\", n);\n"
+      "    end else $display(\"fail at %0d\", $time);\n");
+  EXPECT_EQ(run.errors, 0);
+  EXPECT_EQ(run.out, "pass n=1 at 35\npass n=2\n$finish at time 210\n");
+}
+
+TEST(ExpectActionArmRun, ABlockAsTheElseClauseRunsInOrder) {
+  ErrorRun run = RunArms(
+      "    expect (@(posedge clk) c) $display(\"pass at %0d\", $time);\n"
+      "    else begin\n"
+      "      n = 3;\n"
+      "      $display(\"fail n=%0d at %0d\", n, $time);\n"
+      "      n = 4;\n"
+      "      $display(\"fail n=%0d\", n);\n"
+      "    end\n");
+  EXPECT_EQ(run.errors, 0);
+  EXPECT_EQ(run.out, "fail n=3 at 25\nfail n=4\n$finish at time 210\n");
+}
+
+TEST(ExpectActionArmRun, ANullElseClauseFailingRunsNothingAndReportsNothing) {
+  ErrorRun run = RunArms(
+      "    expect (@(posedge clk) c) $display(\"pass at %0d\", $time);\n"
+      "      else ;\n"
+      "    $display(\"after at %0d\", $time);\n");
+  EXPECT_EQ(run.errors, 0);
+  EXPECT_EQ(run.out, kAfterFailure);
+}
+
 }  // namespace
