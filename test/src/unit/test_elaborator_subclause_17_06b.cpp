@@ -1,10 +1,8 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -28,18 +26,6 @@ const char* const kTop =
     "  logic clk, a;\n"
     "  chk c(clk, a);\n"
     "endmodule\n";
-
-std::vector<uint32_t> LinesHolding(std::string_view src,
-                                   std::string_view what) {
-  std::vector<uint32_t> lines;
-  for (size_t at = src.find(what); at != std::string_view::npos;
-       at = src.find(what, at + 1)) {
-    lines.push_back(
-        static_cast<uint32_t>(std::count(src.begin(), src.begin() + at, '\n')) +
-        1);
-  }
-  return lines;
-}
 
 size_t ReportsOnLine(const std::vector<Diagnostic>& diags, uint32_t line) {
   size_t n = 0;

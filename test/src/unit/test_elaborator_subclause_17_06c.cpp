@@ -1,10 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <algorithm>
-#include <cstddef>
 #include <cstdint>
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "fixture_elaborator.h"
@@ -17,18 +14,6 @@ namespace {
 const char* const kReport =
     "the formal 'mode' of checker 'c', which a covergroup references, has a "
     "const actual";
-
-std::vector<uint32_t> LinesHolding(std::string_view src,
-                                   std::string_view what) {
-  std::vector<uint32_t> lines;
-  for (size_t at = src.find(what); at != std::string_view::npos;
-       at = src.find(what, at + 1)) {
-    lines.push_back(
-        static_cast<uint32_t>(std::count(src.begin(), src.begin() + at, '\n')) +
-        1);
-  }
-  return lines;
-}
 
 void ExpectConstActuals(const std::string& src) {
   ElabFixture f;

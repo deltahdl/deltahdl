@@ -22,6 +22,20 @@ inline uint32_t LineHolding(std::string_view where, std::string_view what) {
   return line;
 }
 
+inline std::vector<uint32_t> LinesHolding(std::string_view where,
+                                          std::string_view what) {
+  std::vector<uint32_t> lines;
+  for (size_t at = where.find(what); at != std::string_view::npos;
+       at = where.find(what, at + 1)) {
+    uint32_t line = 1;
+    for (size_t i = 0; i < at; ++i) {
+      if (where[i] == '\n') ++line;
+    }
+    lines.push_back(line);
+  }
+  return lines;
+}
+
 inline ::testing::AssertionResult ReportedAt(
     const std::vector<Diagnostic>& diags, DiagSeverity severity,
     std::string_view message, uint32_t line, std::string_view subclause) {
