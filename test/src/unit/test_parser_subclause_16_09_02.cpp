@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
@@ -140,6 +143,112 @@ TEST(SequenceRepetitionParsing, ARepeatedGroupsMatchItemsEndEachIteration) {
   EXPECT_TRUE(inner.match_items[0].empty());
   ASSERT_EQ(inner.match_items[1].size(), 1u);
   EXPECT_EQ(inner.match_items[1][0].lvar, "x");
+}
+
+constexpr const char* kUnboundedPlaces[] = {
+    "module m;\n  logic clk, a, b, c;\n"
+    "  sequence s; a ##1 b%s ##1 c; endsequence\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n"
+    "  property p; a ##1 b%s ##1 c; endproperty\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n"
+    "  assert property (@(posedge clk) a ##1 b%s ##1 c);\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n  always @(posedge clk)\n"
+    "    assert property (@(posedge clk) a ##1 b%s ##1 c);\nendmodule\n",
+};
+
+std::string Placed(const char* place, const std::string& repetition) {
+  std::string src = place;
+  return src.replace(src.find("%s"), 2, repetition);
+}
+
+TEST(SequenceRepetitionParsing, GotoAndNonconsecutiveTakeAnUnboundedMaximum) {
+  for (const char* place : kUnboundedPlaces) {
+    for (const char* repetition : {"[->2:$]", "[=2:$]"}) {
+      std::string src = Placed(place, repetition);
+      auto r = Parse(src);
+      EXPECT_FALSE(r.has_errors) << src;
+    }
+  }
+  std::string second = Placed(kUnboundedPlaces[0], "[=2:$]");
+  second.replace(second.find("module m"), 8, "module n");
+  auto r = Parse(Placed(kUnboundedPlaces[0], "[->2:$]") + second);
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->modules.size(), 2u);
+  const SeqRepetition::Kind kKinds[] = {SeqRepetition::Kind::kGoto,
+                                        SeqRepetition::Kind::kNonconsecutive};
+  for (size_t i = 0; i < 2; ++i) {
+    const ModuleItem* seq = FindItemByName(r.cu->modules[i]->items, "s");
+    ASSERT_NE(seq, nullptr);
+    const SeqRepetition& rep = seq->seq_linear.repetitions[1];
+    EXPECT_EQ(rep.kind, kKinds[i]);
+    EXPECT_EQ(rep.min, 2u);
+    EXPECT_EQ(rep.max, SeqCycleDelay::kUnbounded);
+  }
+}
+
+constexpr const char* kUnadmitted = "not one the grammar admits";
+
+void ExpectUnadmitted(const std::string& src, const std::string& form) {
+  auto r = Parse(src);
+  EXPECT_TRUE(
+      ReportedError(r.diags, kUnadmitted, LineHolding(src, form), "A.2.10"))
+      << src;
+}
+
+void ExpectAdmitted(const std::string& src) {
+  auto r = Parse(src);
+  EXPECT_FALSE(r.has_errors) << src;
+}
+
+constexpr const char* kCountlessPlaces[] = {
+    "module m;\n  logic clk, a, b, c;\n"
+    "  sequence s;\n    a ##1 b%s ##1 c;\n  endsequence\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n"
+    "  property p;\n    a ##1 b%s ##1 c;\n  endproperty\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n"
+    "  assert property (@(posedge clk)\n    a ##1 b%s ##1 c);\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n  always @(posedge clk)\n"
+    "    assert property (@(posedge clk)\n    a ##1 b%s ##1 c);\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n"
+    "  cover sequence (@(posedge clk)\n    a ##1 b%s ##1 c);\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n  initial\n"
+    "    expect (@(posedge clk)\n    a ##1 b%s ##1 c);\nendmodule\n",
+    "module m;\n  logic clk, a, b, c;\n"
+    "  sequence s(x); x ##1 c; endsequence\n"
+    "  assert property (@(posedge clk)\n    s(b%s));\nendmodule\n",
+    "package pk;\n  sequence s(y, z);\n    y%s ##1 z;\n  endsequence\n"
+    "endpackage\n",
+    "interface i(input logic y, z);\n  sequence s;\n    y%s ##1 z;\n"
+    "  endsequence\nendinterface\n",
+    "program p(input logic y, z);\n  sequence s;\n    y%s ##1 z;\n"
+    "  endsequence\nendprogram\n",
+    "checker ck(logic y, logic z);\n  sequence s;\n    y%s ##1 z;\n"
+    "  endsequence\nendchecker\n",
+    "module m;\n  logic y, z;\n  if (1) begin : g\n  sequence s;\n"
+    "    y%s ##1 z;\n  endsequence\n  end\nendmodule\n",
+    "module m;\n  logic clk, y, z;\n  clocking cb @(posedge clk);\n"
+    "  sequence s;\n    y%s ##1 z;\n  endsequence\n  endclocking\n"
+    "endmodule\n",
+    "sequence s(y, z);\n  y%s ##1 z;\nendsequence\n",
+};
+
+TEST(SequenceRepetitionParsing, GotoAndNonconsecutiveWithoutACountAreReported) {
+  for (const char* place : kCountlessPlaces) {
+    for (const char* repetition : {"[->]", "[=]"}) {
+      ExpectUnadmitted(Placed(place, repetition), repetition);
+    }
+    for (const char* repetition : {"[*]", "[->1]", "[=1]"}) {
+      ExpectAdmitted(Placed(place, repetition));
+    }
+  }
+}
+
+TEST(SequenceRepetitionParsing, PlusWithACountIsReportedInADeclaration) {
+  for (const char* place : {kCountlessPlaces[0], kCountlessPlaces[1]}) {
+    ExpectUnadmitted(Placed(place, "[+2]"), "[+2]");
+    ExpectAdmitted(Placed(place, "[+]"));
+    ExpectAdmitted(Placed(place, "[*2]"));
+  }
 }
 
 }  // namespace

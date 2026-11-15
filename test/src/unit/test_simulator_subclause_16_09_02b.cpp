@@ -47,10 +47,11 @@ std::string Hit(const std::string& label = "hit") {
 }
 
 std::string Covered(const std::string& spec, const Ticks& ticks,
-                    const std::string& decls = "") {
+                    const std::string& decls = "",
+                    const std::string& kind = "cover property") {
   return RunRepetition(
-      Design("", decls,
-             "  cover property (@(posedge clk) " + spec + ")" + Hit(), ticks));
+      Design("", decls, "  " + kind + " (@(posedge clk) " + spec + ")" + Hit(),
+             ticks));
 }
 
 std::string Hits(std::initializer_list<int> times, int finish) {
@@ -277,6 +278,122 @@ TEST(StarAndPlusRun, EachPlaceKeepsTheEmptyCaseDifference) {
               Hit("plus"),
           kNoB)),
       kStarOnly);
+}
+
+struct CoveredRun {
+  const char* spec;
+  Ticks ticks;
+  std::vector<int> times;
+};
+
+void ExpectCoveredRuns(const std::vector<CoveredRun>& runs) {
+  for (const CoveredRun& run : runs) {
+    std::string expected;
+    for (int time : run.times) {
+      expected += "hit at " + std::to_string(time) + "\n";
+    }
+    expected += "$finish at time " +
+                std::to_string(10 * static_cast<int>(run.ticks.size()) + 30) +
+                "\n";
+    EXPECT_EQ(Covered(run.spec, run.ticks, "", "cover sequence"), expected)
+        << run.spec;
+  }
+}
+
+TEST(GotoRepetitionRun, ALaterMatchCannotBeSkipped) {
+  ExpectCoveredRuns({{"a ##1 b[->2] ##1 c", {"", "a", "b", "b", "b", "c"}, {}},
+                     {"a ##1 b[->2] ##1 c", {"", "a", "b", "b", "bc"}, {45}}});
+}
+
+TEST(GotoRepetitionRun, ACountAboveTheMaximumNeverMatches) {
+  ExpectCoveredRuns({{"a ##1 b[->2:3] ##1 c",
+                      {"", "a", "b", "", "b", "", "b", "", "b", "c"},
+                      {}},
+                     {"a ##1 b[->2:3] ##1 c",
+                      {"", "a", "b", "", "b", "c", "b", "c"},
+                      {55, 75}}});
+}
+
+Ticks FourGotoRounds() {
+  return {"", "a", "b", "c", "b", "c", "b", "c", "b", "c"};
+}
+
+TEST(GotoRepetitionRun, AnUnboundedMaximumMatchesFromTheMinimumUp) {
+  ExpectCoveredRuns({{"a ##1 b[->2:$] ##1 c", FourGotoRounds(), {55, 75, 95}}});
+}
+
+TEST(GotoRepetitionRun, TheClausesEquivalentFormMatchesAlike) {
+  ExpectCoveredRuns({{"a ##1 b[->2:10] ##1 c", FourGotoRounds(), {55, 75, 95}},
+                     {"a ##1 ((!b[*0:$] ##1 b)[*2:10]) ##1 c",
+                      FourGotoRounds(),
+                      {55, 75, 95}}});
+}
+
+TEST(GotoRepetitionRun, AnAssertionInAnInterfaceOrAProgram) {
+  const Ticks kGapBeforeC = {"", "a", "b", "", "b", "", "c"};
+  constexpr const char* kExpected = "fail at 55\n$finish at time 100\n";
+  const std::string kAssert =
+      "  assert property (@(posedge clk) a |-> b[->2] ##1 c) else" +
+      Hit("fail");
+  EXPECT_EQ(RunRepetition(Design("", "", kAssert, kGapBeforeC)), kExpected);
+  EXPECT_EQ(RunRepetition(Design("interface ifc(input logic clk, a, b, c);\n" +
+                                     kAssert + "endinterface\n",
+                                 "  ifc u(clk, a, b, c);\n", "", kGapBeforeC)),
+            kExpected);
+  EXPECT_EQ(RunRepetition(Design("program pr(input logic clk, a, b, c);\n" +
+                                     kAssert + "endprogram\n",
+                                 "  pr p(clk, a, b, c);\n", "", kGapBeforeC)),
+            kExpected);
+}
+
+TEST(NonconsecutiveRepetitionRun, AnExactCountStopsAtALaterMatch) {
+  ExpectCoveredRuns(
+      {{"a ##1 b[=2] ##1 c", {"", "a", "b", "b", "b", "c"}, {}},
+       {"a ##1 b[=2] ##1 c", {"", "a", "b", "b", "", "c"}, {55}}});
+}
+
+TEST(NonconsecutiveRepetitionRun, ARangeStopsAtAMatchAboveItsMaximum) {
+  ExpectCoveredRuns(
+      {{"a ##1 b[=2:3] ##1 c", {"", "a", "b", "b", "b", "b", "c"}, {}},
+       {"a ##1 b[=2:3] ##1 c", {"", "a", "b", "b", "b", "c"}, {55}}});
+}
+
+TEST(NonconsecutiveRepetitionRun, GapsBeforeAndBetweenTheCountedMatches) {
+  const Ticks kGaps = {"", "a", "", "b", "", "b", "", "c"};
+  ExpectCoveredRuns(
+      {{"a ##1 b[=2] ##1 c", kGaps, {75}}, {"a ##1 b[->2] ##1 c", kGaps, {}}});
+}
+
+TEST(NonconsecutiveRepetitionRun, AnExactCountInAnAssertion) {
+  const std::string kAssert =
+      "  assert property (@(posedge clk) a |-> b[=2] ##1 c) else" + Hit("fail");
+  EXPECT_EQ(
+      RunRepetition(Design("", "", kAssert, {"", "a", "b", "b", "", "c"})),
+      "$finish at time 90\n");
+  EXPECT_EQ(
+      RunRepetition(Design("", "", kAssert, {"", "a", "b", "b", "b", "c"})),
+      "fail at 45\n$finish at time 90\n");
+}
+
+Ticks GapAndThirdB() { return {"", "a", "b", "c", "b", "", "c", "b", "c"}; }
+
+TEST(NonconsecutiveRepetitionRun, AnUnboundedMaximumMatchesFromTheMinimumUp) {
+  ExpectCoveredRuns({{"a ##1 b[=2:$] ##1 c", GapAndThirdB(), {65, 85}}});
+}
+
+TEST(NonconsecutiveRepetitionRun, TheClausesWrittenOutFormMatchesAlike) {
+  ExpectCoveredRuns({{"a ##1 b[=2:10] ##1 c", GapAndThirdB(), {65, 85}},
+                     {"a ##1 ((!b[*0:$] ##1 b)[*2:10]) ##1 !b[*0:$] ##1 c",
+                      GapAndThirdB(),
+                      {65, 85}}});
+}
+
+TEST(NonconsecutiveRepetitionRun, TheDerivedGotoFormMatchesAlike) {
+  ExpectCoveredRuns(
+      {{"a ##1 (b[->2:10] ##1 !b[*0:$]) ##1 c", GapAndThirdB(), {65, 85}},
+       {"a ##1 b[=2] ##1 c", GapAndThirdB(), {65}},
+       {"a ##1 (b[->2] ##1 !b[*0:$]) ##1 c", GapAndThirdB(), {65}},
+       {"a ##1 (b[->2:$] ##1 !b[*0:$]) ##1 c", GapAndThirdB(), {65, 85}}});
 }
 
 }  // namespace
