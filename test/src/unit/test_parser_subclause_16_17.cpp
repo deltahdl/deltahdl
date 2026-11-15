@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
@@ -154,6 +155,72 @@ TEST(ExpectStatementParsing, PropertyReferencesAutomaticVariables) {
   ASSERT_EQ(expects.size(), 1u);
   EXPECT_NE(expects[0]->assert_pass_stmt, nullptr);
   EXPECT_NE(expects[0]->assert_fail_stmt, nullptr);
+}
+
+constexpr const char* kExpectItem = "  expect (@(posedge clk) a) ;\n";
+
+constexpr const char* kOutsideProceduralCode =
+    "an expect statement is a procedural statement and may not stand "
+    "outside procedural code";
+
+struct ExpectPlace {
+  const char* open;
+  const char* close;
+};
+
+constexpr ExpectPlace kBodies[] = {
+    {"module m;\n  logic clk, a;\n", "endmodule\n"},
+    {"interface i;\n  logic clk, a;\n", "endinterface\n"},
+    {"program p;\n  logic clk, a;\n", "endprogram\n"},
+    {"package k;\n  logic clk, a;\n", "endpackage\n"},
+    {"module m;\n  logic clk, a;\n  class C;\n", "  endclass\nendmodule\n"},
+    {"module m;\n  logic clk, a;\n  checker c;\n",
+     "  endchecker\n  c uc();\nendmodule\n"},
+    {"module m;\n  logic clk, a;\n  if (1) begin : g\n", "  end\nendmodule\n"},
+    {"module m;\n  logic clk, a;\n  for (genvar k = 0; k < 1; k++) begin : g\n",
+     "  end\nendmodule\n"},
+    {"module m;\n  logic clk, a;\n  generate\n", "  endgenerate\nendmodule\n"},
+    {"logic clk, a;\n", "module m;\nendmodule\n"},
+};
+
+TEST(ExpectStatementParsing, DISABLED_OutsideProceduralCodeEachPlaceReports) {
+  for (const ExpectPlace& place : kBodies) {
+    std::string src = std::string(place.open) + kExpectItem + place.close;
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags, kOutsideProceduralCode,
+                              LineHolding(src, "expect"), "16.17"))
+        << src;
+    EXPECT_EQ(r.diags.size(), 1u) << src;
+  }
+}
+
+constexpr const char* kInsideProceduralCode[] = {
+    "module m;\n  logic clk, a;\n  initial\n  expect (@(posedge clk) a) ;\n"
+    "endmodule\n",
+    "interface i;\n  logic clk, a;\n  initial\n  expect (@(posedge clk) a) ;\n"
+    "endinterface\n",
+    "program p;\n  logic clk, a;\n  initial\n  expect (@(posedge clk) a) ;\n"
+    "endprogram\n",
+    "package k;\n  logic clk, a;\n  task t;\n  expect (@(posedge clk) a) ;\n"
+    "  endtask\nendpackage\n",
+    "module m;\n  logic clk, a;\n  class C;\n  task t;\n"
+    "  expect (@(posedge clk) a) ;\n  endtask\n  endclass\nendmodule\n",
+    "module m;\n  logic clk, a;\n  checker c;\n"
+    "  assert property (@(posedge clk) a);\n  endchecker\n  c uc();\n"
+    "endmodule\n",
+    "module m;\n  logic clk, a;\n  if (1) begin : g\n  initial\n"
+    "  expect (@(posedge clk) a) ;\n  end\nendmodule\n",
+    "module m;\n  logic clk, a;\n  for (genvar k = 0; k < 1; k++) begin : g\n"
+    "  initial\n  expect (@(posedge clk) a) ;\n  end\nendmodule\n",
+    "module m;\n  logic clk, a;\n  generate\n  initial\n"
+    "  expect (@(posedge clk) a) ;\n  endgenerate\nendmodule\n",
+};
+
+TEST(ExpectStatementParsing, InsideProceduralCodeEachPlaceIsAccepted) {
+  for (const char* src : kInsideProceduralCode) {
+    auto r = Parse(src);
+    EXPECT_FALSE(r.has_errors) << src;
+  }
 }
 
 }  // namespace
