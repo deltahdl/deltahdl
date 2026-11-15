@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "simulator/checker_instance_scheduling.h"
@@ -720,6 +721,64 @@ TEST(CheckerPlacementRun, ProceduresOfGenerateBlocksQueueTheirInstances) {
                      "endmodule\n",
                  f),
       "3 2 3 2 1 0\n");
+}
+
+std::string DollarBoundChecker(const std::string& name,
+                               const std::string& formals,
+                               const std::string& bound) {
+  return "checker " + name + "(" + formals +
+         ");\n"
+         "  int ap = 0, af = 0, ep = 0, ef = 0, rp = 0, rf = 0;\n"
+         "  a1: assert property (@(posedge clk) always [1:" +
+         bound +
+         "] a) ap++; else af++;\n"
+         "  a2: assert property (@(posedge clk) s_eventually [1:" +
+         bound +
+         "] b) ep++; else ef++;\n"
+         "  a3: assert property (@(posedge clk) a [*1:" +
+         bound +
+         "] ##1 b) rp++; else rf++;\n"
+         "endchecker\n";
+}
+
+std::vector<uint64_t> DollarCounts(SimFixture& f, const std::string& scope) {
+  std::vector<uint64_t> counts;
+  for (const char* name : {"ap", "af", "ep", "ef", "rp", "rf"}) {
+    auto* var = f.ctx.FindVariable(scope + "." + name);
+    counts.push_back(var == nullptr ? ~0ull : var->value.ToUint64());
+  }
+  return counts;
+}
+
+void ExpectLikeTheLiteral(const std::string& checker,
+                          const std::string& instance) {
+  SimFixture f;
+  auto* lit = RunAndFindVar(
+      DollarBoundChecker("lit", "logic a, b, logic clk", "$") + checker +
+          "module top;\n"
+          "  logic clk = 0, a = 1, b = 0;\n"
+          "  always #5 clk = ~clk;\n"
+          "  lit l(a, b, clk);\n" +
+          instance +
+          "  initial begin #22 b = 1; #10 a = 0; b = 0; #18 $finish; end\n"
+          "endmodule\n",
+      f, "l.ap");
+  ASSERT_NE(lit, nullptr);
+  std::vector<uint64_t> literal = DollarCounts(f, "l");
+  EXPECT_NE(literal, std::vector<uint64_t>(6, 0));
+  EXPECT_EQ(DollarCounts(f, "u"), literal);
+}
+
+TEST(CheckerDollarActualRun, DISABLED_AFormalBoundRunsLikeTheLiteral) {
+  ExpectLikeTheLiteral(
+      DollarBoundChecker("frm", "logic a, b, k, logic clk", "k"),
+      "  frm u(a, b, $, clk);\n");
+}
+
+TEST(CheckerDollarActualRun, DISABLED_ADefaultInAnEmptySlotRunsLikeTheLiteral) {
+  ExpectLikeTheLiteral(
+      DollarBoundChecker("dfl", "logic a, b, k = $, logic clk", "k"),
+      "  dfl u(a, b, , clk);\n");
 }
 
 }  // namespace
