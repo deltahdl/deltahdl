@@ -459,4 +459,29 @@ TEST(CheckerGenerateInstances, AModuleInstanceInANestedCheckersBody) {
       "inner");
 }
 
+TEST(CheckerOutputInitialValue, AnUnpackedAggregateOutputIsNotSingular) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(output struct {int x;} d = '{x: 0},\n"
+      "            output union {int x;} e = '{x: 0});\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'd' is not singular", 1, "17.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "checker formal 'e' is not singular", 2, "17.2"));
+}
+
+TEST(CheckerOutputInitialValue, ASingularOutputTakesAnInitialValue) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef enum logic [1:0] {A, B, C} st_t;\n"
+      "typedef struct packed {logic [3:0] hi, lo;} ps_t;\n"
+      "checker chk(output int a = 5, output bit [3:0] k = 4'h9,\n"
+      "            output ps_t p = '{4'h1, 4'h2}, output st_t e = C);\n"
+      "endchecker\n",
+      f, "chk");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
