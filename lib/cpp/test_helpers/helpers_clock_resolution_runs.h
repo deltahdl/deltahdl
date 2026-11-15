@@ -30,3 +30,16 @@ inline std::string RunClockResolutionDesign(
   SimFixture f;
   return RunCapture(ClockResolutionDesign(modules, instances), f);
 }
+
+inline std::string Failing(const std::string& label,
+                           const std::string& property,
+                           const char* kind = "assert") {
+  return "  " + label + ": " + kind + " property (" + property +
+         ") else $display(\"" + label + " at %0d\", $time);\n";
+}
+
+inline std::string Covering(const std::string& label, const std::string& spec,
+                            const char* kind = "cover property") {
+  return "  " + label + ": " + kind + " (" + spec + ") $display(\"" + label +
+         " at %0d\", $time);\n";
+}

@@ -11,18 +11,6 @@ using namespace delta;
 
 namespace {
 
-std::string Failing(const std::string& label, const std::string& property,
-                    const char* kind = "assert") {
-  return "  " + label + ": " + kind + " property (" + property +
-         ") else $display(\"" + label + " at %0d\", $time);\n";
-}
-
-std::string Covering(const std::string& label, const std::string& spec,
-                     const char* kind = "cover property") {
-  return "  " + label + ": " + kind + " (" + spec + ") $display(\"" + label +
-         " at %0d\", $time);\n";
-}
-
 TEST(DefaultClockLeadingRun, AnAssumeOrACoverSequenceTakesTheDefault) {
   std::string out = RunClockResolutionDesign(
       "module m(input logic a, b, clk);\n"
