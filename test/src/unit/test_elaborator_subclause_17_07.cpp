@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -85,6 +86,36 @@ TEST(CheckerVariables, FreeVariablesSplitIntoActiveAndRandomlyInitialized) {
   EXPECT_EQ(
       mod->random_initial_variables,
       (std::vector<std::string_view>{"a", "b", "c", "d", "e", "k", "s", "p"}));
+}
+
+const char* const kNetGenerateBlocks[][2] = {
+    {"  if (1)\n", ""},
+    {"  for (genvar i = 0; i < 4; i++) begin : gen\n", "  end\n"},
+    {"  case (1)\n    1:\n", "  endcase\n"},
+    {"  generate\n", "  endgenerate\n"},
+};
+
+TEST(CheckerVariables, ANetInEachCheckerGenerateBlockIsIllegal) {
+  for (const auto& block : kNetGenerateBlocks) {
+    ElabFixture f;
+    std::string src = std::string("checker chk;\n") + block[0] +
+                      "    wire w;\n" + block[1] + "endchecker\n";
+    ElaborateSrc(src, f, "chk");
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a net cannot be declared inside checker",
+                              LineHolding(src, "wire w"), "17.7"))
+        << src;
+  }
+}
+
+TEST(CheckerVariables, AVariableInEachCheckerGenerateBlockIsLegal) {
+  for (const auto& block : kNetGenerateBlocks) {
+    ElabFixture f;
+    std::string src = std::string("checker chk;\n") + block[0] +
+                      "    bit w;\n" + block[1] + "endchecker\n";
+    ElaborateSrc(src, f, "chk");
+    EXPECT_FALSE(f.has_errors) << src;
+  }
 }
 
 }  // namespace

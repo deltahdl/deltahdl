@@ -359,4 +359,104 @@ TEST(CheckerDeclaration, AFormalNamingALaterTypedefOrClassIsNotReported) {
                              3, "17.2"));
 }
 
+const char* const kPlacedElements =
+    "module m; endmodule\n"
+    "interface ifc; endinterface\n"
+    "program prog; endprogram\n"
+    "checker cc; endchecker\n";
+
+const char* const kCheckerGenerateBlocks[][2] = {
+    {"  if (1) begin : g\n", "  end\n"},
+    {"  for (genvar i = 0; i < 1; i++) begin : g\n", "  end\n"},
+    {"  case (1) 1: begin : g\n", "  end endcase\n"},
+    {"  generate\n", "  endgenerate\n"},
+};
+
+std::string CheckerWithItems(const std::string& items) {
+  return std::string(kPlacedElements) + "checker chk;\n" + items +
+         "endchecker\n";
+}
+
+void ExpectInstanceReported(const std::string& items, const char* checker) {
+  ElabFixture f;
+  std::string src = CheckerWithItems(items);
+  ElaborateSrc(src, f, "chk");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      std::string("only checkers can be instantiated inside checker '") +
+          checker + "'",
+      LineHolding(src, "u1("), "17.2"))
+      << src;
+}
+
+void ExpectEachGenerateBlockReports(const char* instance) {
+  for (const auto& block : kCheckerGenerateBlocks) {
+    ExpectInstanceReported(
+        std::string(block[0]) + "    " + instance + "\n" + block[1], "chk");
+  }
+}
+
+TEST(CheckerGenerateInstances, AModuleInstanceInEachGenerateBlock) {
+  ExpectEachGenerateBlockReports("m u1();");
+}
+
+TEST(CheckerGenerateInstances, AnInterfaceInstanceInEachGenerateBlock) {
+  ExpectEachGenerateBlockReports("ifc u1();");
+}
+
+TEST(CheckerGenerateInstances, AProgramInstanceInEachGenerateBlock) {
+  ExpectEachGenerateBlockReports("prog u1();");
+}
+
+TEST(CheckerGenerateInstances, ACheckerInstanceInEachGenerateBlock) {
+  for (const auto& block : kCheckerGenerateBlocks) {
+    ElabFixture f;
+    std::string src =
+        CheckerWithItems(std::string(block[0]) + "    cc u1();\n" + block[1]);
+    ElaborateSrc(src, f, "chk");
+    EXPECT_FALSE(f.has_errors) << src;
+  }
+}
+
+TEST(CheckerGenerateInstances, AnElseBranchAndAnUnblockedIf) {
+  ExpectInstanceReported("  if (0) cc u0(); else m u1();\n", "chk");
+  ExpectInstanceReported("  if (1) m u1();\n", "chk");
+}
+
+TEST(CheckerGenerateInstances, NestedGenerateBlocks) {
+  ExpectInstanceReported(
+      "  if (1) begin : g\n"
+      "    for (genvar i = 0; i < 1; i++) begin : h m u1(); end\n"
+      "  end\n",
+      "chk");
+  ExpectInstanceReported(
+      "  generate\n"
+      "    if (1) begin : g m u1(); end\n"
+      "  endgenerate\n",
+      "chk");
+}
+
+TEST(CheckerGenerateInstances, ABlockThatElaboratesToNothing) {
+  for (const char* instance : {"m u1();", "ifc u1();", "prog u1();"}) {
+    ExpectInstanceReported(
+        std::string("  if (0) begin : g ") + instance + " end\n", "chk");
+    ExpectInstanceReported(std::string("  for (genvar i = 0; i < 0; i++) "
+                                       "begin : g ") +
+                               instance + " end\n",
+                           "chk");
+    ExpectInstanceReported(std::string("  case (1) 0: begin : g ") + instance +
+                               " end default: cc u0(); endcase\n",
+                           "chk");
+  }
+}
+
+TEST(CheckerGenerateInstances, AModuleInstanceInANestedCheckersBody) {
+  ExpectInstanceReported(
+      "  checker inner;\n"
+      "    m u1();\n"
+      "  endchecker\n"
+      "  inner u_inner();\n",
+      "inner");
+}
+
 }  // namespace

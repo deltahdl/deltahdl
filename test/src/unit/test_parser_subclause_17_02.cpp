@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
@@ -445,6 +447,254 @@ TEST(CheckerDeclaration, ModulePortsOfTheseKindsAreNotReported) {
   auto r = Parse(
       "interface ifc; endinterface\n"
       "module m(interface i, inout wire a, ref logic d, input var logic v);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+size_t ParseErrorCount(const std::vector<Diagnostic>& diags) {
+  size_t n = 0;
+  for (const auto& diag : diags) {
+    if (diag.severity == DiagSeverity::kError) ++n;
+  }
+  return n;
+}
+
+TEST(CheckerClosing, ACheckerInACheckersGenerateBlockIsAccepted) {
+  auto r = Parse(
+      "checker o;\n"
+      "  if (1) begin : g\n"
+      "    checker c; endchecker\n"
+      "  end\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(CheckerClosing, DISABLED_AnotherEndKeywordDoesNotCloseACheckerInTheUnit) {
+  auto r = Parse("checker c;\nendmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endchecker', got 'endmodule'",
+                            2, "17.2"));
+}
+
+TEST(CheckerClosing, DISABLED_AContainersEndKeywordDoesNotCloseItsChecker) {
+  const char* const kContainers[][2] = {{"module m;", "endmodule"},
+                                        {"interface ifc;", "endinterface"},
+                                        {"program prog;", "endprogram"},
+                                        {"package pkg;", "endpackage"}};
+  for (const auto& container : kContainers) {
+    auto r = Parse(std::string(container[0]) + "\n  checker c;\n" +
+                   container[1] + "\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        std::string("expected 'endchecker', got '") + container[1] + "'", 3,
+        "17.2"))
+        << container[0];
+  }
+}
+
+TEST(CheckerClosing, DISABLED_AGenerateBlocksEndDoesNotCloseItsChecker) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    checker c;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endchecker', got 'end'", 4, "17.2"));
+}
+
+TEST(CheckerClosing, AnOuterCheckerLeftOpenIsReported) {
+  auto r = Parse("checker outer;\n  checker inner; endchecker\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'endchecker', got EOF", 3, "17.2"));
+}
+
+TEST(CheckerClosing, AnEndcheckerWithNoCheckerOpenIsReported) {
+  auto unit = Parse("endchecker\n");
+  EXPECT_TRUE(
+      ReportedError(unit.diags, "expected top-level declaration", 1, "3.12.1"));
+  auto in_module = Parse("module m;\n  endchecker\nendmodule\n");
+  EXPECT_TRUE(ReportedError(in_module.diags, "unexpected token in module body",
+                            2, "23.2.4"));
+}
+
+const char* const kMisplacedCheckerBody = "    checker c; endchecker\n";
+
+struct MisplacedChecker {
+  const char* place;
+  const char* open;
+  const char* close;
+};
+
+const MisplacedChecker kMisplacedCheckers[] = {
+    {"a class", "  class k;\n", "  endclass\n"},
+    {"a function", "  function void f();\n", "  endfunction\n"},
+    {"a task", "  task t();\n", "  endtask\n"},
+    {"a procedure", "  initial begin\n", "  end\n"},
+    {"a procedure", "  always begin\n", "  end\n"},
+    {"a procedure", "  initial begin\n    begin\n", "    end\n  end\n"},
+    {"a procedure", "  initial begin\n    fork\n", "    join\n  end\n"},
+};
+
+TEST(CheckerPlacement, DISABLED_ACheckerOutsideTheAllowedPlacesIsReported) {
+  for (const auto& misplaced : kMisplacedCheckers) {
+    std::string src = std::string("module m;\n") + misplaced.open +
+                      kMisplacedCheckerBody + misplaced.close + "endmodule\n";
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        std::string("checker 'c' may not be declared in ") + misplaced.place,
+        LineHolding(src, "checker c;"), "17.2"))
+        << src;
+    EXPECT_EQ(ParseErrorCount(r.diags), 1u) << src;
+  }
+}
+
+TEST(CheckerPlacement, TheSameCheckerInTheEnclosingModuleIsAccepted) {
+  auto r = Parse(std::string("module m;\n") + kMisplacedCheckerBody +
+                 "  initial begin end\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+const char* const kAttributedCheckerItems[] = {
+    "logic v;",
+    "rand bit r;",
+    "function automatic bit f(); return 1; endfunction",
+    "checker inner; endchecker",
+    "inner u_inner();",
+    "a1: assert property (@(posedge clk) a);",
+    "m1: assume property (@(posedge clk) a);",
+    "c1: cover property (@(posedge clk) a);",
+    "c2: cover sequence (@(posedge clk) a);",
+    "r1: restrict property (@(posedge clk) a);",
+    "d1: assert #0 (a);",
+    "d2: assert final (a);",
+    "let l = a;",
+    "sequence s; a; endsequence",
+    "property p; a; endproperty",
+    "covergroup cg @(posedge clk); coverpoint a; endgroup",
+    "cg cg_inst = new();",
+    "genvar gv;",
+    "clocking cb @(posedge clk); endclocking",
+    "default clocking cb;",
+    "default disable iff (a);",
+    "initial a3: assert property (@(posedge clk) a);",
+    "always_comb begin end",
+    "always_latch begin end",
+    "always_ff @(posedge clk) begin end",
+    "final begin end",
+    "assign v = a;",
+    "if (1) begin : gi bit gx; end else begin : ge bit gy; end",
+    "for (genvar i = 0; i < 2; i++) begin : gf bit gz; end",
+    "case (1) 1: begin : gc bit gw; end endcase",
+    "generate bit gr; endgenerate",
+    "$info(\"i\");",
+    "$warning(\"w\");",
+    "$error(\"e\");",
+    "$fatal(0, \"f\");",
+};
+
+std::string CheckerHolding(const std::string& items) {
+  return "checker inner; endchecker\n"
+         "checker c(input logic clk, input logic a);\n" +
+         items + "endchecker\n";
+}
+
+TEST(CheckerItemAttributes, EachCheckerBodyItemTakesAnAttribute) {
+  for (const char* item : kAttributedCheckerItems) {
+    std::string src = CheckerHolding(std::string("  (* k *) ") + item + "\n");
+    auto r = Parse(src);
+    ASSERT_NE(r.cu, nullptr) << item;
+    EXPECT_EQ(ParseErrorCount(r.diags), 0u) << item;
+  }
+}
+
+TEST(CheckerItemAttributes, DISABLED_TheNullItemTakesAnAttribute) {
+  auto r = Parse(CheckerHolding("  (* k *) ;\n"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(CheckerItemAttributes, AnAttributeLeavesTheItemAsWritten) {
+  auto bare = Parse(CheckerHolding("  logic v;\n  assign v = a;\n"));
+  auto attributed =
+      Parse(CheckerHolding("  (* k *) logic v;\n  (* k *) assign v = a;\n"));
+  ASSERT_NE(bare.cu, nullptr);
+  ASSERT_NE(attributed.cu, nullptr);
+  ASSERT_EQ(bare.cu->checkers.size(), attributed.cu->checkers.size());
+  const auto& bare_items = bare.cu->checkers.back()->items;
+  const auto& attributed_items = attributed.cu->checkers.back()->items;
+  ASSERT_EQ(bare_items.size(), attributed_items.size());
+  for (size_t i = 0; i < bare_items.size(); ++i) {
+    EXPECT_EQ(bare_items[i]->kind, attributed_items[i]->kind);
+    EXPECT_EQ(bare_items[i]->name, attributed_items[i]->name);
+  }
+}
+
+TEST(CheckerItemAttributes, SeveralAttributesOnOneItemAreAccepted) {
+  auto r =
+      Parse(CheckerHolding("  (* k *) (* m = 1 *) logic v;\n"
+                           "  (* k, m = 1 *) logic w;\n"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+const char* const kCheckerGenerateOpens[][2] = {
+    {"  if (1) begin : g\n", "  end\n"},
+    {"  if (1)\n", ""},
+    {"  for (genvar i = 0; i < 2; i++) begin : g\n", "  end\n"},
+    {"  case (1) 1: begin : g\n", "  end endcase\n"},
+    {"  generate\n", "  endgenerate\n"},
+};
+
+const char* const kAttributeInGenerateReport =
+    "an item in a checker's generate block takes no attribute instance";
+
+TEST(CheckerItemAttributes, DISABLED_AnItemInACheckersGenerateBlockTakesNone) {
+  for (const auto& block : kCheckerGenerateOpens) {
+    std::string src = CheckerHolding(std::string(block[0]) +
+                                     "    (* k *) bit w;\n" + block[1]);
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags, kAttributeInGenerateReport,
+                              LineHolding(src, "(* k *)"), "A.4.2"))
+        << src;
+  }
+}
+
+TEST(CheckerItemAttributes, TheSameItemsWithoutAttributesAreAccepted) {
+  for (const auto& block : kCheckerGenerateOpens) {
+    std::string src =
+        CheckerHolding(std::string(block[0]) + "    bit w;\n" + block[1]);
+    auto r = Parse(src);
+    ASSERT_NE(r.cu, nullptr);
+    EXPECT_EQ(ParseErrorCount(r.diags), 0u) << src;
+  }
+}
+
+TEST(CheckerItemAttributes,
+     DISABLED_AnAttributedNullItemInACheckersGenerateBlock) {
+  std::string src =
+      CheckerHolding("  if (1) begin : g\n    (* k *) ;\n  end\n");
+  auto r = Parse(src);
+  EXPECT_TRUE(ReportedError(r.diags, kAttributeInGenerateReport,
+                            LineHolding(src, "(* k *)"), "A.4.2"));
+}
+
+TEST(CheckerItemAttributes, DISABLED_ABareNullItemInACheckersGenerateBlock) {
+  auto r = Parse(CheckerHolding("  if (1) begin : g\n    ;\n  end\n"));
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_EQ(ParseErrorCount(r.diags), 0u);
+}
+
+TEST(CheckerItemAttributes, AModulesGenerateItemTakesAnAttribute) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    (* k *) logic w;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : f (* k *) logic v; end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

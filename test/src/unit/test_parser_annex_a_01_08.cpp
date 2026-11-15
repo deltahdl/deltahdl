@@ -267,7 +267,7 @@ TEST(CheckerItemsParsing, CheckerGenFor) {
       "checker my_chk;\n"
       "  genvar i;\n"
       "  for (i = 0; i < 4; i = i + 1) begin : gen\n"
-      "    wire w;\n"
+      "    bit w;\n"
       "  end\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -280,7 +280,7 @@ TEST(CheckerItemsParsing, GenerateItemInChecker) {
   auto r = Parse(
       "checker my_chk;\n"
       "  if (W > 0)\n"
-      "    wire a;\n"
+      "    bit a;\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -296,9 +296,9 @@ TEST(CheckerItemsParsing, CheckerCaseGenerate) {
   auto r = Parse(
       "checker chk;\n"
       "  case (MODE)\n"
-      "    0: wire a;\n"
-      "    1: wire b;\n"
-      "    default: wire c;\n"
+      "    0: bit a;\n"
+      "    1: bit b;\n"
+      "    default: bit c;\n"
       "  endcase\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -312,7 +312,7 @@ TEST(CheckerItemsParsing, CheckerGenerateRegion) {
   auto r = Parse(
       "checker my_chk;\n"
       "  generate\n"
-      "    wire w;\n"
+      "    bit w;\n"
       "  endgenerate\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -608,6 +608,30 @@ TEST(CheckerItemsParsing, CheckerGateInstantiationRejected) {
       "endchecker\n");
   EXPECT_TRUE(ReportedError(
       r.diags, "a gate instantiation is not an item of a checker", 2, "A.1.8"));
+}
+
+TEST(CheckerItemsParsing, CheckerGateInAGenerateBlockRejected) {
+  auto r = Parse(
+      "checker c;\n"
+      "  logic o, a, b;\n"
+      "  if (1) begin : g\n"
+      "    and n(o, a, b);\n"
+      "  end\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a gate instantiation is not an item of a checker", 4, "A.1.8"));
+}
+
+TEST(CheckerItemsParsing, CheckerVariableInAGenerateBlockAccepted) {
+  auto r = Parse(
+      "checker c;\n"
+      "  logic o, a, b;\n"
+      "  if (1) begin : g\n"
+      "    logic n;\n"
+      "  end\n"
+      "endchecker\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(CheckerItemsParsing, CheckerBodyPortDeclarationRejected) {
