@@ -396,4 +396,123 @@ TEST(NonconsecutiveRepetitionRun, TheDerivedGotoFormMatchesAlike) {
        {"a ##1 (b[->2:$] ##1 !b[*0:$]) ##1 c", GapAndThirdB(), {65, 85}}});
 }
 
+constexpr const char* kSelectable = "  logic [1:0] v;\n  assign v = {b, a};\n";
+
+std::string SequenceCovered(const std::string& spec, const Ticks& ticks,
+                            const std::string& decls) {
+  return Covered(spec, ticks, decls, "cover sequence");
+}
+
+TEST(RepetitionOperandRun, ABitSelectFollowedByARepetition) {
+  EXPECT_EQ(SequenceCovered("v[0][*2] ##1 v[1][->1]", {"", "a", "a", "", "b"},
+                            kSelectable),
+            Hits({45}, 80));
+  EXPECT_EQ(SequenceCovered("v[0][*2] ##1 v[1][->1]", {"", "a", "", "", "b"},
+                            kSelectable),
+            Hits({}, 80));
+  EXPECT_EQ(SequenceCovered("v[0][=2] ##1 v[1]", {"", "a", "", "a", "", "b"},
+                            kSelectable),
+            Hits({55, 55}, 90));
+}
+
+std::string Checked(const std::string& kind, const std::string& property,
+                    const Ticks& ticks) {
+  return RunRepetition(Design("", "  logic [1:0] w;\n  assign w = {b, x};\n",
+                              "  " + kind + " property (@(posedge clk) " +
+                                  property + ") else" + Hit("fail"),
+                              ticks));
+}
+
+TEST(RepetitionOperandRun, ADistFollowedByARepetition) {
+  for (const char* kind : {"assert", "assume"}) {
+    EXPECT_EQ(Checked(kind, "a |-> w dist {1 := 1, 2 := 3}[->1] ##1 c",
+                      {"", "a", "bx", "b", "c"}),
+              "$finish at time 80\n")
+        << kind;
+    EXPECT_EQ(Checked(kind, "a |-> w dist {1 := 1, 2 := 3}[->1] ##1 c",
+                      {"", "a", "bx", "bc"}),
+              "fail at 45\n$finish at time 70\n")
+        << kind;
+    EXPECT_EQ(Checked(kind, "a |-> w dist {1 := 1, 2 := 3}[*2] ##1 c",
+                      {"", "ab", "b", "c"}),
+              "$finish at time 70\n")
+        << kind;
+    EXPECT_EQ(Checked(kind, "a |-> w dist {1 := 1, 2 := 3}[*2] ##1 c",
+                      {"", "ab", "bx", "c"}),
+              "fail at 25\n$finish at time 70\n")
+        << kind;
+    EXPECT_EQ(Checked(kind, "a |-> w dist {1 := 1, 2 := 3}[=2] ##1 c",
+                      {"", "ab", "bx", "b", "c"}),
+              "$finish at time 80\n")
+        << kind;
+    EXPECT_EQ(Checked(kind, "a |-> w dist {1 := 1, 2 := 3}[=2] ##1 c",
+                      {"", "ab", "b", "b", "c"}),
+              "fail at 35\n$finish at time 80\n")
+        << kind;
+  }
+}
+
+std::string AssertedOverTwoRuns(const std::string& outside,
+                                const std::string& decls,
+                                const std::string& spec, const Ticks& ticks) {
+  return RunRepetition(Design(outside, decls,
+                              "  assert property (@(posedge clk) x |-> " +
+                                  spec + ") else" + Hit("fail"),
+                              ticks));
+}
+
+void ExpectHeldOverTwoRuns(const std::string& outside, const std::string& decls,
+                           const std::string& spec) {
+  EXPECT_EQ(
+      AssertedOverTwoRuns(outside, decls, spec, {"", "ax", "b", "a", "b", "c"}),
+      "$finish at time 90\n")
+      << spec;
+  EXPECT_EQ(
+      AssertedOverTwoRuns(outside, decls, spec, {"", "ax", "b", "", "", "c"}),
+      "fail at 35\n$finish at time 90\n")
+      << spec;
+}
+
+TEST(RepetitionOperandRun, AnInstanceWithBooleanActualsRepeated) {
+  ExpectHeldOverTwoRuns("", "  sequence t(p, q); p ##1 q; endsequence\n",
+                        "t(a, b)[*2] ##1 c");
+}
+
+TEST(RepetitionOperandRun, DISABLED_AnInstanceWithASequenceActualRepeated) {
+  ExpectHeldOverTwoRuns("", "  sequence s(q); q; endsequence\n",
+                        "s(a ##1 b)[*2] ##1 c");
+}
+
+TEST(RepetitionOperandRun, APackageScopedInstanceRepeated) {
+  const std::string kPackage =
+      "package pkg;\n  sequence s(p, q); p ##1 q; endsequence\nendpackage\n";
+  ExpectHeldOverTwoRuns(kPackage, "", "pkg::s(a, b)[*2] ##1 c");
+  ExpectHeldOverTwoRuns(kPackage, "  import pkg::*;\n", "s(a, b)[*2] ##1 c");
+}
+
+TEST(RepetitionOperandRun, AHierarchicallyNamedInstanceRepeated) {
+  ExpectHeldOverTwoRuns(
+      "interface ifc(input logic a, b);\n"
+      "  sequence s; a ##1 b; endsequence\nendinterface\n",
+      "  ifc u(a, b);\n", "u.s[*2] ##1 c");
+}
+
+TEST(RepetitionOperandRun, AGroupJoinedByAndIntersectOrWithinRepeated) {
+  ExpectCoveredRuns(
+      {{"(a ##1 b and c)[*2] ##1 x", {"", "ac", "b", "ac", "b", "x"}, {55}},
+       {"(a ##1 b and c)[*2] ##1 x", {"", "ac", "b", "a", "b", "x"}, {}},
+       {"(a ##1 b intersect c[*2])[*2] ##1 x",
+        {"", "ac", "bc", "ac", "bc", "x"},
+        {55}},
+       {"(a ##1 b intersect c[*2])[*2] ##1 x",
+        {"", "ac", "bc", "ac", "b", "x"},
+        {}},
+       {"(a within c[*3])[*2] ##1 x",
+        {"", "c", "ac", "c", "c", "ac", "c", "x"},
+        {75}},
+       {"(a within c[*3])[*2] ##1 x",
+        {"", "c", "ac", "c", "c", "c", "c", "x"},
+        {}}});
+}
+
 }  // namespace
