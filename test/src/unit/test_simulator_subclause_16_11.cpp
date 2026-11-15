@@ -7,6 +7,7 @@
 
 #include "elaborator/sequence_match_attach.h"
 #include "fixture_simulator.h"
+#include "helpers_final_output.h"
 #include "helpers_sequence_ticks.h"
 
 using namespace delta;
@@ -791,6 +792,37 @@ TEST(AttachedEndPoint, DISABLED_AnInstanceInEachPlaceRunsItsCallOncePerMatch) {
                           "generate", "clocking", "property"}) {
     EXPECT_EQ(Occurrences(out, tag), 1u) << tag << out;
   }
+}
+
+TEST(AttachedSubroutine, DISABLED_EachInstanceRunsTheCallsOfItsOwnMatches) {
+  EXPECT_EQ(
+      SortedOutput("module sub(input logic clk, go);\n"
+                   "  int calls = 0;\n"
+                   "  function void bump(); calls++; endfunction\n"
+                   "  sequence s; @(posedge clk) (go, bump()); endsequence\n"
+                   "  c1: cover property (s);\n"
+                   "  a1: assert property (@(posedge clk) go |-> s);\n"
+                   "  final $display(\"%m calls=%0d\", calls);\n"
+                   "endmodule\n"
+                   "checker chk(logic clk, go);\n"
+                   "  int calls = 0;\n"
+                   "  function void bump(); calls++; endfunction\n"
+                   "  sequence s; @(posedge clk) (go, bump()); endsequence\n"
+                   "  c1: cover property (s);\n"
+                   "  final $display(\"%m calls=%0d\", calls);\n"
+                   "endchecker\n"
+                   "module top;\n"
+                   "  logic clk = 0, go = 1;\n"
+                   "  always #5 clk = ~clk;\n"
+                   "  initial #17 go = 0;\n"
+                   "  sub u(clk, go);\n"
+                   "  sub w(clk, go);\n"
+                   "  chk c1(clk, go);\n"
+                   "  chk c2(clk, go);\n"
+                   "  initial #52 $finish;\n"
+                   "endmodule\n"),
+      (std::vector<std::string>{"top.c1 calls=2", "top.c2 calls=2",
+                                "top.u calls=4", "top.w calls=4"}));
 }
 
 }  // namespace
