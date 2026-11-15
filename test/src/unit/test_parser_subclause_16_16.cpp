@@ -257,8 +257,8 @@ constexpr const char* kDefaultBlock =
 
 std::string BlockDecl(const BlockPlace& place, const char* block,
                       const char* kind, const std::string& body) {
-  return std::string(place.open) + "  logic a, b, en, rst, clk;\n" + block +
-         "    " + kind + " d;\n      " + body + ";\n    end" + kind +
+  return std::string(place.open) + "  logic a, b, en, rst, clk, clk2;\n" +
+         block + "    " + kind + " d;\n      " + body + ";\n    end" + kind +
          "\n  endclocking\n" + place.close;
 }
 
@@ -361,6 +361,74 @@ TEST(ClockResolutionParse, NoEventInEachPlacesBlockIsAccepted) {
     const char* block = place == &kInModule ? kDefaultBlock : kPlainBlock;
     ExpectAccepted(*place, block, "property", "a |=> b");
     ExpectAccepted(*place, block, "sequence", "a ##1 b");
+  }
+}
+
+std::string MulticlockedMessage(const char* kind) {
+  return std::string("a multiclocked ") + kind +
+         " is not allowed in a clocking block";
+}
+
+void ExpectMulticlockedReported(const BlockPlace& place, const char* block,
+                                const char* kind, const std::string& body) {
+  auto r = Parse(BlockDecl(place, block, kind, body));
+  ASSERT_NE(r.cu, nullptr) << body;
+  EXPECT_TRUE(ReportedError(r.diags, MulticlockedMessage(kind), 4, "16.16"))
+      << place.open << body;
+}
+
+constexpr BlockPlace kInModuleWithEvent{"module m; event e;\n", "endmodule\n"};
+
+TEST(ClockResolutionParse, EachMulticlockedPropertyOperatorIsRejected) {
+  for (const char* body :
+       {"a |-> @(negedge clk) b", "a and @(negedge clk) b",
+        "a or @(negedge clk) b", "if (a) @(negedge clk) b else b",
+        "a implies @(negedge clk) b", "a until @(posedge clk2) b",
+        "nexttime @(negedge clk) b"}) {
+    ExpectMulticlockedReported(kInModule, kPlainBlock, "property", body);
+  }
+}
+
+TEST(ClockResolutionParse, EachSinglyClockedPropertyOperatorIsAccepted) {
+  for (const char* body : {"a |-> b", "a and b", "a or b", "if (a) b else b",
+                           "a implies b", "a until b", "nexttime b"}) {
+    ExpectAccepted(kInModule, kPlainBlock, "property", body);
+  }
+}
+
+TEST(ClockResolutionParse, AMulticlockedSequenceJoinIsRejected) {
+  ExpectMulticlockedReported(kInModule, kPlainBlock, "sequence",
+                             "a ##0 @(negedge clk) b");
+  ExpectMulticlockedReported(kInModuleWithEvent, kPlainBlock, "sequence",
+                             "a ##1 @e b");
+}
+
+TEST(ClockResolutionParse, ASinglyClockedSequenceJoinIsAccepted) {
+  ExpectAccepted(kInModule, kPlainBlock, "sequence", "a ##0 b");
+  ExpectAccepted(kInModuleWithEvent, kPlainBlock, "sequence", "a ##1 b");
+}
+
+TEST(ClockResolutionParse,
+     AMulticlockedDeclarationInEachPlacesBlockIsRejected) {
+  for (const BlockPlace* place :
+       {&kInModule, &kInInterface, &kInProgram, &kInChecker, &kInGenerate}) {
+    for (const char* block : {kPlainBlock, kDefaultBlock}) {
+      ExpectMulticlockedReported(*place, block, "property",
+                                 "a |=> @(negedge clk) b");
+      ExpectMulticlockedReported(*place, block, "sequence",
+                                 "a ##1 @(negedge clk) b");
+    }
+  }
+}
+
+TEST(ClockResolutionParse,
+     ASinglyClockedDeclarationInEachPlacesBlockIsAccepted) {
+  for (const BlockPlace* place :
+       {&kInModule, &kInInterface, &kInProgram, &kInChecker, &kInGenerate}) {
+    for (const char* block : {kPlainBlock, kDefaultBlock}) {
+      ExpectAccepted(*place, block, "property", "a |=> b");
+      ExpectAccepted(*place, block, "sequence", "a ##1 b");
+    }
   }
 }
 
