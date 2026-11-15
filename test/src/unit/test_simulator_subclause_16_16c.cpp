@@ -264,4 +264,56 @@ TEST(ClockingBlockPathRun, ANonDefaultBlocksSequenceWithoutADefault) {
   EXPECT_EQ(ReportTimes(out, "c1"), "30");
 }
 
+void ExpectInferredClockLeads(const Scope& scope, const std::string& open,
+                              const std::string& close = "  end\n") {
+  SimFixture f;
+  std::string out = RunScope(
+      scope,
+      open + Failing("f1", "a |=> !b") + Failing("f2", "a |=> !b", "assume") +
+          Covering("f3", "a ##1 b") +
+          Covering("f4", "a ##1 b", "cover sequence") + close,
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty()) << scope.keyword << open;
+  for (const char* label : {"f1", "f2", "f3", "f4"}) {
+    EXPECT_EQ(ReportTimes(out, label), "30") << scope.keyword << open << label;
+  }
+}
+
+TEST(InferredClockOverDefaultRun, EachStatementKindInAModuleAlways) {
+  ExpectInferredClockLeads(kModule, kModule.procedure);
+}
+
+TEST(InferredClockOverDefaultRun, AnAlwaysFfOrAnInitialWithOneEventControl) {
+  ExpectInferredClockLeads(kModule, "  always_ff @(negedge clk) begin\n");
+  ExpectInferredClockLeads(kModule, "  initial forever @(negedge clk) begin\n");
+}
+
+TEST(InferredClockOverDefaultRun, AnAlwaysInAGenerateBlock) {
+  ExpectInferredClockLeads(kModule,
+                           "  if (1) begin : g\n"
+                           "  always @(negedge clk) begin\n",
+                           "  end\n  end\n");
+}
+
+TEST(InferredClockOverDefaultRun, AnInterfaceCheckerOrProgramProcedure) {
+  ExpectInferredClockLeads(kInterface, kInterface.procedure);
+  ExpectInferredClockLeads(kChecker, kChecker.procedure);
+  ExpectInferredClockLeads(kProgram,
+                           "  initial forever @(negedge clk) begin\n");
+}
+
+TEST(InferredClockOverDefaultRun, TheClausesA1AndA4) {
+  SimFixture f;
+  std::string out =
+      RunScope(kModule,
+               "  property q5; @(negedge clk) a |=> !b; endproperty\n" +
+                   std::string(kModule.procedure) + "  " +
+                   Failing("a1", "$rose(a) |=> !b") + "  " +
+                   Failing("a4", "q5") + "  end\n",
+               f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "a1"), "30");
+  EXPECT_EQ(ReportTimes(out, "a4"), "30");
+}
+
 }  // namespace
