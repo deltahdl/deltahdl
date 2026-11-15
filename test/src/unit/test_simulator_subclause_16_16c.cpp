@@ -209,4 +209,59 @@ TEST(DefaultClockDeclarationRun, AGenerateBlocksDefaultAndAModuleProperty) {
   EXPECT_EQ(ReportTimes(out, "g2"), "25");
 }
 
+constexpr const char* kBlockHolders =
+    "module sub(input logic x, y, ck);\n"
+    "  clocking cb @(negedge ck);\n"
+    "    property p; x |=> !y; endproperty\n"
+    "    sequence s; x ##1 y; endsequence\n"
+    "  endclocking\n"
+    "endmodule\n"
+    "interface ifc(input logic x, y, ck);\n"
+    "  clocking cb @(negedge ck);\n"
+    "    property p; x |=> !y; endproperty\n"
+    "    sequence s; x ##1 y; endsequence\n"
+    "  endclocking\n"
+    "endinterface\n";
+
+void ExpectPathInstancesOnTheBlocksClock(const std::string& default_decl) {
+  SimFixture f;
+  std::string out = RunCapture(
+      ClockResolutionDesign(
+          std::string(kBlockHolders) + "module m(input logic a, b, clk);\n" +
+          default_decl +
+          "  sub u(a, b, clk);\n"
+          "  ifc i(a, b, clk);\n" +
+          Failing("h1", "u.cb.p") + Covering("h2", "u.cb.s") +
+          Failing("h3", "i.cb.p") + Covering("h4", "i.cb.s") + "endmodule\n"),
+      f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty()) << default_decl;
+  EXPECT_EQ(ReportTimes(out, "h1"), "30") << default_decl;
+  EXPECT_EQ(ReportTimes(out, "h2"), "30") << default_decl;
+  EXPECT_EQ(ReportTimes(out, "h3"), "30") << default_decl;
+  EXPECT_EQ(ReportTimes(out, "h4"), "30") << default_decl;
+}
+
+TEST(ClockingBlockPathRun,
+     DISABLED_AnotherInstancesBlockClocksItsDeclarations) {
+  ExpectPathInstancesOnTheBlocksClock("");
+}
+
+TEST(ClockingBlockPathRun, DISABLED_AnotherInstancesBlockSupersedesTheDefault) {
+  ExpectPathInstancesOnTheBlocksClock(
+      "  default clocking dc @(posedge clk); endclocking\n");
+}
+
+TEST(ClockingBlockPathRun, ANonDefaultBlocksSequenceWithoutADefault) {
+  SimFixture f;
+  std::string out =
+      RunCapture(ClockResolutionDesign("module m(input logic a, b, clk);\n"
+                                       "  clocking cb @(negedge clk);\n"
+                                       "    sequence s; a ##1 b; endsequence\n"
+                                       "  endclocking\n" +
+                                       Covering("c1", "cb.s") + "endmodule\n"),
+                 f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "c1"), "30");
+}
+
 }  // namespace
