@@ -122,6 +122,26 @@ TEST(CheckerInitialContents, EachOtherTimingControlIsReported) {
       kTiming, "17.5", {"t01:", "t02:", "t03:", "wait fork"}, {"t00:"});
 }
 
+TEST(CheckerInitialContents, ACycleDelayWithNoDefaultClockingIsReported) {
+  const std::string kSrc =
+      "checker chk(logic a);\n"
+      "  initial @(a) t0: assert (a);\n"
+      "  initial ##1 t1: assert (a);\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic a;\n"
+      "  chk c(a);\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTiming, 3, "17.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cycle delay (##) requires a default clocking "
+                            "block",
+                            3, "14.11"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 2));
+}
+
 TEST(CheckerInitialContents, DISABLED_AWaitOrderIsReported) {
   ExpectEachReported(InitialChecker("  initial @(e1) @(e2) w0: assert (a);\n"
                                     "  initial wait_order (e1, e2);\n"
