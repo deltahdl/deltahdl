@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -365,6 +367,32 @@ TEST(GlobalClockingElab, GlobalClockInAnAlwaysIffConditionErrors) {
                             "$global_clock has no effective global clocking "
                             "declaration",
                             4, "14.14"));
+}
+
+TEST(GlobalClockingElab, DISABLED_AGlobalClockArgumentOfASampledValueFunction) {
+  for (const char* call :
+       {"$rose(a, @($global_clock))", "$fell(a, @$global_clock)",
+        "$stable(a, @($global_clock))", "$changed(a, @($global_clock))",
+        "$past(a, 1, 1, @($global_clock))"}) {
+    const std::string kItems =
+        std::string("  assert property (@(posedge clk) ") + call +
+        ");\n  always @(posedge clk) b <= " + call + ";\n";
+    ElabFixture accepted;
+    ElaborateSrc(
+        "module m;\n  logic clk, a, b;\n"
+        "  global clocking @(posedge clk); endclocking\n" +
+            kItems + "endmodule\n",
+        accepted);
+    EXPECT_TRUE(accepted.diag.Diagnostics().empty()) << call;
+    ElabFixture reported;
+    ElaborateSrc("module m;\n  logic clk, a, b;\n" + kItems + "endmodule\n",
+                 reported);
+    EXPECT_TRUE(ReportedError(reported.diag.Diagnostics(),
+                              "$global_clock has no effective global clocking "
+                              "declaration",
+                              3, "14.14"))
+        << call;
+  }
 }
 
 }  // namespace

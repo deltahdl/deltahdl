@@ -543,4 +543,25 @@ TEST(GlobalClockingSim,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(GlobalClockingSim,
+     DISABLED_AGlobalClockArgumentOfASampledValueFunctionRuns) {
+  const std::string kSrc =
+      "module t;\n"
+      "  logic gclk = 0, a = 0;\n"
+      "  global clocking @(posedge gclk); endclocking\n"
+      "  initial begin #2; repeat (8) begin gclk = 1; #5 gclk = 0; #5; end "
+      "end\n"
+      "  initial begin #10 a = 1; #20 a = 0; end\n"
+      "  always @(posedge gclk) if ($time > 2) $display(\"%0t %b%b%b%b%0d\",\n"
+      "    $time, $rose(a, @($global_clock)), $fell(a, @$global_clock),\n"
+      "    $stable(a, @($global_clock)), $changed(a, @($global_clock)),\n"
+      "    $past(a, 1, 1, @($global_clock)));\n"
+      "endmodule\n";
+  SimFixture f;
+  EXPECT_EQ(RunCapture(kSrc, f),
+            "12 10010\n22 00101\n32 01011\n42 00100\n52 00100\n62 00100\n"
+            "72 00100\n");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 }  // namespace
