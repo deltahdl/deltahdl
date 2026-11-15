@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <iostream>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -266,6 +270,346 @@ TEST(CheckerCombAndLatchReads, EachDeferredAssertionReadsTheCurrentValue) {
                  42),
              In("c", {"ap", "af", "dp", "df"})),
       (std::vector<uint64_t>{3, 2, 3, 2}));
+}
+
+std::string WithCounters(const std::string& head, const std::string& body) {
+  return head + kCounters + body + "endchecker\n";
+}
+
+TEST(CheckerProcedureAssertions, AnImmediateAssertionInCombRunsEachTime) {
+  EXPECT_EQ(Values(CheckerOverB("  always_comb begin\n"
+                                "    a1: assert (b != 0) inc_ap(); else "
+                                "inc_af();\n"
+                                "  end\n",
+                                42),
+                   In("c", {"ap", "af"})),
+            (std::vector<uint64_t>{4, 1}));
+}
+
+TEST(CheckerProcedureAssertions, AnImmediateAssertionInALatchRunsWhileEnabled) {
+  EXPECT_EQ(
+      Values(WithCounters("checker chk(int b, logic en);\n",
+                          "  int l;\n"
+                          "  always_latch if (en) l = b;\n"
+                          "  always_latch if (en) begin\n"
+                          "    a1: assert (b != 2) inc_ap(); else inc_af();\n"
+                          "  end\n") +
+                 "module top;\n"
+                 "  logic clk = 0, en = 1;\n"
+                 "  int b = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  always @(posedge clk) b = b + 1;\n"
+                 "  chk c(b, en);\n"
+                 "  initial begin\n"
+                 "    #20 en = 0;\n"
+                 "    #22 $finish;\n"
+                 "  end\n"
+                 "endmodule\n",
+             In("c", {"ap", "af", "l"})),
+      (std::vector<uint64_t>{2, 1, 2}));
+}
+
+TEST(CheckerProcedureAssertions, AnInitialsImmediateAssertionRunsOnce) {
+  EXPECT_EQ(Values(WithCounters("checker chk(logic ok);\n",
+                                "  initial a0: assert (ok == 1'b0) inc_ap(); "
+                                "else inc_af();\n") +
+                       "module top;\n"
+                       "  logic ok = 0;\n"
+                       "  chk c(ok);\n"
+                       "  initial #3 $finish;\n"
+                       "endmodule\n",
+                   In("c", {"ap", "af"})),
+            (std::vector<uint64_t>{1, 0}));
+}
+
+TEST(CheckerProcedureAssertions,
+     DISABLED_ACombDeferredAssertionReportsOnceSettled) {
+  EXPECT_EQ(
+      Values(WithCounters("checker chk(logic a, logic b);\n",
+                          "  always_comb d1: assert #0 (a != b) inc_ap(); "
+                          "else inc_af();\n"
+                          "  always_comb a1: assert (a != b) inc_dp(); "
+                          "else inc_df();\n") +
+                 "program drv;\n"
+                 "  initial begin\n"
+                 "    #5 top.a = 1;\n"
+                 "    #0 top.b = 0;\n"
+                 "    #5 $finish;\n"
+                 "  end\n"
+                 "endprogram\n"
+                 "module top;\n"
+                 "  logic a = 0, b = 1;\n"
+                 "  drv d();\n"
+                 "  chk c(a, b);\n"
+                 "endmodule\n",
+             In("c", {"ap", "af", "dp", "df"})),
+      (std::vector<uint64_t>{2, 0, 2, 1}));
+}
+
+const char* const kCountingFf =
+    "  int n = 0;\n"
+    "  always_ff @(posedge clk) begin\n"
+    "    n <= n + 1;\n"
+    "    a1: assert property (n < 3) inc_ap(); else inc_af();\n"
+    "  end\n";
+
+const char* const kClockedTop =
+    "  logic clk = 0;\n"
+    "  always #5 clk = ~clk;\n"
+    "  initial #52 $finish;\n";
+
+TEST(CheckerProceduralConcurrentRuns, DISABLED_AnEventFormalsActualClocksIt) {
+  EXPECT_EQ(Values(WithCounters("checker c1(event clk);\n",
+                                "  int n = 0;\n"
+                                "  always_ff @(clk) begin\n"
+                                "    n <= n + 1;\n"
+                                "    p0: assert property (n < 3) inc_ap(); "
+                                "else inc_af();\n"
+                                "  end\n") +
+                       "module top;\n" + kClockedTop +
+                       "  event ev;\n"
+                       "  always @(posedge clk) -> ev;\n"
+                       "  c1 u(posedge clk);\n"
+                       "  c1 w(ev);\n"
+                       "endmodule\n",
+                   {"top.u.ap", "top.u.af", "top.w.ap", "top.w.af"}),
+            (std::vector<uint64_t>{3, 2, 3, 2}));
+}
+
+TEST(CheckerProceduralConcurrentRuns, EveryInstanceIsQueuedAtEveryEdge) {
+  std::vector<std::string> names;
+  for (const char* scope : {"top.s", "pi", "o.in", "top.i.c", "top.g[0].c"}) {
+    for (const char* counter : {".ap", ".af"}) {
+      std::string name = scope;
+      name += counter;
+      names.push_back(name);
+    }
+  }
+  EXPECT_EQ(Values(WithCounters("checker c2(logic clk);\n", kCountingFf) +
+                       "checker outer(logic clk);\n"
+                       "  c2 in(clk);\n"
+                       "endchecker\n"
+                       "interface ifc(input logic clk);\n"
+                       "  c2 c(clk);\n"
+                       "endinterface\n"
+                       "module top;\n" +
+                       kClockedTop +
+                       "  logic en = 1;\n"
+                       "  initial #20 en = 0;\n"
+                       "  c2 s(clk);\n"
+                       "  always @(posedge clk) if (en) begin : pb\n"
+                       "    c2 pi(clk);\n"
+                       "  end\n"
+                       "  initial @(posedge clk) begin : ob\n"
+                       "    outer o(clk);\n"
+                       "  end\n"
+                       "  ifc i(clk);\n"
+                       "  for (genvar k = 0; k < 1; k++) begin : g\n"
+                       "    c2 c(clk);\n"
+                       "  end\n"
+                       "endmodule\n",
+                   names),
+            (std::vector<uint64_t>{3, 2, 3, 2, 3, 2, 3, 2, 3, 2}));
+}
+
+TEST(CheckerProceduralConcurrentRuns, AnInstanceInAProgramIsQueuedAtEveryEdge) {
+  EXPECT_EQ(Values(WithCounters("checker c2(logic clk);\n", kCountingFf) +
+                       "program prg(input logic clk);\n"
+                       "  c2 c(clk);\n"
+                       "endprogram\n"
+                       "module top;\n" +
+                       kClockedTop +
+                       "  prg p(clk);\n"
+                       "endmodule\n",
+                   {"top.p.c.ap", "top.p.c.af"}),
+            (std::vector<uint64_t>{3, 2}));
+}
+
+TEST(CheckerProceduralConcurrentRuns, AnOwnClockStartsEachAttemptAtItsTick) {
+  EXPECT_EQ(Values(WithCounters("checker c3(logic clk, logic other);\n",
+                                "  int n = 0;\n"
+                                "  always_ff @(posedge clk) begin\n"
+                                "    n <= n + 1;\n"
+                                "    a1: assert property (@(posedge other) "
+                                "n < 3) inc_ap(); else inc_af();\n"
+                                "  end\n") +
+                       "module top;\n" + kClockedTop +
+                       "  logic other = 0;\n"
+                       "  always #10 other = ~other;\n"
+                       "  c3 c(clk, other);\n"
+                       "endmodule\n",
+                   In("c", {"ap", "af"})),
+            (std::vector<uint64_t>{1, 4}));
+}
+
+TEST(CheckerProceduralConcurrentRuns, CombAndLatchTakeTheDefaultClocking) {
+  EXPECT_EQ(
+      Values(WithCounters("checker c4(logic clk, int d, logic en);\n",
+                          "  default clocking @(posedge clk); endclocking\n"
+                          "  always_comb a1: assert property (d < 2) "
+                          "inc_ap(); else inc_af();\n"
+                          "  always_latch if (en) a2: assert property (d < 2) "
+                          "inc_dp(); else inc_df();\n") +
+                 "module top;\n"
+                 "  logic clk = 0, en = 1;\n"
+                 "  int d = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  c4 c(clk, d, en);\n"
+                 "  initial begin\n"
+                 "    #2 d = 1;\n"
+                 "    #10 d = 0;\n"
+                 "    #10 d = 2;\n"
+                 "    #10 $finish;\n"
+                 "  end\n"
+                 "endmodule\n",
+             In("c", {"ap", "af", "dp", "df"})),
+      (std::vector<uint64_t>{3, 1, 3, 1}));
+}
+
+TEST(CheckerProceduralConcurrentRuns, AnInitialsAssertionMakesOneAttempt) {
+  EXPECT_EQ(Values(WithCounters("checker c5(logic clk, logic a);\n",
+                                "  initial a1: assert property (@(posedge clk) "
+                                "a) inc_ap(); else inc_af();\n") +
+                       "module top;\n" + kClockedTop +
+                       "  logic a = 0;\n"
+                       "  c5 c(clk, a);\n"
+                       "endmodule\n",
+                   In("c", {"ap", "af"})),
+            (std::vector<uint64_t>{0, 1}));
+}
+
+std::vector<std::string> SortedOutput(const std::string& src) {
+  SimFixture f;
+  std::string out = RunCapture(src, f);
+  std::ostringstream finals;
+  std::streambuf* old_buf = std::cout.rdbuf(finals.rdbuf());
+  f.ctx.RunFinalBlocks();
+  std::cout.rdbuf(old_buf);
+  out += finals.str();
+  std::vector<std::string> lines;
+  size_t start = 0;
+  while (start < out.size()) {
+    size_t end = out.find('\n', start);
+    if (end == std::string::npos) end = out.size();
+    std::string line = out.substr(start, end - start);
+    if (!line.empty() && !line.starts_with("$finish")) lines.push_back(line);
+    start = end + 1;
+  }
+  std::sort(lines.begin(), lines.end());
+  return lines;
+}
+
+TEST(CheckerFinalRuns, EachStatementOfTheFinalRunsOncePerInstance) {
+  EXPECT_EQ(
+      SortedOutput(
+          "checker chk(logic a);\n"
+          "  function int twice(int v); return 2 * v; endfunction\n"
+          "  final begin\n"
+          "    if (a) $display(\"%m if\"); else $display(\"%m else\");\n"
+          "    case (a) 1'b1: $display(\"%m one\"); "
+          "default: $display(\"%m zero\"); endcase\n"
+          "    for (int i = 0; i < 2; i++) $display(\"%m loop %0d\", i);\n"
+          "    a1: assert (a) $display(\"%m pass\"); "
+          "else $display(\"%m fail\");\n"
+          "    $display(\"%m call %0d\", twice(3));\n"
+          "  end\n"
+          "endchecker\n"
+          "module top;\n"
+          "  logic a = 1, b = 0;\n"
+          "  chk c1(a);\n"
+          "  chk c2(b);\n"
+          "  initial #1 $finish;\n"
+          "endmodule\n"),
+      (std::vector<std::string>{
+          "top.c1 call 6", "top.c1 if", "top.c1 loop 0", "top.c1 loop 1",
+          "top.c1 one", "top.c1.a1 pass", "top.c2 call 6", "top.c2 else",
+          "top.c2 loop 0", "top.c2 loop 1", "top.c2 zero", "top.c2.a1 fail"}));
+}
+
+std::vector<std::string> BothFinals(const std::vector<std::string>& scopes) {
+  std::vector<std::string> lines;
+  for (const auto& scope : scopes) {
+    for (const char* which : {" first", " second"}) {
+      std::string line = scope;
+      line += which;
+      lines.push_back(line);
+    }
+  }
+  std::sort(lines.begin(), lines.end());
+  return lines;
+}
+
+const char* const kTwoFinals =
+    "checker chk;\n"
+    "  final $display(\"%m first\");\n"
+    "  final $display(\"%m second\");\n"
+    "endchecker\n";
+
+TEST(CheckerFinalRuns, BothFinalsRunOnceInEveryStaticContext) {
+  EXPECT_EQ(
+      SortedOutput(std::string(kTwoFinals) +
+                   "checker outer;\n"
+                   "  chk c();\n"
+                   "  if (1) begin : g\n"
+                   "    chk c();\n"
+                   "  end\n"
+                   "endchecker\n"
+                   "interface ifc;\n"
+                   "  chk c();\n"
+                   "endinterface\n"
+                   "program prg;\n"
+                   "  chk c();\n"
+                   "endprogram\n"
+                   "module top;\n"
+                   "  chk c1();\n"
+                   "  chk c2();\n"
+                   "  ifc i();\n"
+                   "  prg p();\n"
+                   "  outer o();\n"
+                   "  for (genvar k = 0; k < 2; k++) begin : g\n"
+                   "    chk c();\n"
+                   "  end\n"
+                   "  if (1) begin : gi\n"
+                   "    chk c();\n"
+                   "  end\n"
+                   "  initial #1 $finish;\n"
+                   "endmodule\n"),
+      BothFinals({"top.c1", "top.c2", "top.g[0].c", "top.g[1].c", "top.gi.c",
+                  "top.i.c", "top.o.c", "top.o.g.c", "top.p.c"}));
+}
+
+const char* const kProceduralTop =
+    "module top;\n"
+    "  logic clk = 0, en = 0;\n"
+    "  initial begin : ib\n"
+    "    chk ci(1);\n"
+    "  end\n"
+    "  always @(posedge clk) if (en) begin : ab\n"
+    "    chk ca(2);\n"
+    "  end\n"
+    "  always @(posedge clk) begin : ar\n"
+    "    chk cr(3);\n"
+    "  end\n"
+    "  initial begin\n"
+    "    #1 clk = 1;\n"
+    "    #1 $finish;\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(CheckerFinalRuns, AProceduralInstancesFinalRunsOnceReachedOrNot) {
+  EXPECT_EQ(SortedOutput(std::string("checker chk(int id);\n"
+                                     "  final $display(\"final %0d\", id);\n"
+                                     "endchecker\n") +
+                         kProceduralTop),
+            (std::vector<std::string>{"final 1", "final 2", "final 3"}));
+}
+
+TEST(CheckerFinalRuns, DISABLED_AProceduralInstanceIsNamedThroughItsBlock) {
+  EXPECT_EQ(SortedOutput(std::string("checker chk(int id);\n"
+                                     "  final $display(\"%m\");\n"
+                                     "endchecker\n") +
+                         kProceduralTop),
+            (std::vector<std::string>{"top.ab.ca", "top.ar.cr", "top.ib.ci"}));
 }
 
 }  // namespace
