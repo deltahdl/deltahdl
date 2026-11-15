@@ -132,4 +132,60 @@ TEST(ExpectResumeRun, AProgramsExpectReadsTheModulesNbaValue) {
             "after at 35 data=4\n$finish at time 210\n");
 }
 
+std::string PassElseAfter(const std::string& spec) {
+  return "    expect (" + spec +
+         ")\n"
+         "      $display(\"pass at %0d\", $time);\n"
+         "      else $display(\"fail at %0d\", $time);\n"
+         "    $display(\"after at %0d\", $time);\n";
+}
+
+int FailuresOf(const std::string& body, std::string& out) {
+  SimFixture f;
+  out = RunCapture(ExpectDesign(body), f);
+  return f.ctx.AssertionFailCount();
+}
+
+TEST(ExpectOneEvaluationRun, ASequenceWithSeveralMatchesPassesOnce) {
+  EXPECT_EQ(RunAfterObserved(PassElseAfter("@(posedge clk) a ##[1:3] b")),
+            "pass at 35\nafter at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectOneEvaluationRun,
+     AnImplicationWithSeveralConsequentMatchesPassesOnce) {
+  EXPECT_EQ(RunAfterObserved(PassElseAfter("@(posedge clk) a |-> ##[1:5] b")),
+            "pass at 35\nafter at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectOneEvaluationRun, AnOrSucceededByOneOperandRunsNoLaterElse) {
+  EXPECT_EQ(
+      RunAfterObserved(PassElseAfter("@(posedge clk) (a ##1 b) or (a ##4 c)")),
+      "pass at 35\nafter at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectOneEvaluationRun, AnOrSucceededByOneOperandReportsNoLaterError) {
+  std::string out;
+  EXPECT_EQ(FailuresOf("    expect (@(posedge clk) (a ##1 b) or (a ##4 c));\n"
+                       "    $display(\"after at %0d\", $time);\n",
+                       out),
+            0);
+  EXPECT_EQ(out, "after at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectOneEvaluationRun, AnAndFailedByOneOperandRunsNothingLater) {
+  EXPECT_EQ(RunAfterObserved(
+                PassElseAfter("@(posedge clk) (a ##1 !b) and (a ##2 c)")),
+            "fail at 35\nafter at 35\n$finish at time 210\n");
+}
+
+TEST(ExpectOneEvaluationRun, AnAndFailedWithAPassStatementOnlyReportsOnce) {
+  std::string out;
+  EXPECT_EQ(FailuresOf("    expect (@(posedge clk) (a ##1 !b) and (a ##2 c))\n"
+                       "      $display(\"pass at %0d\", $time);\n"
+                       "    $display(\"after at %0d\", $time);\n",
+                       out),
+            1);
+  EXPECT_EQ(out, "after at 35\n$finish at time 210\n");
+}
+
 }  // namespace
