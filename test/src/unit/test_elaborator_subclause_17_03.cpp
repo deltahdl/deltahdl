@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "elaborator/checker_instantiation.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -285,6 +288,258 @@ TEST(CheckerActuals, AConstOrAutomaticActualsFormalInAnAssignIsReported) {
                             "cast, is used in a continuous assignment or "
                             "procedural code",
                             15, "17.3"));
+}
+
+const char* const kInOtherChecker =
+    "cannot be instantiated in procedural code that belongs to another "
+    "checker";
+
+const char* const kInForkBlock =
+    "a checker instance cannot stand inside a fork-join, fork-join_any or "
+    "fork-join_none block";
+
+const char* const kInnerChecker =
+    "checker inner(logic a, logic clk);\n"
+    "  a1: assert property (@(posedge clk) a);\n"
+    "endchecker\n";
+
+std::string OuterHolding(const std::string& body) {
+  return "checker outer(logic a, logic clk);\n"
+         "  inner s(a, clk);\n" +
+         body + "endchecker\n";
+}
+
+const char* const kOuterTop =
+    "module top;\n"
+    "  logic clk, a;\n"
+    "  outer o(a, clk);\n"
+    "endmodule\n";
+
+void ExpectReportedBesideStatic(const std::string& src,
+                                const std::vector<std::string>& at,
+                                const char* message, const char* subclause) {
+  ElabFixture f;
+  ElaborateSrc(src, f, "top");
+  for (const auto& marker : at) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                              LineHolding(src, marker), subclause))
+        << marker << "\n"
+        << src;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), LineHolding(src, "inner s(")))
+      << src;
+}
+
+void ExpectInOtherChecker(const std::string& body,
+                          const std::vector<std::string>& at) {
+  ExpectReportedBesideStatic(kInnerChecker + OuterHolding(body) + kOuterTop, at,
+                             kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation, NotInACheckersAlwaysFf) {
+  ExpectInOtherChecker(
+      "  always_ff @(posedge clk) begin\n    inner i(a, clk);\n  end\n",
+      {"inner i("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotInACheckersAlwaysComb) {
+  ExpectInOtherChecker("  always_comb begin\n    inner i(a, clk);\n  end\n",
+                       {"inner i("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotInACheckersAlwaysLatch) {
+  ExpectInOtherChecker("  always_latch begin\n    inner i(a, clk);\n  end\n",
+                       {"inner i("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotInACheckersGeneralAlways) {
+  std::string src =
+      kInnerChecker +
+      OuterHolding(
+          "  always @(posedge clk) begin\n    inner i(a, clk);\n  end\n") +
+      kOuterTop;
+  ExpectReportedBesideStatic(src, {"inner i("}, kInOtherChecker, "17.3");
+  ElabFixture f;
+  ElaborateSrc(src, f, "top");
+  EXPECT_TRUE(ErrorOnLine(f.diag.Diagnostics(), LineHolding(src, "always @")));
+}
+
+TEST(ProceduralCheckerInstantiation, NotNestedInACheckersProcedure) {
+  ExpectInOtherChecker(
+      "  always_ff @(posedge clk) begin\n"
+      "    if (a) inner i1(a, clk);\n"
+      "    begin\n      begin inner i2(a, clk); end\n    end\n"
+      "    case (a)\n      1'b1: inner i3(a, clk);\n      default: ;\n"
+      "    endcase\n"
+      "    for (int k = 0; k < 1; k++) inner i4(a, clk);\n"
+      "  end\n",
+      {"inner i1(", "inner i2(", "inner i3(", "inner i4("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotInAProcedureOfACheckersGenerateBlock) {
+  ExpectInOtherChecker(
+      "  if (1) begin : g\n"
+      "    always_ff @(posedge clk) begin\n      inner i(a, clk);\n    end\n"
+      "  end\n",
+      {"inner i("});
+}
+
+const char* const kForbiddenProcedure =
+    "  always_ff @(posedge clk) begin\n    inner i(a, clk);\n  end\n";
+
+TEST(ProceduralCheckerInstantiation, NotInTheProcedureOfAModulesChecker) {
+  ExpectReportedBesideStatic(
+      std::string(kInnerChecker) + "module top;\n  logic clk, a;\n" +
+          OuterHolding(kForbiddenProcedure) + "  outer o(a, clk);\nendmodule\n",
+      {"inner i("}, kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation, NotInTheProcedureOfAnInterfacesChecker) {
+  ExpectReportedBesideStatic(
+      std::string(kInnerChecker) +
+          "interface ifc(input logic clk, input logic a);\n" +
+          OuterHolding(kForbiddenProcedure) +
+          "  outer o(a, clk);\nendinterface\n"
+          "module top;\n  logic clk, a;\n  ifc i(clk, a);\nendmodule\n",
+      {"inner i("}, kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation, NotInTheProcedureOfAProgramsChecker) {
+  ExpectReportedBesideStatic(
+      std::string(kInnerChecker) +
+          "program prg(input logic clk, input logic a);\n" +
+          OuterHolding(kForbiddenProcedure) +
+          "  outer o(a, clk);\nendprogram\n"
+          "module top;\n  logic clk, a;\n  prg p(clk, a);\nendmodule\n",
+      {"inner i("}, kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation,
+     DISABLED_NotInTheProcedureOfAPackagesChecker) {
+  ExpectReportedBesideStatic(
+      std::string("package p;\n") + kInnerChecker +
+          OuterHolding(kForbiddenProcedure) +
+          "endpackage\n"
+          "module top;\n  logic clk, a;\n  p::outer o(a, clk);\nendmodule\n",
+      {"inner i("}, kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation, NotInTheProcedureOfANestedChecker) {
+  ExpectReportedBesideStatic(
+      std::string(kInnerChecker) + "checker wrap(logic a, logic clk);\n" +
+          OuterHolding(kForbiddenProcedure) +
+          "  outer o(a, clk);\nendchecker\n"
+          "module top;\n  logic clk, a;\n  wrap w(a, clk);\nendmodule\n",
+      {"inner i("}, kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation, NotThroughAPackageScope) {
+  ExpectReportedBesideStatic(
+      std::string("package p;\n") + kInnerChecker + "endpackage\n" +
+          "checker outer(logic a, logic clk);\n"
+          "  p::inner s(a, clk);\n"
+          "  always_ff @(posedge clk) begin\n    p::inner i(a, clk);\n"
+          "  end\nendchecker\n" +
+          kOuterTop,
+      {"p::inner i("}, kInOtherChecker, "17.3");
+}
+
+TEST(ProceduralCheckerInstantiation, NotOfACheckerDeclaredInsideIt) {
+  ExpectReportedBesideStatic(
+      std::string("checker outer(logic a, logic clk);\n") + kInnerChecker +
+          "  inner s(a, clk);\n" + kForbiddenProcedure + "endchecker\n" +
+          kOuterTop,
+      {"inner i("}, kInOtherChecker, "17.3");
+}
+
+const char* const kForkChecker =
+    "checker chk(logic a, logic clk);\n"
+    "  a1: assert property (@(posedge clk) a);\n"
+    "endchecker\n";
+
+void ExpectForkReported(const std::string& src,
+                        const std::vector<std::string>& reported,
+                        const std::vector<std::string>& accepted) {
+  ElabFixture f;
+  ElaborateSrc(src, f, "top");
+  for (const auto& marker : reported) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kInForkBlock,
+                              LineHolding(src, marker), "17.3"))
+        << marker << "\n"
+        << src;
+  }
+  for (const auto& marker : accepted) {
+    EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), LineHolding(src, marker)))
+        << marker << "\n"
+        << src;
+  }
+}
+
+std::string ForkTop(const std::string& items) {
+  return std::string(kForkChecker) + "module top;\n  logic clk, a;\n" + items +
+         "endmodule\n";
+}
+
+TEST(ProceduralCheckerInstantiation, NotInAForkJoinOrForkJoinAny) {
+  ExpectForkReported(ForkTop("  initial begin\n"
+                             "    fork\n"
+                             "      chk c1(a, clk);\n"
+                             "      begin chk c2(a, clk); end\n"
+                             "    join\n"
+                             "    chk c3(a, clk);\n"
+                             "    fork\n"
+                             "      chk c4(a, clk);\n"
+                             "      begin chk c5(a, clk); end\n"
+                             "    join_any\n"
+                             "    chk c6(a, clk);\n"
+                             "  end\n"),
+                     {"chk c1(", "chk c2(", "chk c4(", "chk c5("},
+                     {"chk c3(", "chk c6("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotUnderAnIfOrInANestedFork) {
+  ExpectForkReported(ForkTop("  initial begin\n"
+                             "    fork\n"
+                             "      if (a) chk c1(a, clk);\n"
+                             "      fork\n"
+                             "        chk c2(a, clk);\n"
+                             "      join\n"
+                             "    join_none\n"
+                             "    chk c3(a, clk);\n"
+                             "  end\n"),
+                     {"chk c1(", "chk c2("}, {"chk c3("});
+}
+
+const char* const kForkThenAfter =
+    "begin\n"
+    "    fork\n"
+    "      chk c1(a, clk);\n"
+    "    join_none\n"
+    "    chk c2(a, clk);\n"
+    "  end\n";
+
+TEST(ProceduralCheckerInstantiation, NotInAForkOfAnAlways) {
+  ExpectForkReported(
+      ForkTop(std::string("  always @(posedge clk) ") + kForkThenAfter),
+      {"chk c1("}, {"chk c2("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotInAForkOfAGenerateBlocksInitial) {
+  ExpectForkReported(ForkTop(std::string("  if (1) begin : g\n  initial ") +
+                             kForkThenAfter + "  end\n"),
+                     {"chk c1("}, {"chk c2("});
+}
+
+TEST(ProceduralCheckerInstantiation, NotInAForkOfAnInterfaceOrProgram) {
+  for (const char* keyword : {"interface", "program"}) {
+    SCOPED_TRACE(keyword);
+    ExpectForkReported(
+        std::string(kForkChecker) + keyword +
+            " box(input logic clk, input logic a);\n  initial " +
+            kForkThenAfter + "end" + keyword +
+            "\nmodule top;\n  logic clk, a;\n  box b(clk, a);\nendmodule\n",
+        {"chk c1("}, {"chk c2("});
+  }
 }
 
 }  // namespace

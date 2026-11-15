@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_design.h"
@@ -209,6 +214,209 @@ TEST_F(VerifyParseTest, CheckerInstantiationInAFinalProcedureIsRejected) {
                             "a checker instantiation in procedural code shall "
                             "be in an always or an initial procedure",
                             5, "17.3"));
+}
+
+const char* const kProceduralPlacement =
+    "a checker instantiation in procedural code shall be in an always or an "
+    "initial procedure";
+
+const char* const kPlacedChecker =
+    "checker chk(logic a, logic clk);\n"
+    "  a1: assert property (@(posedge clk) a);\n"
+    "endchecker\n";
+
+size_t ParseErrorCount(const std::vector<Diagnostic>& diags) {
+  size_t count = 0;
+  for (const auto& diag : diags) {
+    if (diag.severity == DiagSeverity::kError) ++count;
+  }
+  return count;
+}
+
+TEST_F(VerifyParseTest, ATaskAndAFinalBesideAnAlwaysAndAnInitial) {
+  std::string src = std::string(kPlacedChecker) +
+                    "module m;\n"
+                    "  logic clk, a;\n"
+                    "  task t;\n"
+                    "    chk ct(a, clk);\n"
+                    "  endtask\n"
+                    "  final begin\n"
+                    "    chk cf(a, clk);\n"
+                    "  end\n"
+                    "  always @(posedge clk) begin\n"
+                    "    chk ca(a, clk);\n"
+                    "  end\n"
+                    "  initial begin\n"
+                    "    chk ci(a, clk);\n"
+                    "  end\n"
+                    "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk ct("), "17.3"));
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk cf("), "17.3"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 2u);
+}
+
+TEST_F(VerifyParseTest, AModuleFunctionBesideAnAlways) {
+  std::string src = std::string(kPlacedChecker) +
+                    "module m;\n"
+                    "  logic clk, a;\n"
+                    "  function void f;\n"
+                    "    chk cf(a, clk);\n"
+                    "  endfunction\n"
+                    "  always @(posedge clk) begin\n"
+                    "    chk ca(a, clk);\n"
+                    "  end\n"
+                    "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk cf("), "17.3"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 1u);
+}
+
+TEST_F(VerifyParseTest, AClassMethodBesideAModuleInitial) {
+  std::string src = std::string(kPlacedChecker) +
+                    "class k;\n"
+                    "  logic clk, a;\n"
+                    "  function void f;\n"
+                    "    chk cf(a, clk);\n"
+                    "  endfunction\n"
+                    "  task t;\n"
+                    "    chk ct(a, clk);\n"
+                    "  endtask\n"
+                    "endclass\n"
+                    "module m;\n"
+                    "  logic clk, a;\n"
+                    "  initial begin\n"
+                    "    chk ci(a, clk);\n"
+                    "  end\n"
+                    "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk cf("), "17.3"));
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk ct("), "17.3"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 2u);
+}
+
+TEST_F(VerifyParseTest, APackageSubroutineBesideAScopedInstanceInAnAlways) {
+  std::string src =
+      "package p;\n"
+      "  checker chk(logic a, logic clk);\n"
+      "    a1: assert property (@(posedge clk) a);\n"
+      "  endchecker\n"
+      "  logic clk, a;\n"
+      "  task t;\n"
+      "    chk ct(a, clk);\n"
+      "  endtask\n"
+      "  function void f;\n"
+      "    chk cf(a, clk);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  always @(posedge clk) begin\n"
+      "    p::chk ca(a, clk);\n"
+      "  end\n"
+      "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk ct("), "17.3"));
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk cf("), "17.3"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 2u);
+}
+
+TEST_F(VerifyParseTest, AUnitSubroutineBesideAnAlways) {
+  std::string src = std::string(kPlacedChecker) +
+                    "logic clk, a;\n"
+                    "function void f;\n"
+                    "  chk cf(a, clk);\n"
+                    "endfunction\n"
+                    "task t;\n"
+                    "  chk ct(a, clk);\n"
+                    "endtask\n"
+                    "module m;\n"
+                    "  always @(posedge clk) begin\n"
+                    "    chk ca(a, clk);\n"
+                    "  end\n"
+                    "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk cf("), "17.3"));
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "chk ct("), "17.3"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 2u);
+}
+
+TEST_F(VerifyParseTest, APackageItemBesideAModuleItem) {
+  std::string src =
+      "package p;\n"
+      "  checker chk(logic a, logic clk);\n"
+      "    a1: assert property (@(posedge clk) a);\n"
+      "  endchecker\n"
+      "  logic clk, a;\n"
+      "  chk cp(a, clk);\n"
+      "endpackage\n"
+      "module m;\n"
+      "  logic clk, a;\n"
+      "  p::chk cm(a, clk);\n"
+      "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "an instantiation is not an item of a package",
+                            LineHolding(src, "chk cp("), "A.1.11"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 1u);
+}
+
+TEST_F(VerifyParseTest, DISABLED_AClassItemBesideAModuleItem) {
+  std::string src = std::string(kPlacedChecker) +
+                    "class k;\n"
+                    "  logic clk, a;\n"
+                    "  chk ck(a, clk);\n"
+                    "endclass\n"
+                    "module m;\n"
+                    "  logic clk, a;\n"
+                    "  chk cm(a, clk);\n"
+                    "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                            "an instantiation is not an item of a class",
+                            LineHolding(src, "chk ck("), "A.1.9"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 1u);
+}
+
+TEST_F(VerifyParseTest, DISABLED_AUnitItemBesideAModuleItem) {
+  std::string src = std::string(kPlacedChecker) +
+                    "logic clk, a;\n"
+                    "chk cu(a, clk);\n"
+                    "module m;\n"
+                    "  chk cm(a, clk);\n"
+                    "endmodule\n";
+  Parse(src);
+  EXPECT_TRUE(
+      ReportedError(diag_.Diagnostics(),
+                    "an instantiation is not an item of the compilation unit",
+                    LineHolding(src, "chk cu("), "A.1.2"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 1u);
+}
+
+TEST_F(VerifyParseTest, ACheckersFinalBesideItsStaticNestedInstance) {
+  std::string src =
+      "checker inner(logic a, logic clk);\n"
+      "  a1: assert property (@(posedge clk) a);\n"
+      "endchecker\n"
+      "checker outer(logic a, logic clk);\n"
+      "  inner s(a, clk);\n"
+      "  final begin\n"
+      "    inner i(a, clk);\n"
+      "  end\n"
+      "endchecker\n";
+  Parse(src);
+  EXPECT_TRUE(ReportedError(diag_.Diagnostics(), kProceduralPlacement,
+                            LineHolding(src, "inner i("), "17.3"));
+  EXPECT_EQ(ParseErrorCount(diag_.Diagnostics()), 1u);
 }
 
 }  // namespace

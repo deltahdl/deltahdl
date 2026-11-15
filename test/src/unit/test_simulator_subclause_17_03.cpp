@@ -616,4 +616,110 @@ TEST(CheckerInstanceScheduling, TriggeredOnASequenceFormalReadsItsActual) {
   EXPECT_EQ(f.ctx.FindVariable("c2.hits")->value.ToUint64(), 5u);
 }
 
+const char* const kClockAndLowA =
+    "  logic clk = 0, a = 1;\n"
+    "  always #5 clk = ~clk;\n"
+    "  initial begin #12 a = 0; #20 a = 1; #20 $finish; end\n";
+
+TEST(CheckerPlacementRun, ACaseGenerateBlocksInstanceRunsAtEveryEdge) {
+  EXPECT_EQ(CheckerCounts(std::string("module top;\n") + kClockAndLowA +
+                              "  case (1)\n"
+                              "    1: begin : gc chk kc(a, clk); end\n"
+                              "  endcase\n"
+                              "endmodule\n",
+                          "gc.kc"),
+            std::make_pair(3ull, 2ull));
+}
+
+TEST(CheckerPlacementRun, AnAlwaysFfQueuesItAtEveryEdge) {
+  EXPECT_EQ(CheckerCounts(std::string("module top;\n") + kClockAndLowA +
+                              "  always_ff @(posedge clk) begin\n"
+                              "    chk kff(a, clk);\n"
+                              "  end\n"
+                              "endmodule\n",
+                          "kff"),
+            std::make_pair(3ull, 2ull));
+}
+
+std::string GuardedIn(const std::string& procedure) {
+  return "module top;\n"
+         "  logic clk = 0, a = 1, en = 0;\n"
+         "  always #5 clk = ~clk;\n"
+         "  " +
+         procedure +
+         " begin\n"
+         "    if (en) chk kc(a, clk);\n"
+         "  end\n"
+         "  initial begin\n"
+         "    #12 a = 0; en = 1;\n"
+         "    #5 en = 0;\n"
+         "    #15 a = 1;\n"
+         "    #2 en = 1;\n"
+         "    #3 en = 0;\n"
+         "    #13 $finish;\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(CheckerPlacementRun, AnAlwaysCombQueuesItEachTimeItIsReached) {
+  EXPECT_EQ(CheckerCounts(GuardedIn("always_comb"), "kc"),
+            std::make_pair(1ull, 1ull));
+}
+
+TEST(CheckerPlacementRun, AnAlwaysLatchQueuesItEachTimeItIsReached) {
+  EXPECT_EQ(CheckerCounts(GuardedIn("always_latch"), "kc"),
+            std::make_pair(1ull, 1ull));
+}
+
+TEST(CheckerPlacementRun, AProgramsInitialQueuesItOnce) {
+  EXPECT_EQ(
+      CheckerCounts(std::string("program prg(input logic clk, input logic a);\n"
+                                "  initial begin\n"
+                                "    @(posedge clk);\n"
+                                "    chk kpi(a, clk);\n"
+                                "  end\n"
+                                "endprogram\n"
+                                "module top;\n") +
+                        kClockAndLowA + "  prg p(clk, a);\nendmodule\n",
+                    "p.kpi"),
+      std::make_pair(1ull, 0ull));
+}
+
+TEST(CheckerPlacementRun, AnInterfacesInitialQueuesItOnce) {
+  EXPECT_EQ(CheckerCounts(
+                std::string("interface ifc(input logic clk, input logic a);\n"
+                            "  initial begin\n"
+                            "    @(posedge clk);\n"
+                            "    @(posedge clk);\n"
+                            "    chk ki(a, clk);\n"
+                            "  end\n"
+                            "endinterface\n"
+                            "module top;\n") +
+                    kClockAndLowA + "  ifc i(clk, a);\nendmodule\n",
+                "i.ki"),
+            std::make_pair(0ull, 1ull));
+}
+
+TEST(CheckerPlacementRun, ProceduresOfGenerateBlocksQueueTheirInstances) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(std::string(kCountingChecker) +
+                     "module top;\n"
+                     "  logic clk = 0, a = 1;\n"
+                     "  initial repeat (10) #5 clk = ~clk;\n"
+                     "  initial begin #12 a = 0; #20 a = 1; end\n"
+                     "  for (genvar g = 0; g < 2; g++) begin : lg\n"
+                     "    always @(posedge clk) chk k(a, clk);\n"
+                     "  end\n"
+                     "  if (1) begin : ig\n"
+                     "    initial begin @(posedge clk); chk k(a, clk); end\n"
+                     "  end\n"
+                     "  initial #52 $display(\"%0d %0d %0d %0d %0d %0d\",\n"
+                     "      lg[0].k.pass, lg[0].k.fail, lg[1].k.pass,\n"
+                     "      lg[1].k.fail, ig.k.pass, ig.k.fail);\n"
+                     "endmodule\n",
+                 f),
+      "3 2 3 2 1 0\n");
+}
+
 }  // namespace
