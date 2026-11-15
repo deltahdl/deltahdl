@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -299,6 +300,32 @@ TEST(DeterminedClockElaboration, EachPlaceLooksTheDeclarationUp) {
                               line, "16.14.6"));
   }
   EXPECT_EQ(f.diag.ErrorCount(), 7u);
+}
+
+std::string RestrictUnderDefault(const char* spec) {
+  return std::string(
+             "module m(input logic a, b, clk);\n"
+             "  default clocking posedge_clk @(posedge clk); endclocking\n"
+             "  property q1; $rose(a) |-> ##[1:5] b; endproperty\n"
+             "  property q5; @(negedge clk) b; endproperty\n"
+             "  property q6; q1 and q5; endproperty\n"
+             "  restrict property (") +
+         spec + ");\nendmodule\n";
+}
+
+TEST(DeterminedClockElaboration, ARestrictsWrittenClockSupersedesTheDefault) {
+  ElabFixture f;
+  Elaborate(RestrictUnderDefault("@(negedge clk) q6"), f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
+TEST(DeterminedClockElaboration,
+     DISABLED_ARestrictUnderTheDefaultAloneIsNotUnique) {
+  ElabFixture f;
+  Elaborate(RestrictUnderDefault("q6"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the property has no unique semantic leading clock",
+                            6, "16.16.1"));
 }
 
 }  // namespace

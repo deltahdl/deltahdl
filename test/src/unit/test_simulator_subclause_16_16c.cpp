@@ -316,4 +316,74 @@ TEST(InferredClockOverDefaultRun, TheClausesA1AndA4) {
   EXPECT_EQ(ReportTimes(out, "a4"), "30");
 }
 
+std::string WrittenClockItems() {
+  return "  sequence s3; @(negedge clk) a ##1 b; endsequence\n" +
+         Failing("w1", "@(negedge clk) a |=> !b") +
+         Failing("w2", "@(negedge clk) a |=> !b", "assume") +
+         Covering("w3", "@(negedge clk) a ##1 b") +
+         Covering("w4", "@(negedge clk) a ##1 b", "cover sequence") +
+         Covering("w5", "s3") + Covering("w6", "s3", "cover sequence") +
+         Failing("w7", "@(ncb) a |=> !b") +
+         Failing("w8", "@(negedge clk iff (a || b)) a |=> !b") +
+         Covering("w9", "@clk a ##1 a");
+}
+
+void ExpectWrittenClocksLead(const Scope& scope, const std::string& open = "",
+                             const std::string& close = "") {
+  SimFixture f;
+  std::string out = RunScope(scope, open + WrittenClockItems() + close, f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty()) << scope.keyword << open;
+  for (const char* label : {"w1", "w2", "w3", "w4", "w5", "w6", "w7", "w8"}) {
+    EXPECT_EQ(ReportTimes(out, label), "30") << scope.keyword << open << label;
+  }
+  EXPECT_EQ(ReportTimes(out, "w9"), "20") << scope.keyword << open;
+}
+
+TEST(WrittenClockOverDefaultRun, EachWrittenFormInAModule) {
+  ExpectWrittenClocksLead(kModule);
+}
+
+TEST(WrittenClockOverDefaultRun, EachWrittenFormInAnInterfaceProgramOrChecker) {
+  ExpectWrittenClocksLead(kInterface);
+  ExpectWrittenClocksLead(kProgram);
+  ExpectWrittenClocksLead(kChecker);
+}
+
+TEST(WrittenClockOverDefaultRun, ACheckerUnderItsModulesDefault) {
+  ExpectWrittenClocksLead(kModule, "  checker cn;\n",
+                          "  endchecker\n  cn ucn();\n");
+}
+
+TEST(WrittenClockOverDefaultRun, AGenerateBlockWithOrWithoutItsOwnDefault) {
+  ExpectWrittenClocksLead(kModule, "  if (1) begin : g\n", "  end\n");
+  ExpectWrittenClocksLead(kModule,
+                          "  if (1) begin : g\n"
+                          "  default clocking gc @(posedge clk); endclocking\n",
+                          "  end\n");
+}
+
+TEST(WrittenClockOverDefaultRun, ANamedEventClock) {
+  SimFixture f;
+  std::string out = RunScope(kModule,
+                             "  event e;\n"
+                             "  initial begin #21 -> e; #8 -> e; end\n" +
+                                 Failing("e1", "@e a |=> !b"),
+                             f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "e1"), "29");
+}
+
+TEST(WrittenClockOverDefaultRun, AWrittenClockInAnInitialProcedure) {
+  SimFixture f;
+  std::string out =
+      RunScope(kModule,
+               "  initial begin\n    #15;\n  " +
+                   Failing("n1", "@(negedge clk) a |=> !b") + "  " +
+                   Covering("n2", "@(negedge clk) a ##1 b") + "  end\n",
+               f);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(ReportTimes(out, "n1"), "30");
+  EXPECT_EQ(ReportTimes(out, "n2"), "30");
+}
+
 }  // namespace
