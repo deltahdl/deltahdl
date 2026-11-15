@@ -188,4 +188,61 @@ TEST(ExpectOneEvaluationRun, AnAndFailedWithAPassStatementOnlyReportsOnce) {
   EXPECT_EQ(out, "after at 35\n$finish at time 210\n");
 }
 
+std::string ExpectOf(const std::string& spec, const std::string& label) {
+  return "expect (" + spec + ") $display(\"" + label +
+         " pass at %0d\", $time);\n      else $display(\"" + label +
+         " fail at %0d\", $time);\n";
+}
+
+TEST(ExpectFirstTickRun, AnAlwaysBodyReachedAtATickWhereThePropertyHolds) {
+  EXPECT_EQ(
+      RunAfterObserved("", "  always @(posedge clk) if ($time == 45)\n    " +
+                               ExpectOf("@(posedge clk) a", "always")),
+      "always fail at 55\n$finish at time 210\n");
+}
+
+TEST(ExpectFirstTickRun, AnAlwaysBodyReachedAtATickWhereThePropertyFails) {
+  EXPECT_EQ(
+      RunAfterObserved("", "  always @(posedge clk) if ($time == 15)\n    " +
+                               ExpectOf("@(posedge clk) a", "always")),
+      "always pass at 25\n$finish at time 210\n");
+}
+
+TEST(ExpectFirstTickRun, AnInitialReachedAtATickAfterAnEventControl) {
+  EXPECT_EQ(RunAfterObserved("    repeat (3) @(posedge clk);\n    " +
+                             ExpectOf("@(posedge clk) a", "initial")),
+            "initial fail at 55\n$finish at time 210\n");
+}
+
+TEST(ExpectFirstTickRun, AnUnclockedSpecUnderTheDefaultClocking) {
+  EXPECT_EQ(RunAfterObserved("    repeat (3) @(posedge clk);\n    " +
+                                 ExpectOf("a", "default"),
+                             "  default clocking dcb @(posedge clk);\n"
+                             "  endclocking\n"),
+            "default fail at 55\n$finish at time 210\n");
+}
+
+TEST(ExpectFirstTickRun, AClockingBlockEventClock) {
+  EXPECT_EQ(RunAfterObserved(
+                "    repeat (3) @(cb);\n    " + ExpectOf("@(cb) a", "block"),
+                "  clocking cb @(posedge clk);\n"
+                "  endclocking\n"),
+            "block fail at 55\n$finish at time 210\n");
+}
+
+TEST(ExpectFirstTickRun, AProgramInitialReachedAtATick) {
+  EXPECT_EQ(RunAfterObserved("",
+                             "  program pr;\n    initial begin\n"
+                             "      #40;\n      @(posedge clk);\n      " +
+                                 ExpectOf("@(posedge clk) a", "program") +
+                                 "      #200;\n    end\n  endprogram\n"),
+            "program fail at 55\n$finish at time 210\n");
+}
+
+TEST(ExpectFirstTickRun, ReachedAtTimeZeroBeforeTheFirstTick) {
+  EXPECT_EQ(RunAfterObserved(
+                "", "  initial " + ExpectOf("@(posedge clk) !a", "zero")),
+            "zero pass at 5\n$finish at time 210\n");
+}
+
 }  // namespace
