@@ -59,4 +59,34 @@ TEST(ConstraintOperandTypes, AnInlineConstraintBlockIsChecked) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "18.3"));
 }
 
+TEST(ConstraintOperandTypes, DISABLED_ScopeRandomizeWithIsChecked) {
+  ElabFixture f;
+  ElabOk(
+      "module m;\n"
+      "  bit [7:0] b;\n"
+      "  initial begin\n"
+      "    void'(std::randomize(b) with { string'(b) == \"A\"; });\n"
+      "    void'(std::randomize(b) with { $countones(b) == 2; });\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 4, "18.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "18.3"));
+}
+
+TEST(ConstraintOperandTypes, AnOutOfBlockConstraintIsChecked) {
+  ElabFixture f;
+  ElabOk(
+      "class C;\n"
+      "  rand bit [7:0] b;\n"
+      "  extern constraint bad;\n"
+      "  extern constraint good;\n"
+      "endclass\n"
+      "constraint C::bad { string'(b) == \"A\"; }\n"
+      "constraint C::good { $countones(b) == 2; }\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "18.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 7, "18.3"));
+}
+
 }  // namespace
