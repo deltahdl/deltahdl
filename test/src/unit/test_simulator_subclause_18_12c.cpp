@@ -112,4 +112,24 @@ TEST(ScopeRandomizeCases, ANoArgumentCheckWithOneFalseExpressionReturnsZero) {
       "0 3 9\n");
 }
 
+TEST(ScopeRandomizeCases, DISABLED_AnUnpackedArrayArgumentIsRandomized) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [7:0] u[4];\n"
+                       "  int i, ok = 0, moved = 0, pinned = 0;\n"
+                       "  initial begin\n"
+                       "    for (i = 0; i < 8; i++) begin\n"
+                       "      ok += std::randomize(u);\n"
+                       "      if (u[0] != 0 || u[1] != 0 || u[2] != 0 || u[3] "
+                       "!= 0) moved++;\n"
+                       "      if (std::randomize(u) with { u[1] == 77; } && "
+                       "u[1] == 77) pinned++;\n"
+                       "    end\n"
+                       "    $display(\"%0d %0d %0d\", ok, moved, pinned);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "8 8 8\n");
+}
+
 }  // namespace
