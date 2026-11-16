@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
@@ -459,6 +460,77 @@ TEST(CovergroupParsing, ACovergroupDeclaredInTheCompilationUnit) {
   ASSERT_EQ(result.cu->cu_items.size(), 1u);
   EXPECT_EQ(result.cu->cu_items[0]->kind, ModuleItemKind::kCovergroupDecl);
   EXPECT_EQ(result.cu->cu_items[0]->name, "ucg");
+}
+
+const char* const kOutwardFormal =
+    "a covergroup formal argument cannot be declared 'output' or 'inout'";
+
+std::string CovergroupHolder(const std::string& scope,
+                             const std::string& formals) {
+  const std::string kGroup = "  covergroup cg (" + formals +
+                             ");\n"
+                             "    coverpoint v;\n"
+                             "  endgroup\n";
+  if (scope == "class") {
+    return "class C;\n  int v;\n" + kGroup + "endclass\n";
+  }
+  if (scope == "unit") return "int v;\n" + kGroup;
+  return scope + " s;\n  int v;\n" + kGroup + "end" + scope + "\n";
+}
+
+TEST(CovergroupParsing, AnOutwardFormalIsRejectedInEveryScope) {
+  for (const char* scope : {"module", "class", "package", "program",
+                            "interface", "checker", "unit"}) {
+    const int kLine = std::string(scope) == "unit" ? 2 : 3;
+    for (const char* formals :
+         {"output int x", "inout int x", "input int a, output int x",
+          "int a, inout int x", "ref int a, output int x"}) {
+      auto r = Parse(CovergroupHolder(scope, formals));
+      EXPECT_TRUE(ReportedError(r.diags, kOutwardFormal, kLine, "19.3"))
+          << scope << ": " << formals;
+    }
+  }
+}
+
+TEST(CovergroupParsing, AnInputOrRefFormalIsAcceptedInEveryScope) {
+  for (const char* scope : {"module", "class", "package", "program",
+                            "interface", "checker", "unit"}) {
+    for (const char* formals : {"int x", "input int x", "ref int x",
+                                "input int a, ref int x", "const ref int x"}) {
+      auto r = Parse(CovergroupHolder(scope, formals));
+      EXPECT_FALSE(r.has_errors) << scope << ": " << formals;
+    }
+  }
+}
+
+std::string CrossWithBins(const std::string& head, const std::string& bins) {
+  return "module m;\n"
+         "  bit [1:0] x, y;\n"
+         "  covergroup cg;\n"
+         "    a: coverpoint x;\n"
+         "    b: coverpoint y;\n"
+         "    " +
+         head +
+         " {\n"
+         "      " +
+         bins +
+         "\n"
+         "    }\n"
+         "  endgroup\n"
+         "endmodule\n";
+}
+
+TEST(CovergroupParsing, AnAttributeBeforeACrossLeavesItsBodyRead) {
+  for (const char* head :
+       {"(* full *) c: cross a, b", "(* full *) cross a, b",
+        "(* full, w = 2 *) c: cross a, b", "c: cross a, b"}) {
+    auto r = Parse(CrossWithBins(head, "bins q binsof(a);"));
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected '=' in bins declaration", 7, "19.5.1"))
+        << head;
+    auto ok = Parse(CrossWithBins(head, "bins q = binsof(a);"));
+    EXPECT_FALSE(ok.has_errors) << head;
+  }
 }
 
 }  // namespace

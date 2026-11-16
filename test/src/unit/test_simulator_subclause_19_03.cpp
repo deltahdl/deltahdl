@@ -570,4 +570,156 @@ TEST(CovergroupInstanceSim, ACompilationUnitCovergroupTypeHasInstances) {
   EXPECT_EQ(out, "25.00 50.00 75.00\n");
 }
 
+std::string Coverage(const std::string& src) {
+  SimFixture f;
+  const std::string kOut = RunCapture(src, f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  return kOut;
+}
+
+TEST(CovergroupInstanceSim,
+     DISABLED_AClockingEventOnARefFormalSamplesTheActual) {
+  EXPECT_EQ(Coverage("module top;\n"
+                     "  bit clk, a; int n, t;\n"
+                     "  covergroup cg (ref bit c) @(posedge c);\n"
+                     "    coverpoint a { bins one = {1}; bins zero = {0}; }\n"
+                     "  endgroup\n"
+                     "  cg g = new(clk);\n"
+                     "  initial begin\n"
+                     "    a = 1; #1 clk = 1; #1 clk = 0; a = 0;\n"
+                     "    #1 clk = 1; #1;\n"
+                     "    void'(g.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=2 t=2\n");
+}
+
+TEST(CovergroupInstanceSim, AnUnstrobedEventSamplesEachOccurrenceInASlot) {
+  EXPECT_EQ(Coverage("module top;\n"
+                     "  bit clk; bit [1:0] v; int n, t;\n"
+                     "  covergroup cg @(clk);\n"
+                     "    coverpoint v { bins b[] = {[0:3]}; }\n"
+                     "  endgroup\n"
+                     "  cg c = new;\n"
+                     "  initial begin\n"
+                     "    v = 1; #1 clk = 1; #0 v = 2; clk = 0; #0 v = 3;\n"
+                     "    clk = 1;\n"
+                     "    #1 void'(c.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=3 t=4\n");
+}
+
+TEST(CovergroupInstanceSim, AStrobedBlockEventSamplesAtOnce) {
+  EXPECT_EQ(Coverage("module top;\n"
+                     "  bit [1:0] v; int n, t;\n"
+                     "  function void fn; endfunction\n"
+                     "  covergroup cg @@(begin fn);\n"
+                     "    type_option.strobe = 1;\n"
+                     "    coverpoint v { bins one = {1}; bins three = {3}; }\n"
+                     "  endgroup\n"
+                     "  cg c = new;\n"
+                     "  initial begin\n"
+                     "    v = 1; fn(); v = 2;\n"
+                     "    #1 void'(c.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=1 t=2\n");
+}
+
+TEST(CovergroupInstanceSim, ABeginBlockEventSamplesAsAFunctionStarts) {
+  EXPECT_EQ(Coverage("module top;\n"
+                     "  bit [1:0] v; int n, t;\n"
+                     "  function void fn; v = 3; endfunction\n"
+                     "  covergroup cg @@(begin fn);\n"
+                     "    coverpoint v { bins lo = {0}; bins three = {3}; }\n"
+                     "  endgroup\n"
+                     "  cg c = new;\n"
+                     "  initial begin v = 0; fn(); "
+                     "void'(c.get_inst_coverage(n, t)); "
+                     "$display(\"n=%0d t=%0d\", n, t); end\n"
+                     "endmodule\n"),
+            "n=1 t=2\n");
+}
+
+TEST(CovergroupInstanceSim, DISABLED_ABlockEventSamplesAtAClassMethod) {
+  EXPECT_EQ(Coverage("class C;\n"
+                     "  function void m; top.v = 3; endfunction\n"
+                     "endclass\n"
+                     "module top;\n"
+                     "  bit [1:0] v; int n, t;\n"
+                     "  covergroup cg @@(begin C::m or end C::m);\n"
+                     "    coverpoint v { bins zero = {0}; bins three = {3}; "
+                     "bins two = {2}; }\n"
+                     "  endgroup\n"
+                     "  cg c = new;\n"
+                     "  initial begin\n"
+                     "    automatic C o = new;\n"
+                     "    v = 0; o.m();\n"
+                     "    void'(c.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=2 t=3\n");
+}
+
+TEST(CovergroupInstanceSim,
+     DISABLED_ABlockEventSamplesAtATaskOfAnotherInstance) {
+  EXPECT_EQ(Coverage("module sub;\n"
+                     "  task tk; top.v = 2; endtask\n"
+                     "endmodule\n"
+                     "module top;\n"
+                     "  bit [1:0] v; int n, t;\n"
+                     "  sub u();\n"
+                     "  covergroup cg @@(begin u.tk);\n"
+                     "    coverpoint v { bins one = {1}; bins two = {2}; }\n"
+                     "  endgroup\n"
+                     "  cg c = new;\n"
+                     "  initial begin\n"
+                     "    v = 1; u.tk();\n"
+                     "    void'(c.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=1 t=2\n");
+}
+
+TEST(CovergroupInstanceSim, AnEndBlockEventSamplesABlockNamedFromTheTop) {
+  EXPECT_EQ(Coverage("module top;\n"
+                     "  bit [1:0] v; int n, t;\n"
+                     "  covergroup cg @@(end top.blk);\n"
+                     "    coverpoint v { bins two = {2}; bins three = {3}; }\n"
+                     "  endgroup\n"
+                     "  cg c = new;\n"
+                     "  initial begin\n"
+                     "    v = 1;\n"
+                     "    begin : blk v = 2; end\n"
+                     "    v = 3;\n"
+                     "    void'(c.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=1 t=2\n");
+}
+
+TEST(CovergroupInstanceSim, AnInputFormalKeepsTheValuePassedAtNew) {
+  EXPECT_EQ(Coverage("module top;\n"
+                     "  int va, v; int n, t;\n"
+                     "  covergroup cg (int lim);\n"
+                     "    coverpoint v { bins b = {lim}; bins z = {1}; }\n"
+                     "  endgroup\n"
+                     "  cg c;\n"
+                     "  initial begin\n"
+                     "    va = 7; c = new(va); va = 1;\n"
+                     "    v = 7; c.sample();\n"
+                     "    void'(c.get_inst_coverage(n, t));\n"
+                     "    $display(\"n=%0d t=%0d\", n, t);\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "n=1 t=2\n");
+}
+
 }  // namespace
