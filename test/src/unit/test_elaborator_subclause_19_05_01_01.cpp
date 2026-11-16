@@ -81,4 +81,17 @@ TEST(CoverpointBinWith, WithExpressionNotIntegralIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
+TEST(CoverpointBinWith, ARealValuedWithExpressionIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins b[] = {[0:15]} with (item * 1.5); }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

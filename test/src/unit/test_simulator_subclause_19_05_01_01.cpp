@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -102,6 +103,94 @@ TEST(CovergroupInstanceSim, WithFilterKeepsMatchingValues) {
           f),
       "n=1 t=4\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+std::string Tally(const std::string& src) {
+  SimFixture f;
+  const std::string kOut = RunCapture(src, f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  return kOut;
+}
+
+std::string OnePoint(const std::string& decls, const std::string& point,
+                     const std::string& samples) {
+  return Tally(
+      "module top;\n"
+      "  int n, t;\n" +
+      decls +
+      "  covergroup cg;\n"
+      "    " +
+      point +
+      "\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n" +
+      samples +
+      "    void'(c.get_inst_coverage(n, t));\n"
+      "    $display(\"%0d %0d\", n, t);\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(BinWithSim, EachInstanceEvaluatesTheWithClauseWithItsOwnFormal) {
+  EXPECT_EQ(Tally("module top;\n"
+                  "  bit [1:0] v; int n, t1, t2;\n"
+                  "  covergroup cg (int lo);\n"
+                  "    coverpoint v { bins b[] = {[0:3]} with (item > lo); }\n"
+                  "  endgroup\n"
+                  "  cg c1 = new(1);\n"
+                  "  cg c2 = new(2);\n"
+                  "  initial begin\n"
+                  "    void'(c1.get_inst_coverage(n, t1));\n"
+                  "    void'(c2.get_inst_coverage(n, t2));\n"
+                  "    $display(\"%0d %0d\", t1, t2);\n"
+                  "  end\n"
+                  "endmodule\n"),
+            "2 1\n");
+}
+
+TEST(BinWithSim, ItemTakesASignedCoverpointsType) {
+  EXPECT_EQ(OnePoint("  byte v;\n",
+                     "coverpoint v { bins m[] = {[-4:3]} with (item < 0); }",
+                     "    v = -2; c.sample(); v = 2; c.sample();\n"),
+            "1 4\n");
+}
+
+TEST(BinWithSim, DISABLED_AFunctionOfItemFiltersAsTheInlineTestDoes) {
+  EXPECT_EQ(OnePoint("  bit [3:0] v;\n"
+                     "  function automatic bit even(int x); return x % 2 == 0; "
+                     "endfunction\n",
+                     "coverpoint v { bins m[] = {[0:15]} with (even(item)); }",
+                     "    v = 3; c.sample(); v = 4; c.sample();\n"),
+            "1 8\n");
+}
+
+TEST(BinWithSim, TheOwnCoverpointNameStandsForEveryValue) {
+  EXPECT_EQ(OnePoint("  bit [3:0] b;\n",
+                     "coverpoint b { bins b[] = b with (item % 2 == 0); }",
+                     "    b = 3; c.sample(); b = 4; c.sample();\n"),
+            "1 8\n");
+}
+
+TEST(BinWithSim, DistributeFirstFiltersAfterTheValuesAreSplit) {
+  EXPECT_EQ(
+      OnePoint("  bit [2:0] v;\n",
+               "type_option.distribute_first = 1;\n"
+               "    coverpoint v { bins b[2] = {[0:7]} with (item < 3); }",
+               "    v = 1; c.sample();\n"),
+      "1 1\n");
+  EXPECT_EQ(OnePoint("  bit [2:0] v;\n",
+                     "coverpoint v { bins b[2] = {[0:7]} with (item < 3); }",
+                     "    v = 1; c.sample();\n"),
+            "1 2\n");
+}
+
+TEST(BinWithSim, TheFilterKeepsDuplicateCandidates) {
+  EXPECT_EQ(
+      OnePoint("  bit [3:0] v;\n",
+               "coverpoint v { bins f[2] = {1, 1, 2, 2} with (item == 1); }",
+               "    v = 1; c.sample();\n"),
+      "2 2\n");
 }
 
 }  // namespace

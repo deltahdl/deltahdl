@@ -59,4 +59,29 @@ TEST(CovergroupInstanceSim, SetExpressionBinsTakeQueueElements) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+TEST(SetExpressionSim, DISABLED_AFormalArrayIsReadWhenTheInstanceIsBuilt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [2:0] v; int n, t;\n"
+                       "  typedef int arr_t[];\n"
+                       "  covergroup cg (input arr_t vals);\n"
+                       "    coverpoint v { bins s[] = vals; }\n"
+                       "  endgroup\n"
+                       "  cg c;\n"
+                       "  initial begin\n"
+                       "    arr_t a;\n"
+                       "    a = '{1, 3, 5, 6};\n"
+                       "    c = new(a);\n"
+                       "    a = '{2};\n"
+                       "    v = 6; c.sample();\n"
+                       "    v = 3; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=2 t=4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace
