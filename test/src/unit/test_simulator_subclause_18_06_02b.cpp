@@ -208,4 +208,169 @@ TEST(PrePostRandomizeRun, AMemberPreRandomizeAllocatesIsSolvedWithTheObject) {
   EXPECT_EQ(out, "0\n");
 }
 
+TEST(PrePostRandomizeRun, AMembersPreSeesItsValuesBeforeTheDraw) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class Inner;\n"
+                 "  rand bit [7:0] v;\n"
+                 "  int seen = -1;\n"
+                 "  constraint c { v > 10; }\n"
+                 "  function void pre_randomize(); seen = v; endfunction\n"
+                 "endclass\n"
+                 "class Outer;\n"
+                 "  rand Inner in;\n"
+                 "  function new(); in = new; endfunction\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  initial begin\n"
+                 "    static Outer o = new;\n"
+                 "    o.in.v = 7;\n"
+                 "    void'(o.randomize());\n"
+                 "    $display(\"%0d %0d\", o.in.seen, o.in.v > 10);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "7 1\n");
+}
+
+const char* const kCounted =
+    "class Inner;\n"
+    "  rand bit [7:0] v;\n"
+    "  int pre_calls = 0, post_calls = 0;\n"
+    "  function void pre_randomize(); pre_calls++; endfunction\n"
+    "  function void post_randomize(); post_calls++; endfunction\n"
+    "endclass\n";
+
+TEST(PrePostRandomizeRun, AMemberTwoDeepRunsEachHookOncePerCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kCounted) +
+                           "class Mid;\n"
+                           "  rand Inner i;\n"
+                           "  function new(); i = new; endfunction\n"
+                           "endclass\n"
+                           "class Root;\n"
+                           "  rand Mid m;\n"
+                           "  function new(); m = new; endfunction\n"
+                           "endclass\n"
+                           "module t;\n"
+                           "  initial begin\n"
+                           "    static Root r = new;\n"
+                           "    void'(r.randomize());\n"
+                           "    void'(r.randomize());\n"
+                           "    $display(\"%0d %0d\", r.m.i.pre_calls, "
+                           "r.m.i.post_calls);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "2 2\n");
+}
+
+TEST(PrePostRandomizeRun, AMemberNotDeclaredRandRunsNoHook) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kCounted) +
+                           "class Root;\n"
+                           "  rand bit [7:0] x;\n"
+                           "  Inner plain;\n"
+                           "  function new(); plain = new; endfunction\n"
+                           "endclass\n"
+                           "module t;\n"
+                           "  initial begin\n"
+                           "    static Root r = new;\n"
+                           "    void'(r.randomize());\n"
+                           "    $display(\"%0d %0d\", r.plain.pre_calls, "
+                           "r.plain.post_calls);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "0 0\n");
+}
+
+TEST(PrePostRandomizeRun, HooksInheritedThroughTwoLevelsRun) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class G;\n"
+                       "  rand bit [7:0] v;\n"
+                       "  int pre_calls = 0, post_calls = 0;\n"
+                       "  function void pre_randomize(); pre_calls++; "
+                       "endfunction\n"
+                       "  function void post_randomize(); post_calls++; "
+                       "endfunction\n"
+                       "endclass\n"
+                       "class P extends G; endclass\n"
+                       "class K extends P; rand bit [7:0] w; endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    static K k = new;\n"
+                       "    void'(k.randomize());\n"
+                       "    $display(\"%0d %0d\", k.pre_calls, k.post_calls);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
+}
+
+const char* const kNonVirtualHooks =
+    "class B;\n"
+    "  rand bit [7:0] v;\n"
+    "  int which = 0;\n"
+    "  function void pre_randomize(); which = 1; endfunction\n"
+    "  function void post_randomize(); which = 2; endfunction\n"
+    "endclass\n"
+    "class D extends B;\n"
+    "  function void pre_randomize(); which = 11; endfunction\n"
+    "  function void post_randomize(); which = 12; endfunction\n"
+    "endclass\n";
+
+TEST(PrePostRandomizeRun, AnExplicitPreThroughABaseHandleRunsTheBases) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kNonVirtualHooks) +
+                           "module t;\n"
+                           "  initial begin\n"
+                           "    static D d = new;\n"
+                           "    static B bh = d;\n"
+                           "    bh.pre_randomize();\n"
+                           "    $display(\"%0d\", d.which);\n"
+                           "    d.pre_randomize();\n"
+                           "    $display(\"%0d\", d.which);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "1\n11\n");
+}
+
+TEST(PrePostRandomizeRun, AnExplicitPostThroughABaseHandleRunsTheBases) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kNonVirtualHooks) +
+                           "module t;\n"
+                           "  initial begin\n"
+                           "    static D d = new;\n"
+                           "    static B bh = d;\n"
+                           "    bh.post_randomize();\n"
+                           "    $display(\"%0d\", d.which);\n"
+                           "    d.post_randomize();\n"
+                           "    $display(\"%0d\", d.which);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "2\n12\n");
+}
+
+TEST(PrePostRandomizeRun, AForkJoinNoneInAHookRunsItsProcess) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  rand bit [7:0] v;\n"
+                       "  int y = 0;\n"
+                       "  function void post_randomize(); fork y = 1; "
+                       "join_none endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    static C c = new;\n"
+                       "    void'(c.randomize());\n"
+                       "    #1 $display(\"%0d\", c.y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
 }  // namespace

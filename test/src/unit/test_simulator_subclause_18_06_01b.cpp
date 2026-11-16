@@ -165,4 +165,39 @@ TEST(RandomizeMethodRun, ACallWrittenWithoutItsListRandomizes) {
   EXPECT_EQ(out, "1 1 9 6 4\n");
 }
 
+TEST(RandomizeMethodRun, AClassWithoutRandomVariablesSucceedsUntouched) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Plain;\n"
+                       "  int a = 5;\n"
+                       "  bit [7:0] b = 8'h3c;\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    static Plain p = new;\n"
+                       "    int ok;\n"
+                       "    ok = p.randomize();\n"
+                       "    $display(\"%0d %0d %0d\", ok, p.a, p.b);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 5 60\n");
+}
+
+TEST(RandomizeMethodRun, ACallWrittenAsAStatementRandomizes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class Item;\n"
+                       "  rand bit [7:0] v;\n"
+                       "  constraint c { v inside {[100:110]}; }\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    static Item it = new;\n"
+                       "    it.randomize();\n"
+                       "    $display(\"%0d\", it.v >= 100 && it.v <= 110);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
 }  // namespace

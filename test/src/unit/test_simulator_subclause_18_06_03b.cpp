@@ -25,7 +25,9 @@ const char* const kRootAndLeaf =
     "  function void post_randomize(); post_calls++; endfunction\n"
     "endclass\n";
 
-std::string RunRootAndLeaf(const std::string& body) {
+std::string RunRootAndLeaf(
+    const std::string& body,
+    const std::string& call = "r.randomize() with (x) { x < 50; }") {
   SimFixture f;
   return RunCapture(std::string(kRootAndLeaf) +
                         "module t;\n"
@@ -33,8 +35,8 @@ std::string RunRootAndLeaf(const std::string& body) {
                         "  initial begin\n"
                         "    static Root r = new;\n"
                         "    r.leaf = new;\n" +
-                        body +
-                        "    ok = r.randomize() with (x) { x < 50; };\n"
+                        body + "    ok = " + call +
+                        ";\n"
                         "    $display(\"%0d %0d %0d %0d %0d\", ok, r.x, "
                         "r.leaf.y, r.post_calls,\n"
                         "             r.leaf.post_calls);\n"
@@ -136,6 +138,31 @@ TEST(RandomizationBehaviorRun, AMembersFailureLeavesTheObjectAsItWas) {
 
 TEST(RandomizationBehaviorRun, AnObjectsFailureLeavesItsMembersAsTheyWere) {
   EXPECT_EQ(RunRootAndLeaf("    r.ceiling = 0;\n"), "0 0 0 0 0\n");
+}
+
+TEST(RandomizationBehaviorRun, APlainCallFailingInAMemberKeepsEveryValue) {
+  EXPECT_EQ(RunRootAndLeaf("    r.x = 7;\n"
+                           "    r.leaf.y = 7;\n"
+                           "    r.leaf.ceiling = 0;\n",
+                           "r.randomize()"),
+            "0 7 7 0 0\n");
+}
+
+TEST(RandomizationBehaviorRun, APlainCallFailingInTheObjectKeepsEveryValue) {
+  EXPECT_EQ(RunRootAndLeaf("    r.x = 7;\n"
+                           "    r.leaf.y = 7;\n"
+                           "    r.ceiling = 0;\n",
+                           "r.randomize()"),
+            "0 7 7 0 0\n");
+}
+
+TEST(RandomizationBehaviorRun, APlainCallThatSucceedsCallsEachPostOnce) {
+  const std::string kOut = RunRootAndLeaf(
+      "    r.x = 7;\n"
+      "    r.leaf.y = 7;\n",
+      "r.randomize()");
+  EXPECT_EQ(kOut.substr(0, 2), "1 ");
+  EXPECT_EQ(kOut.substr(kOut.size() - 4), "1 1\n");
 }
 
 }  // namespace
