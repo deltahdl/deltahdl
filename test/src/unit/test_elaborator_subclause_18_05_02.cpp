@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -441,6 +443,388 @@ TEST(ConstraintInheritance, ExternalBlockSpecifierWithoutPrototypeRejected) {
                             "external constraint block 'C::c' and its "
                             "prototype disagree on dynamic override specifiers",
                             5, "18.5.2"));
+}
+
+void ExpectInheritanceReport(const std::string& classes, const std::string& msg,
+                             int line) {
+  ElabFixture f;
+  ElabOk(classes + "module m;\nendmodule\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, line, "18.5.2"))
+      << classes;
+}
+
+void ExpectInheritanceAccepted(const std::string& classes) {
+  ElabFixture f;
+  EXPECT_TRUE(ElabOk(classes + "module m;\nendmodule\n", f)) << classes;
+}
+
+const char* const kDisagree =
+    "external constraint block 'C::c' and its prototype disagree on dynamic "
+    "override specifiers";
+const char* const kBase =
+    "class B;\n"
+    "  rand int x;\n"
+    "  constraint c { x > 0; }\n"
+    "endclass\n";
+
+TEST(ConstraintSpecifierAgreement, InitialOnTheBlockOnlyRejected) {
+  ExpectInheritanceReport(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint c;\n"
+      "endclass\n"
+      "constraint :initial C::c { x > 0; }\n",
+      kDisagree, 5);
+}
+
+TEST(ConstraintSpecifierAgreement, ExtendsOnTheBlockOnlyRejected) {
+  ExpectInheritanceReport(std::string(kBase) +
+                              "class C extends B;\n"
+                              "  constraint c;\n"
+                              "endclass\n"
+                              "constraint :extends C::c { x > 1; }\n",
+                          kDisagree, 8);
+}
+
+TEST(ConstraintSpecifierAgreement, InitialPrototypeWithExtendsBlockRejected) {
+  ExpectInheritanceReport(std::string(kBase) +
+                              "class C extends B;\n"
+                              "  constraint :initial c;\n"
+                              "endclass\n"
+                              "constraint :extends C::c { x > 1; }\n",
+                          kDisagree, 8);
+}
+
+TEST(ConstraintSpecifierAgreement,
+     InitialFinalPrototypeWithInitialBlockRejected) {
+  ExpectInheritanceReport(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint :initial :final c;\n"
+      "endclass\n"
+      "constraint :initial C::c { x > 0; }\n",
+      kDisagree, 5);
+}
+
+TEST(ConstraintSpecifierAgreement, ExternFinalPrototypeWithPlainBlockRejected) {
+  ExpectInheritanceReport(
+      "class C;\n"
+      "  rand int x;\n"
+      "  extern constraint :final c;\n"
+      "endclass\n"
+      "constraint C::c { x > 0; }\n",
+      kDisagree, 5);
+}
+
+TEST(ConstraintSpecifierAgreement, MatchingCombinedSpecifiersAccepted) {
+  ExpectInheritanceAccepted(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint :initial :final c;\n"
+      "endclass\n"
+      "constraint :initial :final C::c { x > 0; }\n");
+  ExpectInheritanceAccepted(std::string(kBase) +
+                            "class C extends B;\n"
+                            "  constraint :extends :final c;\n"
+                            "endclass\n"
+                            "constraint :extends :final C::c { x > 1; }\n");
+}
+
+const char* const kFinalBase =
+    "class B;\n"
+    "  rand int x;\n"
+    "  constraint :final c { x > 0; }\n"
+    "endclass\n";
+const char* const kReplacesFinal =
+    "constraint 'c' replaces a base class constraint declared ':final'";
+
+TEST(FinalConstraintReplacement, ReplacedByAPrototypeRejected) {
+  ExpectInheritanceReport(std::string(kFinalBase) +
+                              "class D extends B;\n"
+                              "  constraint c;\n"
+                              "endclass\n"
+                              "constraint D::c { x > 1; }\n",
+                          kReplacesFinal, 6);
+}
+
+TEST(FinalConstraintReplacement, ReplacedByAnExtendsBlockRejected) {
+  ExpectInheritanceReport(std::string(kFinalBase) +
+                              "class D extends B;\n"
+                              "  constraint :extends c { x > 1; }\n"
+                              "endclass\n",
+                          kReplacesFinal, 6);
+}
+
+TEST(FinalConstraintReplacement, ReplacedByAPureConstraintRejected) {
+  ExpectInheritanceReport(std::string(kFinalBase) +
+                              "virtual class D extends B;\n"
+                              "  pure constraint c;\n"
+                              "endclass\n",
+                          kReplacesFinal, 6);
+}
+
+TEST(FinalConstraintReplacement, ReplacedInAGrandchildRejected) {
+  ExpectInheritanceReport(std::string(kFinalBase) +
+                              "class M extends B;\n"
+                              "endclass\n"
+                              "class D extends M;\n"
+                              "  constraint c { x > 1; }\n"
+                              "endclass\n",
+                          kReplacesFinal, 8);
+}
+
+TEST(FinalConstraintReplacement, AFinalPrototypeCompletedThenReplacedRejected) {
+  ExpectInheritanceReport(
+      "class B;\n"
+      "  rand int x;\n"
+      "  constraint :final c;\n"
+      "endclass\n"
+      "constraint :final B::c { x > 0; }\n"
+      "class D extends B;\n"
+      "  constraint c { x > 1; }\n"
+      "endclass\n",
+      kReplacesFinal, 7);
+}
+
+const char* const kExtendsNothing =
+    "constraint 'c' declared ':extends' does not override a constraint in a "
+    "base class";
+const char* const kNoCBase =
+    "class B;\n"
+    "  rand int x;\n"
+    "endclass\n";
+
+TEST(ExtendsConstraintOverride, AnExtendsPrototypeWithNoBaseRejected) {
+  ExpectInheritanceReport(std::string(kNoCBase) +
+                              "class D extends B;\n"
+                              "  constraint :extends c;\n"
+                              "endclass\n"
+                              "constraint :extends D::c { x > 0; }\n",
+                          kExtendsNothing, 5);
+}
+
+TEST(ExtendsConstraintOverride, ExtendsFinalWithNoBaseRejected) {
+  ExpectInheritanceReport(std::string(kNoCBase) +
+                              "class D extends B;\n"
+                              "  constraint :extends :final c { x > 0; }\n"
+                              "endclass\n",
+                          kExtendsNothing, 5);
+}
+
+TEST(ExtendsConstraintOverride, ExtendsInAClassExtendingNothingRejected) {
+  ExpectInheritanceReport(
+      "class D;\n"
+      "  rand int x;\n"
+      "  constraint :extends c { x > 0; }\n"
+      "endclass\n",
+      kExtendsNothing, 3);
+}
+
+TEST(ExtendsConstraintOverride, ExtendsOverridingAGrandparentAccepted) {
+  ExpectInheritanceAccepted(std::string(kBase) +
+                            "class M extends B;\n"
+                            "endclass\n"
+                            "class D extends M;\n"
+                            "  constraint :extends c { x > 1; }\n"
+                            "endclass\n");
+}
+
+const char* const kInitialOverrides =
+    "constraint 'c' declared ':initial' overrides a constraint of the same "
+    "name in a base class";
+
+TEST(InitialConstraintOverride, AnInitialPrototypeOverridingRejected) {
+  ExpectInheritanceReport(std::string(kBase) +
+                              "class D extends B;\n"
+                              "  constraint :initial c;\n"
+                              "endclass\n"
+                              "constraint :initial D::c { x > 1; }\n",
+                          kInitialOverrides, 6);
+}
+
+TEST(InitialConstraintOverride, AnInitialBlockOverridingAGrandparentRejected) {
+  ExpectInheritanceReport(std::string(kBase) +
+                              "class M extends B;\n"
+                              "endclass\n"
+                              "class D extends M;\n"
+                              "  constraint :initial c { x > 1; }\n"
+                              "endclass\n",
+                          kInitialOverrides, 8);
+}
+
+TEST(InitialConstraintOverride, InitialFinalOverridingRejected) {
+  ExpectInheritanceReport(std::string(kBase) +
+                              "class D extends B;\n"
+                              "  constraint :initial :final c { x > 1; }\n"
+                              "endclass\n",
+                          kInitialOverrides, 6);
+}
+
+TEST(InitialConstraintOverride, AnInitialPureConstraintOverridingRejected) {
+  ExpectInheritanceReport(std::string(kBase) +
+                              "virtual class D extends B;\n"
+                              "  pure constraint :initial c;\n"
+                              "endclass\n",
+                          kInitialOverrides, 6);
+}
+
+TEST(InitialConstraintOverride, AnInitialPrototypeOnANewNameAccepted) {
+  ExpectInheritanceAccepted(std::string(kBase) +
+                            "class D extends B;\n"
+                            "  constraint :initial k;\n"
+                            "endclass\n"
+                            "constraint :initial D::k { x > 1; }\n");
+}
+
+const char* const kConflictsWithPure =
+    "constraint 'c' in class 'C' conflicts with a pure constraint of the same "
+    "name";
+
+TEST(PureConstraintConflicts, AnExternPrototypeOfTheNameRejected) {
+  ExpectInheritanceReport(
+      "virtual class C;\n"
+      "  rand int x;\n"
+      "  pure constraint c;\n"
+      "  extern constraint c;\n"
+      "endclass\n",
+      kConflictsWithPure, 4);
+}
+
+TEST(PureConstraintConflicts, AStaticBlockBesideAPureStaticRejected) {
+  ExpectInheritanceReport(
+      "virtual class C;\n"
+      "  rand int x;\n"
+      "  pure static constraint c;\n"
+      "  static constraint c { x > 0; }\n"
+      "endclass\n",
+      kConflictsWithPure, 4);
+}
+
+TEST(PureConstraintConflicts, ADifferentlyNamedBlockAccepted) {
+  ExpectInheritanceAccepted(
+      "virtual class C;\n"
+      "  rand int x;\n"
+      "  pure constraint c;\n"
+      "  constraint k { x > 0; }\n"
+      "endclass\n");
+}
+
+TEST(PureConstraintObligation, AGrandchildThroughAnAbstractClassRejected) {
+  ExpectInheritanceReport(
+      "virtual class B;\n"
+      "  rand int x;\n"
+      "  pure constraint c;\n"
+      "endclass\n"
+      "virtual class M extends B;\n"
+      "endclass\n"
+      "class D extends M;\n"
+      "endclass\n",
+      "non-abstract class 'D' does not implement inherited pure constraint 'c'",
+      7);
+}
+
+TEST(PureConstraintObligation, OneOfTwoPureConstraintsMissingRejected) {
+  ElabFixture f;
+  ElabOk(
+      "virtual class B;\n"
+      "  rand int x;\n"
+      "  pure constraint c;\n"
+      "  pure constraint k;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  constraint c { x > 0; }\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "non-abstract class 'D' does not implement inherited pure constraint 'k'",
+      6, "18.5.2"));
+  for (const auto& d : f.diag.Diagnostics()) {
+    EXPECT_EQ(d.message.find("pure constraint 'c'"), std::string::npos)
+        << d.message;
+  }
+}
+
+TEST(PureConstraintObligation, AConstraintRedeclaredPureMustBeImplemented) {
+  ExpectInheritanceReport(
+      std::string(kBase) +
+          "virtual class M extends B;\n"
+          "  pure constraint c;\n"
+          "endclass\n"
+          "class D extends M;\n"
+          "endclass\n",
+      "non-abstract class 'D' does not implement inherited pure constraint 'c'",
+      8);
+}
+
+const char* const kNeedsAbstract =
+    "pure constraint 'c' needs an abstract class, and class 'C' is not "
+    "declared virtual";
+
+TEST(PureConstraintPlacement, ANonAbstractClassExtendingAVirtualRejected) {
+  ExpectInheritanceReport(
+      "virtual class B;\n"
+      "  rand int x;\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "  pure constraint c;\n"
+      "endclass\n",
+      kNeedsAbstract, 5);
+}
+
+TEST(PureConstraintPlacement, ANonAbstractClassExtendingAConcreteRejected) {
+  ExpectInheritanceReport(std::string(kNoCBase) +
+                              "class C extends B;\n"
+                              "  pure constraint c;\n"
+                              "endclass\n",
+                          kNeedsAbstract, 5);
+}
+
+TEST(PureConstraintPlacement, InAPackageAModuleAndANestedClassRejected) {
+  ElabFixture f;
+  ElabOk(
+      "package p;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    pure constraint c;\n"
+      "  endclass\n"
+      "endpackage\n"
+      "class O;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    pure constraint c;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    pure constraint c;\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  for (int line : {4, 10, 16}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNeedsAbstract, line, "18.5.2"))
+        << line;
+  }
+}
+
+TEST(PureConstraintPlacement, AnAbstractClassExtendingAConcreteAccepted) {
+  ExpectInheritanceAccepted(std::string(kNoCBase) +
+                            "virtual class C extends B;\n"
+                            "  pure constraint c;\n"
+                            "endclass\n");
+}
+
+TEST(PureConstraintPlacement, APureStaticInANonAbstractClassRejected) {
+  ExpectInheritanceReport(
+      "class C;\n"
+      "  rand int x;\n"
+      "  pure static constraint c;\n"
+      "endclass\n",
+      kNeedsAbstract, 3);
 }
 
 }  // namespace

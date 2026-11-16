@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "fixture_parser.h"
@@ -53,6 +54,43 @@ TEST(ConstraintInheritanceParsing, ExtendsFinalCombinationRecorded) {
   ASSERT_NE(m, nullptr);
   EXPECT_TRUE(m->is_constraint_extends);
   EXPECT_TRUE(m->is_constraint_final);
+}
+
+void ExpectBothSpecifiersRejected(const std::string& member, int line,
+                                  std::string_view message,
+                                  const char* subclause = "18.5") {
+  auto r = Parse(
+      "class B;\n  rand int x;\n  constraint c { x > 0; }\nendclass\n"
+      "virtual class C extends B;\n" +
+      member +
+      "endclass\n"
+      "constraint :initial :extends C::k { x > 0; }\n");
+  EXPECT_TRUE(ReportedError(r.diags, message, line, subclause)) << member;
+}
+
+TEST(ConstraintInheritanceParsing, ExtendsBeforeInitialOnABlockRejected) {
+  ExpectBothSpecifiersRejected("  constraint :extends :initial c { x > 1; }\n",
+                               6, "expected identifier, got 'initial'");
+}
+
+TEST(ConstraintInheritanceParsing, InitialExtendsOnAPrototypeRejected) {
+  ExpectBothSpecifiersRejected("  constraint :initial :extends c;\n", 6,
+                               "expected identifier, got 'extends'");
+}
+
+TEST(ConstraintInheritanceParsing, ExtendsInitialOnAnExternPrototypeRejected) {
+  ExpectBothSpecifiersRejected("  extern constraint :extends :initial c;\n", 6,
+                               "expected identifier, got 'initial'");
+}
+
+TEST(ConstraintInheritanceParsing, InitialExtendsOnAPureConstraintRejected) {
+  ExpectBothSpecifiersRejected("  pure constraint :initial :extends c;\n", 6,
+                               "expected identifier, got 'extends'");
+}
+
+TEST(ConstraintInheritanceParsing, InitialExtendsOnAnExternalBlockRejected) {
+  ExpectBothSpecifiersRejected("  extern constraint k;\n", 8,
+                               "expected identifier, got 'extends'", "18.5.1");
 }
 
 }  // namespace
