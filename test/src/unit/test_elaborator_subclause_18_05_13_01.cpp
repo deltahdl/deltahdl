@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
+#include "helpers_constraint_item_places.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -123,6 +126,76 @@ TEST(SoftConstraintVariable, SoftOnInheritedRandcRejected) {
       f.diag.Diagnostics(),
       "a soft constraint may not be specified on randc variable 'cy'", 6,
       "18.5.13.1"));
+}
+
+constexpr ItemPlace kClassPlaces[] = {
+    ItemPlace::kClassBlock, ItemPlace::kOutOfBlock, ItemPlace::kInline};
+
+const char* const kRandcDecl =
+    "randc bit [3:0] x; randc bit [1:0] ra[2]; rand bit g; rand int y; rand "
+    "bit [1:0] ry[2];";
+
+void ExpectRandcSoftReported(ItemPlace place, const std::string& item,
+                             const std::string& name) {
+  ElabFixture f;
+  ElabOk(ItemIn(place, kRandcDecl, item), f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "a soft constraint may not be specified on randc variable '" + name + "'",
+      5, "18.5.13.1"))
+      << ItemPlaceName(place) << ": " << item;
+}
+
+void ExpectSoftAccepted(ItemPlace place, const std::string& item) {
+  EXPECT_TRUE(ElabOk(ItemIn(place, kRandcDecl, item)))
+      << ItemPlaceName(place) << ": " << item;
+}
+
+TEST(SoftConstraintVariable, ASoftOnARandcVariableIsRejectedInEveryConstruct) {
+  for (ItemPlace place : {ItemPlace::kClassBlock, ItemPlace::kOutOfBlock}) {
+    ExpectRandcSoftReported(place, "soft x == 3;", "x");
+    ExpectRandcSoftReported(place, "g -> soft x == 3;", "x");
+    ExpectRandcSoftReported(place, "if (g) soft x == 3;", "x");
+    ExpectRandcSoftReported(place, "if (g) y == 1; else soft x == 3;", "x");
+    ExpectRandcSoftReported(place, "foreach (ra[i]) soft ra[i] == 1;", "ra");
+  }
+}
+
+TEST(SoftConstraintVariable,
+     DISABLED_ASoftOnARandcVariableIsRejectedInRandomizeWith) {
+  ExpectRandcSoftReported(ItemPlace::kInline, "soft x == 3;", "x");
+  ExpectRandcSoftReported(ItemPlace::kInline, "g -> soft x == 3;", "x");
+  ExpectRandcSoftReported(ItemPlace::kInline,
+                          "foreach (ra[i]) soft ra[i] == 1;", "ra");
+}
+
+TEST(SoftConstraintVariable, ASoftOnARandVariableIsAcceptedInEveryConstruct) {
+  for (ItemPlace place : kClassPlaces) {
+    for (const char* item :
+         {"soft y == 3;", "g -> soft y == 3;", "if (g) soft y == 3;",
+          "if (g) x == 1; else soft y == 3;",
+          "foreach (ry[i]) soft ry[i] == 1;"}) {
+      ExpectSoftAccepted(place, item);
+    }
+  }
+}
+
+TEST(SoftConstraintVariable, DISABLED_ASoftOnARandcMemberOfAHandleIsRejected) {
+  for (ItemPlace place : kClassPlaces) {
+    ElabFixture f;
+    ElabOk(ItemIn(place, "rand D h; rand int z;", "soft h.x == 3;",
+                  "class D; randc bit [3:0] x; rand bit [3:0] w; endclass"),
+           f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "a soft constraint may not be specified on randc variable 'h.x'", 6,
+        "18.5.13.1"))
+        << ItemPlaceName(place);
+    EXPECT_TRUE(ElabOk(ItemIn(place, "rand D h; rand int z;", "soft h.w == 3;",
+                              "class D; randc bit [3:0] x; rand bit [3:0] w; "
+                              "endclass")))
+        << ItemPlaceName(place);
+  }
 }
 
 }  // namespace

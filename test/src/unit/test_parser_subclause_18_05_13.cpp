@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "fixture_parser.h"
+#include "helpers_constraint_item_places.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 
 using namespace delta;
@@ -62,6 +65,40 @@ TEST(SoftConstraintParsing, DisableSoftOnAnArraysSizeIsRecorded) {
   ASSERT_EQ(m->constraint_disable_soft_refs.size(), 2u);
   EXPECT_EQ(m->constraint_disable_soft_refs[0].name, "a.size");
   EXPECT_EQ(m->constraint_disable_soft_refs[1].name, "b.size");
+}
+
+const char* const kSoftDecl = "bit [3:0] x, z; bit mode; int length; int a[4];";
+const char* const kItemsDoNotParse =
+    "the constraint block's items do not parse from here";
+
+void ExpectSoftRejected(ItemPlace place, const std::string& item) {
+  auto r = Parse(ItemIn(place, kSoftDecl, item));
+  EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 5, "A.1.10"))
+      << ItemPlaceName(place) << ": " << item;
+}
+
+void ExpectSoftAccepted(ItemPlace place, const std::string& item) {
+  auto r = Parse(ItemIn(place, kSoftDecl, item));
+  EXPECT_FALSE(r.has_errors) << ItemPlaceName(place) << ": " << item;
+}
+
+TEST(SoftConstraintParsing, SoftBeforeABraceIsRejectedEverywhere) {
+  for (ItemPlace place : kEveryItemPlace) {
+    ExpectSoftRejected(place, "soft { x == 3; }");
+    ExpectSoftRejected(place, "soft mode -> { length == 1024; }");
+  }
+}
+
+TEST(SoftConstraintParsing, SoftBeforeAnExpressionIsAcceptedEverywhere) {
+  for (ItemPlace place : kEveryItemPlace) {
+    for (const char* item :
+         {"soft x == 3;", "soft mode -> length == 1024;",
+          "soft x dist {1 := 1, [2:3] :/ 2};", "soft x inside {1, [4:6]};",
+          "if (mode) soft x == 3;", "if (mode) z == 0; else soft x == 3;",
+          "mode -> soft x == 3;", "foreach (a[i]) soft a[i] == i;"}) {
+      ExpectSoftAccepted(place, item);
+    }
+  }
 }
 
 }  // namespace
