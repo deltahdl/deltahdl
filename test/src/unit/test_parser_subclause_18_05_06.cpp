@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -58,6 +61,51 @@ TEST(ConstraintIfElseParsing, DanglingElseNestedFormAccepted) {
       " else len > 100; }\n"
       "endclass\n");
   EXPECT_FALSE(r.has_errors);
+}
+
+ParseResult ParseIfElseConstraint(const std::string& body) {
+  return Parse(
+      "class C;\n"
+      "  rand bit [3:0] p, q;\n"
+      "  constraint ie { " +
+      body +
+      " }\n"
+      "endclass\n");
+}
+
+TEST(ConstraintIfElseParsing, AnOutOfBlockIfElseIsAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand bit [3:0] p, q;\n"
+      "  constraint ie;\n"
+      "endclass\n"
+      "constraint C::ie { if (p > 3) q == 1; else { q == 2; } }\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ConstraintIfElseParsing, EmptyBracedSetsAreAccepted) {
+  EXPECT_FALSE(ParseIfElseConstraint("if (p > 3) {} else {}").has_errors);
+}
+
+TEST(ConstraintIfElseParsing, AConditionWithoutParenthesesIsRejected) {
+  auto r = ParseIfElseConstraint("if p q == 1;");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "the constraint block's items do not parse from here", 3,
+      "A.1.10"));
+}
+
+TEST(ConstraintIfElseParsing, AnEmptyThenSetIsRejected) {
+  auto r = ParseIfElseConstraint("if (p > 3) ;");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "the constraint block's items do not parse from here", 3,
+      "A.1.10"));
+}
+
+TEST(ConstraintIfElseParsing, AnEmptyElseSetIsRejected) {
+  auto r = ParseIfElseConstraint("if (p > 3) q == 1; else ;");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "the constraint block's items do not parse from here", 3,
+      "A.1.10"));
 }
 
 }  // namespace
