@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "fixture_parser.h"
+#include "helpers_constraint_item_places.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 
 using namespace delta;
@@ -112,6 +115,57 @@ TEST(SolveBeforeOrdering, ADottedPrimaryKeepsItsHandles) {
   EXPECT_TRUE(before[1].handles.empty());
   EXPECT_TRUE(before[2].handles.empty());
   EXPECT_TRUE(before[3].handles.empty());
+}
+
+const char* OrderedVars(ItemPlace place) {
+  return place == ItemPlace::kScope ? "int a, b, c, z;"
+                                    : "rand int a, b, c, z;";
+}
+
+TEST(SolveBeforeOrdering, AnOrderingWithListsParsesInEveryPlace) {
+  for (ItemPlace place : kEveryItemPlace) {
+    auto r =
+        Parse(ItemIn(place, OrderedVars(place), "solve a, b before c, z;"));
+    EXPECT_FALSE(r.has_errors) << ItemPlaceName(place);
+  }
+}
+
+TEST(SolveBeforeOrdering, AnOrderingBesideValueConstraintsParsesInEveryPlace) {
+  for (ItemPlace place : kEveryItemPlace) {
+    auto r = Parse(ItemIn(place, OrderedVars(place),
+                          "a -> b == 0; solve a before b, c; z > a;"));
+    EXPECT_FALSE(r.has_errors) << ItemPlaceName(place);
+  }
+}
+
+void ExpectMalformedOrdering(const std::string& item) {
+  for (ItemPlace place : kEveryItemPlace) {
+    auto r = Parse(ItemIn(place, OrderedVars(place), item));
+    EXPECT_TRUE(ReportedError(
+        r.diags, "the constraint block's items do not parse from here", 5,
+        "A.1.10"))
+        << ItemPlaceName(place) << ": " << item;
+  }
+}
+
+TEST(SolveBeforeOrdering, AnOrderingWithoutBeforeIsRejectedInEveryPlace) {
+  ExpectMalformedOrdering("solve a b;");
+}
+
+TEST(SolveBeforeOrdering, AnEmptyBeforeListIsRejectedInEveryPlace) {
+  ExpectMalformedOrdering("solve before b;");
+}
+
+TEST(SolveBeforeOrdering, AnEmptyAfterListIsRejectedInEveryPlace) {
+  ExpectMalformedOrdering("solve a before;");
+}
+
+TEST(SolveBeforeOrdering, AnOrderingWithoutItsSemicolonIsRejectedInEveryPlace) {
+  ExpectMalformedOrdering("solve a before b z > 0;");
+}
+
+TEST(SolveBeforeOrdering, ATrailingCommaInAListIsRejectedInEveryPlace) {
+  ExpectMalformedOrdering("solve a, before b;");
 }
 
 }  // namespace

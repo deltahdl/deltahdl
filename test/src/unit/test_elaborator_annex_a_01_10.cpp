@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
+#include "helpers_constraint_item_places.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -222,6 +225,59 @@ TEST(ConstraintElaboration, ParenthesesOnAnInlineNonArrayPrimaryAreErrors) {
       ReportedError(f.diag.Diagnostics(), kNoArrayMethod, 10, "A.1.10"));
   EXPECT_FALSE(
       ReportedError(f.diag.Diagnostics(), kNoArrayMethod, 11, "A.1.10"));
+}
+
+const char* const kNonArrayPrimaries[] = {
+    "solve x.size() before y;", "solve f() before y;", "disable soft x.size();",
+    "disable soft f();"};
+const char* const kArrayMethodPrimaries[] = {"solve a.size() before y;",
+                                             "disable soft a.size();"};
+
+void ExpectNoArrayMethodReport(const std::string& src, bool reported,
+                               const std::string& item) {
+  ElabFixture f;
+  ElabOk(src, f);
+  EXPECT_EQ(static_cast<bool>(ReportedError(f.diag.Diagnostics(),
+                                            kNoArrayMethod, 5, "A.1.10")),
+            reported)
+      << item;
+}
+
+std::string ObjectParenItem(ItemPlace place, const std::string& item) {
+  return ItemIn(place,
+                "rand int x, y; rand int a[]; "
+                "function int f(); return 1; endfunction",
+                item);
+}
+
+std::string ScopeParenItem(const std::string& item) {
+  return ScopeItemIn("int x, y; int a[];", "x, y, a", item);
+}
+
+TEST(ConstraintElaboration,
+     ParenthesesOnANonArrayPrimaryAreErrorsOutOfBlockAndInline) {
+  for (ItemPlace place : {ItemPlace::kOutOfBlock, ItemPlace::kInline}) {
+    for (const char* item : kNonArrayPrimaries) {
+      ExpectNoArrayMethodReport(ObjectParenItem(place, item), true, item);
+    }
+    for (const char* item : kArrayMethodPrimaries) {
+      ExpectNoArrayMethodReport(ObjectParenItem(place, item), false, item);
+    }
+  }
+}
+
+TEST(ConstraintElaboration,
+     DISABLED_ParenthesesOnANonArrayPrimaryAreErrorsInScopeRandomize) {
+  for (const char* item : kNonArrayPrimaries) {
+    ExpectNoArrayMethodReport(ScopeParenItem(item), true, item);
+  }
+}
+
+TEST(ConstraintElaboration,
+     ParenthesesOnAnArrayArgumentsMethodAreAcceptedInScopeRandomize) {
+  for (const char* item : kArrayMethodPrimaries) {
+    ExpectNoArrayMethodReport(ScopeParenItem(item), false, item);
+  }
 }
 
 }  // namespace

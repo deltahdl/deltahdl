@@ -30,6 +30,21 @@ inline const char* ItemPlaceName(ItemPlace place) {
   }
 }
 
+inline std::string ScopeItemIn(const std::string& decl, const std::string& args,
+                               const std::string& item,
+                               const std::string& prefix = "") {
+  const std::string kHead = prefix.empty() ? "" : prefix + "\n";
+  return kHead + "module t;\n  " + decl +
+         "\n"
+         "  function int f(); return 1; endfunction\n"
+         "  initial begin\n"
+         "    void'(std::randomize(" +
+         args + ") with { " + item +
+         " });\n"
+         "  end\n"
+         "endmodule\n";
+}
+
 inline std::string ItemIn(ItemPlace place, const std::string& decl,
                           const std::string& item,
                           const std::string& prefix = "") {
@@ -54,15 +69,7 @@ inline std::string ItemIn(ItemPlace place, const std::string& decl,
              " }); end\n"
              "endmodule\n";
     case ItemPlace::kScope:
-      return kHead + "module t;\n  " + decl +
-             "\n"
-             "  function int f(); return 1; endfunction\n"
-             "  initial begin\n"
-             "    void'(std::randomize(z) with { " +
-             item +
-             " });\n"
-             "  end\n"
-             "endmodule\n";
+      return ScopeItemIn(decl, "z", item, prefix);
     default:
       return kHead + "class C;\n  " + decl +
              "\n"
