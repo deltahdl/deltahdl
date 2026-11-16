@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -186,6 +189,148 @@ TEST(StaticConstraint, NonStaticPureOverriddenByNonStaticAccepted) {
              "endclass\n"
              "module m;\n"
              "endmodule\n"));
+}
+
+void ExpectStaticReport(const std::string& src, const char* message,
+                        uint32_t line) {
+  ElabFixture f;
+  EXPECT_FALSE(ElabOk(src, f)) << src;
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, line, "18.5.10"))
+      << src;
+}
+
+const char* const kBodyDisagrees =
+    "external constraint block 'C::c' and its prototype disagree on the "
+    "'static' qualifier";
+const char* const kOverrideMismatch =
+    "constraint 'c' overriding a pure constraint shall match its 'static' "
+    "qualification";
+
+std::string ExternPrototype(const std::string& prototype,
+                            const std::string& body) {
+  return "class C;\n"
+         "  rand int x;\n"
+         "  " +
+         prototype +
+         "\n"
+         "endclass\n" +
+         body +
+         " { x > 0; }\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+TEST(StaticConstraint, AnExternStaticPrototypeWithANonStaticBodyIsRejected) {
+  ExpectStaticReport(
+      ExternPrototype("extern static constraint c;", "constraint C::c"),
+      kBodyDisagrees, 5);
+}
+
+TEST(StaticConstraint, AnExternPrototypeWithAStaticBodyIsRejected) {
+  ExpectStaticReport(
+      ExternPrototype("extern constraint c;", "static constraint C::c"),
+      kBodyDisagrees, 5);
+}
+
+TEST(StaticConstraint, AnExternStaticPrototypeWithAStaticBodyIsAccepted) {
+  EXPECT_TRUE(ElabOk(ExternPrototype("extern static constraint c;",
+                                     "static constraint C::c")));
+}
+
+TEST(StaticConstraint, AStaticPrototypeWithADynamicOverrideIsRejected) {
+  ExpectStaticReport(
+      ExternPrototype("static constraint :initial c;",
+                      "static constraint :initial C::c"),
+      "static constraint 'c' shall not carry a dynamic override specifier", 3);
+}
+
+std::string PureOverride(const std::string& pure,
+                         const std::string& derived_items,
+                         const std::string& after = "") {
+  return "virtual class B;\n"
+         "  rand int x;\n"
+         "  " +
+         pure +
+         "\n"
+         "endclass\n"
+         "class D extends B;\n"
+         "  " +
+         derived_items +
+         "\n"
+         "endclass\n" +
+         after +
+         "module m;\n"
+         "endmodule\n";
+}
+
+TEST(StaticConstraint, AStaticPureOverriddenByANonStaticPrototypeIsRejected) {
+  ExpectStaticReport(PureOverride("pure static constraint c;", "constraint c;",
+                                  "constraint D::c { x > 0; }\n"),
+                     kOverrideMismatch, 6);
+}
+
+TEST(StaticConstraint, AStaticPureOverriddenByAStaticPrototypeIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk(PureOverride("pure static constraint c;", "static constraint c;",
+                          "static constraint D::c { x > 0; }\n")));
+}
+
+std::string AbstractRedeclaration(const std::string& redeclared) {
+  return "virtual class B;\n"
+         "  rand int x;\n"
+         "  pure static constraint c;\n"
+         "endclass\n"
+         "virtual class D extends B;\n"
+         "  " +
+         redeclared +
+         "\n"
+         "endclass\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+TEST(StaticConstraint, DISABLED_AStaticPureRedeclaredPureNonStaticIsRejected) {
+  ExpectStaticReport(AbstractRedeclaration("pure constraint c;"),
+                     kOverrideMismatch, 6);
+}
+
+TEST(StaticConstraint, AStaticPureRedeclaredPureStaticIsAccepted) {
+  EXPECT_TRUE(ElabOk(AbstractRedeclaration("pure static constraint c;")));
+}
+
+std::string TwoLevelOverride(const std::string& pure,
+                             const std::string& block) {
+  return "virtual class B;\n"
+         "  rand int x;\n"
+         "  " +
+         pure +
+         "\n"
+         "endclass\n"
+         "virtual class M extends B;\n"
+         "endclass\n"
+         "class D extends M;\n"
+         "  " +
+         block +
+         "\n"
+         "endclass\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+TEST(StaticConstraint, AnOverrideTwoLevelsDownIsHeldToThePureQualification) {
+  ExpectStaticReport(
+      TwoLevelOverride("pure static constraint c;", "constraint c { x > 0; }"),
+      kOverrideMismatch, 8);
+  ExpectStaticReport(
+      TwoLevelOverride("pure constraint c;", "static constraint c { x > 0; }"),
+      kOverrideMismatch, 8);
+}
+
+TEST(StaticConstraint, AMatchingOverrideTwoLevelsDownIsAccepted) {
+  EXPECT_TRUE(ElabOk(TwoLevelOverride("pure static constraint c;",
+                                      "static constraint c { x > 0; }")));
+  EXPECT_TRUE(ElabOk(
+      TwoLevelOverride("pure constraint c;", "constraint c { x > 0; }")));
 }
 
 }  // namespace
