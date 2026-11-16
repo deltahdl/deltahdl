@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "elaborator/covergroup_inheritance.h"
@@ -241,6 +242,72 @@ TEST(EmbeddedCovergroupInheritance, ADerivedCrossOfAnUnknownNameIsRefused) {
                             "cross item 'zz' is neither a coverpoint of "
                             "covergroup 'g1' nor a variable",
                             9, "19.6"));
+}
+
+const char* const kNoBase =
+    "derived covergroup cannot extend 'g': no covergroup of that name is "
+    "defined in a base class";
+
+TEST(EmbeddedCovergroupInheritance, ACovergroupOfTheEnclosingClassIsNoBase) {
+  ElabFixture f;
+  ElabOk(
+      "class b; endclass\n"
+      "class d extends b;\n"
+      "  bit x;\n"
+      "  covergroup g; coverpoint x; endgroup\n"
+      "  covergroup extends g; coverpoint x; endgroup\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoBase, 5, "19.4.1"));
+}
+
+TEST(EmbeddedCovergroupInheritance, ABaseVariableOfTheNameIsNoBase) {
+  ElabFixture f;
+  ElabOk(
+      "class b; int g; endclass\n"
+      "class d extends b;\n"
+      "  bit x;\n"
+      "  covergroup extends g; coverpoint x; endgroup\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoBase, 4, "19.4.1"));
+}
+
+std::string ScopedClasses(const char* keyword, const char* base_body) {
+  return std::string(keyword) +
+         " q;\n"
+         "  class b; " +
+         base_body +
+         " endclass\n"
+         "  class d extends b;\n"
+         "    bit x;\n"
+         "    covergroup extends g; coverpoint x; endgroup\n"
+         "  endclass\n"
+         "end" +
+         keyword +
+         "\n"
+         "module top; endmodule\n";
+}
+
+TEST(EmbeddedCovergroupInheritance,
+     DISABLED_ExtendingANameNoBaseDefinesIsErrorInAPackageOrModule) {
+  for (const char* keyword : {"package", "module"}) {
+    ElabFixture f;
+    ElabOk(ScopedClasses(keyword, ""), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoBase, 5, "19.4.1"))
+        << keyword;
+  }
+}
+
+TEST(EmbeddedCovergroupInheritance, ExtendingABaseCovergroupInAPackageIsOk) {
+  ElabFixture f;
+  ElabOk(ScopedClasses("package",
+                       "bit y; covergroup g; coverpoint y; endgroup "
+                       "function new(); g = new; endfunction"),
+         f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace
