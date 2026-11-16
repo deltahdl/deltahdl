@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -127,6 +129,209 @@ TEST(ConstraintBlock, MalformedConstraintNames18_5) {
       "  constraint { x > 0; }\n"
       "endclass\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier", 3, "18.5"));
+}
+
+constexpr std::string_view kSideEffect =
+    "operator with side effects is not allowed in a constraint";
+constexpr std::string_view kDistNested =
+    "a dist expression may not appear within another expression";
+
+constexpr uint32_t kClassItemLine = 6;
+constexpr uint32_t kExternalItemLine = 7;
+constexpr uint32_t kInlineItemLine = 9;
+constexpr uint32_t kScopeItemLine = 5;
+
+std::string InClass(std::string_view item) {
+  return std::string(
+             "class C;\n"
+             "  rand int x, a[4];\n"
+             "  rand bit b;\n"
+             "  int y;\n"
+             "  function int f(int v); return v; endfunction\n"
+             "  constraint c { ") +
+         std::string(item) +
+         " }\n"
+         "endclass\n";
+}
+
+std::string InExternal(std::string_view item) {
+  return std::string(
+             "class C;\n"
+             "  rand int x, a[4];\n"
+             "  rand bit b;\n"
+             "  int y;\n"
+             "  extern constraint c;\n"
+             "endclass\n"
+             "constraint C::c { ") +
+         std::string(item) + " }\n";
+}
+
+std::string InInline(std::string_view item) {
+  return std::string(
+             "class C;\n"
+             "  rand int x, a[4];\n"
+             "  rand bit b;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    automatic C o = new;\n"
+             "    automatic int z = 0;\n"
+             "    void'(o.randomize() with { ") +
+         std::string(item) +
+         " });\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string InScope(std::string_view item) {
+  return std::string(
+             "module m;\n"
+             "  initial begin\n"
+             "    automatic int x = 0, z = 0;\n"
+             "    automatic bit b;\n"
+             "    void'(std::randomize(x, b) with { ") +
+         std::string(item) +
+         " });\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+void ExpectReported(const std::string& src, std::string_view message,
+                    uint32_t line) {
+  auto r = Parse(src);
+  EXPECT_TRUE(ReportedError(r.diags, message, line, "18.5")) << src;
+}
+
+void ExpectAccepted(const std::string& src) {
+  auto r = Parse(src);
+  EXPECT_FALSE(r.has_errors) << src;
+}
+
+TEST(ConstraintSideEffect, IncrementInAnExternalBlockRejected) {
+  ExpectReported(InExternal("x == y++;"), kSideEffect, kExternalItemLine);
+}
+
+TEST(ConstraintSideEffect, PlainArithmeticInAnExternalBlockAccepted) {
+  ExpectAccepted(InExternal("x == y + 1;"));
+}
+
+TEST(ConstraintSideEffect, IncrementAndDecrementInAnInlineBlockRejected) {
+  ExpectReported(InInline("x == z++;"), kSideEffect, kInlineItemLine);
+  ExpectReported(InInline("x == --z;"), kSideEffect, kInlineItemLine);
+}
+
+TEST(ConstraintSideEffect, PlainArithmeticInAnInlineBlockAccepted) {
+  ExpectAccepted(InInline("x == z + 1;"));
+}
+
+TEST(ConstraintSideEffect, IncrementInAScopeRandomizeBlockRejected) {
+  ExpectReported(InScope("x == z++;"), kSideEffect, kScopeItemLine);
+}
+
+TEST(ConstraintSideEffect, PlainArithmeticInAScopeRandomizeBlockAccepted) {
+  ExpectAccepted(InScope("x == z + 1;"));
+}
+
+TEST(ConstraintSideEffect, IncrementInEveryNestedConstraintFormRejected) {
+  for (std::string_view item :
+       {"if (b) x == y++;", "if (b) x == 1; else x == y++;", "b -> x == y++;",
+        "foreach (a[i]) a[i] == y++;", "soft x == y++;", "x dist {y++ := 1};",
+        "x dist {1 := y++};"}) {
+    ExpectReported(InClass(item), kSideEffect, kClassItemLine);
+  }
+}
+
+TEST(ConstraintSideEffect, EveryNestedConstraintFormWithoutOneAccepted) {
+  for (std::string_view item :
+       {"if (b) x == y + 1;", "if (b) x == 1; else x == y + 1;",
+        "b -> x == y + 1;", "foreach (a[i]) a[i] == y + 1;", "soft x == y + 1;",
+        "x dist {y + 1 := 1};"}) {
+    ExpectAccepted(InClass(item));
+  }
+}
+
+TEST(ConstraintSideEffect, IncrementAsAFunctionArgumentRejected) {
+  ExpectReported(InClass("x == f(y++);"), kSideEffect, kClassItemLine);
+}
+
+TEST(ConstraintSideEffect, PlainFunctionArgumentAccepted) {
+  ExpectAccepted(InClass("x == f(y + 1);"));
+}
+
+TEST(ConstraintSideEffect, DISABLED_AssignmentInAClassBlockRejected) {
+  ExpectReported(InClass("x == (y = 3);"), kSideEffect, kClassItemLine);
+}
+
+TEST(ConstraintSideEffect, EqualityInAClassBlockAccepted) {
+  ExpectAccepted(InClass("x == (y == 3);"));
+}
+
+TEST(ConstraintSideEffect,
+     DISABLED_EveryCompoundAssignmentInAClassBlockRejected) {
+  for (std::string_view op : {"+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=",
+                              "<<=", ">>=", "<<<=", ">>>="}) {
+    ExpectReported(InClass("x == (y " + std::string(op) + " 3);"), kSideEffect,
+                   kClassItemLine);
+  }
+}
+
+TEST(ConstraintSideEffect, DISABLED_AssignmentInAnInlineBlockRejected) {
+  ExpectReported(InInline("x == (z = 4);"), kSideEffect, kInlineItemLine);
+}
+
+TEST(ConstraintSideEffect, DISABLED_AssignmentInAnExternalBlockRejected) {
+  ExpectReported(InExternal("x == (y = 3);"), kSideEffect, kExternalItemLine);
+}
+
+TEST(ConstraintSideEffect, DISABLED_AssignmentInAScopeRandomizeBlockRejected) {
+  ExpectReported(InScope("x == (z = 4);"), kSideEffect, kScopeItemLine);
+}
+
+TEST(ConstraintDistNesting, DistAsAnOperandOfAnyOperatorRejected) {
+  for (std::string_view item :
+       {"!(x dist {1:=1});", "(x dist {1:=1}) && b;",
+        "b ? x dist {1:=1} : x == 2;", "x dist {1:=1} dist {2:=1};",
+        "(x dist {1:=1});"}) {
+    ExpectReported(InClass(item), kDistNested, kClassItemLine);
+  }
+}
+
+TEST(ConstraintDistNesting, DistAsAnIfConditionRejected) {
+  ExpectReported(InClass("if (x dist {1:=1}) b == 1;"), kDistNested,
+                 kClassItemLine);
+}
+
+TEST(ConstraintDistNesting, DistAsAnOperandInAForeachBodyRejected) {
+  ExpectReported(InClass("foreach (a[i]) a[i] dist {1:=1} + 1 == 2;"),
+                 kDistNested, kClassItemLine);
+}
+
+TEST(ConstraintDistNesting, DistAsAWholeConstraintInEveryFormAccepted) {
+  for (std::string_view item :
+       {"b -> x dist {1:=1, 2:=1};", "foreach (a[i]) a[i] dist {1:=1};",
+        "soft x dist {1:=1};", "if (b) x dist {1:=1}; else x dist {2:=1};"}) {
+    ExpectAccepted(InClass(item));
+  }
+}
+
+TEST(ConstraintDistNesting, DistAsAnOperandInAnExternalBlockRejected) {
+  ExpectReported(InExternal("b == (x dist {1:=1});"), kDistNested,
+                 kExternalItemLine);
+}
+
+TEST(ConstraintDistNesting, DistAsAnOperandInAnInlineBlockRejected) {
+  ExpectReported(InInline("b == (x dist {1:=1});"), kDistNested,
+                 kInlineItemLine);
+}
+
+TEST(ConstraintDistNesting, DistAsAnOperandInAScopeRandomizeBlockRejected) {
+  ExpectReported(InScope("b == (x dist {1:=1});"), kDistNested, kScopeItemLine);
+}
+
+TEST(ConstraintDistNesting, DistAsAWholeConstraintOutsideAClassAccepted) {
+  ExpectAccepted(InExternal("x dist {1:=1, 2:=1};"));
+  ExpectAccepted(InInline("x dist {1:=1, 2:=1};"));
+  ExpectAccepted(InScope("x dist {1:=1, 2:=1};"));
 }
 
 const ClassMember* BlockOf(const ParseResult& r) {
