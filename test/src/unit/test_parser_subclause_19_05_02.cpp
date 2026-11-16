@@ -58,4 +58,26 @@ TEST_F(VerifyParseTest, UnboundedTransitionInBinArrayIsError) {
   }
 }
 
+TEST_F(VerifyParseTest, ARangeRepeatedOnceIsError) {
+  Parse(R"(
+    module m;
+      bit [1:0] v;
+      covergroup cg;
+        coverpoint v {
+          bins a = ([0:1] [* 1]);
+          bins e = ([0:1] [* 1:1]);
+          bins ok = ([0:1] [* 2]);
+        }
+      endgroup
+    endmodule
+  )");
+  EXPECT_EQ(diag_.ErrorCount(), 2u);
+  for (uint32_t line : {6u, 7u}) {
+    EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                              "a transition of length 0 is illegal; its "
+                              "trans_set covers a single value range",
+                              line, "19.5.2"));
+  }
+}
+
 }  // namespace

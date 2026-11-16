@@ -483,4 +483,81 @@ TEST(CovergroupInstanceSim, DefaultSequenceBinIsLeftOutOfACross) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+std::string Hits(const std::string& bins, const std::vector<int>& stream) {
+  std::string samples;
+  for (int value : stream) {
+    samples += "    v = " + std::to_string(value) + "; c.sample();\n";
+  }
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [2:0] v;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v {\n" +
+          bins +
+          "    }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n" +
+          samples +
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const CoverGroup* group = f.ctx.CoverageData().FindGroup("c");
+  if (group == nullptr) return "no group";
+  std::string out;
+  for (const CoverBin& bin : group->coverpoints[0].bins) {
+    out += bin.name + "=" + std::to_string(bin.hit_count) + " ";
+  }
+  return out;
+}
+
+TEST(TransitionRepetitionSim, TheStandardsOverlapExampleCountsEachBin) {
+  EXPECT_EQ(Hits("      bins b2 = (2 [-> 3:5]);\n"
+                 "      bins b3 = (3 [-> 3:5]);\n"
+                 "      bins b5 = (5 [* 3]);\n"
+                 "      bins b6 = (1 => 3 [-> 4:6] => 1);\n"
+                 "      bins b7 = (1 => 2 [= 3:6] => 5);\n",
+                 {1, 4, 3, 2, 3, 3, 2, 2, 3, 2, 3, 1, 5, 5, 5, 5, 5, 5}),
+            "b2=2 b3=3 b5=4 b6=1 b7=1 ");
+}
+
+TEST(TransitionRepetitionSim, AConsecutiveRunBrokenByAnotherValueDoesNotCount) {
+  EXPECT_EQ(Hits("      bins b = (5 [* 3]);\n", {5, 5, 4, 5, 5}), "b=0 ");
+  EXPECT_EQ(Hits("      bins b = (5 [* 3]);\n", {5, 5, 4, 5, 5, 5}), "b=1 ");
+}
+
+TEST(TransitionRepetitionSim, ANonconsecutiveRunLetsTheNextValueComeLater) {
+  const std::string kBins =
+      "      bins n = (1 => 2 [= 2] => 5);\n"
+      "      bins g = (1 => 2 [-> 2] => 5);\n";
+  EXPECT_EQ(Hits(kBins, {1, 2, 3, 2, 3, 5}), "n=1 g=0 ");
+  EXPECT_EQ(Hits(kBins, {1, 2, 3, 2, 5}), "n=1 g=1 ");
+  EXPECT_EQ(Hits(kBins, {1, 2, 3, 2, 2, 5}), "n=0 g=0 ");
+}
+
+TEST(TransitionRepetitionSim, ABinArrayHoldsOneBinPerBoundedSequence) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [4:1] v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v {\n"
+                       "      bins sb[] = (4 => 5 => 6), ([7:9],10 => 11,12);\n"
+                       "    }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = 4; c.sample(); v = 5; c.sample();\n"
+                       "    v = 6; c.sample(); v = 10; c.sample();\n"
+                       "    v = 12; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"n=%0d t=%0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "n=2 t=9\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

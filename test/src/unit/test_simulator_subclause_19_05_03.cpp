@@ -350,4 +350,31 @@ TEST(AutoBinCreationSim, AnEnumDeclaredInAClassHasABinPerValue) {
   EXPECT_EQ(out, "3 2 4\n");
 }
 
+TEST(AutoBinCreationSim,
+     IgnoreOrIllegalBinsAloneLeaveAutomaticBinsOverTheRest) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [3:0] v; int n, t;\n"
+                       "  covergroup ci;\n"
+                       "    coverpoint v { ignore_bins i = {[0:11]}; }\n"
+                       "  endgroup\n"
+                       "  covergroup cl;\n"
+                       "    coverpoint v { illegal_bins i = {[4:15]}; }\n"
+                       "  endgroup\n"
+                       "  ci c1 = new;\n"
+                       "  cl c2 = new;\n"
+                       "  initial begin\n"
+                       "    v = 5; c1.sample(); v = 13; c1.sample();\n"
+                       "    v = 2; c2.sample();\n"
+                       "    void'(c1.get_inst_coverage(n, t));\n"
+                       "    $display(\"%0d %0d\", n, t);\n"
+                       "    void'(c2.get_inst_coverage(n, t));\n"
+                       "    $display(\"%0d %0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 4\n1 4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

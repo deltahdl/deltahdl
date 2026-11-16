@@ -194,4 +194,56 @@ TEST(Coverage, ASampleWithUnknownBitsMatchesNo2StateBin) {
   EXPECT_EQ(out, "xx x1\n0.00 0.00\n");
 }
 
+TEST(WildcardBinSim, XZAndQuestionDigitsMatchBothBitValues) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [3:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    a: coverpoint v { wildcard bins x = {4'b11xx}; }\n"
+                 "    b: coverpoint v { wildcard bins z = {4'b11zz}; }\n"
+                 "    c: coverpoint v { wildcard bins r[] = {4'b11??}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    v = 11; c.sample();\n"
+                 "    $display(\"%0.2f %0.2f %0.2f\", c.a.get_inst_coverage(), "
+                 "c.b.get_inst_coverage(), c.c.get_inst_coverage());\n"
+                 "    v = 14; c.sample();\n"
+                 "    $display(\"%0.2f %0.2f %0.2f\", c.a.get_inst_coverage(), "
+                 "c.b.get_inst_coverage(), c.c.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0.00 0.00 0.00\n100.00 100.00 25.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(WildcardBinSim, AWildcardTransitionMatchesEachExpandedSequence) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] w; int n, t;\n"
+          "  covergroup cg;\n"
+          "    d: coverpoint w { wildcard bins t = (2'b0x => 2'b1x); }\n"
+          "    e: coverpoint w { wildcard bins ta[] = (2'b0x => 2'b1x); }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    w = 2; c.sample(); w = 1; c.sample();\n"
+          "    $display(\"%0.2f %0.2f\", c.d.get_inst_coverage(), "
+          "c.e.get_inst_coverage());\n"
+          "    w = 3; c.sample();\n"
+          "    $display(\"%0.2f %0.2f\", c.d.get_inst_coverage(), "
+          "c.e.get_inst_coverage());\n"
+          "    void'(c.get_inst_coverage(n, t));\n"
+          "    $display(\"%0d %0d\", n, t);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "0.00 0.00\n100.00 25.00\n2 5\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

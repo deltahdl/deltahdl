@@ -310,4 +310,81 @@ TEST(CovergroupInstanceSim, SixtyFourBitCoverpointKeepsEveryBinValue) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+TEST(ValueResolutionSim, AnEnumCoverpointResolvesBinValuesInItsBaseType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  typedef enum bit [1:0] {A, B, C, D} e_t;\n"
+                       "  e_t v; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint v { bins b = {0, 3, 7, -1}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    v = D; c.sample();\n"
+                       "    void'(c.get_inst_coverage(n, t));\n"
+                       "    $display(\"%0d %0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bin value 7 does not fit the coverpoint's type "
+                              "and takes no part in its bin",
+                              5, "19.5.7"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bin value -1 is negative while the coverpoint's "
+                              "type is unsigned, and takes no part in its bin",
+                              5, "19.5.7"));
+  EXPECT_EQ(f.diag.WarningCount(), 2u);
+}
+
+TEST(ValueResolutionSim, AnIntegralBinValueOnARealCoverpointIsCastToReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  localparam int XSTATE = 3;\n"
+                       "  real r;\n"
+                       "  covergroup cg;\n"
+                       "    a: coverpoint r { bins xs = {XSTATE}; }\n"
+                       "    b: coverpoint r { bins xs = {XSTATE}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    r = 3.25; c.sample();\n"
+                       "    $display(\"%0.2f\", c.b.get_inst_coverage());\n"
+                       "    r = 3.0; c.sample();\n"
+                       "    $display(\"%0.2f %0.2f\", c.a.get_inst_coverage(), "
+                       "c.b.get_inst_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0.00\n100.00 100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(ValueResolutionSim, ADeclaredCoverpointTypeIsTheEffectiveType) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  int v;\n"
+      "  covergroup cg;\n"
+      "    bit [2:0] a: coverpoint v { bins b2 = {-1, 15}; bins b3 = {2}; }\n"
+      "    b: coverpoint v { bins ok = {-1, 15}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial $display(\"done\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bin value -1 is negative while the coverpoint's "
+                              "type is unsigned, and takes no part in its bin",
+                              4, "19.5.7"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "bin value 15 does not fit the coverpoint's type "
+                              "and takes no part in its bin",
+                              4, "19.5.7"));
+  EXPECT_EQ(f.diag.WarningCount(), 2u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace
