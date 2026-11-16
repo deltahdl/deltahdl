@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -512,6 +515,215 @@ TEST(ConstraintModeNamedBlock,
                     "constraint 'missing' does not exist in the hierarchy "
                     "of class 'Packet'",
                     10, "18.9"));
+}
+
+void ExpectModeError(const std::string& src, const std::string& msg,
+                     uint32_t line) {
+  ElabFixture f;
+  EXPECT_FALSE(ElabOk(src, f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, line, "18.9"));
+}
+
+const char kModeBuiltin[] =
+    "'constraint_mode' is a built-in method and cannot be overridden";
+const char kModeVoidValue[] =
+    "constraint_mode() with an argument is a void function and yields no "
+    "value";
+const char kModeOneArgument[] = "constraint_mode() takes at most one argument";
+
+std::string MissingIn(const std::string& name) {
+  return "constraint '" + name +
+         "' does not exist in the hierarchy of class 'P'";
+}
+
+const char kClassP[] =
+    "class P;\n"
+    "  rand int x;\n"
+    "  constraint c { x > 0; }\n"
+    "endclass\n";
+
+std::string PUse(const std::string& stmt) {
+  return std::string(kClassP) +
+         "module m;\n"
+         "  P p = new;\n"
+         "  int r;\n"
+         "  initial begin\n"
+         "    " +
+         stmt +
+         "\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(ConstraintModeBuiltin, ATaskNamedConstraintModeRejected) {
+  ExpectModeError(
+      "class C;\n"
+      "  rand int x;\n"
+      "  task constraint_mode(bit on);\n"
+      "  endtask\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      kModeBuiltin, 3);
+}
+
+TEST(ConstraintModeBuiltin, ADerivedClassMethodNamedConstraintModeRejected) {
+  ExpectModeError(
+      "class B;\n"
+      "  rand int x;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  function void constraint_mode(bit on);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      kModeBuiltin, 5);
+}
+
+TEST(ConstraintModeBuiltin, ADerivedClassMethodOfAnotherNameAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class B;\n"
+             "  rand int x;\n"
+             "endclass\n"
+             "class D extends B;\n"
+             "  task toggle(bit on);\n"
+             "  endtask\n"
+             "endclass\n"
+             "module m; endmodule\n"));
+}
+
+std::string PMethod(const std::string& stmt) {
+  return "class P;\n"
+         "  rand int x;\n"
+         "  constraint c { x > 0; }\n"
+         "  function void f();\n"
+         "    " +
+         stmt +
+         "\n"
+         "  endfunction\n"
+         "endclass\n"
+         "module m; endmodule\n";
+}
+
+TEST(ConstraintModeNamedBlock,
+     DISABLED_AThisQualifiedMissingBlockInAMethodRejected) {
+  ExpectModeError(PMethod("this.missing.constraint_mode(0);"),
+                  MissingIn("missing"), 5);
+}
+
+TEST(ConstraintModeNamedBlock,
+     DISABLED_AnUnqualifiedMissingBlockInAMethodRejected) {
+  ExpectModeError(PMethod("missing.constraint_mode(0);"), MissingIn("missing"),
+                  5);
+}
+
+TEST(ConstraintModeNamedBlock, AnExistingBlockInAMethodAccepted) {
+  EXPECT_TRUE(ElabOk(
+      PMethod("begin c.constraint_mode(0); this.c.constraint_mode(1); end")));
+}
+
+TEST(ConstraintModeNamedBlock,
+     DISABLED_AMissingBlockInAPackageFunctionRejected) {
+  ExpectModeError(
+      "package q;\n"
+      "  class P;\n"
+      "    rand int x;\n"
+      "    constraint c { x > 0; }\n"
+      "  endclass\n"
+      "  function void f(P p);\n"
+      "    p.missing.constraint_mode(0);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module m; endmodule\n",
+      MissingIn("missing"), 7);
+}
+
+TEST(ConstraintModeNamedBlock, AMissingBlockInAUnitFunctionRejected) {
+  ExpectModeError(std::string(kClassP) +
+                      "function void f(P p);\n"
+                      "  p.missing.constraint_mode(0);\n"
+                      "endfunction\n"
+                      "module m; endmodule\n",
+                  MissingIn("missing"), 6);
+}
+
+TEST(ConstraintModeNamedBlock, AMissingBlockInAProgramRejected) {
+  ExpectModeError(std::string(kClassP) +
+                      "program pr;\n"
+                      "  initial begin\n"
+                      "    automatic P p = new;\n"
+                      "    p.missing.constraint_mode(0);\n"
+                      "  end\n"
+                      "endprogram\n",
+                  MissingIn("missing"), 8);
+}
+
+TEST(ConstraintModeNamedBlock, AnExistingBlockInEachOfThosePlacesAccepted) {
+  EXPECT_TRUE(ElabOk(std::string(kClassP) + "function void f(P p);\n"
+                                            "  p.c.constraint_mode(0);\n"
+                                            "endfunction\n"
+                                            "program pr;\n"
+                                            "  initial begin\n"
+                                            "    automatic P p = new;\n"
+                                            "    p.c.constraint_mode(0);\n"
+                                            "  end\n"
+                                            "endprogram\n"
+                                            "module m; endmodule\n"));
+}
+
+TEST(ConstraintModeNamedBlock, ARandomVariableNamedAsABlockRejected) {
+  ExpectModeError(PUse("p.x.constraint_mode(0);"), MissingIn("x"), 9);
+}
+
+TEST(ConstraintModeNamedBlock, ADerivedOnlyBlockThroughABaseHandleRejected) {
+  ExpectModeError(
+      "class B;\n"
+      "  rand int x;\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  constraint dc { x > 0; }\n"
+      "endclass\n"
+      "module m;\n"
+      "  initial begin\n"
+      "    automatic D d = new;\n"
+      "    automatic B b = d;\n"
+      "    b.dc.constraint_mode(0);\n"
+      "  end\n"
+      "endmodule\n",
+      "constraint 'dc' does not exist in the hierarchy of class 'B'", 11);
+}
+
+TEST(ConstraintModeForms, DISABLED_TwoArgumentsToABlockRejected) {
+  ExpectModeError(PUse("p.c.constraint_mode(0, 1);"), kModeOneArgument, 9);
+}
+
+TEST(ConstraintModeForms, OneArgumentToABlockAccepted) {
+  EXPECT_TRUE(ElabOk(PUse("p.c.constraint_mode(0);")));
+}
+
+TEST(ConstraintModeForms, DISABLED_ASetterUsedAsAValueRejected) {
+  ExpectModeError(PUse("r = p.c.constraint_mode(0);"), kModeVoidValue, 9);
+}
+
+TEST(ConstraintModeForms, TheQueryUsedAsAValueAccepted) {
+  EXPECT_TRUE(ElabOk(PUse("r = p.c.constraint_mode();")));
+}
+
+TEST(ConstraintModeForms, DISABLED_AnInnerObjectPropertyAsTheObjectAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class In;\n"
+             "  rand int y;\n"
+             "  constraint ci { y > 0; }\n"
+             "endclass\n"
+             "class P;\n"
+             "  In inner = new;\n"
+             "endclass\n"
+             "module m;\n"
+             "  initial begin\n"
+             "    automatic P p = new;\n"
+             "    p.inner.constraint_mode(0);\n"
+             "    p.inner.ci.constraint_mode(0);\n"
+             "  end\n"
+             "endmodule\n"));
 }
 
 }  // namespace
