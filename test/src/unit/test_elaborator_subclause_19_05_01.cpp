@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -55,6 +56,46 @@ TEST(FixedBinCount, ConstantCountOfZeroOrLessIsError) {
                             "a positive integral value",
                             6, "19.5.1"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(FixedBinCount, DISABLED_ANonIntegralCountIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v; real r;\n"
+      "  parameter real K = 2.5;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins a[2.5] = {[0:7]}; bins b[K] = {[8:15]}; }\n"
+      "    coverpoint r { bins a[2.5] = {[0.0:4.0]}; bins b[K] = {[4.0:8.0]}; "
+      "}\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5u, 6u}) {
+    for (const char* name : {"a", "b"}) {
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                std::string("the number of bins of bins '") +
+                                    name + "' is not integral",
+                                line, "19.5.1"))
+          << line << " " << name;
+    }
+  }
+}
+
+TEST(FixedBinCount, AnIntegralCountOfAnyIntegralTypeIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v; real r;\n"
+      "  parameter byte K = 3;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins a[3] = {[0:7]}; bins b[K] = {[8:15]}; }\n"
+      "    coverpoint r { bins a[4'd3] = {[0.0:4.0]}; bins b[K] = {[4.0:8.0]}; "
+      "}\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

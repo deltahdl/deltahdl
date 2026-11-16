@@ -386,4 +386,178 @@ TEST(CovergroupInstanceSim, NonPositiveBinCountFromAFormalIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
+std::string Counts(const std::string& decls, const std::string& point,
+                   const std::string& samples) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  int n, t;\n" +
+          decls +
+          "  covergroup cg;\n"
+          "    " +
+          point +
+          "\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n" +
+          samples +
+          "    void'(c.get_inst_coverage(n, t));\n"
+          "    $display(\"%0d %0d\", n, t);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  return kOut;
+}
+
+TEST(BinsForValuesSim, AFixedCountSplitsTheValuesKeepingDuplicates) {
+  EXPECT_EQ(Counts("  bit [3:0] v;\n",
+                   "coverpoint v { bins fixed[4] = {[1:10], 1, 4, 7}; }",
+                   "    v = 1; c.sample();\n"),
+            "2 4\n");
+  EXPECT_EQ(Counts("  bit [3:0] v;\n",
+                   "coverpoint v { bins fixed[4] = {[1:10], 1, 4, 7}; }",
+                   "    v = 3; c.sample(); v = 9; c.sample();\n"),
+            "2 4\n");
+}
+
+TEST(BinsForValuesSim, TheEmptyBinsOfAFixedCountLeaveTheCoverage) {
+  EXPECT_EQ(
+      Counts("  bit [3:0] v;\n", "coverpoint v { bins fixed[5] = {1, 4, 7}; }",
+             "    v = 7; c.sample();\n"),
+      "1 3\n");
+}
+
+TEST(BinsForValuesSim, TheStandardsBinGroupingsCountAsDescribed) {
+  EXPECT_EQ(Counts("  bit [9:0] v_a;\n",
+                   "coverpoint v_a { bins a = {[0:63], 65}; "
+                   "bins b[] = {[127:150], [148:191]}; "
+                   "bins c[] = {200, 201, 202}; bins d = {[1000:$]}; "
+                   "bins others[] = default; }",
+                   "    v_a = 65; c.sample(); v_a = 149; c.sample();\n"
+                   "    v_a = 1023; c.sample(); v_a = 500; c.sample();\n"),
+            "3 70\n");
+}
+
+TEST(BinsForValuesSim, ARealOpenArrayDividesAtTheDefaultInterval) {
+  EXPECT_EQ(
+      Counts("  real r;\n", "coverpoint r { bins b[] = {[0.0:4.0]}; }", ""),
+      "0 4\n");
+  EXPECT_EQ(Counts("  real r;\n", "coverpoint r { bins b[] = {[0.0:4.0]}; }",
+                   "    r = 0.5; c.sample(); r = 1.0; c.sample();\n"),
+            "2 4\n");
+  EXPECT_EQ(Counts("  real r;\n", "coverpoint r { bins b[] = {[0.0:4.0]}; }",
+                   "    r = 3.5; c.sample(); r = 4.0; c.sample();\n"),
+            "1 4\n");
+  EXPECT_EQ(Counts("  real r;\n", "coverpoint r { bins b[] = {[0.0:0.5]}; }",
+                   "    r = 0.0; c.sample(); r = 0.5; c.sample();\n"),
+            "1 1\n");
+}
+
+TEST(BinsForValuesSim, TheRealIntervalOptionSetsTheWidth) {
+  EXPECT_EQ(Counts("  real r;\n",
+                   "type_option.real_interval = 2.0;\n"
+                   "    coverpoint r { bins b[] = {[0.0:4.0]}; }",
+                   ""),
+            "0 2\n");
+  EXPECT_EQ(Counts("  real r;\n",
+                   "type_option.real_interval = 2.0;\n"
+                   "    coverpoint r { type_option.real_interval = 1.0; "
+                   "bins b[] = {[0.0:4.0]}; }",
+                   ""),
+            "0 4\n");
+  EXPECT_EQ(Counts("  real r;\n",
+                   "coverpoint r { type_option.real_interval = 0.01; "
+                   "bins b1[] = {[0.75:0.85]}; }",
+                   ""),
+            "0 10\n");
+}
+
+TEST(BinsForValuesSim, IntervalsAndValuesFormTheStandardsBinCounts) {
+  const char* const kFine = "coverpoint r { type_option.real_interval = 0.01; ";
+  EXPECT_EQ(
+      Counts("  real r;\n",
+             std::string(kFine) + "bins b2[] = {[0.75:0.85], [0.90:0.92]}; }",
+             ""),
+      "0 12\n");
+  EXPECT_EQ(
+      Counts("  real r;\n",
+             std::string(kFine) + "bins b3[] = {[0.75:0.80], 0.902}; }", ""),
+      "0 6\n");
+  EXPECT_EQ(Counts("  real r;\n",
+                   std::string(kFine) +
+                       "bins b5[] = {[0.75:0.85], [0.753+/-0.01], 0.902}; }",
+                   ""),
+            "0 13\n");
+}
+
+TEST(BinsForValuesSim, IdenticalIntervalsOfSeveralRangesMerge) {
+  EXPECT_EQ(Counts("  real r;\n",
+                   "coverpoint r { bins a3[] = {[1.0:4.0], [2.0:5.0], "
+                   "[1.1:3.1], 3.3, [1.5+/-0.5]}; }",
+                   ""),
+            "0 9\n");
+}
+
+TEST(BinsForValuesSim, ARealDollarRangeIsOneBin) {
+  EXPECT_EQ(
+      Counts("  real r;\n", "coverpoint r { bins a[] = {[$:0.75]}; }", ""),
+      "0 1\n");
+  EXPECT_EQ(
+      Counts("  real r;\n", "coverpoint r { bins a[] = {3.0, [0.75:$]}; }",
+             "    r = 100.0; c.sample();\n"),
+      "1 2\n");
+  EXPECT_EQ(Counts("  real r;\n",
+                   "coverpoint r { bins a[4] = {3.0, [0.75:$]}; }", ""),
+            "0 2\n");
+}
+
+TEST(BinsForValuesSim, AFixedRealCountSplitsTheItems) {
+  EXPECT_EQ(Counts("  real r;\n",
+                   "coverpoint r { bins fixed[4] = {[1.0:4.0], [2.0:5.0], "
+                   "1.0, 4.0, 7.0}; }",
+                   "    r = 7.0; c.sample();\n"),
+            "1 4\n");
+  EXPECT_EQ(Counts("  real r;\n",
+                   "coverpoint r { bins fixed[5] = {[1.0:3.0], 7.0}; }",
+                   "    r = 7.0; c.sample();\n"),
+            "1 3\n");
+}
+
+TEST(BinsForValuesSim, ToleranceSpecificationsDefineRanges) {
+  const char* const kDecls =
+      "  real a;\n"
+      "  parameter real ZSTATE = -100.0;\n"
+      "  parameter int XSTATE = 100;\n";
+  const char* const kPoint =
+      "coverpoint a { bins highz = {[ZSTATE+/-0.1]}; "
+      "bins x_st = {[XSTATE+%-1.0]}; }";
+  EXPECT_EQ(Counts(kDecls, kPoint,
+                   "    a = -100.05; c.sample(); a = 101.5; c.sample();\n"),
+            "1 2\n");
+  EXPECT_EQ(Counts(kDecls, kPoint,
+                   "    a = -99.95; c.sample(); a = 100.9; c.sample();\n"),
+            "2 2\n");
+}
+
+TEST(BinsForValuesSim, DISABLED_ANonIntegralCountFromAFormalIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [3:0] v; real r;\n"
+      "  covergroup cg (real k);\n"
+      "    coverpoint v { bins b[k] = {[0:15]}; }\n"
+      "    coverpoint r { bins b[k] = {[0.0:4.0]}; }\n"
+      "  endgroup\n"
+      "  cg c = new(2.5);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the number of bins of bins 'b' is not integral", 4,
+                            "19.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the number of bins of bins 'b' is not integral", 5,
+                            "19.5.1"));
+}
+
 }  // namespace
