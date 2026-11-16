@@ -94,4 +94,39 @@ TEST(ManuallySeedingRandomizeRun,
   EXPECT_EQ(out, "4 4\n");
 }
 
+TEST(ManuallySeedingRandomizeRun, ADerivedConstructorsSeedGovernsItsFirstDraw) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class Base;\n"
+      "  rand bit [15:0] header;\n"
+      "  function new();\n"
+      "    this.srandom(1);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Derived extends Base;\n"
+      "  bit [15:0] first;\n"
+      "  function new(int seed);\n"
+      "    super.new();\n"
+      "    this.srandom(seed);\n"
+      "    void'(randomize());\n"
+      "    first = header;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "class Later extends Base;\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static Derived d = new(200);\n"
+      "    static Later l = new;\n"
+      "    static Base b = new;\n"
+      "    l.srandom(200);\n"
+      "    void'(l.randomize());\n"
+      "    void'(b.randomize());\n"
+      "    $display(\"%0d %0d\", d.first == l.header, d.first != b.header);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
 }  // namespace
