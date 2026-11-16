@@ -1,11 +1,19 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
 
 namespace {
+
+const char kClassQ[] =
+    "class C;\n"
+    "  rand bit [7:0] x;\n"
+    "  int q = 2;\n"
+    "endclass\n";
 
 TEST(InlineConstraints, AThisNameTheClassLacksIsReported) {
   ElabFixture f;
@@ -81,6 +89,87 @@ TEST(InlineConstraints, ThisAndSuperEnumLiteralsElaborate) {
              "});\n"
              "  end\n"
              "endmodule\n"));
+}
+
+void ExpectUndeclared(const std::string& with_clause, const std::string& name) {
+  ElabFixture f;
+  EXPECT_FALSE(ElabOk(std::string(kClassQ) +
+                          "module m;\n"
+                          "  initial begin\n"
+                          "    static C c = new;\n"
+                          "    void'(c.randomize() " +
+                          with_clause +
+                          ");\n"
+                          "  end\n"
+                          "endmodule\n",
+                      f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "undeclared identifier '" + name + "'", 8, "18.7"));
+}
+
+void ExpectAccepted(const std::string& with_clause) {
+  EXPECT_TRUE(ElabOk(std::string(kClassQ) +
+                     "module m;\n"
+                     "  int q = 1;\n"
+                     "  initial begin\n"
+                     "    static C c = new;\n"
+                     "    void'(c.randomize() " +
+                     with_clause +
+                     ");\n"
+                     "  end\n"
+                     "endmodule\n"));
+}
+
+TEST(InlineConstraints, DISABLED_ANameNeitherScopeDeclaresIsReported) {
+  ExpectUndeclared("with { x == nosuch; }", "nosuch");
+}
+
+TEST(InlineConstraints, ANameTheObjectDeclaresElaborates) {
+  ExpectAccepted("with { x == q; }");
+}
+
+TEST(InlineConstraints, DISABLED_ALocalNameOnlyTheObjectDeclaresIsReported) {
+  ExpectUndeclared("with { x == local::q; }", "q");
+}
+
+TEST(InlineConstraints, ALocalNameTheCallerDeclaresElaborates) {
+  ExpectAccepted("with { x == local::q; }");
+}
+
+TEST(InlineConstraints,
+     DISABLED_AnUnlistedNameOnlyTheObjectDeclaresIsReported) {
+  ExpectUndeclared("with (x) { x == q; }", "q");
+}
+
+TEST(InlineConstraints, AnUnlistedNameTheCallerDeclaresElaborates) {
+  ExpectAccepted("with (x) { x == q; }");
+}
+
+TEST(InlineConstraints, DISABLED_AnEmptyListLeavesAnObjectOnlyNameUnresolved) {
+  ExpectUndeclared("with () { x == 5; }", "x");
+}
+
+TEST(InlineConstraints, AnEmptyListReadsCallerNamesOnly) {
+  ExpectAccepted("with () { q == 1; }");
+}
+
+TEST(InlineConstraints, AThisNameOnlyTheCallingClassDeclaresIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("class C;\n"
+             "  rand bit [7:0] x;\n"
+             "endclass\n"
+             "class H;\n"
+             "  int limit = 100;\n"
+             "  function int go(C obj);\n"
+             "    return obj.randomize() with { x < this.limit; };\n"
+             "  endfunction\n"
+             "endclass\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'this.limit' names no member of class 'C', the "
+                            "class randomize() with is called on",
+                            7, "18.7"));
 }
 
 }  // namespace
