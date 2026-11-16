@@ -159,4 +159,59 @@ TEST(RandomStabilityRun,
   EXPECT_EQ(out, "4 1\n");
 }
 
+TEST(RandomStabilityRun, ScopeRandomizeIgnoresObjectDrawsAndFollowsTheSeed) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [31:0] v;\n"
+      "endclass\n"
+      "module t;\n"
+      "  bit [31:0] x, a, b, c;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    process p;\n"
+      "    p = process::self();\n"
+      "    p.srandom(5);\n"
+      "    void'(std::randomize(x));\n"
+      "    a = x;\n"
+      "    p.srandom(5);\n"
+      "    repeat (3) void'(o.randomize());\n"
+      "    void'(std::randomize(x));\n"
+      "    b = x;\n"
+      "    p.srandom(6);\n"
+      "    void'(std::randomize(x));\n"
+      "    c = x;\n"
+      "    $display(\"%0d %0d\", a == b, a != c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
+TEST(RandomStabilityRun, ReseedingTheThreadLeavesAnObjectsDrawAlone) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class C;\n"
+      "  rand bit [31:0] v;\n"
+      "endclass\n"
+      "module t;\n"
+      "  bit [31:0] a, b;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    process p;\n"
+      "    p = process::self();\n"
+      "    o.srandom(3);\n"
+      "    void'(o.randomize());\n"
+      "    a = o.v;\n"
+      "    p.srandom(77);\n"
+      "    o.srandom(3);\n"
+      "    void'(o.randomize());\n"
+      "    b = o.v;\n"
+      "    $display(\"%0d\", a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace
