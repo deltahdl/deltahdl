@@ -76,4 +76,29 @@ TEST(SubroutineCallExprParsing, FunctionCallArgIsRejected) {
                             2, "18.11"));
 }
 
+TEST(SubroutineCallExprParsing, ExpressionArgInAClassMethodIsRejected) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "  function int f();\n"
+      "    return randomize(x + 1);\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "randomize() arguments shall be object property "
+                            "names, not expressions",
+                            4, "18.11"));
+}
+
+TEST(SubroutineCallExprParsing, PropertyArgInAClassMethodIsAccepted) {
+  auto r = Parse(
+      "class C;\n"
+      "  rand bit [3:0] x;\n"
+      "  function int f();\n"
+      "    return randomize(x);\n"
+      "  endfunction\n"
+      "endclass\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
