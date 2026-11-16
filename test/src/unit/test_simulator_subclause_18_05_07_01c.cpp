@@ -8,51 +8,6 @@ using namespace delta;
 
 namespace {
 
-std::string Tally(const std::string& before, const std::string& body,
-                  const std::string& after, const std::string& call,
-                  const std::string& check) {
-  return before + "class C;\n" + body + "endclass\n" + after +
-         "module t;\n"
-         "  int n, held = 0;\n"
-         "  initial begin\n"
-         "    static C o = new;\n"
-         "    for (n = 0; n < 16; n++)\n"
-         "      if ((" +
-         call + ") && (" + check +
-         ")) held++;\n"
-         "    $display(\"%0d\", held);\n"
-         "  end\n"
-         "endmodule\n";
-}
-
-std::string Held(const std::string& body, const std::string& check) {
-  return CountHeld(Tally("", body, "", "o.randomize()", check));
-}
-
-std::string HeldWith(const std::string& body, const std::string& items,
-                     const std::string& check) {
-  return CountHeld(
-      Tally("", body, "", "o.randomize() with { " + items + " }", check));
-}
-
-std::string Fails(const std::string& body) {
-  return CountHeld(Tally("", body, "", "o.randomize() == 0", "1"));
-}
-
-std::string HeldInScopeOf(const std::string& decls, const std::string& call,
-                          const std::string& check) {
-  return CountHeld("module t;\n" + decls +
-                   "  int n, held = 0;\n"
-                   "  initial begin\n"
-                   "    for (n = 0; n < 16; n++)\n"
-                   "      if ((" +
-                   call + ") && (" + check +
-                   ")) held++;\n"
-                   "    $display(\"%0d\", held);\n"
-                   "  end\n"
-                   "endmodule\n");
-}
-
 const char* const kAll = "16\n";
 
 const char* const kAscending =
