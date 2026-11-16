@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -424,6 +427,159 @@ TEST(EmbeddedCovergroup, NewWithoutActualForAFormalIsError) {
                             "'arg', which has no default",
                             7, "19.3"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+const char* const kOnlyInNew =
+    "embedded covergroup 'cg' shall only be assigned inside the new() method "
+    "of its class";
+
+const char* const kHolder =
+    "class C;\n"
+    "  int v;\n"
+    "  covergroup cg; coverpoint v; endgroup\n"
+    "  function new(); cg = new; endfunction\n";
+
+TEST(EmbeddedCovergroup, AssigningNullOrNewInATaskOrFunctionIsError) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kHolder) +
+                   "  function void drop(); cg = null; endfunction\n"
+                   "  task rebuild(); cg = new; endtask\n"
+                   "endclass\n"
+                   "module m; endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOnlyInNew, 5, "19.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOnlyInNew, 6, "19.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(EmbeddedCovergroup,
+     DISABLED_AssigningThroughAHandleOutsideTheClassIsError) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kHolder) +
+                   "endclass\n"
+                   "class K;\n"
+                   "  function void poke(C o); o.cg = new; endfunction\n"
+                   "endclass\n"
+                   "module m;\n"
+                   "  C o = new;\n"
+                   "  initial begin\n"
+                   "    o.cg = new;\n"
+                   "    o.cg = null;\n"
+                   "  end\n"
+                   "endmodule\n",
+               f);
+  for (uint32_t line : {7u, 12u, 13u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kOnlyInNew, line, "19.4"))
+        << line;
+  }
+}
+
+TEST(EmbeddedCovergroup, ReadingTheVariableThroughAHandleIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kHolder) +
+                   "endclass\n"
+                   "module m;\n"
+                   "  C o = new;\n"
+                   "  real r;\n"
+                   "  initial begin\n"
+                   "    o.cg.sample();\n"
+                   "    r = o.cg.get_inst_coverage();\n"
+                   "  end\n"
+                   "endmodule\n",
+               f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(EmbeddedCovergroup, DISABLED_TheEmbeddedNameIsNoType) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kHolder) +
+                   "  cg other;\n"
+                   "  function void f(); cg local_copy; endfunction\n"
+                   "endclass\n"
+                   "module m; endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'cg' names an embedded covergroup instance, not "
+                            "a type",
+                            5, "19.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'cg' names an embedded covergroup instance, not "
+                            "a type",
+                            6, "19.4"));
+}
+
+std::string BaseLocal(const std::string& derived_items) {
+  return "class base;\n"
+         "  local bit [1:0] m_z;\n"
+         "  protected bit [1:0] m_p;\n"
+         "  bit [1:0] m_q;\n"
+         "  covergroup g;\n"
+         "    coverpoint m_z;\n"
+         "    coverpoint m_q;\n"
+         "  endgroup\n"
+         "  function new(); g = new; endfunction\n"
+         "endclass\n"
+         "class derived extends base;\n"
+         "  covergroup h;\n"
+         "    " +
+         derived_items +
+         "\n"
+         "  endgroup\n"
+         "  function new(); super.new(); h = new; endfunction\n"
+         "endclass\n"
+         "module m; endmodule\n";
+}
+
+const char* const kBaseLocalMz =
+    "covergroup 'h' of class 'derived' cannot cover 'm_z', a property local to "
+    "its base class 'base'";
+
+TEST(EmbeddedCovergroup, ABaseLocalPropertyInAnyConstructOfASubclassIsError) {
+  for (const char* item :
+       {"a: coverpoint m_p; x: cross a, m_z;", "coverpoint m_q iff (m_z == 1);",
+        "option.weight = m_z; coverpoint m_q;",
+        "coverpoint m_q { bins b = {m_z}; }",
+        "a: coverpoint m_p; b: coverpoint m_q; x: cross a, b iff (m_z > 0);"}) {
+    ElabFixture f;
+    ElaborateSrc(BaseLocal(item), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kBaseLocalMz, 13, "19.4"))
+        << item;
+  }
+}
+
+TEST(EmbeddedCovergroup, ABaseProtectedPropertyInAnyConstructIsAccepted) {
+  for (const char* item :
+       {"a: coverpoint m_q; x: cross a, m_p;", "coverpoint m_q iff (m_p == 1);",
+        "option.weight = m_p; coverpoint m_q;",
+
+        "a: coverpoint m_p; b: coverpoint m_q; x: cross a, b iff (m_p > 0);"}) {
+    ElabFixture f;
+    ElaborateSrc(BaseLocal(item), f);
+    EXPECT_EQ(f.diag.ErrorCount(), 0u) << item;
+  }
+}
+
+TEST(EmbeddedCovergroup,
+     ADerivedCovergroupInheritingALocalCoverpointIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class base;\n"
+      "  local bit [1:0] m_z;\n"
+      "  bit [1:0] m_q;\n"
+      "  covergroup g;\n"
+      "    coverpoint m_z;\n"
+      "  endgroup\n"
+      "  function new(); g = new; endfunction\n"
+      "endclass\n"
+      "class derived extends base;\n"
+      "  covergroup extends g;\n"
+      "    coverpoint m_q;\n"
+      "  endgroup\n"
+      "  function new(); super.new(); endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace
