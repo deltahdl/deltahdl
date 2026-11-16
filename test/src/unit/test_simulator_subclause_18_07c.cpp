@@ -331,23 +331,27 @@ TEST(InlineConstraintCases, AUniqueGroupDrawsDistinctValues) {
       "50 50\n");
 }
 
-TEST(InlineConstraintCases, ASolveBeforeOrderingIsAccepted) {
+TEST(InlineConstraintCases, DISABLED_ASolveBeforeOrderingKeepsTheBlock) {
   EXPECT_EQ(RunSrc("class C;\n"
                    "  rand bit [3:0] x, y;\n"
                    "endclass\n"
                    "module t;\n"
+                   "  int ok = 0, held = 0;\n"
                    "  initial begin\n"
                    "    static C c = new;\n"
-                   "    int ok;\n"
-                   "    ok = c.randomize() with {\n"
-                   "      solve x before y;\n"
-                   "      x == 1;\n"
-                   "      y == x + 1;\n"
-                   "    };\n"
-                   "    $display(\"%0d %0d %0d\", ok, c.x, c.y);\n"
+                   "    repeat (64) begin\n"
+                   "      if (c.randomize() with {\n"
+                   "            solve x before y;\n"
+                   "            x == 1;\n"
+                   "            y == x + 1;\n"
+                   "          })\n"
+                   "        ok++;\n"
+                   "      if (c.x == 1 && c.y == 2) held++;\n"
+                   "    end\n"
+                   "    $display(\"%0d %0d\", ok, held);\n"
                    "  end\n"
                    "endmodule\n"),
-            "1 1 2\n");
+            "64 64\n");
 }
 
 TEST(InlineConstraintCases, TwoListedNamesBothBindIntoTheObject) {

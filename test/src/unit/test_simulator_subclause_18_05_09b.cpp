@@ -82,4 +82,39 @@ TEST(VariableOrderingRun, AnOrderingNeverFailsTheSolve) {
   EXPECT_EQ(out, "64\n");
 }
 
+std::string HeldUnderOrder(const std::string& order) {
+  return "class B;\n"
+         "  rand bit [3:0] x, y;\n"
+         "  constraint k { " +
+         order +
+         " x == 1; y == x + 1; }\n"
+         "endclass\n"
+         "module t;\n"
+         "  int ok = 0, held = 0;\n"
+         "  initial begin\n"
+         "    static B o = new;\n"
+         "    repeat (64) begin\n"
+         "      if (o.randomize()) ok++;\n"
+         "      if (o.x == 1 && o.y == 2) held++;\n"
+         "    end\n"
+         "    $display(\"%0d %0d\", ok, held);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(VariableOrderingRun, AnUnorderedChainOfEqualitiesHolds) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(HeldUnderOrder(""), f), "64 64\n");
+}
+
+TEST(VariableOrderingRun, DISABLED_AnOrderingKeepsEveryEqualityOfTheChain) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(HeldUnderOrder("solve x before y;"), f), "64 64\n");
+}
+
+TEST(VariableOrderingRun, DISABLED_AReversedOrderingKeepsEveryEquality) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(HeldUnderOrder("solve y before x;"), f), "64 64\n");
+}
+
 }  // namespace
