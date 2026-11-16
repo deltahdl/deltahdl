@@ -575,4 +575,176 @@ TEST(RandsequenceProductionReturns,
                             5, "23.8"));
 }
 
+void ExpectReportAt(const std::string& src, std::string_view message,
+                    std::string_view anchor, const char* subclause) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                            LineHolding(src, anchor), subclause));
+}
+
+void ExpectNoErrors(const std::string& src) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(RandsequenceScope, DISABLED_UndeclaredProductionInAnInterfaceIsReported) {
+  ExpectReportAt(
+      "interface ifc;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : missing;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endinterface\n",
+      kItemNamesNoProduction, "main : missing", "18.17");
+}
+
+TEST(RandsequenceScope, UndeclaredProductionInAProgramIsReported) {
+  ExpectReportAt(
+      "program pg;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : missing;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endprogram\n",
+      kItemNamesNoProduction, "main : missing", "18.17");
+}
+
+TEST(RandsequenceScope, AnInnerStatementCannotNameAnOuterProduction) {
+  ExpectReportAt(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { randsequence(inner) inner : other; endsequence } ;\n"
+      "      other : { } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n",
+      kItemNamesNoProduction, "inner : other", "18.17");
+}
+
+TEST(RandsequenceScope, AnInnerStatementNamingItsOwnProductionIsAccepted) {
+  ExpectNoErrors(
+      "module m;\n"
+      "  initial begin\n"
+      "    randsequence(main)\n"
+      "      main : { randsequence(inner) inner : x; x : { }; endsequence } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(RandsequenceScope,
+     DISABLED_AHierarchicalReferenceIntoACodeBlockIsReported) {
+  ExpectReportAt(
+      "module m;\n"
+      "  int got;\n"
+      "  initial begin : b\n"
+      "    randsequence(main)\n"
+      "      main : { int v; v = 5; } ;\n"
+      "    endsequence\n"
+      "    got = b.main.v;\n"
+      "  end\n"
+      "endmodule\n",
+      "hierarchical reference to a variable declared in a randsequence code "
+      "block",
+      "got = b.main.v", "18.17");
+}
+
+TEST(RandsequenceScope, AReadOfACodeBlockVariableInsideTheBlockIsAccepted) {
+  ExpectNoErrors(
+      "module m;\n"
+      "  int got;\n"
+      "  initial begin : b\n"
+      "    randsequence(main)\n"
+      "      main : { int v; v = 5; got = v; } ;\n"
+      "    endsequence\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+std::string WithProduction(const std::string& production) {
+  return "module t;\n"
+         "  initial begin\n"
+         "    randsequence (main)\n"
+         "      main : a ;\n"
+         "      " +
+         production +
+         "\n"
+         "    endsequence\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(RandsequenceProductionReturns,
+     DISABLED_AValueReturnedFromAVoidProductionIsReported) {
+  ExpectReportAt(WithProduction("void a : { return 5; } ;"),
+                 "return in production 'a', which returns no value, gives a "
+                 "value",
+                 "void a", "18.17.7");
+}
+
+TEST(RandsequenceProductionReturns,
+     DISABLED_AValueReturnedFromAnUntypedProductionIsReported) {
+  ExpectReportAt(WithProduction("a : { return 5; } ;"),
+                 "return in production 'a', which returns no value, gives a "
+                 "value",
+                 "a : {", "18.17.7");
+}
+
+TEST(RandsequenceProductionReturns,
+     AValueLessReturnInAVoidProductionIsAccepted) {
+  ExpectNoErrors(WithProduction("void a : { return; } ;"));
+}
+
+std::string WithRule(const std::string& rule) {
+  return "module t;\n"
+         "  real r = 2.5;\n"
+         "  initial begin\n"
+         "    randsequence (main)\n"
+         "      main : " +
+         rule +
+         " ;\n"
+         "      a : { } ;\n"
+         "      b : { } ;\n"
+         "    endsequence\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(RandsequenceRepeat, DISABLED_ARealRepeatCountIsReported) {
+  ExpectReportAt(WithRule("repeat (2.5) a"),
+                 "randsequence repeat count shall be an integral expression",
+                 "main :", "18.17.4");
+}
+
+TEST(RandsequenceRepeat, DISABLED_ARealVariableRepeatCountIsReported) {
+  ExpectReportAt(WithRule("repeat (r) a"),
+                 "randsequence repeat count shall be an integral expression",
+                 "main :", "18.17.4");
+}
+
+TEST(RandsequenceRepeat, AnIntegralRepeatCountIsAccepted) {
+  ExpectNoErrors(WithRule("repeat (2) a"));
+}
+
+TEST(RandsequenceWeights, DISABLED_ARealWeightIsReported) {
+  ExpectReportAt(WithRule("a := (2.5) | b := 1"),
+                 "randsequence weight shall be an integral expression",
+                 "main :", "18.17.1");
+}
+
+TEST(RandsequenceWeights, DISABLED_ARealVariableWeightIsReported) {
+  ExpectReportAt(WithRule("a := (r) | b := 1"),
+                 "randsequence weight shall be an integral expression",
+                 "main :", "18.17.1");
+}
+
+TEST(RandsequenceWeights, IntegralWeightsAreAccepted) {
+  ExpectNoErrors(WithRule("a := (2) | b := 1"));
+}
+
 }  // namespace
