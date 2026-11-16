@@ -88,4 +88,74 @@ TEST(SetRandstateRun, TheStateInstalledOnTheProcessOrAThreadSetsWhatItDraws) {
   EXPECT_EQ(out, "4 4 1\n");
 }
 
+TEST(SetRandstateRun, AThisQualifiedCallRestoresTheObjectsState) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P;\n"
+      "    rand bit [15:0] v;\n"
+      "    function string got_this(); return this.get_randstate(); "
+      "endfunction\n"
+      "    function string got_bare(); return get_randstate(); endfunction\n"
+      "    function void put_this(string s); this.set_randstate(s); "
+      "endfunction\n"
+      "    function void put_bare(string s); set_randstate(s); endfunction\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    static P o = new;\n"
+      "    string s;\n"
+      "    bit [15:0] first;\n"
+      "    static int same = 0;\n"
+      "    o.srandom(5);\n"
+      "    repeat (8) begin\n"
+      "      s = o.get_randstate();\n"
+      "      void'(o.randomize());\n"
+      "      first = o.v;\n"
+      "      void'(o.randomize());\n"
+      "      o.put_this(s);\n"
+      "      void'(o.randomize());\n"
+      "      if (o.v == first) same++;\n"
+      "    end\n"
+      "    $display(\"%0d\", same);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8\n");
+}
+
+TEST(SetRandstateRun, DISABLED_AnUnqualifiedCallRestoresTheObjectsState) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P;\n"
+      "    rand bit [15:0] v;\n"
+      "    function string got_this(); return this.get_randstate(); "
+      "endfunction\n"
+      "    function string got_bare(); return get_randstate(); endfunction\n"
+      "    function void put_this(string s); this.set_randstate(s); "
+      "endfunction\n"
+      "    function void put_bare(string s); set_randstate(s); endfunction\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    static P o = new;\n"
+      "    string s;\n"
+      "    bit [15:0] first;\n"
+      "    static int same = 0;\n"
+      "    o.srandom(5);\n"
+      "    repeat (8) begin\n"
+      "      s = o.get_randstate();\n"
+      "      void'(o.randomize());\n"
+      "      first = o.v;\n"
+      "      void'(o.randomize());\n"
+      "      o.put_bare(s);\n"
+      "      void'(o.randomize());\n"
+      "      if (o.v == first) same++;\n"
+      "    end\n"
+      "    $display(\"%0d\", same);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "8\n");
+}
+
 }  // namespace

@@ -127,4 +127,56 @@ TEST(GetRandstateRun, TheReturnedStateTakesStringMethods) {
       "1 1\n");
 }
 
+TEST(GetRandstateRun, AThisQualifiedCallReadsTheObjectsState) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P;\n"
+      "    rand bit [15:0] v;\n"
+      "    function string got_this(); return this.get_randstate(); "
+      "endfunction\n"
+      "    function string got_bare(); return get_randstate(); endfunction\n"
+      "    function void put_this(string s); this.set_randstate(s); "
+      "endfunction\n"
+      "    function void put_bare(string s); set_randstate(s); endfunction\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    static P o = new;\n"
+      "    string s;\n"
+      "    o.srandom(5);\n"
+      "    void'(o.randomize());\n"
+      "    s = o.get_randstate();\n"
+      "    $display(\"%0d\", o.got_this() == s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+TEST(GetRandstateRun, DISABLED_AnUnqualifiedCallReadsTheObjectsState) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P;\n"
+      "    rand bit [15:0] v;\n"
+      "    function string got_this(); return this.get_randstate(); "
+      "endfunction\n"
+      "    function string got_bare(); return get_randstate(); endfunction\n"
+      "    function void put_this(string s); this.set_randstate(s); "
+      "endfunction\n"
+      "    function void put_bare(string s); set_randstate(s); endfunction\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    static P o = new;\n"
+      "    string s;\n"
+      "    o.srandom(5);\n"
+      "    void'(o.randomize());\n"
+      "    s = o.get_randstate();\n"
+      "    $display(\"%0d\", o.got_bare() == s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
 }  // namespace

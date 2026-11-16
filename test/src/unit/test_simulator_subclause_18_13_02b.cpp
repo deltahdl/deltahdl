@@ -82,4 +82,55 @@ TEST(UrandomRangeRun, ASeededThreadReplaysBesideABusierNeighbour) {
   EXPECT_EQ(out, "8\n");
 }
 
+TEST(UrandomRangeRun, NegativeActualsConvertToIntUnsigned) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int i, kept = 0, inside_band = 0;\n"
+      "  int unsigned r;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 32; i++) begin\n"
+      "      if ($urandom_range(-1, -1) == 32'hFFFF_FFFF) kept++;\n"
+      "      r = $urandom_range(-2, -3);\n"
+      "      if (r == 32'hFFFF_FFFD || r == 32'hFFFF_FFFE) inside_band++;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", kept, inside_band);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32 32\n");
+}
+
+TEST(UrandomRangeRun, ActualsWiderThanThirtyTwoBitsAreReduced) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int i, five = 0;\n"
+      "  initial begin\n"
+      "    for (i = 0; i < 32; i++)\n"
+      "      if ($urandom_range(64'h1_0000_0005, 64'h2_0000_0005) == 5) "
+      "five++;\n"
+      "    $display(\"%0d\", five);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "32\n");
+}
+
+TEST(UrandomRangeRun, TheResultIsUnsignedAsAnOperandAndThroughATypeReference) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  longint w;\n"
+      "  initial begin\n"
+      "    w = $urandom_range(-1, -1);\n"
+      "    $display(\"%0d %0d %0d\", w == 64'hFFFF_FFFF, $urandom_range(3, 3) "
+      "> -1,\n"
+      "             type($urandom_range(1))'(-1) > 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1\n");
+}
+
 }  // namespace

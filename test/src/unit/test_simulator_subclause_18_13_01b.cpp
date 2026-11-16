@@ -66,4 +66,65 @@ TEST(UrandomRun, EachCallIsANewUnsignedThirtyTwoBitNumber) {
   EXPECT_EQ(out, "32 32 1\n");
 }
 
+TEST(UrandomRun, EmptyParenthesesDrawFromTheSameSequence) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int unsigned a, b, z;\n"
+      "  initial begin\n"
+      "    z = $urandom(3);\n"
+      "    a = $urandom();\n"
+      "    z = $urandom(3);\n"
+      "    b = $urandom;\n"
+      "    $display(\"%0d\", a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1\n");
+}
+
+TEST(UrandomRun, TheResultIsUnsignedAsAnOperand) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  longint w;\n"
+      "  initial begin\n"
+      "    w = $urandom(9) | 32'h8000_0000;\n"
+      "    $display(\"%0d %0d\", $urandom > -1, w > 0);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1\n");
+}
+
+TEST(UrandomRun, AClassMethodAndAPackageFunctionReplayASeed) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package q;\n"
+      "  function automatic bit [63:0] two(int s);\n"
+      "    two[63:32] = $urandom(s);\n"
+      "    two[31:0] = $urandom;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  class C;\n"
+      "    function bit [63:0] two(int s);\n"
+      "      two[63:32] = $urandom(s);\n"
+      "      two[31:0] = $urandom;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  bit [63:0] a, b, c, d;\n"
+      "  initial begin\n"
+      "    static C o = new;\n"
+      "    a = o.two(11);\n"
+      "    b = o.two(11);\n"
+      "    c = q::two(12);\n"
+      "    d = q::two(12);\n"
+      "    $display(\"%0d %0d %0d\", a == b, c == d, a[63:32] != a[31:0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1\n");
+}
+
 }  // namespace

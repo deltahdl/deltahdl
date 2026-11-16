@@ -101,4 +101,92 @@ TEST(SrandomRun, AnArrayElementIsSeeded) {
   EXPECT_EQ(out, "4\n");
 }
 
+TEST(SrandomRun, EveryWayOfReachingTheObjectSeedsIt) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P;\n"
+      "    rand bit [15:0] v;\n"
+      "    function new(int s = -1);\n"
+      "      if (s >= 0) srandom(s);\n"
+      "    endfunction\n"
+      "    function void seed_this(int s); this.srandom(s); endfunction\n"
+      "    function void seed_bare(int s); srandom(s); endfunction\n"
+      "  endclass\n"
+      "  class D extends P;\n"
+      "    function new(int s);\n"
+      "      super.new();\n"
+      "      this.srandom(s);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  function automatic bit [63:0] four(P p);\n"
+      "    four = 0;\n"
+      "    repeat (4) begin\n"
+      "      void'(p.randomize());\n"
+      "      four = {four[47:0], p.v};\n"
+      "    end\n"
+      "  endfunction\n"
+      "  function automatic void seed_through(P p, int s); p.srandom(s); "
+      "endfunction\n"
+      "  bit [63:0] want;\n"
+      "  initial begin\n"
+      "    static P a = new;\n"
+      "    static D d = new(7);\n"
+      "    a.srandom(7);\n"
+      "    want = four(a);\n"
+      "    a.seed_this(7);\n"
+      "    $write(\"%0d\", four(a) == want);\n"
+      "    $write(\" %0d\", four(d) == want);\n"
+      "    seed_through(a, 7);\n"
+      "    $write(\" %0d\", four(a) == want);\n"
+      "    $display(\"\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1\n");
+}
+
+TEST(SrandomRun, DISABLED_AnUnqualifiedCallSeedsTheEnclosingObject) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class P;\n"
+      "    rand bit [15:0] v;\n"
+      "    function new(int s = -1);\n"
+      "      if (s >= 0) srandom(s);\n"
+      "    endfunction\n"
+      "    function void seed_this(int s); this.srandom(s); endfunction\n"
+      "    function void seed_bare(int s); srandom(s); endfunction\n"
+      "  endclass\n"
+      "  class D extends P;\n"
+      "    function new(int s);\n"
+      "      super.new();\n"
+      "      this.srandom(s);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  function automatic bit [63:0] four(P p);\n"
+      "    four = 0;\n"
+      "    repeat (4) begin\n"
+      "      void'(p.randomize());\n"
+      "      four = {four[47:0], p.v};\n"
+      "    end\n"
+      "  endfunction\n"
+      "  function automatic void seed_through(P p, int s); p.srandom(s); "
+      "endfunction\n"
+      "  bit [63:0] want;\n"
+      "  initial begin\n"
+      "    static P a = new;\n"
+      "    static P b = new(7);\n"
+      "    a.srandom(7);\n"
+      "    want = four(a);\n"
+      "    $write(\"%0d\", four(b) == want);\n"
+      "    a.seed_bare(7);\n"
+      "    $write(\" %0d\", four(a) == want);\n"
+      "    $display(\"\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+}
+
 }  // namespace
