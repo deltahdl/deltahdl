@@ -109,4 +109,32 @@ TEST(DynamicConstraintModificationRun, ChangedWeightsMoveTheDistribution) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
+TEST(DynamicConstraintModificationRun, ANewObjectStartsWithEverythingActive) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "class B;\n"
+      "  rand bit [3:0] a;\n"
+      "  randc bit [3:0] b;\n"
+      "  constraint ba { a == 2; }\n"
+      "endclass\n"
+      "class D extends B;\n"
+      "  rand bit [3:0] c;\n"
+      "  randc bit [3:0] d;\n"
+      "  constraint dc { c == 7; }\n"
+      "endclass\n"
+      "module t;\n"
+      "  initial begin\n"
+      "    static D o = new;\n"
+      "    $display(\"%0d%0d%0d%0d %0d%0d\", o.a.rand_mode(), "
+      "o.b.rand_mode(),\n"
+      "             o.c.rand_mode(), o.d.rand_mode(), o.ba.constraint_mode(),\n"
+      "             o.dc.constraint_mode());\n"
+      "    void'(o.randomize());\n"
+      "    $display(\"%0d %0d\", o.a, o.c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1111 11\n2 7\n");
+}
+
 }  // namespace
