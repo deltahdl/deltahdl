@@ -220,4 +220,25 @@ TEST(ConstraintModeCases, ABaseHandleNamesABlockOfTheDerivedObject) {
             "0 1\n");
 }
 
+TEST(ConstraintModeCases,
+     DISABLED_AMemberHandleInTheHoldersMethodTurnsItsObjectsBlockOff) {
+  EXPECT_EQ(RunSrc("class A; rand bit [3:0] v; constraint bad { v == 3; } "
+                   "endclass\n"
+                   "class C;\n"
+                   "  rand A a = new;\n"
+                   "  constraint c { a.v != 3; }\n"
+                   "  function void off(); a.bad.constraint_mode(0); "
+                   "endfunction\n"
+                   "endclass\n"
+                   "module t;\n"
+                   "  initial begin\n"
+                   "    static C o = new;\n"
+                   "    o.off();\n"
+                   "    $display(\"%0d %0d\", o.a.bad.constraint_mode(), "
+                   "o.randomize());\n"
+                   "  end\n"
+                   "endmodule\n"),
+            "0 1\n");
+}
+
 }  // namespace
