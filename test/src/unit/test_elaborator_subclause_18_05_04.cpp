@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -620,9 +621,243 @@ TEST(UniqueMemberForms, EquivalentMemberTypesAccepted) {
              "  rand bit [7:0] x;\n"
              "  rand int_t n;\n"
              "  constraint u { unique {b, arr[2:3], arr, s8}; }\n"
-             "  constraint v { unique {b, x[3:0]}; unique {n, b}; }\n"
+             "  constraint v { unique {b, arr}; }\n"
              "endclass\n"
              "module m; endmodule\n"));
+}
+
+void ExpectUniqueReport(const std::string& src, const std::string& msg,
+                        int line) {
+  ElabFixture f;
+  ElabOk(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, line, "18.5.4")) << src;
+}
+
+void ExpectUniqueAccepted(const std::string& src) {
+  ElabFixture f;
+  EXPECT_TRUE(ElabOk(src, f)) << src;
+}
+
+std::string InClass(const std::string& decls, const std::string& item) {
+  return "class C;\n" + decls + "  constraint u { " + item +
+         " }\n"
+         "endclass\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+std::string OutOfBlock(const std::string& decls, const std::string& item) {
+  return "class C;\n" + decls +
+         "  constraint u;\n"
+         "endclass\n"
+         "constraint C::u { " +
+         item +
+         " }\n"
+         "module m;\n"
+         "endmodule\n";
+}
+
+std::string Inline(const std::string& decls, const std::string& item) {
+  return "class C;\n" + decls +
+         "endclass\n"
+         "module m;\n"
+         "  initial begin\n"
+         "    static C o = new;\n"
+         "    void'(o.randomize() with { " +
+         item +
+         " });\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string Scope(const std::string& decls, const std::string& vars,
+                  const std::string& item) {
+  return "module m;\n" + decls +
+         "  initial begin\n"
+         "    void'(std::randomize(" +
+         vars + ") with { " + item +
+         " });\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+const char* const kDenote =
+    "a uniqueness constraint member shall denote a singular or array variable";
+const char* const kIntegralOrReal =
+    "a uniqueness constraint member shall be of integral or real type";
+const char* const kEquivalent =
+    "the members of a uniqueness constraint shall be of equivalent types";
+const char* const kRandc =
+    "a uniqueness constraint member shall not be a randc variable";
+
+const char* const kForms =
+    "  rand bit [7:0] a;\n"
+    "  rand bit [7:0] b[3];\n"
+    "  rand bit [7:0] d[];\n"
+    "  rand bit [7:0] q[$];\n"
+    "  rand bit [7:0] w[int];\n"
+    "  rand bit [7:0] t[2][3];\n"
+    "  rand bit [15:0] x;\n"
+    "  string ss[2];\n"
+    "  C hh[2];\n"
+    "  function bit [7:0] g();\n"
+    "    return 1;\n"
+    "  endfunction\n";
+
+TEST(UniqueMemberForms, ElementsAndArraysOfEveryKindAreAccepted) {
+  ExpectUniqueAccepted(InClass(kForms, "unique {a, b[1]};"));
+  ExpectUniqueAccepted(InClass(kForms, "unique {a, d, q, w};"));
+  ExpectUniqueAccepted(InClass(kForms, "unique {a, t[1]};"));
+}
+
+TEST(UniqueMemberForms, AFunctionCallIsReported) {
+  ExpectUniqueReport(InClass(kForms, "unique {a, g()};"), kDenote, 14);
+}
+
+TEST(UniqueMemberForms, StringAndHandleArraysAreReported) {
+  ExpectUniqueReport(InClass(kForms, "unique {ss};"), kIntegralOrReal, 14);
+  ExpectUniqueReport(InClass(kForms, "unique {hh};"), kIntegralOrReal, 14);
+}
+
+TEST(UniqueMemberForms, DISABLED_AValueRangeIsReported) {
+  ExpectUniqueReport(InClass(kForms, "unique {a, [1:3]};"), kDenote, 14);
+}
+
+TEST(UniqueMemberForms, DISABLED_APackedPartSelectIsReported) {
+  ExpectUniqueReport(InClass(kForms, "unique {a, x[7:0]};"), kDenote, 14);
+}
+
+const char* const kScopeVars =
+    "  bit [7:0] a;\n"
+    "  bit [15:0] x;\n"
+    "  string ss[2];\n";
+const char* const kSmall =
+    "  rand bit [7:0] a;\n"
+    "  rand bit [15:0] x;\n"
+    "  string ss[2];\n";
+
+TEST(UniqueMemberForms, ForbiddenFormsOutOfBlockAreReported) {
+  ExpectUniqueReport(OutOfBlock(kSmall, "unique {a, 5};"), kDenote, 7);
+  ExpectUniqueReport(OutOfBlock(kSmall, "unique {ss};"), kIntegralOrReal, 7);
+}
+
+TEST(UniqueMemberForms, DISABLED_RangesAndPartSelectsOutOfBlockAreReported) {
+  ExpectUniqueReport(OutOfBlock(kSmall, "unique {a, [1:3]};"), kDenote, 7);
+  ExpectUniqueReport(OutOfBlock(kSmall, "unique {a, x[7:0]};"), kDenote, 7);
+}
+
+TEST(UniqueMemberForms, ForbiddenFormsInlineAreReported) {
+  ExpectUniqueReport(Inline(kSmall, "unique {a, 5};"), kDenote, 9);
+  ExpectUniqueReport(Inline(kSmall, "unique {ss};"), kIntegralOrReal, 9);
+}
+
+TEST(UniqueMemberForms, DISABLED_RangesAndPartSelectsInlineAreReported) {
+  ExpectUniqueReport(Inline(kSmall, "unique {a, [1:3]};"), kDenote, 9);
+  ExpectUniqueReport(Inline(kSmall, "unique {a, x[7:0]};"), kDenote, 9);
+}
+
+TEST(UniqueMemberForms, DISABLED_ForbiddenFormsInAScopeRandomizeAreReported) {
+  ExpectUniqueReport(Scope(kScopeVars, "a", "unique {a, 5};"), kDenote, 6);
+  ExpectUniqueReport(Scope(kScopeVars, "a", "unique {ss};"), kIntegralOrReal,
+                     6);
+}
+
+TEST(UniqueMemberForms,
+     DISABLED_RangesAndPartSelectsInAScopeRandomizeAreReported) {
+  ExpectUniqueReport(Scope(kScopeVars, "a", "unique {a, [1:3]};"), kDenote, 6);
+  ExpectUniqueReport(Scope(kScopeVars, "a, x", "unique {a, x[7:0]};"), kDenote,
+                     6);
+}
+
+const char* const kTypedefs =
+    "typedef int int_t;\n"
+    "typedef byte byte_t;\n";
+
+TEST(UniqueMemberTypes, DISABLED_AByteBesideATypedefOfIntIsReported) {
+  ExpectUniqueReport(
+      std::string(kTypedefs) +
+          InClass("  rand byte a;\n  rand int_t n;\n", "unique {a, n};"),
+      kEquivalent, 6);
+}
+
+TEST(UniqueMemberTypes, AByteBesideATypedefOfByteIsAccepted) {
+  ExpectUniqueAccepted(
+      std::string(kTypedefs) +
+      InClass("  rand byte a;\n  rand byte_t n;\n", "unique {a, n};"));
+}
+
+TEST(UniqueMemberTypes, IntBesideRealAndRealBesideShortrealAreReported) {
+  ExpectUniqueReport(
+      InClass("  rand int a;\n  rand real r;\n", "unique {a, r};"), kEquivalent,
+      4);
+  ExpectUniqueReport(
+      InClass("  rand real r;\n  rand shortreal s;\n", "unique {r, s};"),
+      kEquivalent, 4);
+}
+
+TEST(UniqueMemberTypes, ByteLeavesBesideAnIntAreReported) {
+  ExpectUniqueReport(
+      InClass("  rand byte arr[3];\n  rand int n;\n", "unique {arr, n};"),
+      kEquivalent, 4);
+}
+
+TEST(UniqueMemberTypes, StateCountAndSignednessDifferencesAreReported) {
+  ExpectUniqueReport(InClass("  rand logic [7:0] l;\n"
+                             "  rand bit signed [7:0] s;\n",
+                             "unique {l, s};"),
+                     kEquivalent, 4);
+}
+
+TEST(UniqueMemberTypes, InequivalentTypesOutOfBlockAreReported) {
+  ExpectUniqueReport(
+      OutOfBlock("  rand byte a;\n  rand int n;\n", "unique {a, n};"),
+      kEquivalent, 6);
+}
+
+TEST(UniqueMemberTypes,
+     DISABLED_InequivalentTypesInAScopeRandomizeAreReported) {
+  ExpectUniqueReport(Scope("  byte a;\n  int n;\n", "a, n", "unique {a, n};"),
+                     kEquivalent, 5);
+}
+
+TEST(UniqueMemberTypes, DISABLED_TypedefsOutOfBlockAndInAScopeRandomize) {
+  ExpectUniqueReport(
+      std::string(kTypedefs) +
+          OutOfBlock("  rand byte a;\n  rand int_t n;\n", "unique {a, n};"),
+      kEquivalent, 8);
+  ExpectUniqueReport(std::string(kTypedefs) + Scope("  byte a;\n  int_t n;\n",
+                                                    "a, n", "unique {a, n};"),
+                     kEquivalent, 7);
+}
+
+TEST(UniqueMemberForms, ARandcArrayMemberIsReported) {
+  ExpectUniqueReport(InClass("  randc bit [1:0] a[3];\n", "unique {a};"),
+                     kRandc, 3);
+}
+
+const char* const kNested =
+    "  rand bit m;\n"
+    "  rand bit [3:0] a;\n"
+    "  randc bit [3:0] b;\n"
+    "  rand bit [3:0] r[2];\n";
+
+TEST(UniqueMemberForms, DISABLED_ARandcMemberInsideAnIfIsReported) {
+  ExpectUniqueReport(InClass(kNested, "if (m) unique {a, b};"), kRandc, 6);
+}
+
+TEST(UniqueMemberForms, DISABLED_ARandcMemberInAnImplicationIsReported) {
+  ExpectUniqueReport(InClass(kNested, "m -> unique {a, b};"), kRandc, 6);
+}
+
+TEST(UniqueMemberForms, DISABLED_ARandcMemberInsideAForeachIsReported) {
+  ExpectUniqueReport(InClass(kNested, "foreach (r[i]) unique {r[i], b};"),
+                     kRandc, 6);
+}
+
+TEST(UniqueMemberForms, NestedGroupsOfRandMembersAreAccepted) {
+  ExpectUniqueAccepted(InClass(kNested, "if (m) unique {a, r[0]};"));
+  ExpectUniqueAccepted(InClass(kNested, "m -> unique {a, r[0]};"));
+  ExpectUniqueAccepted(InClass(kNested, "foreach (r[i]) unique {r[i], a};"));
 }
 
 }  // namespace

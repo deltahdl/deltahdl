@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_class.h"
 
 using namespace delta;
@@ -60,6 +63,38 @@ TEST(ConstraintUniqueParsing, UniqueCapturedAlongsideRelations) {
   ASSERT_NE(c, nullptr);
   EXPECT_EQ(c->constraint_unique_refs.size(), 1u);
   EXPECT_FALSE(c->constraint_exprs.empty());
+}
+
+std::string UniqueItem(const std::string& item) {
+  return "class C;\n"
+         "  rand byte a;\n"
+         "  rand byte b;\n"
+         "  constraint k { " +
+         item +
+         " }\n"
+         "endclass\n";
+}
+
+const char* const kNoParse =
+    "the constraint block's items do not parse from here";
+
+TEST(ConstraintUniqueParsing, AGroupWithItsSemicolonIsAccepted) {
+  EXPECT_FALSE(Parse(UniqueItem("unique {a, b};")).has_errors);
+}
+
+TEST(ConstraintUniqueParsing, TheSemicolonLeftOffIsRejected) {
+  auto r = Parse(UniqueItem("unique {a, b}"));
+  EXPECT_TRUE(ReportedError(r.diags, kNoParse, 4, "A.1.10"));
+}
+
+TEST(ConstraintUniqueParsing, AnEmptyGroupIsRejected) {
+  auto r = Parse(UniqueItem("unique {};"));
+  EXPECT_TRUE(ReportedError(r.diags, kNoParse, 4, "A.1.10"));
+}
+
+TEST(ConstraintUniqueParsing, TheBracesLeftOffAreRejected) {
+  auto r = Parse(UniqueItem("unique a, b;"));
+  EXPECT_TRUE(ReportedError(r.diags, kNoParse, 4, "A.1.10"));
 }
 
 }  // namespace
