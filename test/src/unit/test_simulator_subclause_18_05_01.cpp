@@ -234,4 +234,28 @@ TEST(ExternalConstraintBlocksRun, ASolveBeforeInTheBlockHolds) {
             5);
 }
 
+TEST(ExternalConstraintBlocksRun, ABlockAfterTheClassInAnInterfaceHolds) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface ifc;\n"
+      "  class C;\n"
+      "    rand bit [7:0] x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "  constraint C::p { x == 42; }\n"
+      "  int got;\n"
+      "  initial begin\n"
+      "    static C c = new;\n"
+      "    void'(c.randomize());\n"
+      "    got = c.x;\n"
+      "  end\n"
+      "endinterface\n"
+      "module t;\n"
+      "  ifc u();\n"
+      "  initial #1 $display(\"%0d\", u.got);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "42\n");
+}
+
 }  // namespace

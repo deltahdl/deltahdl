@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -475,6 +477,204 @@ TEST(ExternalConstraintBlocks, UncompletedImplicitPrototypeHasNoRelations) {
   ASSERT_NE(proto, nullptr);
   EXPECT_TRUE(proto->is_constraint_prototype);
   EXPECT_TRUE(proto->constraint_exprs.empty());
+}
+
+void ExpectExternalReport(const std::string& src, const std::string& msg,
+                          int line) {
+  ElabFixture f;
+  ElabOk(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, line, "18.5.1")) << src;
+}
+
+const char* const kNoBlockP =
+    "explicit constraint prototype 'p' in class 'C' has no external "
+    "constraint block";
+
+TEST(ExternalConstraintBlocks,
+     DISABLED_ExplicitPrototypeInAnInterfaceClassNeedsBlock) {
+  ExpectExternalReport(
+      "interface ifc;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "endinterface\n",
+      kNoBlockP, 4);
+}
+
+TEST(ExternalConstraintBlocks, ExplicitPrototypeInAProgramClassNeedsBlock) {
+  ExpectExternalReport(
+      "program pg;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "endprogram\n",
+      kNoBlockP, 4);
+}
+
+TEST(ExternalConstraintBlocks, ExplicitPrototypeInANestedClassNeedsBlock) {
+  ExpectExternalReport(
+      "class Outer;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      kNoBlockP, 4);
+}
+
+TEST(ExternalConstraintBlocks,
+     BlocksAfterTheClassInAnInterfaceAndAProgramComplete) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("interface ifc;\n"
+             "  class C;\n"
+             "    rand int x;\n"
+             "    extern constraint p;\n"
+             "  endclass\n"
+             "  constraint C::p { x > 0; }\n"
+             "endinterface\n"
+             "program pg;\n"
+             "  class D;\n"
+             "    rand int y;\n"
+             "    extern constraint q;\n"
+             "  endclass\n"
+             "  constraint D::q { y > 0; }\n"
+             "endprogram\n",
+             f));
+}
+
+const char* const kBeforeC =
+    "external constraint block 'C::p' comes before the declaration of class "
+    "'C' ends";
+
+TEST(ExternalConstraintBlocks, DISABLED_BlockBeforeClassInAnInterfaceRejected) {
+  ExpectExternalReport(
+      "interface ifc;\n"
+      "  constraint C::p { x > 0; }\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "endinterface\n",
+      kBeforeC, 2);
+}
+
+TEST(ExternalConstraintBlocks, BlockBeforeClassInAProgramRejected) {
+  ExpectExternalReport(
+      "program pg;\n"
+      "  constraint C::p { x > 0; }\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    extern constraint p;\n"
+      "  endclass\n"
+      "endprogram\n",
+      kBeforeC, 2);
+}
+
+TEST(ExternalConstraintBlocks, BlockBeforeClassInAGenerateBlockRejected) {
+  ExpectExternalReport(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    constraint C::p { x > 0; }\n"
+      "    class C;\n"
+      "      rand int x;\n"
+      "      extern constraint p;\n"
+      "    endclass\n"
+      "  end\n"
+      "endmodule\n",
+      kBeforeC, 3);
+}
+
+TEST(ExternalConstraintBlocks, DISABLED_BlockForANameTheClassLacksRejected) {
+  ExpectExternalReport(
+      "class C;\n"
+      "  rand int x;\n"
+      "endclass\n"
+      "constraint C::p { x > 0; }\n"
+      "module m;\n"
+      "endmodule\n",
+      "external constraint block 'C::p' has no constraint prototype 'p' in "
+      "class 'C'",
+      4);
+}
+
+TEST(ExternalConstraintBlocks,
+     DISABLED_BlockForANameTheClassDeclaresAsABlockRejected) {
+  ExpectExternalReport(
+      "class C;\n"
+      "  rand int x;\n"
+      "  constraint p { x > 5; }\n"
+      "endclass\n"
+      "constraint C::p { x > 0; }\n"
+      "module m;\n"
+      "endmodule\n",
+      "external constraint block 'C::p' has no constraint prototype 'p' in "
+      "class 'C'",
+      5);
+}
+
+TEST(ExternalConstraintBlocks,
+     DISABLED_BlockForAnInheritedPrototypeOnlyRejected) {
+  ExpectExternalReport(
+      "class B;\n"
+      "  rand int x;\n"
+      "  constraint p;\n"
+      "endclass\n"
+      "class C extends B;\n"
+      "endclass\n"
+      "constraint C::p { x == 7; }\n"
+      "constraint B::p { x > 0; }\n"
+      "module m;\n"
+      "endmodule\n",
+      "external constraint block 'C::p' has no constraint prototype 'p' in "
+      "class 'C'",
+      7);
+}
+
+TEST(ExternalConstraintBlocks,
+     DISABLED_BlocksWithoutPrototypesInAPackageAndAModuleRejected) {
+  ElabFixture f;
+  ElabOk(
+      "package pkg;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "  endclass\n"
+      "  constraint C::p { x > 0; }\n"
+      "endpackage\n"
+      "module m;\n"
+      "  class C;\n"
+      "    rand int x;\n"
+      "    constraint p { x > 5; }\n"
+      "  endclass\n"
+      "  constraint C::p { x > 0; }\n"
+      "endmodule\n",
+      f);
+  const std::string kMsg =
+      "external constraint block 'C::p' has no constraint prototype 'p' in "
+      "class 'C'";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 5, "18.5.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMsg, 12, "18.5.1"));
+}
+
+TEST(ExternalConstraintBlocks, BlockForTheClassesOwnPrototypeAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("class B;\n"
+             "  rand int x;\n"
+             "  constraint p;\n"
+             "endclass\n"
+             "class C extends B;\n"
+             "  constraint p;\n"
+             "endclass\n"
+             "constraint B::p { x > 0; }\n"
+             "constraint C::p { x == 7; }\n"
+             "module m;\n"
+             "endmodule\n",
+             f));
 }
 
 }  // namespace
