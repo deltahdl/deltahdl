@@ -318,4 +318,126 @@ TEST(CovergroupInstanceSim, BinsReadTheGenerateBlockGenvar) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+std::string SimOk(const std::string& src) {
+  SimFixture f;
+  const std::string kOut = RunCapture(src, f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  return kOut;
+}
+
+TEST(CovergroupInstanceSim, AnImplicitDataTypeConvertsTheSample) {
+  EXPECT_EQ(SimOk("module top;\n"
+                  "  bit [7:0] v; int n, t;\n"
+                  "  covergroup cg;\n"
+                  "    [1:0] lo: coverpoint v;\n"
+                  "  endgroup\n"
+                  "  cg c = new;\n"
+                  "  initial begin\n"
+                  "    v = 8'h05; c.sample();\n"
+                  "    void'(c.get_inst_coverage(n, t));\n"
+                  "    $display(\"n=%0d t=%0d\", n, t);\n"
+                  "  end\n"
+                  "endmodule\n"),
+            "n=1 t=4\n");
+}
+
+TEST(CovergroupInstanceSim, AnIntDataTypeOverARealSamplesTheConvertedValue) {
+  EXPECT_EQ(
+      SimOk("module top;\n"
+            "  real r;\n"
+            "  covergroup cg;\n"
+            "    int ic: coverpoint r { bins one = {1}; bins two = {2}; }\n"
+            "  endgroup\n"
+            "  cg c = new;\n"
+            "  initial begin\n"
+            "    r = 1.4; c.sample();\n"
+            "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+            "  end\n"
+            "endmodule\n"),
+      "50.00\n");
+}
+
+const char* const kVif =
+    "interface ifc;\n"
+    "  logic [1:0] v;\n"
+    "  logic en;\n"
+    "endinterface\n"
+    "class C;\n"
+    "  virtual ifc w;\n"
+    "  bit x;\n";
+
+const char* const kVifTop =
+    "module top;\n"
+    "  ifc u();\n"
+    "  initial begin\n"
+    "    static C o = new(u);\n";
+
+TEST(CovergroupInstanceSim, ACoverpointReadsAVirtualInterfaceMember) {
+  EXPECT_EQ(SimOk(std::string(kVif) +
+                  "  covergroup cg;\n"
+                  "    coverpoint w.v { bins a = {1}; bins b = {3}; }\n"
+                  "  endgroup\n"
+                  "  function new(virtual ifc h); w = h; cg = new; "
+                  "endfunction\n"
+                  "endclass\n" +
+                  kVifTop +
+                  "    u.v = 3; o.cg.sample();\n"
+                  "    $display(\"%0.2f\", o.cg.get_inst_coverage());\n"
+                  "  end\n"
+                  "endmodule\n"),
+            "50.00\n");
+}
+
+TEST(CovergroupInstanceSim, AnIffGuardReadsAVirtualInterfaceMember) {
+  EXPECT_EQ(
+      SimOk(std::string(kVif) +
+            "  covergroup cg;\n"
+            "    coverpoint x iff (w.en) { bins z = {0}; bins o = {1}; }\n"
+            "  endgroup\n"
+            "  function new(virtual ifc h); w = h; cg = new; "
+            "endfunction\n"
+            "endclass\n" +
+            kVifTop +
+            "    u.en = 0; o.x = 0; o.cg.sample();\n"
+            "    u.en = 1; o.x = 1; o.cg.sample();\n"
+            "    $display(\"%0.2f\", o.cg.get_inst_coverage());\n"
+            "  end\n"
+            "endmodule\n"),
+      "50.00\n");
+}
+
+std::string ClockedRun(const char* skew, const char* bin) {
+  return std::string(
+             "module top;\n"
+             "  bit clk;\n"
+             "  bit [1:0] v;\n"
+             "  clocking cb @(posedge clk);\n"
+             "    input ") +
+         skew +
+         " v;\n"
+         "  endclocking\n"
+         "  covergroup cg;\n"
+         "    coverpoint cb.v { " +
+         bin +
+         " }\n"
+         "  endgroup\n"
+         "  cg c = new;\n"
+         "  initial begin\n"
+         "    v = 3;\n"
+         "    #5 clk = 1; v = 2;\n"
+         "    #1 c.sample();\n"
+         "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(CovergroupInstanceSim, DISABLED_AStepSkewClockvarSamplesThePreponedValue) {
+  EXPECT_EQ(SimOk(ClockedRun("#1step", "bins three = {3};")), "100.00\n");
+}
+
+TEST(CovergroupInstanceSim, DISABLED_AZeroSkewClockvarSamplesTheObservedValue) {
+  EXPECT_EQ(SimOk(ClockedRun("#0", "bins two = {2};")), "100.00\n");
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -431,6 +432,299 @@ TEST(CovergroupExpressionNames, EmbeddedCovergroupReadsItsClassAndScope) {
                             "covergroup_expression",
                             13, "19.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+std::string CallIn(const std::string& bin) {
+  return "module m;\n"
+         "  int v, g;\n"
+         "  function automatic int fo(int a, output int b); b = a; return a; "
+         "endfunction\n"
+         "  function automatic int fi(int a, inout int b); return a; "
+         "endfunction\n"
+         "  function automatic int bump(ref int x); x++; return x; "
+         "endfunction\n"
+         "  function int count(); static int n = 0; n++; return n; "
+         "endfunction\n"
+         "  function automatic int outer(); return g; endfunction\n"
+         "  covergroup cg;\n"
+         "    coverpoint v {\n"
+         "      " +
+         bin +
+         "\n"
+         "    }\n"
+         "  endgroup\n"
+         "endmodule\n";
+}
+
+std::string Placed(const std::string& place, const std::string& call) {
+  std::string out = place;
+  out.replace(out.find('@'), 1, call);
+  return out;
+}
+
+const char* const kCallPlaces[] = {
+    "bins x = {@};", "bins x = {[0:15]} with (item < @);",
+    "bins x[@] = {[0:3]};", "bins x = (@ => 2);"};
+
+TEST(CovergroupExpressionCalls, ARestrictedCallIsErrorInEveryPosition) {
+  struct Call {
+    const char* text;
+    const char* message;
+  };
+  const Call kCalls[] = {
+      {"fo(1, g)",
+       "function 'fo' has an output, inout or ref argument and cannot be "
+       "called in a covergroup_expression"},
+      {"fi(1, g)",
+       "function 'fi' has an output, inout or ref argument and cannot be "
+       "called in a covergroup_expression"},
+      {"bump(g)",
+       "function 'bump' has an output, inout or ref argument and cannot be "
+       "called in a covergroup_expression"},
+      {"count()",
+       "function 'count' keeps state or has a side effect and cannot be "
+       "called in a covergroup_expression"},
+      {"outer()",
+       "function 'outer' reads 'g', a variable outside it that is no "
+       "constant, and cannot be called in a covergroup_expression"},
+      {"$urandom()",
+       "system function '$urandom' is no constant system function and cannot "
+       "be called in a covergroup_expression"}};
+  for (const char* place : kCallPlaces) {
+    for (const Call& call : kCalls) {
+      ElabFixture f;
+      ElaborateSrc(CallIn(Placed(place, call.text)), f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), call.message, 10, "19.5"))
+          << place << " " << call.text;
+    }
+  }
+}
+
+TEST(CovergroupExpressionCalls, AConstRefArgumentIsAcceptedInEveryPosition) {
+  for (const char* place : kCallPlaces) {
+    ElabFixture f;
+    ElaborateSrc(
+        "module m;\n"
+        "  int v;\n"
+        "  parameter int P = 2;\n"
+        "  function automatic int fc(int a, const ref int b); return a; "
+        "endfunction\n"
+        "  covergroup cg;\n"
+        "    coverpoint v {\n"
+        "      " +
+            Placed(place, "fc(2, P)") +
+            "\n"
+            "    }\n"
+            "  endgroup\n"
+            "endmodule\n",
+        f);
+    EXPECT_EQ(f.diag.ErrorCount(), 0u) << place;
+  }
+}
+
+TEST(CovergroupExpressionCalls,
+     DISABLED_ARestrictedCallInASetExpressionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef int arr_t[2];\n"
+      "  int v, g;\n"
+      "  function automatic arr_t fa(int a, output int b); arr_t r; return r; "
+      "endfunction\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins s[] = fa(1, g); }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "function 'fa' has an output, inout or ref "
+                            "argument and cannot be called in a "
+                            "covergroup_expression",
+                            6, "19.5"));
+}
+
+TEST(CovergroupExpressionNames,
+     DISABLED_ASetExpressionReadingANonConstantIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  int q[2];\n"
+      "  covergroup cg (ref int r[2]);\n"
+      "    coverpoint v { bins s1[] = q; bins s2[] = r; }\n"
+      "  endgroup\n"
+      "  class C;\n"
+      "    bit [3:0] x; int pa[2];\n"
+      "    covergroup k; coverpoint x { bins s[] = pa; } endgroup\n"
+      "    function new(); k = new; endfunction\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'q' is no constant and cannot be read in a "
+                            "covergroup_expression",
+                            5, "19.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'r' is a ref formal of covergroup 'cg' and cannot "
+                            "be read in a covergroup_expression",
+                            5, "19.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'pa' is no constant and cannot be read in a "
+                            "covergroup_expression",
+                            9, "19.5"));
+}
+
+TEST(CovergroupExpressionNames, ASetExpressionReadingAConstantIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  parameter int P[2] = '{1, 2};\n"
+      "  const int K[2] = '{3, 4};\n"
+      "  covergroup cg (input int fi[2]);\n"
+      "    coverpoint v { bins s1[] = P; bins s2[] = K; bins s3[] = fi; }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupExpressionNames,
+     DISABLED_AnotherObjectsInstanceConstantIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class K;\n"
+      "  const int k;\n"
+      "  function new(); k = 5; endfunction\n"
+      "endclass\n"
+      "class C;\n"
+      "  K o;\n"
+      "  bit [3:0] x;\n"
+      "  covergroup cg;\n"
+      "    coverpoint x { bins b = {[0:o.k]}; }\n"
+      "  endgroup\n"
+      "  function new(); o = new; cg = new; endfunction\n"
+      "endclass\n"
+      "module m; endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'o.k' is an instance constant of another object "
+                            "and cannot be read in a covergroup_expression",
+                            9, "19.5"));
+}
+
+TEST(CoverpointTypes, DISABLED_AnEnumTypeOverAnIntExpressionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  int i;\n"
+      "  covergroup cg;\n"
+      "    e_t ec: coverpoint i;\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the expression of coverpoint 'ec' is not "
+                            "assignment compatible with its data type",
+                            5, "19.5"));
+}
+
+TEST(CoverpointTypes, AnEnumTypeOverItsOwnEnumExpressionIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  e_t e;\n"
+      "  bit [7:0] v;\n"
+      "  covergroup cg;\n"
+      "    e_t ec: coverpoint e;\n"
+      "    [1:0] lo: coverpoint v;\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverpointBinNames, DISABLED_ABinNameDeclaredTwiceInOneCoverpointIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v {\n"
+      "      bins a = {0};\n"
+      "      bins a = {1};\n"
+      "      ignore_bins a = {2};\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bin 'a' is already declared in this coverpoint", 6,
+                            "19.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "bin 'a' is already declared in this coverpoint", 7,
+                            "19.5"));
+}
+
+TEST(CoverpointBinNames, OneBinNameInTwoCoverpointsIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v, w;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins a = {0}; }\n"
+      "    coverpoint w { bins a = {0}; }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverpointNameVisibility, DISABLED_ABareCoverpointNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v;\n"
+      "  int z;\n"
+      "  covergroup cg;\n"
+      "    e: coverpoint v;\n"
+      "    e.option.weight = 2;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial z = e.option.weight;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {6u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "coverpoint 'e' can be named only in a cross, "
+                              "after a covergroup variable or after a "
+                              "covergroup type and ::",
+                              line, "19.5"))
+        << line;
+  }
+}
+
+TEST(CoverpointNameVisibility, ACoverpointNamedInEachAllowedPlaceIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [3:0] v, w;\n"
+      "  int z, y;\n"
+      "  covergroup cg;\n"
+      "    e: coverpoint v;\n"
+      "    d: coverpoint w;\n"
+      "    x: cross e, d;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    z = c.e.option.weight;\n"
+      "    y = cg::e::type_option.weight;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace
