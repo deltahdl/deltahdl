@@ -3,8 +3,16 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
+#include <string>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
+#include "driver/cli_options.h"
+#include "driver/protect_license_libraries.h"
+#include "driver/source_units.h"
 #include "fixture_preprocessor.h"
+#include "fixture_scratch_dir.h"
+#include "helpers_include_test_dir.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
@@ -252,4 +260,89 @@ TEST(Preprocessor, FileAfterALineNamingTheEmptyNameIsEmpty) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("\n\"\"\n"), std::string::npos) << out;
   EXPECT_NE(out.find("x = \"\";"), std::string::npos) << out;
+}
+
+static std::string PreprocessedFromTheCommandLine(const std::string& arg) {
+  CliOptions opts;
+  opts.source_files.push_back(arg);
+  SourceManager mgr;
+  DiagEngine diag(mgr);
+  ProtectLicenseLibraries licenses;
+  return PreprocessSources(opts, mgr, diag, licenses).source;
+}
+
+TEST(FileAndLineMacroPreprocessing, File_NamesARelativeCommandLineArgument) {
+  ScratchWorkingDir cwd;
+  cwd.Write("sub/rel.sv", "name `__FILE__\n");
+  auto out = PreprocessedFromTheCommandLine("sub/rel.sv");
+  EXPECT_NE(out.find("name \"sub/rel.sv\""), std::string::npos) << out;
+}
+
+TEST(FileAndLineMacroPreprocessing, File_NamesAnAbsoluteCommandLineArgument) {
+  ScratchDir tmp;
+  auto path = tmp.Write("abs.sv", "name `__FILE__\n").string();
+  auto out = PreprocessedFromTheCommandLine(path);
+  EXPECT_NE(out.find("name \"" + path + "\""), std::string::npos) << out;
+}
+
+TEST(FileAndLineMacroPreprocessing, File_InAMacroBodyNamesTheFileOfTheUse) {
+  IncludeTestDir dir;
+  auto inc = dir.WriteFile("use.svh", "used_in_include `F\n");
+  PreprocFixture f;
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(dir.dir.string());
+  Preprocessor pp(f.mgr, f.diag, cfg);
+  auto out = pp.Preprocess(f.mgr.AddFile("top.sv",
+                                         "`define F `__FILE__\n"
+                                         "used_in_top `F\n"
+                                         "`include \"use.svh\"\n"));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("used_in_top \"top.sv\""), std::string::npos) << out;
+  EXPECT_NE(out.find("used_in_include \"" + inc.string() + "\""),
+            std::string::npos)
+      << out;
+}
+
+TEST(FileAndLineMacroPreprocessing,
+     Line_BlockCommentAndContinuedDefineLinesAreCounted) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "/* one\n"
+      "   two\n"
+      "   three */\n"
+      "`define X 1 \\\n"
+      "  + 2\n"
+      "at `__LINE__\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("at 6"), std::string::npos) << out;
+}
+
+TEST(FileAndLineMacroPreprocessing,
+     Line_TheLineAfterASplitUsageKeepsItsOwnNumber) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define PAIR(a, b) a b\n"
+      "`PAIR(x,\n"
+      "  y)\n"
+      "after `__LINE__\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("after 4"), std::string::npos) << out;
+}
+
+TEST(FileAndLineMacroPreprocessing, Line_InAMacroBodyTakesTheLineOfTheUse) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define L `__LINE__\n"
+      "`define ML first `__LINE__ \\\n"
+      "  second `__LINE__\n"
+      "\n"
+      "single `L\n"
+      "`ML\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("single 5"), std::string::npos) << out;
+  EXPECT_NE(out.find("first 6"), std::string::npos) << out;
+  EXPECT_NE(out.find("second 6"), std::string::npos) << out;
 }
