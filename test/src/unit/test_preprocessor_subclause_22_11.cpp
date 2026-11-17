@@ -803,4 +803,37 @@ TEST(Preprocessor, EncryptingHalfRefusesALineTheGrammarRejects) {
   EXPECT_FALSE(quiet.HasErrors());
 }
 
+TEST(PragmaGrammar, ADollarLedKeywordIsRejectedAndAnInnerDollarAccepted) {
+  PreprocFixture bad;
+  Preprocess("`pragma my_pragma $k = 1\n", bad);
+  EXPECT_TRUE(ReportedError(bad.diag.Diagnostics(),
+                            "`pragma directive contains an illegal token", 1,
+                            "22.11"));
+  PreprocFixture good;
+  Preprocess("`pragma my_pragma k1_a$b2 = 1\n", good);
+  EXPECT_FALSE(good.diag.HasErrors());
+}
+
+TEST(PragmaGrammar, SignedBasedAndOctalNumbersAreAcceptedValues) {
+  for (const char* value : {"3'sd2", "16'o777", "4'sb1010", "8'shff"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`pragma my_pragma v = ") + value + "\n", f);
+    EXPECT_FALSE(f.diag.HasErrors()) << value;
+  }
+}
+
+TEST(PragmaGrammar, SystemAndHierarchicalNamesAreRejectedAsValues) {
+  for (const char* value : {"$foo", "a.b"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`pragma my_pragma v = ") + value + "\n", f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "`pragma directive contains an illegal token", 1,
+                              "22.11"))
+        << value;
+  }
+  PreprocFixture good;
+  Preprocess("`pragma my_pragma v = fast\n", good);
+  EXPECT_FALSE(good.diag.HasErrors());
+}
+
 }  // namespace

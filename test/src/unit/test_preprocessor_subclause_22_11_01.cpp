@@ -144,4 +144,28 @@ TEST(StandardPragmas, RecognizedPragmaNamesAreWhatResetallReaches) {
   EXPECT_FALSE(IsRecognizedPragmaName(kResetallPragmaName));
 }
 
+TEST(StandardPragmas, ResetOfSeveralNamesIncludingProtectRestoresIt) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`pragma protect author=\"ada\"\n"
+      "`pragma reset my_pragma, protect\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(pp.ProtectKeywords().ValueOf("author").defaulted);
+}
+
+TEST(StandardPragmas, AResetCompiledAwayRestoresNothing) {
+  for (const char* reset : {"`pragma reset protect\n", "`pragma resetall\n"}) {
+    PreprocFixture f;
+    Preprocessor pp(f.mgr, f.diag, {});
+    PreprocessWithPP(std::string("`pragma protect author=\"ada\"\n"
+                                 "`ifdef NEVER_DEFINED\n") +
+                         reset + "`endif\n",
+                     f, pp);
+    EXPECT_FALSE(f.diag.HasErrors()) << reset;
+    EXPECT_EQ(pp.ProtectKeywords().ValueOf("author").value, "ada") << reset;
+  }
+}
+
 }  // namespace

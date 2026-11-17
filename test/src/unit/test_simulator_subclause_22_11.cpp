@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
 #include "preprocessor/preprocessor.h"
@@ -114,6 +116,95 @@ TEST(PragmaSimulation, MacroSuppliedPragmaExpressionsConsumed) {
       "endmodule\n",
       "result");
   EXPECT_EQ(result, 7u);
+}
+
+static std::string RunPragma(const std::string& src) {
+  SimFixture f;
+  return PreprocessAndCapture(src, f);
+}
+
+TEST(PragmaSimulation, UnknownPragmaInsideATaskBody) {
+  EXPECT_EQ(RunPragma("module t;\n"
+                      "  task show(input int v);\n"
+                      "    `pragma unknown_in_task\n"
+                      "    $display(\"%0d\", v + 1);\n"
+                      "  endtask\n"
+                      "  initial show(6);\n"
+                      "endmodule\n"),
+            "7\n");
+}
+
+TEST(PragmaSimulation, UnknownPragmaInsideAMultiLineExpression) {
+  EXPECT_EQ(RunPragma("module t;\n"
+                      "  int r;\n"
+                      "  initial begin\n"
+                      "    r = 2 +\n"
+                      "`pragma unknown_mid_expr\n"
+                      "    3;\n"
+                      "    $display(\"%0d\", r);\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "5\n");
+}
+
+TEST(PragmaSimulation, UnknownPragmaBesideACompilationUnitDeclaration) {
+  EXPECT_EQ(RunPragma("`pragma unknown_unit\n"
+                      "int g = 4;\n"
+                      "`pragma unknown_unit_after\n"
+                      "module t;\n"
+                      "  initial $display(\"%0d\", g);\n"
+                      "endmodule\n"),
+            "4\n");
+}
+
+TEST(PragmaSimulation, UnknownPragmaInsideAnInterfaceBody) {
+  EXPECT_EQ(RunPragma("interface i;\n"
+                      "  `pragma unknown_in_interface\n"
+                      "  int v = 8;\n"
+                      "endinterface\n"
+                      "module t;\n"
+                      "  i u();\n"
+                      "  initial #1 $display(\"%0d\", u.v);\n"
+                      "endmodule\n"),
+            "8\n");
+}
+
+TEST(PragmaSimulation, UnknownPragmaInsideAProgramBody) {
+  EXPECT_EQ(RunPragma("program p;\n"
+                      "  `pragma unknown_in_program\n"
+                      "  int v = 9;\n"
+                      "  initial $display(\"%0d\", v);\n"
+                      "endprogram\n"
+                      "module t;\n"
+                      "  p u();\n"
+                      "endmodule\n"),
+            "9\n");
+}
+
+TEST(PragmaSimulation, UnknownPragmaInsideAClassBody) {
+  EXPECT_EQ(RunPragma("class c;\n"
+                      "  `pragma unknown_in_class\n"
+                      "  int m = 11;\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  c o;\n"
+                      "  initial begin\n"
+                      "    o = new;\n"
+                      "    $display(\"%0d\", o.m);\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "11\n");
+}
+
+TEST(PragmaSimulation, UnknownPragmaInsideACheckerBody) {
+  EXPECT_EQ(RunPragma("checker k;\n"
+                      "  `pragma unknown_in_checker\n"
+                      "  initial assert #0 (1) $display(\"checked\");\n"
+                      "endchecker\n"
+                      "module t;\n"
+                      "  k u();\n"
+                      "endmodule\n"),
+            "checked\n");
 }
 
 }  // namespace
