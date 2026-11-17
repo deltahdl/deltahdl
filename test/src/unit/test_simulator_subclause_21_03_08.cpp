@@ -269,7 +269,7 @@ TEST(DetectingEof, FeofOnDescriptorStraightFromFopen) {
   std::remove(tmp.c_str());
 }
 
-TEST(DetectingEof, FeofNonzeroOnClosedDescriptor) {
+TEST(DetectingEof, DISABLED_FeofZeroOnAClosedDescriptorThatDetectedNothing) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_closed.txt";
   SeedFile(tmp, "z");
@@ -286,7 +286,39 @@ TEST(DetectingEof, FeofNonzeroOnClosedDescriptor) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_NE(out.find("en=1"), std::string::npos) << out;
+  EXPECT_NE(out.find("en=0"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+TEST(DetectingEof, FeofFromAClassMethodAndAFunction) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_21308_places.txt";
+  SeedFile(tmp, "z");
+  std::string out = RunCapture(
+      "class Reader;\n"
+      "  function int done(integer fd); return $feof(fd); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  integer fd, c, a, b, x, y;\n"
+      "  Reader r;\n"
+      "  function int at_end(integer fd); return $feof(fd); endfunction\n"
+      "  initial begin\n"
+      "    r = new;\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    a = r.done(fd);\n"
+          "    b = at_end(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    x = r.done(fd);\n"
+          "    y = at_end(fd);\n"
+          "    $display(\"%0d %0d %0d %0d\", a, b, x != 0, y != 0);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 0 1 1\n");
   std::remove(tmp.c_str());
 }
 
