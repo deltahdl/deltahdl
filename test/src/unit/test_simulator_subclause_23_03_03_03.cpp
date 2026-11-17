@@ -40,8 +40,8 @@ TEST(PortConnectionRulesForNetsSimulation,
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0x00u);
-  EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
+  EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0x00u);
+  EXPECT_EQ(var->value.words[0].bval & 0xFFu, 0xFFu);
 }
 
 TEST(PortConnectionRulesForNetsSimulation,
@@ -245,6 +245,20 @@ TEST(PortConnectionRulesForNetsSimulation,
                        "endmodule\n",
                        f),
             "unconnected=z empty=z tri0=0 tri1=1 wire=z\n");
+}
+
+TEST(NetPortTypeDifferenceRun,
+     ADifferentlyTypedConnectionWakesTheChildAtMostOnce) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module c(input wire [7:0] a);\n"
+                 "  integer n = 0;\n"
+                 "  always @(a) n++;\n"
+                 "  initial #1 $display(\"%h %0d\", a, n <= 1);\n"
+                 "endmodule\n"
+                 "module t;\n  logic [3:0] v = 4'h9;\n  c u(v);\nendmodule\n",
+                 f),
+      "09 1\n");
 }
 
 }  // namespace

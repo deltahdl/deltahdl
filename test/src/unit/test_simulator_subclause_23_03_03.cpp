@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -154,6 +156,109 @@ TEST(PortConnectionRulesSimulation,
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1 1 1\n");
+}
+
+TEST(PortConnectionKindsRun, AnEventCrossesAnInputVarAndARefPort) {
+  for (const char* port : {"input var event e", "ref event e"}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(std::string("module c(") + port +
+                             ");\n"
+                             "  initial begin @e; $display(\"got %0t\", "
+                             "$time); end\n"
+                             "endmodule\n"
+                             "module t;\n  event e;\n  c u(e);\n"
+                             "  initial #2 ->e;\nendmodule\n",
+                         f),
+              "got 2\n")
+        << port;
+  }
+}
+
+TEST(PortConnectionKindsRun, DISABLED_AWildcardImportedVariableConnectsByName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n  logic [3:0] wc = 4'd7;\nendpackage\n"
+                       "module c(input [3:0] a);\n"
+                       "  initial #1 $display(\"%0d\", a);\n"
+                       "endmodule\n"
+                       "module t;\n  import p::*;\n  c u(.a(wc));\nendmodule\n",
+                       f),
+            "7\n");
+}
+
+TEST(PortConnectionKindsRun,
+     DISABLED_AnExplicitlyImportedVariableConnectsByName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n  logic [3:0] wc = 4'd7;\nendpackage\n"
+                 "module c(input [3:0] a);\n"
+                 "  initial #1 $display(\"%0d\", a);\n"
+                 "endmodule\n"
+                 "module t;\n  import p::wc;\n  c u(.a(wc));\nendmodule\n",
+                 f),
+      "7\n");
+}
+
+TEST(InoutStrengthRun, AWeakDriverInsideReadsWeakOutside) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(inout w);\n"
+                       "  assign (weak0, weak1) w = 1'b1;\n"
+                       "endmodule\n"
+                       "module t;\n  wire w;\n  c u(w);\n"
+                       "  initial #1 $display(\"%v\", w);\nendmodule\n",
+                       f),
+            "We1\n");
+}
+
+TEST(InoutStrengthRun, AStrongDriverOutsideBeatsAWeakDriverInside) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(inout w);\n"
+                       "  assign (weak0, weak1) w = 1'b1;\n"
+                       "endmodule\n"
+                       "module t;\n  wire w;\n  c u(w);\n  assign w = 1'b0;\n"
+                       "  initial #1 $display(\"%v %b\", w, w);\nendmodule\n",
+                       f),
+            "St0 0\n");
+}
+
+TEST(NettypePortRun, MatchingNettypesResolveDriversOnBothSidesTogether) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package q;\n"
+                 "  function automatic logic [3:0] rsum(input logic "
+                 "[3:0] d[]);\n"
+                 "    rsum = 0;\n"
+                 "    foreach (d[i]) rsum += d[i];\n"
+                 "  endfunction\n"
+                 "endpackage\n"
+                 "import q::*;\n"
+                 "nettype logic [3:0] snet with rsum;\n"
+                 "module c(inout snet p);\n  assign p = 4'd2;\nendmodule\n"
+                 "module t;\n  snet w;\n  assign w = 4'd3;\n  c u(w);\n"
+                 "  initial #1 $display(\"%0d\", w);\nendmodule\n",
+                 f),
+      "5\n");
+}
+
+TEST(PortConnectionKindsRun, AScopedPackageVariableConnectsByName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n  logic [3:0] wc = 4'd7;\nendpackage\n"
+                       "module c(input [3:0] a);\n"
+                       "  initial #1 $display(\"%0d\", a);\n"
+                       "endmodule\n"
+                       "module t;\n  c u(.a(p::wc));\nendmodule\n",
+                       f),
+            "7\n");
+}
+
+TEST(PortConnectionKindsRun, DISABLED_AnImportedVariableConnectsByPosition) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n  logic [3:0] wc = 4'd7;\nendpackage\n"
+                       "module c(input [3:0] a);\n"
+                       "  initial #1 $display(\"%0d\", a);\n"
+                       "endmodule\n"
+                       "module t;\n  import p::wc;\n  c u(wc);\nendmodule\n",
+                       f),
+            "7\n");
 }
 
 }  // namespace

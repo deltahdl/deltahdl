@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -811,6 +814,62 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kWand);
+}
+
+struct NetKindEntry {
+  const char* keyword;
+  NetType type;
+  int group;
+};
+
+constexpr NetKindEntry kTableNetKinds[] = {
+    {"wire", NetType::kWire, 0},       {"tri", NetType::kTri, 0},
+    {"wand", NetType::kWand, 1},       {"triand", NetType::kTriand, 1},
+    {"wor", NetType::kWor, 2},         {"trior", NetType::kTrior, 2},
+    {"trireg", NetType::kTrireg, 3},   {"tri0", NetType::kTri0, 4},
+    {"tri1", NetType::kTri1, 5},       {"uwire", NetType::kUwire, 6},
+    {"supply0", NetType::kSupply0, 7}, {"supply1", NetType::kSupply1, 8},
+};
+
+constexpr const char* kResultingNetTable[9] = {
+    "EEEEEEEEE", "IEXXXXXEE", "IXEXXXXEE", "IXXEEEXEE", "IXXIEXXEE",
+    "IXXIXEXEE", "IJJJJJEEE", "IIIIIIIEX", "IIIIIIIXE",
+};
+
+TEST(DissimilarNetTypePortConnectionElaboration,
+     EveryPairTakesTheTablesNetTypeAndWarning) {
+  for (const auto& internal : kTableNetKinds) {
+    for (const auto& external : kTableNetKinds) {
+      if (internal.group == external.group) continue;
+      char entry = kResultingNetTable[internal.group][external.group];
+      bool uses_internal = entry == 'I' || entry == 'J';
+      bool warns = entry == 'X' || entry == 'J';
+      ElabFixture f;
+      auto* design =
+          ElaborateSrc(std::string("module child(inout ") + internal.keyword +
+                           " a);\n"
+                           "endmodule\n"
+                           "module top;\n  " +
+                           external.keyword +
+                           " w;\n"
+                           "  child u(.a(w));\n"
+                           "endmodule\n",
+                       f);
+      std::string pair = std::string(internal.keyword) + " inside, " +
+                         external.keyword + " outside";
+      ASSERT_NE(design, nullptr) << pair;
+      EXPECT_FALSE(f.has_errors) << pair;
+      EXPECT_EQ(ElaboratedNetType(design, "top", "w"),
+                uses_internal ? internal.type : external.type)
+          << pair;
+      bool warned = false;
+      for (const auto& d : f.diag.Diagnostics()) {
+        warned = warned || (d.severity == DiagSeverity::kWarning &&
+                            d.loc.line == 5 && d.subclause == "23.3.3.7");
+      }
+      EXPECT_EQ(warned, warns) << pair;
+    }
+  }
 }
 
 }  // namespace

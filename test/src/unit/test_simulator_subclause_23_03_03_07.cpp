@@ -156,4 +156,51 @@ TEST(GenerateBlockInoutConnectionSim, ANameTheBlockLacksIsTheModulesNet) {
             "n 1\n");
 }
 
+TEST(CollapsedNetDelayRun, TheDominatingExternalNetsDelayApplies) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(inout wire p);\nendmodule\n"
+                       "module t;\n  wand #5 w;\n  logic d = 0;\n"
+                       "  assign w = d;\n  c u(w);\n"
+                       "  initial begin\n    #10 d = 1;\n"
+                       "    #2 $display(\"%b\", w);\n"
+                       "    #4 $display(\"%b\", w);\n  end\nendmodule\n",
+                       f),
+            "0\n1\n");
+}
+
+TEST(CollapsedNetDelayRun, DISABLED_TheDominatingInternalNetsDelayApplies) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(p);\n  inout p;\n  wand #5 p;\nendmodule\n"
+                       "module t;\n  wire #1 w;\n  logic d = 0;\n"
+                       "  assign w = d;\n  c u(w);\n"
+                       "  initial begin\n    #10 d = 1;\n"
+                       "    #2 $display(\"%b\", w);\n"
+                       "    #4 $display(\"%b\", w);\n  end\nendmodule\n",
+                       f),
+            "0\n1\n");
+}
+
+TEST(CollapsedNetDelayRun, DISABLED_ADominatingTriregKeepsItsChargeStrength) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module c(p);\n  inout p;\n  trireg (small) p;\nendmodule\n"
+                 "module t;\n  wire w;\n  logic d = 1, en = 1;\n"
+                 "  assign w = en ? d : 1'bz;\n  c u(w);\n"
+                 "  initial begin\n    #5 en = 0;\n"
+                 "    #1 $display(\"%v\", w);\n  end\nendmodule\n",
+                 f),
+      "Sm1\n");
+}
+
+TEST(CollapsedNetDelayRun, AnUnconnectedTriregKeepsItsChargeStrength) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n  trireg (small) w;\n  logic d = 1, en = 1;\n"
+                 "  assign w = en ? d : 1'bz;\n"
+                 "  initial begin\n    #5 en = 0;\n"
+                 "    #1 $display(\"%v\", w);\n  end\nendmodule\n",
+                 f),
+      "Sm1\n");
+}
+
 }  // namespace
