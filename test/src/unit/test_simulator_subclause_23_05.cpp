@@ -132,4 +132,105 @@ TEST(ExternModuleSimulation, WildcardExternUnpackedParameterPortIsArray) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
+std::string WildcardRun(const std::string& decls, SimFixture& f) {
+  return RunCapture(decls +
+                        "module t;\n  logic [3:0] a = 4'd5;\n"
+                        "  wire [3:0] y;\n  m u(.a(a), .y(y));\n"
+                        "  initial #1 $display(\"y %0d\", y);\n"
+                        "endmodule\n",
+                    f);
+}
+
+TEST(ExternWildcardRun, ANonAnsiExternWithParametersFeedsTheHeader) {
+  SimFixture f;
+  EXPECT_EQ(WildcardRun("extern module m #(parameter W = 4) (a, y);\n"
+                        "module m (.*);\n  input [W-1:0] a;\n"
+                        "  output [W-1:0] y;\n  assign y = a;\nendmodule\n",
+                        f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, AnExternMacromoduleFeedsTheHeader) {
+  SimFixture f;
+  EXPECT_EQ(WildcardRun("extern macromodule m (input [3:0] a, "
+                        "output [3:0] y);\n"
+                        "macromodule m (.*);\n  assign y = a;\nendmodule\n",
+                        f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, AnAutomaticExternFeedsAnAutomaticHeader) {
+  SimFixture f;
+  EXPECT_EQ(WildcardRun("extern module automatic m (input [3:0] a, "
+                        "output [3:0] y);\n"
+                        "module automatic m (.*);\n  assign y = a;\n"
+                        "endmodule\n",
+                        f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, AnExternWrittenAfterTheModuleFeedsTheHeader) {
+  SimFixture f;
+  EXPECT_EQ(WildcardRun("module m (.*);\n  assign y = a;\nendmodule\n"
+                        "extern module m (input [3:0] a, output [3:0] y);\n",
+                        f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, DISABLED_AnExternImportTypesTheHeadersPorts) {
+  SimFixture f;
+  EXPECT_EQ(WildcardRun("package p;\n  typedef logic [3:0] t4;\nendpackage\n"
+                        "extern module m import p::*; (input t4 a, "
+                        "output t4 y);\n"
+                        "module m (.*);\n  assign y = a;\nendmodule\n",
+                        f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, AnImportOnBothHeadersTypesThePorts) {
+  SimFixture f;
+  EXPECT_EQ(WildcardRun("package p;\n  typedef logic [3:0] t4;\nendpackage\n"
+                        "extern module m import p::*; (input t4 a, "
+                        "output t4 y);\n"
+                        "module m import p::*; (input t4 a, output t4 y);\n"
+                        "  assign y = a;\nendmodule\n",
+                        f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, DISABLED_ANestedExternFeedsItsNestedHeader) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n  logic [3:0] a = 4'd5;\n"
+                       "  wire [3:0] y;\n"
+                       "  extern module n (input [3:0] a, output [3:0] y);\n"
+                       "  module n (.*);\n    assign y = a;\n  endmodule\n"
+                       "  n u(.a(a), .y(y));\n"
+                       "  initial #1 $display(\"y %0d\", y);\n"
+                       "endmodule\n",
+                       f),
+            "y 5\n");
+}
+
+TEST(ExternWildcardRun, ADifferentParameterDefaultIsAccepted) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("extern module m #(parameter W = 4) "
+                       "(output [7:0] y);\n"
+                       "module m #(parameter W = 5) (output [7:0] y);\n"
+                       "  assign y = W;\nendmodule\n"
+                       "module t;\n  wire [7:0] y;\n  m u(y);\n"
+                       "  initial #1 $display(\"y %0d\", y);\nendmodule\n",
+                       f),
+            "y 5\n");
+}
+
+TEST(ExternTopRun, DISABLED_ANonAnsiExternBesideItsDefinitionIsNoTop) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("extern module m (a, b);\n"
+                              "module m (a, b);\n  input a;\n  output b;\n"
+                              "  initial $display(\"%m\");\nendmodule\n",
+                              f),
+            "m\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

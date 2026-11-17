@@ -168,4 +168,22 @@ TEST(ExternModuleParsing, ErrorMissingModuleName) {
       ReportedError(r.diags, "expected identifier, got ';'", 1, "23.5"));
 }
 
+TEST(ExternModuleHeaderForms, ANonAnsiHeaderTakesAParameterPortList) {
+  auto r = Parse("extern module m #(parameter W = 4) (a, y);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_extern);
+}
+
+TEST(ExternModuleHeaderForms, AHeaderTakesAPackageImportBeforeItsPorts) {
+  auto r = Parse(
+      "package p;\n  typedef logic [3:0] t4;\nendpackage\n"
+      "extern module m import p::*; (input t4 a, output t4 y);\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_TRUE(r.cu->modules[0]->is_extern);
+}
+
 }  // namespace

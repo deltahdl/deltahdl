@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string_view>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_type.h"
@@ -377,6 +382,167 @@ TEST(ExternModuleElaboration, WildcardExternLocalparamPortFollowsParameter) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+bool ErrorAtLineUnder(const std::vector<Diagnostic>& diags, uint32_t line,
+                      std::string_view subclause) {
+  for (const auto& d : diags) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line &&
+        d.subclause == subclause) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(ExternModuleAgreement, SwappedPortPositionsAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a, input logic b);\n"
+      "module m(input logic b, input logic a);\nendmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'm' port 'b' at position 0 does not match "
+                            "extern declaration port 'a'",
+                            2, "23.5"));
+}
+
+TEST(ExternModuleAgreement, DISABLED_ADifferentPackedWidthIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic [3:0] a);\n"
+      "module m(input logic [7:0] a);\nendmodule\n",
+      f, "m");
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 2, "23.5"));
+}
+
+TEST(ExternModuleAgreement, DISABLED_ATypedefAliasOfTheSameTypeIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "typedef logic [7:0] byte_t;\n"
+      "extern module m(input byte_t a);\n"
+      "module m(input logic [7:0] a);\nendmodule\n",
+      f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleAgreement, AnotherPackedRangeOfTheSameWidthIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic [3:0] a);\n"
+      "module m(input logic [4:1] a);\nendmodule\n",
+      f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleAgreement, DISABLED_ADifferentUnpackedDimensionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a [2]);\n"
+      "module m(input logic a [3]);\nendmodule\n",
+      f, "m");
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 2, "23.5"));
+}
+
+TEST(ExternModuleAgreement, AMatchingUnpackedDimensionIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a [2]);\n"
+      "module m(input logic a [2]);\nendmodule\n",
+      f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleAgreement, SwappedParameterPositionsAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m #(parameter A = 1, parameter B = 2) ();\n"
+      "module m #(parameter B = 2, parameter A = 1) ();\nendmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'm' parameter 'B' at position 0 does not "
+                            "match extern declaration parameter 'A'",
+                            2, "23.5"));
+}
+
+TEST(ExternModuleAgreement, ANonAnsiPortNameDifferenceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(a, b);\n"
+      "module m(a, c);\n  input a;\n  input c;\nendmodule\n",
+      f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'm' port 'c' at position 1 does not match "
+                            "extern declaration port 'b'",
+                            2, "23.5"));
+}
+
+TEST(ExternModuleAgreement, DISABLED_ANestedDefinitionUnlikeItsNestedExtern) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  extern module n(input logic [3:0] a, output logic [3:0] y);\n"
+      "  module n(input logic [3:0] a, output logic [3:0] z);\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f, "t");
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 3, "23.5"));
+}
+
+TEST(ExternModuleAgreement, ANestedDefinitionLikeItsNestedExternIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  extern module n(input logic [3:0] a, output logic [3:0] y);\n"
+      "  module n(input logic [3:0] a, output logic [3:0] y);\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleVisibility, DISABLED_AnExternNestedElsewhereIsNotApplied) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module o;\n  extern module c(input logic a);\nendmodule\n"
+      "module c(.*);\nendmodule\nmodule t;\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 4, "23.5"));
+}
+
+TEST(ExternModuleVisibility, DISABLED_AWildcardHeaderWithNoExternIsReported) {
+  ElabFixture f;
+  ElaborateSrc("module m(.*);\nendmodule\nmodule t;\nendmodule\n", f, "t");
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 1, "23.5"));
+}
+
+TEST(ExternModuleVisibility, AWildcardHeaderWithItsExternIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a);\nmodule m(.*);\nendmodule\n"
+      "module t;\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ExternModuleDefinition,
+     DISABLED_AnInstanceOfAnExternOnlyModuleIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a);\n"
+      "module t;\n  wire w;\n  m u(w);\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "unknown module 'm'", 4, "23.3.2"));
+}
+
+TEST(ExternModuleDefinition, AnInstanceOfADefinedModuleIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "extern module m(input logic a);\nmodule m(input logic a);\n"
+      "endmodule\nmodule t;\n  wire w;\n  m u(w);\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
