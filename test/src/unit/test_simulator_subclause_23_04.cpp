@@ -460,4 +460,133 @@ TEST(NestedModuleSimulation, NestedDeclarationReadsItsEnclosingInstance) {
             "v=5\nv=6\n");
 }
 
+std::string RunNested(const std::string& items, SimFixture& f) {
+  return RunCapture("module t;\n" + items + "endmodule\n", f);
+}
+
+TEST(NestedModuleInstancesRun, TwoExplicitInstancesMakeNoImplicitOne) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module B;\n    initial $display(\"%m\");\n"
+                      "  endmodule\n  B x();\n  B y();\n",
+                      f),
+            "t.x\nt.y\n");
+}
+
+TEST(NestedModuleInstancesRun, DISABLED_AnInstanceInAGenerateBlockIsExplicit) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module B;\n    initial $display(\"%m\");\n"
+                      "  endmodule\n  if (1) begin : g\n    B x();\n  end\n",
+                      f),
+            "t.g.x\n");
+}
+
+TEST(NestedModuleInstancesRun,
+     DISABLED_AnInstanceInADeeperNestedModuleIsExplicit) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module B;\n    initial $display(\"%m\");\n"
+                      "  endmodule\n  module N;\n    B x();\n  endmodule\n"
+                      "  N n();\n",
+                      f),
+            "t.n.x\n");
+}
+
+TEST(NestedModuleInstancesRun, AnEmptyPortListIsImplicitlyInstantiated) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module C();\n    initial $display(\"%m\");\n"
+                      "  endmodule\n",
+                      f),
+            "t.C\n");
+}
+
+TEST(NestedModuleInstancesRun, AnUninstantiatedNonAnsiPortedModuleIsIgnored) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module D(p);\n    input p;\n"
+                      "    initial $display(\"%m\");\n  endmodule\n"
+                      "  initial $display(\"t\");\n",
+                      f),
+            "t\n");
+}
+
+TEST(NestedModuleInstancesRun, AnUninstantiatedPortedModulesBodyIsNotChecked) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module E(input p);\n    assign nosuch = p;\n"
+                      "    initial $display(\"%m\");\n  endmodule\n"
+                      "  initial $display(\"t\");\n",
+                      f),
+            "t\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(NestedModuleInstancesRun,
+     APortlessModuleInsideAnImplicitOneIsImplicitToo) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module N;\n    module I;\n"
+                      "      initial $display(\"%m\");\n    endmodule\n"
+                      "  endmodule\n",
+                      f),
+            "t.N.I\n");
+}
+
+TEST(NestedModuleInstancesRun, ANonAnsiPortedNestedModuleConnects) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  module D(p);\n    input p;\n"
+                      "    initial #1 $display(\"%b\", p);\n  endmodule\n"
+                      "  wire w = 1;\n  D d(w);\n",
+                      f),
+            "1\n");
+}
+
+TEST(NestedModuleScopeRun, AnOuterTypedefTypesANestedDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  typedef logic [5:0] T;\n  module n;\n    T x;\n"
+                      "    initial $display(\"%0d\", $bits(x));\n"
+                      "  endmodule\n",
+                      f),
+            "6\n");
+}
+
+TEST(NestedModuleScopeRun, AnOuterTaskIsCalledFromTheNestedModule) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  task hi;\n    $display(\"hi\");\n  endtask\n"
+                      "  module n;\n    initial hi;\n  endmodule\n",
+                      f),
+            "hi\n");
+}
+
+TEST(NestedModuleScopeRun, ALocalNetHidesTheOuterNetOfItsName) {
+  SimFixture f;
+  EXPECT_EQ(RunNested("  wire w = 1;\n  module n;\n    wire w = 0;\n"
+                      "    initial #1 $display(\"in %b\", w);\n"
+                      "  endmodule\n  initial #2 $display(\"out %b\", w);\n",
+                      f),
+            "in 0\nout 1\n");
+}
+
+std::string NestedPropertyRun(const std::string& outer,
+                              const std::string& inner, SimFixture& f) {
+  return RunNested(
+      "  logic clk2 = 0, b = 1;\n"
+      "  initial repeat (4) #5 clk2 = ~clk2;\n" +
+          outer + "  module n;\n" + inner +
+          "    x1: assert property (q(posedge clk2))\n"
+          "      $display(\"pass %0t\", $time);\n"
+          "    else $display(\"fail %0t\", $time);\n"
+          "  endmodule\n",
+      f);
+}
+
+TEST(NestedModuleScopeRun, DISABLED_AnOuterPropertyIsUsableInTheNestedModule) {
+  SimFixture f;
+  EXPECT_EQ(NestedPropertyRun("  property q(e);\n    @(e) b;\n  endproperty\n",
+                              "", f),
+            "pass 5\npass 15\n");
+}
+
+TEST(NestedModuleScopeRun, AnInnerPropertyIsUsableInTheNestedModule) {
+  SimFixture f;
+  EXPECT_EQ(NestedPropertyRun(
+                "", "    property q(e);\n      @(e) b;\n    endproperty\n", f),
+            "pass 5\npass 15\n");
+}
+
 }  // namespace
