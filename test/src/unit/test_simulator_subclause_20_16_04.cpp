@@ -241,4 +241,225 @@ TEST(PlaPersonalityFormat, AsyncPlaneExampleDisplaysEachResult) {
             "111 -> 0101\n000 -> 0011\nxxx -> xxx1\n101 -> 1101\n");
 }
 
+TEST(PlaPersonalityFormat, OrPlaneXCodeTakesTheWorstCase) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1x;\n"
+                       "    in = 2'b00;\n"
+                       "    $sync$or$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "x\n");
+}
+
+TEST(PlaPersonalityFormat, OrPlaneZCodeIsADontCare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1z;\n"
+                       "    in = 2'b01;\n"
+                       "    $sync$or$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n");
+}
+
+TEST(PlaPersonalityFormat, OrPlaneQuestionMarkCodeIsADontCare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1?;\n"
+                       "    in = 2'b01;\n"
+                       "    $sync$or$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n");
+}
+
+TEST(PlaPersonalityFormat, OrPlaneOneCodeTakesTheTrueInput) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'bz1;\n"
+                       "    in = 2'b01;\n"
+                       "    $sync$or$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(PlaPersonalityFormat, NandPlaneXCodeTakesTheWorstCase) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1x;\n"
+                       "    in = 2'b10;\n"
+                       "    $sync$nand$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "x\n");
+}
+
+TEST(PlaPersonalityFormat, NandPlaneZCodeIsADontCare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1z;\n"
+                       "    in = 2'b10;\n"
+                       "    $sync$nand$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n");
+}
+
+TEST(PlaPersonalityFormat, NandPlaneQuestionMarkCodeIsADontCare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1?;\n"
+                       "    in = 2'b10;\n"
+                       "    $sync$nand$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0\n");
+}
+
+TEST(PlaPersonalityFormat, NandPlaneOneCodeTakesTheTrueInput) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b11;\n"
+                       "    in = 2'b10;\n"
+                       "    $sync$nand$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(PlaPersonalityFormat, NorPlaneXCodeTakesTheWorstCase) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1x;\n"
+                       "    in = 2'b00;\n"
+                       "    $sync$nor$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "x\n");
+}
+
+TEST(PlaPersonalityFormat, NorPlaneZCodeIsADontCare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1z;\n"
+                       "    in = 2'b01;\n"
+                       "    $sync$nor$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(PlaPersonalityFormat, NorPlaneQuestionMarkCodeIsADontCare) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b1?;\n"
+                       "    in = 2'b01;\n"
+                       "    $sync$nor$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(PlaPersonalityFormat, NorPlaneOneCodeTakesTheTrueInput) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b11;\n"
+                       "    in = 2'b00;\n"
+                       "    $sync$nor$plane(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(PlaPersonalityFormat, NorArrayZeroLeavesTheInputOut) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b10;\n"
+                       "    in = 2'b01;\n"
+                       "    $sync$nor$array(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
 }  // namespace

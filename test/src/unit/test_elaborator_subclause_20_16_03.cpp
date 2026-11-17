@@ -247,4 +247,310 @@ TEST(PlaAscendingOrder,
                             7, "20.16.3"));
 }
 
+TEST(PlaAscendingPlacement, DescendingInputsInATaskAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  task t();\n"
+      "    $async$and$array(mem, in, v);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    6, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, DescendingInputsInAFunctionAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  function void f();\n"
+      "    $async$and$array(mem, in, v);\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    6, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, DescendingInputsInAProgramAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "program p;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, in, v);\n"
+      "endprogram\n"
+      "module m;\n"
+      "  p u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, DescendingInputsInAnInterfaceAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "interface i;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, in, v);\n"
+      "endinterface\n"
+      "module m;\n"
+      "  i u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, DescendingInputsInAnAlwaysBlockAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  always #1 $async$and$array(mem, in, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement,
+     DISABLED_DescendingInputsInAClassMethodAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  class C;\n"
+      "    task t();\n"
+      "      $async$and$array(mem, in, v);\n"
+      "    endtask\n"
+      "  endclass\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    7, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement,
+     DISABLED_DescendingInputsInAGenerateBlockAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  if (1) begin : g\n"
+      "    initial $async$and$array(mem, in, v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    6, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement,
+     DISABLED_DescendingInputsInAPackageTaskAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "package pk;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [2:1] in;\n"
+      "  logic [1:1] v;\n"
+      "  task t();\n"
+      "    $async$and$array(mem, in, v);\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module m;\n"
+      "  import pk::*;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    6, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement,
+     DISABLED_DescendingInputsInACompilationUnitTaskAreRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "logic [1:2] mem [1:1];\n"
+      "logic [2:1] in;\n"
+      "logic [1:1] v;\n"
+      "task t();\n"
+      "  $async$and$array(mem, in, v);\n"
+      "endtask\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, ADescendingPartSelectInputIsRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:1];\n"
+      "  logic [7:1] a;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, a[2:1], v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    5, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, AnAscendingPartSelectInputIsAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:3] mem [1:1];\n"
+      "  logic [1:7] a;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, a[1:3], v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(PlaAscendingPlacement,
+     DISABLED_AConcatenationHoldingADescendingVectorIsRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:4] mem [1:1];\n"
+      "  logic [3:1] x;\n"
+      "  logic y;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, {x, y}, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the input terms of a PLA modeling system task have a "
+                    "descending range; give them an ascending one",
+                    6, "20.16.3"));
+}
+
+TEST(PlaAscendingPlacement, AConcatenationHoldingAnAscendingVectorIsAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:4] mem [1:1];\n"
+      "  logic [1:3] x;\n"
+      "  logic y;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, {x, y}, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(PlaMemoryShape, DISABLED_ANetMemoryIsRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  wire [1:2] mem [1:1];\n"
+      "  logic [1:2] in;\n"
+      "  logic [1:1] v;\n"
+      "  initial $async$and$array(mem, in, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "the memory of a PLA modeling system task shall be an array of variables",
+      5, "20.16.3"));
+}
+
+TEST(PlaMemoryShape, DISABLED_AMemoryWiderThanTheInputsIsRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:3] mem [1:2];\n"
+      "  logic [1:2] in;\n"
+      "  logic [1:2] v;\n"
+      "  initial $async$and$array(mem, in, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the memory of a PLA modeling system task shall be as wide "
+                    "as the input terms and as deep as the output terms",
+                    5, "20.16.3"));
+}
+
+TEST(PlaMemoryShape, DISABLED_AMemoryDeeperThanTheOutputsIsRejected) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m;\n"
+      "  logic [1:2] mem [1:3];\n"
+      "  logic [1:2] in;\n"
+      "  logic [1:2] v;\n"
+      "  initial $async$and$array(mem, in, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "the memory of a PLA modeling system task shall be as wide "
+                    "as the input terms and as deep as the output terms",
+                    5, "20.16.3"));
+}
+
+TEST(PlaMemoryShape, AMemoryMatchingTheTermsIsAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  logic [1:2] mem [1:3];\n"
+      "  logic [1:2] in;\n"
+      "  logic [1:3] v;\n"
+      "  initial $async$and$array(mem, in, v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

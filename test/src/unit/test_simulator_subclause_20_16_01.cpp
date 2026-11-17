@@ -177,4 +177,64 @@ TEST(PlaArrayType, SyncDrivesConcatenatedOutputTerms) {
   EXPECT_EQ(b2->value.ToUint64(), 0u);
 }
 
+TEST(PlaArrayType, AsyncReevaluatesWhenANetInputChanges) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] r;\n"
+                       "  wire [1:2] w;\n"
+                       "  assign w = r;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b11;\n"
+                       "    r = 2'b11;\n"
+                       "    #1 $async$and$array(mem, w, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "    #1 r = 2'b10;\n"
+                       "    #1 $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n0\n");
+}
+
+TEST(PlaArrayType, ABitOutputIsDriven) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [1:2] in;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  bit [1:1] out;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b11;\n"
+                       "    in = 2'b11;\n"
+                       "    $sync$and$array(mem, in, out);\n"
+                       "    $display(\"%b\", out);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(PlaArrayType, ARedeclaredNonAnsiOutputPortIsDriven) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module async_array(a1, a2, b1);\n"
+                       "  input a1, a2;\n"
+                       "  output b1;\n"
+                       "  logic [1:2] mem [1:1];\n"
+                       "  logic b1;\n"
+                       "  initial begin\n"
+                       "    mem[1] = 2'b11;\n"
+                       "    $async$and$array(mem, {a1, a2}, {b1});\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic a1 = 1, a2 = 1;\n"
+                       "  wire b1;\n"
+                       "  async_array u(a1, a2, b1);\n"
+                       "  initial #1 $display(\"%b\", b1);\n"
+                       "endmodule\n",
+                       f),
+            "1\n");
+}
+
 }  // namespace
