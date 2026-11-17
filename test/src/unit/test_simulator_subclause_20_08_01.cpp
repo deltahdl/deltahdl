@@ -97,4 +97,16 @@ TEST(UtilitySystemTaskTest, Clog2WideVectorArgument) {
   EXPECT_EQ(var->value.ToUint64(), 34u);
 }
 
+TEST(UtilitySystemTaskTest, Clog2ReadsANegativeByteAtItsOwnWidth) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  byte b = -1;\n"
+                 "  shortint s = -2;\n"
+                 "  initial $display(\"%0d %0d\", $clog2(b), $clog2(s));\n"
+                 "endmodule\n",
+                 f),
+      "8 16\n");
+}
+
 }  // namespace

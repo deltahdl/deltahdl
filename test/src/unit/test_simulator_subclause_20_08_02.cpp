@@ -174,4 +174,41 @@ TEST(RealMath, AParameterInitializedByAMathFunctionHoldsItsValue) {
             "1.500000 9\n");
 }
 
+TEST(RealMath, IntegralVariableArgumentsAreConvertedToReal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int k = 16;\n"
+                 "  int e = 5;\n"
+                 "  logic [7:0] v = 9;\n"
+                 "  initial $display(\"%g %g %g %g\", $sqrt(k), $pow(2, e),\n"
+                 "    $sqrt(v), $hypot(k - 13, 4));\n"
+                 "endmodule\n",
+                 f),
+      "4 32 3 5\n");
+}
+
+TEST(RealMath, AShortrealArgumentIsConvertedToReal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  shortreal s = 2.25;\n"
+                       "  initial $display(\"%g %g\", $sqrt(s), $floor(s));\n"
+                       "endmodule\n",
+                       f),
+            "1.5 2\n");
+}
+
+TEST(RealMath, TheResultIsOfTypeReal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n"
+          "  int k = 2;\n"
+          "  initial $display(\"%s %s %0d %0d\", $typename($sqrt(2)),\n"
+          "    $typename($pow(k, k)), $bits($ln(2.0)), $bits($atan2(1, k)));\n"
+          "endmodule\n",
+          f),
+      "real real 64 64\n");
+}
+
 }  // namespace

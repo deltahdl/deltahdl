@@ -3,6 +3,7 @@
 #include "elaborator/const_eval.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_param_value.h"
 
 using namespace delta;
 
@@ -80,6 +81,72 @@ TEST(ConstExprElab, Clog2OfPortParameterArgumentFolds) {
     }
   }
   EXPECT_TRUE(found);
+}
+
+TEST(ConstExprElab, DISABLED_Clog2FoldsANegativeArgumentAtItsOwnWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam byte B = -2;\n"
+      "  localparam int A = $clog2(-1);\n"
+      "  localparam int C = $clog2(-2);\n"
+      "  localparam int D = $clog2(-8'sd1);\n"
+      "  localparam int E = $clog2(B);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "A"), 32);
+  EXPECT_EQ(ParamValue(design, "C"), 32);
+  EXPECT_EQ(ParamValue(design, "D"), 8);
+  EXPECT_EQ(ParamValue(design, "E"), 8);
+}
+
+TEST(ConstExprElab, Clog2FoldsAnAllOnesUnsignedArgument) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int A = $clog2(32'hFFFF_FFFF);\n"
+      "  localparam int B = $clog2(8'hFF);\n"
+      "  localparam int C = $clog2(0);\n"
+      "  localparam int D = $clog2(257);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "A"), 32);
+  EXPECT_EQ(ParamValue(design, "B"), 8);
+  EXPECT_EQ(ParamValue(design, "C"), 0);
+  EXPECT_EQ(ParamValue(design, "D"), 9);
+}
+
+TEST(ConstExprElab, MathFunctionsSizeARangeAndFoldInAParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  logic [$clog2(256) - 1 : 0] v;\n"
+      "  localparam int W = $bits(v);\n"
+      "  localparam int F = $floor($sqrt(17.0));\n"
+      "  if ($clog2(4) == 2) begin : g\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "W"), 8);
+  EXPECT_EQ(ParamValue(design, "F"), 4);
+}
+
+TEST(ConstExprElab, DISABLED_ARealMathFunctionSelectsAGenerateBranch) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  if ($pow(2, 3) == 8.0) begin : g\n"
+             "  end\n"
+             "  case ($sqrt(16.0) > 3)\n"
+             "    1: begin : h end\n"
+             "    default: begin : k end\n"
+             "  endcase\n"
+             "endmodule\n"));
 }
 
 }  // namespace
