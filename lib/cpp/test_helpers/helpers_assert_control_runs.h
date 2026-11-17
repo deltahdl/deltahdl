@@ -57,10 +57,6 @@ inline std::string ErrorTimes(const std::string& err) {
   return times;
 }
 
-inline std::string ControlledErrorTimes(const std::string& src) {
-  return ErrorTimes(RunControlled(src).err);
-}
-
 inline std::string ControlledOutput(const std::string& src) {
   return RunControlled(src).out;
 }
