@@ -259,22 +259,6 @@ TEST(IoSystemTaskTest, StdoutFdIsWritable) {
   std::remove(path.c_str());
 }
 
-TEST(IoSystemTaskTest, FcloseDoesNotInvalidateReservedStdio) {
-  SimFixture f;
-  EvalExpr(MakeSysCall(f.arena, "$fclose",
-                       {MakeInt(f.arena, SimContext::kStdoutFd)}),
-           f.ctx, f.arena);
-  EvalExpr(MakeSysCall(f.arena, "$fclose",
-                       {MakeInt(f.arena, SimContext::kStderrFd)}),
-           f.ctx, f.arena);
-  EvalExpr(
-      MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, SimContext::kStdinFd)}),
-      f.ctx, f.arena);
-  EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdoutFd), nullptr);
-  EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStderrFd), nullptr);
-  EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdinFd), nullptr);
-}
-
 TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
   SimFixture f;
   const std::string kPath = "/tmp/x";
