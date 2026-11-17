@@ -406,4 +406,50 @@ TEST(ReadmemMultiDimSim, AddressBeyondHighestDimensionNames21_4_3) {
   std::remove(path.c_str());
 }
 
+TEST(ReadmemMultiDimSim, LowestReversedDimensionSameLayout) {
+  SimFixture f;
+  std::string path = WriteData("lowrev", "11\n22\n33\n44\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  bit [7:0] fwd [0:1][5:6];\n"
+      "  bit [7:0] mix [0:1][6:5];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", fwd);\n"
+          "    $readmemh(\"" +
+          path +
+          "\", mix);\n"
+          "    $display(\"%h %h %h %h\", fwd[0][5], fwd[0][6], fwd[1][5], "
+          "fwd[1][6]);\n"
+          "    $display(\"%h %h %h %h\", mix[0][5], mix[0][6], mix[1][5], "
+          "mix[1][6]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "11 22 33 44\n11 22 33 44\n");
+  std::remove(path.c_str());
+}
+
+TEST(ReadmemMultiDimSim, AddressesNameHighestWordsOfAReversedThreeDimArray) {
+  SimFixture f;
+  std::string path = WriteData("rev3_at", "@2 a b c d\n@0 1 2 3 4\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] mem [2:0][0:1][6:5];\n"
+      "  initial begin\n"
+      "    $readmemh(\"" +
+          path +
+          "\", mem);\n"
+          "    $display(\"%h %h %h %h\", mem[2][0][5], mem[2][0][6], "
+          "mem[2][1][5], mem[2][1][6]);\n"
+          "    $display(\"%h %h %h\", mem[0][0][5], mem[0][1][6], "
+          "mem[1][0][5]);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0a 0b 0c 0d\n01 04 xx\n");
+  std::remove(path.c_str());
+}
+
 }  // namespace
