@@ -116,4 +116,70 @@ TEST_F(VcdChangeDetectionFromSource, PosedgeUnderANegedgeWaitIsStillRecorded) {
   EXPECT_EQ(values, "101");
 }
 
+class VcdValueFormsFromSource : public VcdDumpFromSourceTestBase {
+ protected:
+  std::string Dump(const std::string& body, const std::string& steps) {
+    RunSource("module t;\n" + body +
+              "  initial begin\n"
+              "    $dumpfile(\"forms.vcd\");\n"
+              "    $dumpvars;\n" +
+              steps +
+              "  end\n"
+              "endmodule\n");
+    return DumpFile("forms.vcd");
+  }
+
+  static std::string CodeOf(const std::string& content,
+                            const std::string& name) {
+    for (const auto& line : AllLines(content)) {
+      auto toks = Tokens(line);
+      if (toks.size() == 6 && toks[0] == "$var" && toks[4] == name) {
+        return toks[3];
+      }
+    }
+    return "<not-declared>";
+  }
+
+  static std::string Checkpoint(const std::string& content,
+                                const std::string& keyword) {
+    auto start = content.find("\n" + keyword + "\n");
+    if (start == std::string::npos) return "<no-" + keyword + ">";
+    auto end = content.find("$end", start);
+    return content.substr(start, end - start);
+  }
+};
+
+TEST_F(VcdValueFormsFromSource,
+       DISABLED_AnUnassignedRealIsWrittenInRFormAtEveryCheckpoint) {
+  auto content = Dump("  real r;\n  realtime rt;\n  shortreal sr;\n",
+                      "    #1 $dumpall;\n"
+                      "    #1 $dumpoff;\n"
+                      "    #1;\n");
+  for (const char* keyword : {"$dumpvars", "$dumpall", "$dumpoff"}) {
+    auto lines = AllLines(Checkpoint(content, keyword));
+    for (const char* name : {"r", "rt", "sr"}) {
+      EXPECT_TRUE(HasLine(lines, "r0 " + CodeOf(content, name)))
+          << keyword << ' ' << name << '\n'
+          << content;
+    }
+  }
+}
+
+TEST_F(VcdValueFormsFromSource, ANetOfAnyStrengthIsWrittenWithoutStrength) {
+  auto content = Dump(
+      "  wire w;\n"
+      "  assign (weak0, weak1) w = 1'b1;\n"
+      "  wire p;\n"
+      "  assign (pull0, pull1) p = 1'b0;\n"
+      "  supply1 s1;\n"
+      "  tri0 t0;\n",
+      "    #1 $dumpall;\n"
+      "    #1;\n");
+  auto lines = AllLines(Checkpoint(content, "$dumpall"));
+  EXPECT_TRUE(HasLine(lines, "1" + CodeOf(content, "w"))) << content;
+  EXPECT_TRUE(HasLine(lines, "0" + CodeOf(content, "p"))) << content;
+  EXPECT_TRUE(HasLine(lines, "1" + CodeOf(content, "s1"))) << content;
+  EXPECT_TRUE(HasLine(lines, "0" + CodeOf(content, "t0"))) << content;
+}
+
 }  // namespace

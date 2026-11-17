@@ -521,5 +521,77 @@ TEST_F(VcdPackageScopeSim, APackageIsATopLevelScopeOfTheDump) {
   EXPECT_NE(kDump.find(" v $end", at), std::string::npos) << kDump;
 }
 
+TEST_F(VcdTimescaleFromSource, DISABLED_TimescaleNamesATenStepPrecision) {
+  auto content = DumpAfterOneUnit("100ns", "10ns");
+  EXPECT_EQ(CountToken(Tokens(Section(content, "$timescale")), "10ns"), 1u)
+      << content;
+  EXPECT_TRUE(HasLine(AllLines(content), "#10")) << content;
+}
+
+TEST_F(VcdTimescaleFromSource, DISABLED_TimescaleNamesAHundredStepPrecision) {
+  auto content = DumpAfterOneUnit("1ns", "100ps");
+  EXPECT_EQ(CountToken(Tokens(Section(content, "$timescale")), "100ps"), 1u)
+      << content;
+  EXPECT_TRUE(HasLine(AllLines(content), "#10")) << content;
+}
+
+class VcdDeclarationsFromSource : public VcdDumpFromSourceTestBase {
+ protected:
+  std::string Dump(const std::string& body) {
+    RunSource("module t;\n" + body +
+              "  initial begin\n"
+              "    $dumpfile(\"decl.vcd\");\n"
+              "    $dumpvars;\n"
+              "    #1;\n"
+              "  end\n"
+              "endmodule\n");
+    return DumpFile("decl.vcd");
+  }
+};
+
+TEST_F(VcdDeclarationsFromSource,
+       DISABLED_AFunctionStaticVariableIsDumpedInAFunctionScope) {
+  auto content = Dump(
+      "  function int f(input int x);\n"
+      "    static int keep;\n"
+      "    keep = x;\n"
+      "    return keep;\n"
+      "  endfunction\n"
+      "  int y;\n"
+      "  initial #1 y = f(3);\n");
+  auto scope = content.find("$scope function f $end");
+  ASSERT_NE(scope, std::string::npos) << content;
+  auto keep = content.find(" keep $end", scope);
+  auto up = content.find("$upscope", scope);
+  EXPECT_LT(keep, up) << content;
+}
+
+TEST_F(VcdDeclarationsFromSource, DISABLED_RealtimeIsDeclaredRealtime) {
+  auto content = Dump("  realtime rt;\n  real r;\n");
+  auto lines = AllLines(content);
+  auto rt = FindVarLine(lines, "rt");
+  ASSERT_FALSE(rt.empty()) << content;
+  EXPECT_EQ(Tokens(rt)[1], "realtime") << rt;
+  auto r = FindVarLine(lines, "r");
+  ASSERT_FALSE(r.empty()) << content;
+  EXPECT_EQ(Tokens(r)[1], "real") << r;
+}
+
+TEST_F(VcdDeclarationsFromSource, DISABLED_EachNetTypeIsDeclaredWithItsOwn) {
+  const char* const kNetTypes[] = {"tri",     "triand",  "trior", "trireg",
+                                   "tri0",    "tri1",    "wand",  "wor",
+                                   "supply0", "supply1", "wire"};
+  std::string body;
+  for (const char* type : kNetTypes) {
+    body += std::string("  ") + type + " n_" + type + ";\n";
+  }
+  auto lines = AllLines(Dump(body));
+  for (const char* type : kNetTypes) {
+    auto line = FindVarLine(lines, std::string("n_") + type);
+    ASSERT_FALSE(line.empty()) << type;
+    EXPECT_EQ(Tokens(line)[1], type) << line;
+  }
+}
+
 }  // namespace
 }  // namespace delta

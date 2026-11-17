@@ -384,5 +384,32 @@ TEST_F(DumpOffOnSysTask, DumpoffRecordsOnlyTheVariablesDumpvarsListed) {
       << section;
 }
 
+TEST_F(DumpOffOnSysTask, DISABLED_CheckpointHoldsTheValuesAtTheEndOfTheUnit) {
+  auto content = RunVcd(
+      "module t;\n"
+      "  logic [7:0] data;\n"
+      "  logic d;\n"
+      "  wire w;\n"
+      "  assign w = d;\n"
+      "  initial begin\n"
+      "    d = 1'b1;\n"
+      "    data = 8'h11;\n"
+      "    #10 data = 8'h22;\n"
+      "    $dumpvars;\n"
+      "    data = 8'h33;\n"
+      "    #10 data = 8'h44;\n"
+      "  end\n"
+      "endmodule\n");
+  auto begin = content.find("$dumpvars\n");
+  ASSERT_NE(begin, std::string::npos) << content;
+  auto end = content.find("$end", begin);
+  auto lines = AllLines(content.substr(begin, end - begin));
+  EXPECT_TRUE(HasLine(lines, "b110011 " + VarIdentCode(content, "data")))
+      << content;
+  EXPECT_FALSE(HasLine(lines, "b100010 " + VarIdentCode(content, "data")))
+      << content;
+  EXPECT_TRUE(HasLine(lines, "1" + VarIdentCode(content, "w"))) << content;
+}
+
 }  // namespace
 }  // namespace delta
