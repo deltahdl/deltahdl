@@ -256,4 +256,150 @@ TEST(SimControlSim, FinishInAModuleTaskEndsTheTask) {
             "before\n");
 }
 
+std::string RunSource(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+std::string CallAtFive(const std::string& call) {
+  return RunSource("module locmod;\n  initial #5 " + call + ";\nendmodule\n");
+}
+
+TEST(SimControlSim, DISABLED_TheDiagnosticNamesItsLocation) {
+  for (const char* call : {"$finish", "$finish(1)", "$finish(2)", "$stop",
+                           "$stop(1)", "$stop(2)"}) {
+    std::string out = CallAtFive(call);
+    EXPECT_TRUE(out.find("locmod") != std::string::npos ||
+                out.find(":2") != std::string::npos)
+        << call << ": " << out;
+  }
+}
+
+TEST(SimControlSim, DISABLED_LevelTwoReportsMemoryAndCpuTime) {
+  for (const char* call : {"$finish(2)", "$stop(2)"}) {
+    std::string out = CallAtFive(call);
+    EXPECT_NE(out.find("memory"), std::string::npos) << call;
+    EXPECT_NE(out.find("CPU"), std::string::npos) << call;
+    EXPECT_EQ(out.find("unavailable"), std::string::npos) << call;
+  }
+}
+
+std::string FinishWithVariableLevel(int level) {
+  return RunSource("module t;\n  int lvl = " + std::to_string(level) +
+                   ";\n  initial #5 $finish(lvl);\nendmodule\n");
+}
+
+TEST(SimControlSim, ARunTimeVariableSelectsTheLevel) {
+  EXPECT_EQ(FinishWithVariableLevel(0), "");
+  std::string level_one = FinishWithVariableLevel(1);
+  std::string level_two = FinishWithVariableLevel(2);
+  EXPECT_NE(level_one.find("time 5"), std::string::npos);
+  EXPECT_GT(level_two.size(), level_one.size());
+}
+
+TEST(SimControlSim, StopFromSourceSuspendsTheRunAtItsTime) {
+  std::string out = RunSource(
+      "module t;\n"
+      "  initial #5 $stop;\n"
+      "  initial #9 $display(\"later\");\n"
+      "endmodule\n");
+  EXPECT_NE(out.find("$stop at time 5"), std::string::npos);
+  EXPECT_EQ(out.find("later"), std::string::npos);
+}
+
+TEST(SimControlSim, DISABLED_StopLeavesTheFinalProceduresUnrun) {
+  LowerFixture f;
+  auto* x = RunAndFindVar(
+      "module t;\n"
+      "  int x;\n"
+      "  initial #5 $stop(0);\n"
+      "  final x = 7;\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(x, nullptr);
+  f.scheduler.EndSimulation();
+  EXPECT_EQ(x->value.ToUint64(), 0u);
+}
+
+TEST(SimControlSim, DISABLED_ExitPrintsTheDiagnosticOfAPlainFinish) {
+  std::string out = RunSource(
+      "program p;\n"
+      "  initial #3 $exit;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  p u();\n"
+      "endmodule\n");
+  EXPECT_NE(out.find("$finish at time 3"), std::string::npos) << out;
+}
+
+TEST(SimControlSim, DISABLED_FinishInAVoidFunctionEndsTheFunction) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  function void stop();\n"
+                      "    $display(\"before\");\n"
+                      "    $finish(0);\n"
+                      "    $display(\"after\");\n"
+                      "  endfunction\n"
+                      "  initial #1 stop();\n"
+                      "endmodule\n"),
+            "before\n");
+}
+
+TEST(SimControlSim, DISABLED_FinishInAStaticClassFunctionEndsTheFunction) {
+  EXPECT_EQ(RunSource("class C;\n"
+                      "  static function void stop();\n"
+                      "    $display(\"before\");\n"
+                      "    $finish(0);\n"
+                      "    $display(\"after\");\n"
+                      "  endfunction\n"
+                      "endclass\n"
+                      "module t;\n"
+                      "  initial #1 C::stop();\n"
+                      "endmodule\n"),
+            "before\n");
+}
+
+TEST(SimControlSim, FinishInAPackageTaskEndsTheTask) {
+  EXPECT_EQ(RunSource("package p;\n"
+                      "  task run();\n"
+                      "    #1 $display(\"before\");\n"
+                      "    $finish(0);\n"
+                      "    $display(\"after\");\n"
+                      "  endtask\n"
+                      "endpackage\n"
+                      "module t;\n"
+                      "  initial p::run();\n"
+                      "endmodule\n"),
+            "before\n");
+}
+
+TEST(SimControlSim, FinishInAProgramEndsTheModulesToo) {
+  EXPECT_EQ(RunSource("program pr;\n"
+                      "  initial begin\n"
+                      "    #2 $display(\"before\");\n"
+                      "    $finish(0);\n"
+                      "    $display(\"after\");\n"
+                      "  end\n"
+                      "endprogram\n"
+                      "module t;\n"
+                      "  pr u();\n"
+                      "  initial #5 $display(\"later\");\n"
+                      "endmodule\n"),
+            "before\n");
+}
+
+TEST(SimControlSim, FinishInAnInterfaceEndsTheRun) {
+  EXPECT_EQ(RunSource("interface i;\n"
+                      "  initial begin\n"
+                      "    #2 $display(\"before\");\n"
+                      "    $finish(0);\n"
+                      "    $display(\"after\");\n"
+                      "  end\n"
+                      "endinterface\n"
+                      "module t;\n"
+                      "  i u();\n"
+                      "  initial #5 $display(\"later\");\n"
+                      "endmodule\n"),
+            "before\n");
+}
+
 }  // namespace
