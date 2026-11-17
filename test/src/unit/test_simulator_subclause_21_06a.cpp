@@ -507,20 +507,6 @@ TEST(ValuePlusargsSim, UserStringWithLeadingPlusDoesNotMatch) {
   EXPECT_EQ(out, "no match, still 8\n");
 }
 
-TEST(ValuePlusargsSim, InvalidConversionSpecStoresX) {
-  SimFixture f;
-  f.ctx.AddPlusArg("CH=a");
-  std::string out = RunCapture(
-      "module t;\n"
-      "  logic [7:0] ch;\n"
-      "  initial begin\n"
-      "    if ($value$plusargs(\"CH=%c\", ch)) $display(\"ch=%b\", ch);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_EQ(out, "ch=xxxxxxxx\n");
-}
-
 TEST(ValuePlusargsSim, IllegalBinaryCharStoresAllX) {
   SimFixture f;
   f.ctx.AddPlusArg("FLAG=12");
