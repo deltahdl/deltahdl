@@ -9,6 +9,7 @@
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -60,8 +61,9 @@ class DumpvarsSysTask : public VcdTestBase {
     {
       VcdWriter vcd(tmp_path_);
       vcd.WriteHeader("1ns");
-      for (const auto& [name, var] : f.ctx.GetVariables()) {
-        vcd.RegisterSignal(name, var->value.width, var);
+      for (const auto& entry : f.ctx.GetVariables()) {
+        vcd.RegisterSignal(entry.first, entry.second->value.width,
+                           entry.second);
       }
       vcd.EndDefinitions();
       vcd.WriteTimestamp(0);
@@ -427,4 +429,59 @@ TEST_F(VcdEnumConstantSim, EnumConstantsAreNoVariablesOfTheDump) {
 }
 
 }  // namespace
+class DumpvarsLevelsAndArguments : public VcdDumpFromSourceTestBase {
+ protected:
+  std::string DeclaredWith(const std::string& calls) {
+    RunSource(
+        "module gm;\n"
+        "  logic [7:0] gv = 8'h01;\n"
+        "endmodule\n"
+        "module cm;\n"
+        "  logic [7:0] cv = 8'h02;\n"
+        "  gm gi();\n"
+        "endmodule\n"
+        "module mod2;\n"
+        "  logic [7:0] net1 = 8'h03;\n"
+        "  logic [7:0] other = 8'h04;\n"
+        "endmodule\n"
+        "module t;\n"
+        "  logic [7:0] tv = 8'h05;\n"
+        "  logic [7:0] alpha = 8'h06;\n"
+        "  cm ci();\n"
+        "  mod2 m2();\n"
+        "  initial begin\n"
+        "    $dumpfile(\"d.vcd\");\n" +
+        calls +
+        "  end\n"
+        "endmodule\n");
+    std::string names;
+    for (const auto& line : Lines(DumpFile("d.vcd"))) {
+      if (line.rfind("$var ", 0) != 0) continue;
+      auto end = line.rfind(" $end");
+      auto start = line.rfind(' ', end - 1);
+      if (!names.empty()) names += ' ';
+      names += line.substr(start + 1, end - start - 1);
+    }
+    return names;
+  }
+};
+
+TEST_F(DumpvarsLevelsAndArguments, LevelTwoStopsAfterTwoLevels) {
+  EXPECT_EQ(DeclaredWith("    $dumpvars(2, t);\n"), "alpha cv net1 other tv");
+}
+
+TEST_F(DumpvarsLevelsAndArguments, ANonzeroLevelLeavesAVariableArgumentWhole) {
+  EXPECT_EQ(DeclaredWith("    $dumpvars(1, t.ci.cv);\n"
+                         "    $dumpvars(3, alpha);\n"),
+            "alpha cv");
+}
+
+TEST_F(DumpvarsLevelsAndArguments, LevelOneAppliesToTheModuleNotTheVariable) {
+  EXPECT_EQ(DeclaredWith("    $dumpvars(1, t.ci, t.m2.net1);\n"), "cv net1");
+}
+
+TEST_F(DumpvarsLevelsAndArguments, LevelZeroAppliesToTheModuleNotTheVariable) {
+  EXPECT_EQ(DeclaredWith("    $dumpvars(0, t.ci, t.m2.net1);\n"), "cv gv net1");
+}
+
 }  // namespace delta
