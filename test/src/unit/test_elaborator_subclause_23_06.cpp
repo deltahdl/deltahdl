@@ -2,7 +2,11 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string>
+#include <string_view>
+#include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -669,6 +673,64 @@ TEST(HierarchicalNameElaboration, InstanceSelectNamesBlockLocalParam) {
                             "expression",
                             17, "23.6"));
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+bool ErrorAtLineUnder(const std::vector<Diagnostic>& diags, uint32_t line,
+                      std::string_view subclause) {
+  for (const auto& d : diags) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line &&
+        d.subclause == subclause) {
+      return true;
+    }
+  }
+  return false;
+}
+
+std::string LoopBlockRead(const std::string& name) {
+  return "module t;\n"
+         "  for (genvar i = 0; i < 4; i++) begin : blk\n"
+         "    int w = i;\n  end\n"
+         "  int r;\n  initial r = " +
+         name + ";\nendmodule\n";
+}
+
+TEST(InstanceSelectRules, DISABLED_ALoopBlockNameNeedsASelectMidPath) {
+  ElabFixture f;
+  ElabOk(LoopBlockRead("blk.w"), f);
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 6, "23.6"));
+}
+
+TEST(InstanceSelectRules, DISABLED_ALoopBlockSelectOutOfRangeIsReported) {
+  ElabFixture f;
+  ElabOk(LoopBlockRead("blk[5].w"), f);
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 6, "23.6"));
+}
+
+TEST(InstanceSelectRules, ALoopBlockSelectInRangeIsAccepted) {
+  EXPECT_TRUE(ElabOk(LoopBlockRead("blk[3].w")));
+}
+
+std::string TwoDimensionalArrayRead(const std::string& name) {
+  return "module leaf;\n  int v;\nendmodule\n"
+         "module t;\n  leaf u [0:3][0:3] ();\n"
+         "  int r;\n  initial r = " +
+         name + ";\nendmodule\n";
+}
+
+TEST(InstanceSelectRules, DISABLED_ASecondIndexOutOfRangeIsReported) {
+  ElabFixture f;
+  ElabOk(TwoDimensionalArrayRead("u[1][5].v"), f);
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 6, "23.6"));
+}
+
+TEST(InstanceSelectRules, DISABLED_TooFewSelectsOnATwoDimensionalArray) {
+  ElabFixture f;
+  ElabOk(TwoDimensionalArrayRead("u[1].v"), f);
+  EXPECT_TRUE(ErrorAtLineUnder(f.diag.Diagnostics(), 6, "23.6"));
+}
+
+TEST(InstanceSelectRules, BothIndicesInRangeAreAccepted) {
+  EXPECT_TRUE(ElabOk(TwoDimensionalArrayRead("u[1][2].v")));
 }
 
 }  // namespace

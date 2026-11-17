@@ -242,4 +242,121 @@ TEST(HierarchicalNames, NameThroughAGenerateBlockReachesAnInstancesVariable) {
   EXPECT_EQ(out, "3 3 7 14\n");
 }
 
+TEST(HierarchicalNameTree, OneNamedBlockInTwoInstancesIsTwoObjects) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mod(input in);\n"
+                       "  always @(posedge in) begin : keep\n"
+                       "    logic hold;\n    hold = in;\n  end\n"
+                       "endmodule\n"
+                       "module cct(input s1, s2);\n"
+                       "  mod amod(s1), bmod(s2);\nendmodule\n"
+                       "module wave;\n  logic s1 = 0, s2 = 0;\n"
+                       "  cct a(s1, s2);\n"
+                       "  initial begin\n    #1 s1 = 1;\n"
+                       "    #1 $display(\"%b %b\", a.amod.keep.hold, "
+                       "a.bmod.keep.hold);\n  end\nendmodule\n",
+                       f),
+            "1 x\n");
+}
+
+std::string OutputActualRun(const std::string& routine, SimFixture& f) {
+  return RunCapture(
+      "module leaf;\n  logic [3:0] v;\nendmodule\n"
+      "module t;\n  leaf u();\n" +
+          routine +
+          "  initial begin\n    put(u.v);\n"
+          "    #1 $display(\"%0d\", u.v);\n  end\nendmodule\n",
+      f);
+}
+
+TEST(HierarchicalNameTree, AHierarchicalNameIsATasksOutputActual) {
+  SimFixture f;
+  EXPECT_EQ(OutputActualRun("  task put(output logic [3:0] o);\n"
+                            "    o = 4'd9;\n  endtask\n",
+                            f),
+            "9\n");
+}
+
+TEST(HierarchicalNameTree, AHierarchicalNameIsAFunctionsOutputActual) {
+  SimFixture f;
+  EXPECT_EQ(OutputActualRun("  function void put(output logic [3:0] o);\n"
+                            "    o = 4'd9;\n  endfunction\n",
+                            f),
+            "9\n");
+}
+
+TEST(HierarchicalNameTree, AnEscapedInstanceNameHeadsAPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n  int v = 7;\nendmodule\n"
+                       "module t;\n  leaf \\in-st ();\n"
+                       "  initial #1 $display(\"%0d\", \\in-st .v);\n"
+                       "endmodule\n",
+                       f),
+            "7\n");
+}
+
+TEST(HierarchicalNameTree, AnEscapedNameEndsAPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n  int \\v-1  = 8;\nendmodule\n"
+                       "module t;\n  leaf u();\n"
+                       "  initial #1 $display(\"%0d\", u.\\v-1 );\n"
+                       "endmodule\n",
+                       f),
+            "8\n");
+}
+
+TEST(HierarchicalNameTree, StaticLocalsAreReachedThroughTheirSubroutine) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n"
+                       "  task tk;\n    static int n = 0;\n    n++;\n"
+                       "  endtask\n"
+                       "  function int fn;\n    static int k = 0;\n"
+                       "    k++;\n    return k;\n  endfunction\n"
+                       "endmodule\n"
+                       "module t;\n  leaf u();\n  int r;\n"
+                       "  initial begin\n    u.tk();\n    u.tk();\n"
+                       "    r = u.fn();\n"
+                       "    #1 $display(\"%0d %0d\", u.tk.n, u.fn.k);\n"
+                       "  end\nendmodule\n",
+                       f),
+            "2 1\n");
+}
+
+TEST(HierarchicalNameTree, ALaterForkWritesAnEarlierForksVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n  initial begin\n"
+                       "    fork : mod_1\n      reg x;\n"
+                       "      #2 $display(\"%b\", x);\n    join_none\n"
+                       "    fork : mod_2\n      reg x;\n"
+                       "      #1 mod_1.x = 1;\n    join_none\n"
+                       "  end\nendmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(HierarchicalNameTree, AnElementOfATwoDimensionalInstanceArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\n  int v;\nendmodule\n"
+                       "module t;\n  leaf u [0:3][0:3] ();\n"
+                       "  initial begin\n    u[1][2].v = 6;\n"
+                       "    #1 $display(\"%0d %0d\", u[1][2].v, u[2][1].v);\n"
+                       "  end\nendmodule\n",
+                       f),
+            "6 0\n");
+}
+
+TEST(HierarchicalNameTree, APathMayEndAtAnArrayOrLoopBlockName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf;\nendmodule\n"
+                       "module t;\n  leaf u [0:3] ();\n"
+                       "  for (genvar i = 0; i < 4; i++) begin : blk\n"
+                       "    int w = i;\n  end\n"
+                       "  initial begin\n    $printtimescale(u);\n"
+                       "    $printtimescale(t.blk);\n  end\nendmodule\n",
+                       f),
+            "Time scale of (u) is 1ns / 1ns\n"
+            "Time scale of (t.blk) is 1ns / 1ns\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace
