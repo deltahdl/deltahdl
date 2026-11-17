@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 #include "helpers_vcd_file_form.h"
@@ -26,10 +27,15 @@ constexpr const char* kFourStateSrc =
     "endmodule\n";
 
 constexpr const char* kExtendedSrc =
+    "module m(input a, output b);\n"
+    "  assign b = a;\n"
+    "endmodule\n"
     "module t;\n"
     "  logic a;\n"
+    "  wire b;\n"
+    "  m u(a, b);\n"
     "  initial begin\n"
-    "    $dumpports;\n"
+    "    $dumpports(u, \"ext.vcd\");\n"
     "    a = 1'b0;\n"
     "    #1 a = 1'b1;\n"
     "    #1 a = 1'bx;\n"
@@ -57,16 +63,39 @@ PortValueChange ReadPortValueChange(const std::string& line) {
   return {body.substr(0, body.size() - 2), strengths};
 }
 
+std::string PortCode(const std::string& content, const std::string& scope,
+                     const std::string& port) {
+  std::string inside;
+  for (const auto& line : AllLines(content)) {
+    if (line.rfind("$scope module ", 0) == 0) {
+      inside = line.substr(14, line.find(' ', 14) - 14);
+      continue;
+    }
+    if (line.rfind("$upscope", 0) == 0) inside.clear();
+    if (inside != scope || line.rfind("$var port ", 0) != 0) continue;
+    auto code = line.find('<');
+    auto space = line.find(' ', code);
+    if (code == std::string::npos || space == std::string::npos) continue;
+    if (line.compare(space + 1, port.size() + 1, port + " ") == 0) {
+      return line.substr(code, space - code);
+    }
+  }
+  return "";
+}
+
+class ExtendedValueChangeDump : public VcdDumpFromSourceTestBase {
+ protected:
+  std::string RunExtended() {
+    RunSource(kExtendedSrc);
+    return DumpFile("ext.vcd");
+  }
+};
+
 class ValueChangeDumpFiles : public VcdDumpRunTestBase {
  protected:
   std::string RunFourState() {
     SimFixture f;
     return RunVcdDump(f, kFourStateSrc, {.scope = "t"});
-  }
-
-  std::string RunExtended() {
-    SimFixture f;
-    return RunVcdDump(f, kExtendedSrc, {.scope = "t", .extended = true});
   }
 };
 
@@ -87,26 +116,40 @@ TEST_F(ValueChangeDumpFiles, FourStateTypeCarriesNoStrengthInformation) {
   }
 }
 
-TEST_F(ValueChangeDumpFiles, ExtendedTypeCarriesStrengthWithEveryValueChange) {
+TEST_F(ExtendedValueChangeDump, EveryPortValueChangeCarriesStateAndStrength) {
   std::string content = RunExtended();
-  int with_strength = 0;
+  std::string in_code = PortCode(content, "u", "a");
+  std::string out_code = PortCode(content, "u", "b");
+  ASSERT_FALSE(in_code.empty()) << content;
+  ASSERT_FALSE(out_code.empty()) << content;
+  std::string in_states;
+  int out_changes = 0;
   for (const auto& line : AllLines(content)) {
     if (line.empty() || line[0] != 'p') continue;
+    auto space = line.find(' ');
+    if (space == std::string::npos) continue;
+    std::string code = line.substr(space + 1);
+    if (code != in_code && code != out_code) continue;
     PortValueChange change = ReadPortValueChange(line);
     EXPECT_FALSE(change.states.empty()) << line;
     EXPECT_EQ(change.strengths.size(), 2u) << line;
-    ++with_strength;
+    if (code == in_code) in_states += change.states;
+    if (code == out_code) ++out_changes;
   }
-  EXPECT_GE(with_strength, 3) << content;
+  EXPECT_EQ(in_states, "DUNZ") << content;
+  EXPECT_EQ(out_changes, 4) << content;
 }
 
-TEST_F(ValueChangeDumpFiles, BothTypesAreAsciiTextInCreationOrder) {
-  std::string four_state = RunFourState();
-  ExpectFileIsAsciiText(four_state);
-  ExpectHeaderThenDefinitionsThenValueChanges(four_state, "$var", "#1");
+TEST_F(ExtendedValueChangeDump, ExtendedFileIsAsciiTextInCreationOrder) {
   std::string extended = RunExtended();
   ExpectFileIsAsciiText(extended);
   ExpectHeaderThenDefinitionsThenValueChanges(extended, "$var", "#1");
+}
+
+TEST_F(ValueChangeDumpFiles, FourStateFileIsAsciiTextInCreationOrder) {
+  std::string four_state = RunFourState();
+  ExpectFileIsAsciiText(four_state);
+  ExpectHeaderThenDefinitionsThenValueChanges(four_state, "$var", "#1");
 }
 
 }  // namespace
