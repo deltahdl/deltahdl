@@ -359,4 +359,68 @@ TEST(ConversionSim, ItorConvertsItsOperandToAnIntegerByValue) {
             "-3.000000 3.000000 -3.000000\n");
 }
 
+TEST(ConversionSim, RtoiTruncatesAShortrealOperand) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  shortreal sr = 2.7, sn = -2.7;\n"
+                 "  initial $display(\"%0d %0d\", $rtoi(sr), $rtoi(sn));\n"
+                 "endmodule\n",
+                 f),
+      "2 -2\n");
+}
+
+TEST(ConversionSim, SignedAndUnsignedKeepXAndZBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] v = 8'b1x0z_1100;\n"
+                       "  initial $display(\"%b %b %0d %0d\", $signed(v),\n"
+                       "    $unsigned(8'sb1x0z_1100), $bits($signed(v)),\n"
+                       "    $signed(4'b1100) < 0);\n"
+                       "endmodule\n",
+                       f),
+            "1x0z1100 1x0z1100 8 1\n");
+}
+
+TEST(ConversionSim, TheOperandIsEvaluatedOnce) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int calls = 0;\n"
+                       "  function logic [3:0] f();\n"
+                       "    calls++;\n"
+                       "    return 4'b1010;\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    $display(\"%0d\", $signed(f()));\n"
+                       "    $display(\"%0d\", $unsigned(f()));\n"
+                       "    $display(\"%0d\", calls);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "-6\n10\n2\n");
+}
+
+TEST(ConversionSim, TheStandardsPortExampleCarriesARealThroughBits) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module driver (net_r);\n"
+                       "  output [64:1] net_r;\n"
+                       "  real r = -1.25;\n"
+                       "  wire [64:1] net_r = $realtobits(r);\n"
+                       "endmodule\n"
+                       "module receiver (net_r);\n"
+                       "  input [64:1] net_r;\n"
+                       "  wire [64:1] net_r;\n"
+                       "  real r;\n"
+                       "  initial assign r = $bitstoreal(net_r);\n"
+                       "  initial #1 $display(\"%f\", r);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  wire [64:1] w;\n"
+                       "  driver d(w);\n"
+                       "  receiver c(w);\n"
+                       "endmodule\n",
+                       f),
+            "-1.250000\n");
+}
+
 }  // namespace

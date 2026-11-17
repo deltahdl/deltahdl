@@ -157,4 +157,21 @@ TEST(ConversionFunctions, RtoiFoldsToA32BitInteger) {
   EXPECT_EQ(design->top_modules[0]->params[1].resolved_value, 1294967296);
 }
 
+TEST(ConversionFunctions, RtoiFoldsANegativeRealTowardZero) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int N = $rtoi(-3.7);\n"
+      "  localparam int M = $rtoi(-0.5);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_GE(design->top_modules[0]->params.size(), 2u);
+  EXPECT_EQ(design->top_modules[0]->params[0].name, "N");
+  EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, -3);
+  EXPECT_EQ(design->top_modules[0]->params[1].name, "M");
+  EXPECT_EQ(design->top_modules[0]->params[1].resolved_value, 0);
+}
+
 }  // namespace
