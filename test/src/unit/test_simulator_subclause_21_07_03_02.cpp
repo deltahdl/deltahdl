@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_dump.h"
@@ -337,6 +338,67 @@ TEST_F(DumpportsOffOnSysTask, DumpportsonUnknownFilenameResumesNothing) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(content.find("$dumpon"), std::string::npos);
   EXPECT_EQ(content.find("0!"), std::string::npos);
+}
+
+class DumpportsOffOn : public ExtendedVcdFromSource {};
+
+TEST_F(DumpportsOffOn, DISABLED_OffWritesUnknownPortRecordsThenNothing) {
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    #1 $dumpportsoff(\"one.vcd\");\n"
+          "    #1 a = 1'b1;\n"
+          "    #1;\n");
+  auto off = Section(content, "$dumpportsoff");
+  EXPECT_EQ(StatesFor(off, PortCode(content, "u", "a")), "N") << content;
+  EXPECT_EQ(StatesFor(off, PortCode(content, "u", "b")), "X") << content;
+  EXPECT_EQ(off.find("\nx"), std::string::npos) << content;
+  auto rest = content.substr(content.find("$end", content.find(off)));
+  EXPECT_EQ(StatesFor(rest, PortCode(content, "u", "a")), "") << content;
+}
+
+TEST_F(DumpportsOffOn, OnWritesEachPortsCurrentValue) {
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    #1 $dumpportsoff(\"one.vcd\");\n"
+          "    #1 a = 1'b1;\n"
+          "    #1 $dumpportson(\"one.vcd\");\n"
+          "    #1;\n");
+  auto on = Section(content, "$dumpportson");
+  EXPECT_EQ(StatesFor(on, PortCode(content, "u", "a")), "U") << content;
+  EXPECT_EQ(StatesFor(on, PortCode(content, "u", "b")), "H") << content;
+}
+
+TEST_F(DumpportsOffOn, DISABLED_WithNoFilenameEveryFileIsSuspendedAndResumed) {
+  auto one =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    $dumpports(v, \"two.vcd\");\n"
+          "    #1 $dumpportsoff;\n"
+          "    #1 c = 1'b1;\n"
+          "    #1 $dumpportson;\n"
+          "    #1;\n");
+  auto two = DumpFile("two.vcd");
+  for (const auto& content : {one, two}) {
+    EXPECT_EQ(CountSections(content, "$dumpportsoff"), 1u) << content;
+    EXPECT_EQ(CountSections(content, "$dumpportson"), 1u) << content;
+  }
+  EXPECT_EQ(StatesFor(Section(two, "$dumpportsoff"), PortCode(two, "v", "c")),
+            "N")
+      << two;
+  EXPECT_EQ(StatesFor(Section(two, "$dumpportson"), PortCode(two, "v", "c")),
+            "U")
+      << two;
+}
+
+TEST_F(DumpportsOffOn, RepeatedOffAndOnWriteOneSectionEach) {
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    #1 $dumpportsoff;\n"
+          "    #1 $dumpportsoff;\n"
+          "    #1 $dumpportson;\n"
+          "    #1 $dumpportson;\n"
+          "    #1;\n");
+  EXPECT_EQ(CountSections(content, "$dumpportsoff"), 1u) << content;
+  EXPECT_EQ(CountSections(content, "$dumpportson"), 1u) << content;
 }
 
 }  // namespace

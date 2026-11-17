@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
@@ -649,6 +650,81 @@ TEST_F(DumpvarsAndDumpportsFromSource, DumpportsThenDumpvarsWritesBothFiles) {
 TEST_F(DumpvarsAndDumpportsFromSource, DumpportsAloneWritesOnlyItsOwnDefault) {
   RunSource(SourceCalling("    $dumpports;\n"));
   EXPECT_EQ(NamesWritten(), "dumpports.vcd");
+}
+
+class DumpportsSelection : public ExtendedVcdFromSource {};
+
+TEST_F(DumpportsSelection, DISABLED_OnlyTheListedModulesOwnPortsAreDumped) {
+  EXPECT_EQ(Declared(Run("    $dumpports(u, \"one.vcd\");\n"
+                         "    #1 a = 1'b1;\n")),
+            "u.a u.b");
+}
+
+TEST_F(DumpportsSelection, DISABLED_TwoListedModulesEachGetOnlyTheirPorts) {
+  EXPECT_EQ(Declared(Run("    $dumpports(u, v, \"one.vcd\");\n"
+                         "    #1 a = 1'b1;\n")),
+            "u.a u.b v.c");
+}
+
+TEST_F(DumpportsSelection,
+       DISABLED_WithNoScopeTheCallingModulesPortsAreDumped) {
+  RunSource(
+      "module m2(input c, output d);\n"
+      "  logic body_var;\n"
+      "  assign d = c;\n"
+      "  initial $dumpports(, \"self.vcd\");\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic c = 1'b0;\n"
+      "  wire d;\n"
+      "  m2 v(c, d);\n"
+      "  initial #1 c = 1'b1;\n"
+      "endmodule\n");
+  EXPECT_EQ(Declared(DumpFile("self.vcd")), "v.c v.d");
+}
+
+TEST_F(DumpportsSelection, AnExistingFileIsOverwrittenSilently) {
+  {
+    std::ofstream stale(scratch_.dir / "one.vcd");
+    stale << "stale contents\n";
+  }
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    #1 a = 1'b1;\n");
+  EXPECT_EQ(content.find("stale"), std::string::npos) << content;
+  EXPECT_EQ(content.rfind("$date", 0), 0u) << content;
+  EXPECT_TRUE(f_.diag.Diagnostics().empty());
+}
+
+TEST_F(DumpportsSelection, DISABLED_SeveralCallsAtOneTimeEachWriteTheirFile) {
+  auto one =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    $dumpports(v, \"two.vcd\");\n"
+          "    #1 c = 1'b1;\n");
+  EXPECT_EQ(Declared(one), "u.a u.b");
+  EXPECT_EQ(Declared(DumpFile("two.vcd")), "v.c");
+}
+
+TEST_F(DumpportsSelection, DumpingStartsAtTheEndOfATimeZeroUnit) {
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    a = 1'b1;\n    #1;\n");
+  EXPECT_EQ(
+      StatesFor(Section(content, "$dumpports"), PortCode(content, "u", "a")),
+      "U")
+      << content;
+}
+
+TEST_F(DumpportsSelection, DumpingStartsAtTheEndOfALaterUnit) {
+  auto content =
+      Run("    #5 $dumpports(u, \"one.vcd\");\n"
+          "    a = 1'b1;\n"
+          "    #1;\n");
+  EXPECT_EQ(
+      StatesFor(Section(content, "$dumpports"), PortCode(content, "u", "a")),
+      "U")
+      << content;
+  EXPECT_LT(content.find("#5"), content.find("\n$dumpports\n")) << content;
 }
 
 }  // namespace

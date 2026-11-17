@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_reported_error.h"
@@ -557,6 +558,30 @@ TEST_F(ExtendedVcdGeneralRules, EmptyParenLimitGetsNoDefaultAction) {
                             "21.7.3.4"));
   EXPECT_EQ(content.find("$comment"), std::string::npos);
   EXPECT_NE(content.find("#400\n"), std::string::npos);
+}
+
+class ExtendedControlTaskDefaults : public ExtendedVcdFromSource {};
+
+TEST_F(ExtendedControlTaskDefaults, ATaskNamingAnUnopenedFileIsIgnored) {
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    #1 $dumpportsoff(\"nosuch.vcd\");\n"
+          "    #1 a = 1'b1;\n"
+          "    #1;\n");
+  EXPECT_EQ(CountSections(content, "$dumpportsoff"), 0u) << content;
+  EXPECT_EQ(StatesFor(content, PortCode(content, "u", "a")), "DU") << content;
+}
+
+TEST_F(ExtendedControlTaskDefaults,
+       TheBareAndEmptyParenthesisFormsRunTheDefault) {
+  auto content =
+      Run("    $dumpports(u, \"one.vcd\");\n"
+          "    #1 a = 1'b1;\n"
+          "    #1 $dumpportsall;\n"
+          "    #1 $dumpportsall();\n"
+          "    #1;\n");
+  EXPECT_EQ(CountSections(content, "$dumpportsall"), 2u) << content;
+  EXPECT_EQ(StatesFor(content, PortCode(content, "u", "a")), "DUUU") << content;
 }
 
 }  // namespace

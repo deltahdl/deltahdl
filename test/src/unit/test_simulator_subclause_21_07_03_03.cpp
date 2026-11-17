@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "simulator/lowerer.h"
@@ -274,6 +275,61 @@ TEST_F(DumpportsallSysTask, UnknownFilenameInVariableWritesNoCheckpoint) {
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(content.find("$dumpall"), std::string::npos);
+}
+
+class DumpportsallFiles : public ExtendedVcdFromSource {
+ protected:
+  void ExpectEveryFileCheckpointed(const std::string& call) {
+    auto one =
+        Run("    $dumpports(u, \"one.vcd\");\n"
+            "    $dumpports(v, \"two.vcd\");\n"
+            "    #1 a = 1'b1;\n"
+            "    #1 " +
+            call +
+            ";\n"
+            "    #1;\n");
+    auto two = DumpFile("two.vcd");
+    EXPECT_EQ(StatesFor(Section(one, "$dumpportsall"), PortCode(one, "u", "b")),
+              "H")
+        << one;
+    EXPECT_EQ(StatesFor(Section(two, "$dumpportsall"), PortCode(two, "v", "c")),
+              "D")
+        << two;
+  }
+
+  void ExpectNamedFileCheckpointed(const std::string& call) {
+    auto content =
+        Run("    $dumpports(u, \"one.vcd\");\n"
+            "    #1 a = 1'b1;\n"
+            "    #1 " +
+            call +
+            ";\n"
+            "    #1;\n");
+    auto all = Section(content, "$dumpportsall");
+    EXPECT_EQ(StatesFor(all, PortCode(content, "u", "a")), "U") << content;
+    EXPECT_EQ(StatesFor(all, PortCode(content, "u", "b")), "H") << content;
+  }
+};
+
+TEST_F(DumpportsallFiles, AStringLiteralNamesTheCheckpointedFile) {
+  ExpectNamedFileCheckpointed("$dumpportsall(\"one.vcd\")");
+}
+
+TEST_F(DumpportsallFiles, AStringVariableNamesTheCheckpointedFile) {
+  ExpectNamedFileCheckpointed("$dumpportsall(sname)");
+}
+
+TEST_F(DumpportsallFiles, AnIntegralVariableNamesTheCheckpointedFile) {
+  ExpectNamedFileCheckpointed("$dumpportsall(iname)");
+}
+
+TEST_F(DumpportsallFiles, DISABLED_TheBareFormCheckpointsEveryFile) {
+  ExpectEveryFileCheckpointed("$dumpportsall");
+}
+
+TEST_F(DumpportsallFiles,
+       DISABLED_TheEmptyParenthesisFormCheckpointsEveryFile) {
+  ExpectEveryFileCheckpointed("$dumpportsall()");
 }
 
 }  // namespace

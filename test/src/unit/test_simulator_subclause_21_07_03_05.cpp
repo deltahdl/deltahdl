@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "simulator/lowerer.h"
@@ -444,6 +446,34 @@ TEST_F(DumpportsflushSysTask, FlushWithNoDumpportsFilesIsHarmless) {
          "  end\n"
          "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+class DumpportsflushFiles : public ExtendedVcdFromSource {
+ protected:
+  int64_t RecordsOnDiskAfter(const std::string& flush) {
+    Run("    $dumpports(u, \"one.vcd\");\n"
+        "    $dumpports(v, \"two.vcd\");\n"
+        "    #1 a = 1'b1;\n"
+        "    c = 1'b1;\n"
+        "    #1 " +
+        flush + ";\n" + CountPortRecordsInto("one.vcd") + "    held = seen;\n" +
+        CountPortRecordsInto("two.vcd") +
+        "    seen = held * 100 + seen;\n"
+        "    #1;\n");
+    return Seen();
+  }
+};
+
+TEST_F(DumpportsflushFiles, DISABLED_ANamedFlushPutsThatFilesRecordsOnDisk) {
+  EXPECT_EQ(RecordsOnDiskAfter("$dumpportsflush(\"one.vcd\")") / 100, 4);
+}
+
+TEST_F(DumpportsflushFiles, DISABLED_TheBareFormFlushesEveryFile) {
+  EXPECT_EQ(RecordsOnDiskAfter("$dumpportsflush"), 402);
+}
+
+TEST_F(DumpportsflushFiles, DISABLED_TheEmptyParenthesisFormFlushesEveryFile) {
+  EXPECT_EQ(RecordsOnDiskAfter("$dumpportsflush()"), 402);
 }
 
 }  // namespace
