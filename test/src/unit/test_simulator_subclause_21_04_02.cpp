@@ -363,4 +363,62 @@ TEST(Readmem2StateSim, OutOfRangeEnumValueNames21_4_2) {
   std::remove(path.c_str());
 }
 
+std::string LoadThree(SimFixture& f, const std::string& tag,
+                      const std::string& data, const std::string& decl,
+                      const std::string& task) {
+  std::string path = WriteData(tag, data);
+  std::string out = RunCapture("module t;\n" + decl +
+                                   "\n"
+                                   "  initial begin\n"
+                                   "    " +
+                                   task + "(\"" + path +
+                                   "\", mem);\n"
+                                   "    $display(\"%0d %0d %0d\", mem[0], "
+                                   "mem[1], mem[2]);\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                               f);
+  std::remove(path.c_str());
+  return out;
+}
+
+TEST(Readmem2StateSim, OutOfRangeEnumValueUnderReadmembStopsReading) {
+  SimFixture f;
+  EXPECT_EQ(LoadThree(f, "oor_b", "1\n101\n10\n",
+                      "  typedef enum {RED, GREEN, BLUE} color_t;\n"
+                      "  color_t mem [0:2];",
+                      "$readmemb"),
+            "1 0 0\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$readmemb: value out of range for the enumerated "
+                            "type",
+                            5, "21.4.2"));
+}
+
+TEST(Readmem2StateSim, DISABLED_ANumberWiderThanAnIntStopsReading) {
+  SimFixture f;
+  EXPECT_EQ(LoadThree(f, "oor_int", "1\n123456789\n2\n", "  int mem [0:2];",
+                      "$readmemh"),
+            "1 0 0\n");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "value out of range", 5, "21.4.2"));
+}
+
+TEST(Readmem2StateSim, DISABLED_ANumberWiderThanABitVectorStopsReading) {
+  SimFixture f;
+  EXPECT_EQ(LoadThree(f, "oor_bit", "1\n11111\n10\n", "  bit [3:0] mem [0:2];",
+                      "$readmemb"),
+            "1 0 0\n");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "value out of range", 5, "21.4.2"));
+}
+
+TEST(Readmem2StateSim, NumbersThatFitTheTwoStateElementLoadWithoutAReport) {
+  SimFixture f;
+  EXPECT_EQ(LoadThree(f, "fit_int", "1\nffffffff\n2\n", "  int mem [0:2];",
+                      "$readmemh"),
+            "1 -1 2\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
