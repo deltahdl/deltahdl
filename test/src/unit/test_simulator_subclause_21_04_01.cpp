@@ -411,4 +411,99 @@ TEST(ReadmemAssocSim, StringIndexRejectionNames21_4_1) {
   std::remove(path.c_str());
 }
 
+struct AssocLoad {
+  std::string prelude;
+  std::string decl;
+  std::string call;
+  std::string show;
+};
+
+std::string LoadInto(SimFixture& f, const std::string& tag,
+                     const std::string& data, const AssocLoad& c) {
+  std::string path = WriteData(tag, data);
+  std::string out = RunCapture(c.prelude + "module t;\n" + c.decl +
+                                   "\n"
+                                   "  initial begin\n"
+                                   "    " +
+                                   c.call + "(\"" + path +
+                                   "\", aa);\n"
+                                   "    $display(" +
+                                   c.show +
+                                   ");\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                               f);
+  std::remove(path.c_str());
+  return out;
+}
+
+TEST(ReadmemQueueDynSim, AnEmptyQueueAndAnUnsizedDynamicArrayStayEmpty) {
+  for (const char* call : {"$readmemh", "$readmemb"}) {
+    for (const char* decl : {"  logic [7:0] aa [$];", "  logic [7:0] aa [];"}) {
+      SimFixture f;
+      EXPECT_EQ(LoadInto(f, "empty", "1 1 1\n",
+                         {"", decl, call, "\"%0d\", aa.size()"}),
+                "0\n")
+          << call << decl;
+    }
+  }
+}
+
+TEST(ReadmemAssocSim, StringIndexUnderReadmembIsRejected) {
+  SimFixture f;
+  EXPECT_EQ(LoadInto(f, "aa_str_b", "@1 1\n",
+                     {"", "  logic [7:0] aa [string];", "$readmemb",
+                      "\"after %0d\", aa.num()"}),
+            "after 0\n");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$readmemb: associative array index must be of an integral type", 4,
+      "21.4.1"));
+}
+
+TEST(ReadmemAssocSim, DISABLED_ClassHandleIndexIsRejected) {
+  for (const char* call : {"$readmemh", "$readmemb"}) {
+    SimFixture f;
+    EXPECT_EQ(LoadInto(f, "aa_class", "@1 1\n",
+                       {"class C;\nendclass\n", "  logic [7:0] aa [C];", call,
+                        "\"after %0d\", aa.num()"}),
+              "after 0\n")
+        << call;
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string(call) +
+                                  ": associative array index must be of an "
+                                  "integral type",
+                              6, "21.4.1"))
+        << call;
+  }
+}
+
+TEST(ReadmemAssocSim, DISABLED_RealIndexIsRejected) {
+  for (const char* index : {"real", "shortreal"}) {
+    SimFixture f;
+    EXPECT_EQ(LoadInto(f, "aa_real", "@1 1\n",
+                       {"", std::string("  logic [7:0] aa [") + index + "];",
+                        "$readmemh", "\"after %0d\", aa.num()"}),
+              "after 0\n")
+        << index;
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "$readmemh: associative array index must be of an integral type", 4,
+        "21.4.1"))
+        << index;
+  }
+}
+
+TEST(ReadmemAssocSim, PackedVectorAndByteIndicesLoadLikeInt) {
+  for (const char* index : {"bit [3:0]", "byte", "logic [7:0]"}) {
+    SimFixture f;
+    EXPECT_EQ(LoadInto(f, "aa_packed", "@2 a1 a2\n",
+                       {"", std::string("  logic [7:0] aa [") + index + "];",
+                        "$readmemh", "\"%0d %h %h\", aa.num(), aa[2], aa[3]"}),
+              "2 a1 a2\n")
+        << index;
+    EXPECT_FALSE(f.has_errors) << index;
+  }
+}
+
 }  // namespace
