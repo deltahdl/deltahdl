@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/elaborator_helpers.h"
@@ -501,6 +503,106 @@ TEST(NonAnsiStylePortDeclarations,
       "endmodule\n",
       f, "m");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+bool ErrorAtUnderNonAnsi(const ElabFixture& f, uint32_t line) {
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == delta::DiagSeverity::kError && d.loc.line == line &&
+        d.subclause == "23.2.2.1") {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(NonAnsiBodyPortTypes, DISABLED_AnInoutVariableBodyPortIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(a);\n"
+      "  inout var logic a;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(ErrorAtUnderNonAnsi(f, 2));
+}
+
+TEST(NonAnsiBodyPortTypes, AnInoutNetBodyPortWithADataTypeIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(a);\n"
+      "  inout wire logic [2:0] a;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->ports[0].width, 3u);
+}
+
+TEST(NonAnsiBodyPortTypes, DISABLED_BodyInterconnectPortsTakeTheirStatedWidth) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(a, b);\n"
+      "  inout interconnect a;\n"
+      "  input interconnect [3:0] b;\n"
+      "endmodule\n",
+      f, "m");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_EQ(design->top_modules[0]->ports.size(), 2u);
+  EXPECT_EQ(design->top_modules[0]->ports[0].width, 1u);
+  EXPECT_EQ(design->top_modules[0]->ports[1].width, 4u);
+}
+
+TEST(NonAnsiBodyPortTypes,
+     DISABLED_ABodyInterconnectPortWithADataTypeIsReportedAtTheType) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module m(a);\n"
+      "  input interconnect logic a;\n"
+      "endmodule\n",
+      f, "m");
+  bool at_type = false;
+  bool at_keyword = false;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity != delta::DiagSeverity::kError || d.loc.line != 2) continue;
+    at_type = at_type || (d.loc.column == 22 && d.subclause == "23.2.2.1");
+    at_keyword = at_keyword || d.loc.column == 9;
+  }
+  EXPECT_TRUE(at_type);
+  EXPECT_FALSE(at_keyword);
+}
+
+TEST(NonAnsiPortExpressionNames,
+     DISABLED_AnUndeclaredConcatenationElementIsReported) {
+  for (const char* src : {"module m({a, b});\n  input a;\nendmodule\n",
+                          "module m({a, b[1:0]});\n  input a;\nendmodule\n"}) {
+    ElabFixture f;
+    ElaborateSrc(src, f, "m");
+    EXPECT_TRUE(ErrorAtUnderNonAnsi(f, 1)) << src;
+  }
+}
+
+TEST(NonAnsiPortExpressionNames,
+     DISABLED_AnUndeclaredNameInAnExplicitPortIsReported) {
+  for (const char* src : {"module m(.p(x));\nendmodule\n",
+                          "module m(.p({x, y}));\n  input x;\nendmodule\n"}) {
+    ElabFixture f;
+    ElaborateSrc(src, f, "m");
+    EXPECT_TRUE(ErrorAtUnderNonAnsi(f, 1)) << src;
+  }
+}
+
+TEST(NonAnsiPortExpressionNames,
+     PortExpressionsWhoseNamesAreAllDeclaredAreAccepted) {
+  for (const char* src :
+       {"module m({a, b});\n  input a;\n  input b;\nendmodule\n",
+        "module m({a, b[1:0]});\n  input a;\n  input [1:0] b;\nendmodule\n",
+        "module m(.p(x));\n  input x;\nendmodule\n",
+        "module m(.p({x, y}));\n  input x, y;\nendmodule\n"}) {
+    ElabFixture f;
+    ElaborateSrc(src, f, "m");
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
 }
 
 }  // namespace

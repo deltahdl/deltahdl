@@ -357,4 +357,29 @@ TEST(OnePortStyle, EachStyleOnItsOwnIsAccepted) {
   EXPECT_FALSE(Parse("module m();\nendmodule\n").has_errors);
 }
 
+TEST(AnsiPortRedeclaration,
+     DISABLED_ABodyNetOrVariableNamedLikeAPortCitesThisRule) {
+  for (const char* item : {"wire [7:0] a;", "logic [7:0] a;"}) {
+    auto r =
+        Parse(std::string("module m(input logic [7:0] a, output logic y);\n") +
+              item + "\nendmodule\n");
+    EXPECT_TRUE(
+        ReportedError(r.diags, "redeclaration of ANSI port 'a'", 2, "23.2.2.2"))
+        << item;
+  }
+}
+
+TEST(AnsiPortRedeclaration,
+     DISABLED_ABodyPortDeclarationOfAnAnsiPortCitesThisRule) {
+  EXPECT_TRUE(ErrorAtUnder("module m(input a, b);\ninput a;\nendmodule\n", 2,
+                           "23.2.2.2"));
+}
+
+TEST(AnsiPortRedeclaration, ABodyDeclarationOfAnotherNameIsAccepted) {
+  auto r = Parse(
+      "module m(input logic [7:0] a, output logic y);\n"
+      "wire [7:0] c;\nlogic [7:0] d;\nendmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

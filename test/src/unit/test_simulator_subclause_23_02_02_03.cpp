@@ -104,4 +104,91 @@ TEST(PortKindSimulation, APortWithNoPortKindIsANetOfTheDefaultNetType) {
       "0 z 1\n");
 }
 
+std::string InheritedPortRun(const std::string& keyword,
+                             const std::string& header, const std::string& body,
+                             const std::string& top) {
+  SimFixture f;
+  return RunCapture(keyword + " m(" + header + ");\n" + body +
+                        (keyword == "program" ? "  initial #3;\n" : "") +
+                        "end" + keyword + "\nmodule t;\n" + top + "endmodule\n",
+                    f);
+}
+
+constexpr const char* kAnsiHeaderKeywords[] = {"module", "interface",
+                                               "program"};
+
+TEST(InheritedAnsiPortRun, LaterNamesInheritAnInputWireDeclaration) {
+  for (const char* kw : kAnsiHeaderKeywords) {
+    EXPECT_EQ(
+        InheritedPortRun(
+            kw, "input wire a, b, sel, output logic y",
+            "  assign y = sel ? a : b;\n"
+            "  initial #1 $display(\"%0d %0d\", $bits(b), $bits(sel));\n",
+            "  logic a = 0, b = 1, s = 0;\n  wire y;\n  m u(a, b, s, y);\n"
+            "  initial #2 $display(\"%b\", y);\n"),
+        "1 1\n1\n")
+        << kw;
+  }
+}
+
+TEST(InheritedAnsiPortRun, ALaterNameInheritsAnOutputVariableAndItsRange) {
+  for (const char* kw : kAnsiHeaderKeywords) {
+    EXPECT_EQ(InheritedPortRun(kw, "output logic [3:0] a, b",
+                               "  initial begin a = 4'd9; b = 4'd10; end\n",
+                               "  wire [3:0] x, y;\n  m u(x, y);\n"
+                               "  initial #1 $display(\"%0d %0d\", $bits(y), "
+                               "y);\n"),
+              "4 10\n")
+        << kw;
+  }
+}
+
+TEST(InheritedAnsiPortRun, ALaterNameInheritsAnInputIntVariable) {
+  for (const char* kw : kAnsiHeaderKeywords) {
+    EXPECT_EQ(
+        InheritedPortRun(kw, "input var int a, b",
+                         "  initial #1 $display(\"%0d %0d\", $bits(b), b);\n",
+                         "  int x = 1, y = -70000;\n  m u(x, y);\n"),
+        "32 -70000\n")
+        << kw;
+  }
+}
+
+TEST(InheritedAnsiPortRun, ALaterNameInheritsSigningAndRange) {
+  for (const char* kw : kAnsiHeaderKeywords) {
+    EXPECT_EQ(
+        InheritedPortRun(kw, "input signed [7:0] a, b",
+                         "  initial #1 $display(\"%0d %0d\", $bits(b), b);\n",
+                         "  logic [7:0] x = 1, y = 8'hF0;\n  m u(x, y);\n"),
+        "8 -16\n")
+        << kw;
+  }
+}
+
+TEST(InheritedAnsiPortRun, TheMuxOfTheModulesOverviewFollowsItsSelect) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mux2to1(input wire a, b, sel, output logic y);\n"
+                       "  always_comb if (sel) y = a; else y = b;\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  logic a = 1, b = 0, sel = 1;\n"
+                       "  wire y;\n"
+                       "  mux2to1 u(a, b, sel, y);\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%b\", y);\n"
+                       "    sel = 0;\n"
+                       "    #1 $display(\"%b\", y);\n"
+                       "    b = 1;\n"
+                       "    #1 $display(\"%b\", y);\n"
+                       "    sel = 1;\n"
+                       "    a = 0;\n"
+                       "    #1 $display(\"%b\", y);\n"
+                       "    a = 1;\n"
+                       "    #1 $display(\"%b\", y);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1\n0\n1\n0\n1\n");
+}
+
 }  // namespace

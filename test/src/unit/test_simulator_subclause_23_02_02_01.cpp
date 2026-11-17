@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -116,6 +118,181 @@ TEST(NonAnsiPortExpressionSimulation,
                        "endmodule\n",
                        f),
             "1 0\n");
+}
+
+std::string BodyPortWidth(const std::string& direction,
+                          const std::string& override_by,
+                          const std::string& after, SimFixture& f) {
+  return RunCapture(
+      "module m(a);\n"
+      "  parameter W = 4;\n"
+      "  localparam L = W + 1;\n"
+      "  " +
+          direction +
+          " a;\n"
+          "  initial $display(\"%0d\", $bits(a));\n"
+          "endmodule\n"
+          "module t;\n  wire [9:0] w;\n  m " +
+          override_by + " u(w);\n" + after + "endmodule\n",
+      f);
+}
+
+TEST(NonAnsiPortRangeOverride, DISABLED_AnInputRangeTakesTheOverride) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("input [W-1:0]", "#(7)", "", f), "7\n");
+}
+
+TEST(NonAnsiPortRangeOverride, DISABLED_AnOutputRangeTakesTheOverride) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("output [W-1:0]", "#(7)", "", f), "7\n");
+}
+
+TEST(NonAnsiPortRangeOverride, DISABLED_AnInoutRangeTakesTheOverride) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("inout [W-1:0]", "#(7)", "", f), "7\n");
+}
+
+TEST(NonAnsiPortRangeOverride, DISABLED_ALocalparamRangeTakesTheOverride) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("input [L-1:0]", "#(7)", "", f), "8\n");
+}
+
+TEST(NonAnsiPortRangeOverride, DISABLED_AnOverrideByNameReachesTheRange) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("input [W-1:0]", "#(.W(7))", "", f), "7\n");
+}
+
+TEST(NonAnsiPortRangeOverride, DISABLED_ADefparamReachesTheRange) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("input [W-1:0]", "", "  defparam u.W = 7;\n", f),
+            "7\n");
+}
+
+TEST(NonAnsiPortRangeOverride, WithoutAnOverrideTheDefaultWidthHolds) {
+  SimFixture f;
+  EXPECT_EQ(BodyPortWidth("input [W-1:0]", "", "", f), "4\n");
+}
+
+TEST(NonAnsiPortRangeOverride, AnAnsiPortRangeTakesTheOverride) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m #(parameter W = 4)(input [W-1:0] a);\n"
+                 "  initial $display(\"%0d\", $bits(a));\n"
+                 "endmodule\n"
+                 "module t;\n  wire [6:0] w;\n  m #(7) u(w);\nendmodule\n",
+                 f),
+      "7\n");
+}
+
+TEST(NonAnsiPortRangeOverride, AHeaderParameterReachesABodyPortRange) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m #(parameter W = 4)(a);\n"
+                 "  input [W-1:0] a;\n"
+                 "  initial $display(\"%0d\", $bits(a));\n"
+                 "endmodule\n"
+                 "module t;\n  wire [6:0] w;\n  m #(7) u(w);\nendmodule\n",
+                 f),
+      "7\n");
+}
+
+std::string BodyInterfacePortDesign(const std::string& keyword,
+                                    const std::string& name,
+                                    const std::string& type,
+                                    const std::string& connection) {
+  return keyword + " " + name + "(a);\n  " + type +
+         " a;\n  initial #1 a.gnt = a.req;\n  initial #3;\nend" + keyword +
+         "\n" +
+         "module t;\n  simple_bus sb_intf();\n  initial sb_intf.req = 1;\n  " +
+         name + " u(" + connection +
+         ");\n  initial #2 $display(\"%b\", sb_intf.gnt);\nendmodule\n";
+}
+
+std::string RunInterfacePortDesign(const std::string& design, SimFixture& f) {
+  return RunCapture(
+      "interface simple_bus;\n"
+      "  logic req, gnt;\n"
+      "  modport target(input req, output gnt);\n"
+      "endinterface\n" +
+          design,
+      f);
+}
+
+TEST(NonAnsiInterfacePorts,
+     DISABLED_ABodyInterfacePortDenotesThePositionalActual) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunInterfacePortDesign(
+          BodyInterfacePortDesign("module", "memMod", "simple_bus", "sb_intf"),
+          f),
+      "1\n");
+}
+
+TEST(NonAnsiInterfacePorts, DISABLED_ABodyInterfacePortDenotesTheNamedActual) {
+  SimFixture f;
+  EXPECT_EQ(RunInterfacePortDesign(
+                BodyInterfacePortDesign("module", "memMod", "simple_bus",
+                                        ".a(sb_intf)"),
+                f),
+            "1\n");
+}
+
+TEST(NonAnsiInterfacePorts, DISABLED_ABodyInterfacePortThroughAModport) {
+  SimFixture f;
+  EXPECT_EQ(RunInterfacePortDesign(
+                BodyInterfacePortDesign("module", "memMod", "simple_bus.target",
+                                        "sb_intf"),
+                f),
+            "1\n");
+}
+
+TEST(NonAnsiInterfacePorts,
+     DISABLED_OneDeclarationBindsEachPortToItsOwnActual) {
+  SimFixture f;
+  EXPECT_EQ(RunInterfacePortDesign(
+                "module memMod(a, b);\n"
+                "  simple_bus a, b;\n"
+                "  initial #1 begin a.gnt = 1; b.gnt = 0; end\n"
+                "endmodule\n"
+                "module t;\n  simple_bus x(), y();\n  memMod mem(y, x);\n"
+                "  initial #2 $display(\"%b %b\", x.gnt, y.gnt);\nendmodule\n",
+                f),
+            "0 1\n");
+}
+
+TEST(NonAnsiInterfacePorts, DISABLED_AnInterfaceBodyDeclaresAnInterfacePort) {
+  for (const char* type : {"simple_bus", "simple_bus.target"}) {
+    SimFixture f;
+    EXPECT_EQ(
+        RunInterfacePortDesign(
+            BodyInterfacePortDesign("interface", "outer", type, "sb_intf"), f),
+        "1\n")
+        << type;
+  }
+}
+
+TEST(NonAnsiInterfacePorts, DISABLED_AProgramBodyDeclaresAnInterfacePort) {
+  for (const char* type : {"simple_bus", "simple_bus.target"}) {
+    SimFixture f;
+    EXPECT_EQ(
+        RunInterfacePortDesign(
+            BodyInterfacePortDesign("program", "prog", type, "sb_intf"), f),
+        "1\n")
+        << type;
+  }
+}
+
+TEST(NonAnsiInterfacePorts, AnAnsiInterfacePortDenotesItsActual) {
+  SimFixture f;
+  EXPECT_EQ(RunInterfacePortDesign(
+                "module memMod(simple_bus a);\n"
+                "  initial #1 a.gnt = a.req;\n"
+                "endmodule\n"
+                "module t;\n  simple_bus sb_intf();\n"
+                "  initial sb_intf.req = 1;\n  memMod mem(sb_intf);\n"
+                "  initial #2 $display(\"%b\", sb_intf.gnt);\nendmodule\n",
+                f),
+            "1\n");
 }
 
 }  // namespace
