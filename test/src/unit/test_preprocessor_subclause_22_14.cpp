@@ -728,4 +728,73 @@ TEST(KeywordVersionPreprocessing, CommentAheadOfTheDirectiveKeepsItsText) {
   EXPECT_NE(out.find(marked), std::string::npos);
 }
 
+struct SplitHeader {
+  const char* header;
+  const char* closer;
+};
+
+TEST(KeywordDirectivePlacement, BothRejectedInsideAHeaderSplitOverLines) {
+  for (const char* directive :
+       {"begin_keywords \"1800-2023\"", "end_keywords"}) {
+    std::string name = directive;
+    name = name.substr(0, name.find(' '));
+    for (const auto& h : {
+             SplitHeader{"module\nm;\n", "endmodule\n"},
+             SplitHeader{"module automatic\nm;\n", "endmodule\n"},
+             SplitHeader{"interface\ni;\n", "endinterface\n"},
+             SplitHeader{"program\np;\n", "endprogram\n"},
+             SplitHeader{"package\nk;\n", "endpackage\n"},
+             SplitHeader{"checker\nk;\n", "endchecker\n"},
+             SplitHeader{"primitive\nu(output o, input a);\n",
+                         "table 0:0; 1:1; endtable\nendprimitive\n"},
+             SplitHeader{"config\ncf;\n", "design t;\nendconfig\n"},
+         }) {
+      PreprocFixture f;
+      Preprocess(std::string(h.header) + "`" + directive + "\n" + h.closer, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "`" + name + " illegal inside a design element",
+                                3, "22.14"))
+          << directive << " after " << h.header;
+    }
+  }
+}
+
+TEST(KeywordDirectivePlacement,
+     APairInsideACompilationUnitScopeItemIsAccepted) {
+  for (const auto& h : {
+           SplitHeader{"class k;\n", "endclass\n"},
+           SplitHeader{"function void f();\n", "endfunction\n"},
+           SplitHeader{"task tk();\n", "endtask\n"},
+       }) {
+    PreprocFixture f;
+    Preprocess(std::string(h.header) +
+                   "`begin_keywords \"1800-2023\"\n`end_keywords\n" + h.closer,
+               f);
+    EXPECT_FALSE(f.diag.HasErrors()) << h.header;
+  }
+}
+
+TEST(KeywordDirectivePlacement, ASurplusEndKeywordsIsReportedWhereItStands) {
+  PreprocFixture one;
+  Preprocess("`begin_keywords \"1800-2023\"\n`end_keywords\n`end_keywords\n",
+             one);
+  EXPECT_TRUE(ReportedError(one.diag.Diagnostics(),
+                            "`end_keywords without matching `begin_keywords", 3,
+                            "22.14"));
+  PreprocFixture nest;
+  Preprocess(
+      "`begin_keywords \"1800-2023\"\n`begin_keywords \"1800-2017\"\n"
+      "`end_keywords\n`end_keywords\n`end_keywords\n",
+      nest);
+  EXPECT_TRUE(ReportedError(nest.diag.Diagnostics(),
+                            "`end_keywords without matching `begin_keywords", 5,
+                            "22.14"));
+  PreprocFixture balanced;
+  Preprocess(
+      "`begin_keywords \"1800-2023\"\n`begin_keywords \"1800-2017\"\n"
+      "`end_keywords\n`end_keywords\n",
+      balanced);
+  EXPECT_FALSE(balanced.diag.HasErrors());
+}
+
 }  // namespace

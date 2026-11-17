@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 
@@ -154,6 +156,41 @@ TEST(KeywordVersionParsing, NestedRegionRestoresEnclosingVersion) {
       "endmodule\n"
       "`end_keywords\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got ';'", 8, "6.7"));
+}
+
+struct FreedWordBody {
+  const char* body;
+  int line;
+  const char* subclause;
+};
+
+TEST(KeywordVersionParsing, AFreedWordNamesItemsInEveryOtherBody) {
+  for (const auto& b : {
+           FreedWordBody{"program p; int soft; endprogram\n"
+                         "module t; endmodule\n",
+                         2, "6.8"},
+           FreedWordBody{"checker k; bit soft; endchecker\n"
+                         "module t; endmodule\n",
+                         2, "6.8"},
+           FreedWordBody{"primitive u(output soft, input a);\n"
+                         "  table 0:0; 1:1; endtable\nendprimitive\n"
+                         "module t; endmodule\n",
+                         2, "29.3.1"},
+           FreedWordBody{"module t; endmodule\n"
+                         "config soft; design t; endconfig\n",
+                         3, "33.4.1"},
+       }) {
+    EXPECT_TRUE(
+        ParseWithPreprocessorOk(std::string("`begin_keywords \"1800-2009\"\n") +
+                                b.body + "`end_keywords\n"))
+        << b.body;
+    auto r =
+        ParseWithPreprocessor(std::string("`begin_keywords \"1800-2012\"\n") +
+                              b.body + "`end_keywords\n");
+    EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'soft'",
+                              b.line, b.subclause))
+        << b.body;
+  }
 }
 
 }  // namespace
