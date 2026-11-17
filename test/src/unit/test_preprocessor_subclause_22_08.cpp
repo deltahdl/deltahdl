@@ -191,3 +191,59 @@ TEST(Preprocessor, DefaultNettype_RecordedAtEachHeader) {
   EXPECT_EQ(list[2].default_nettype, NetType::kWire);
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 }
+
+TEST(Preprocessor, DefaultNettype_InterconnectIsRejected) {
+  PreprocFixture f;
+  Preprocess("`default_nettype interconnect\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid net type 'interconnect'", 1, "22.8"));
+}
+
+TEST(Preprocessor, DefaultNettype_AUserDefinedNettypeIsRejected) {
+  PreprocFixture f;
+  Preprocess("nettype logic mynet;\n`default_nettype mynet\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid net type 'mynet'", 2,
+                            "22.8"));
+}
+
+struct PlacedNettype {
+  const char* src;
+  int line;
+};
+
+TEST(Preprocessor, DefaultNettype_RejectedInsideEveryDesignElement) {
+  for (const auto& c : {
+           PlacedNettype{"interface i;\n`default_nettype wire\nendinterface\n",
+                         2},
+           PlacedNettype{"program p;\n`default_nettype wire\nendprogram\n", 2},
+           PlacedNettype{"package k;\n`default_nettype wire\nendpackage\n", 2},
+           PlacedNettype{"checker c;\n`default_nettype wire\nendchecker\n", 2},
+           PlacedNettype{"primitive u(output o, input a);\n"
+                         "`default_nettype wire\n"
+                         "table 0:0; 1:1; endtable\nendprimitive\n",
+                         2},
+           PlacedNettype{"config cf;\n`default_nettype wire\ndesign t;\n"
+                         "endconfig\n",
+                         2},
+           PlacedNettype{"module outer;\nmodule inner;\nendmodule\n"
+                         "`default_nettype wire\nendmodule\n",
+                         4},
+           PlacedNettype{"`define DN `default_nettype wire\nmodule m;\n`DN\n"
+                         "endmodule\n",
+                         3},
+       }) {
+    PreprocFixture f;
+    Preprocess(c.src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "`default_nettype illegal inside a design "
+                              "element",
+                              c.line, "22.8"))
+        << c.src;
+  }
+}
+
+TEST(Preprocessor, DefaultNettype_AcceptedInsideAClassAtCompilationUnitScope) {
+  PreprocFixture f;
+  Preprocess("class k;\n`default_nettype wire\nendclass\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
