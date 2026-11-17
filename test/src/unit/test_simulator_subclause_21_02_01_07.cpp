@@ -273,4 +273,85 @@ TEST(StringFormat, NonByteUnpackedArrayNames21_2_1_7) {
       "a string format specifier applied to an unpacked array", 6, "21.2.1.7"));
 }
 
+TEST(StringFormat, AQueueOfIntIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int v[$] = {1, 2};\n"
+      "  initial $display(\"%s\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a string format specifier applied to an unpacked "
+                            "array requires elements of type byte",
+                            3, "21.2.1.7"));
+}
+
+TEST(StringFormat, ADynamicArrayOfIntIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int v[] = '{1, 2};\n"
+      "  initial $display(\"%s\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a string format specifier applied to an unpacked "
+                            "array requires elements of type byte",
+                            3, "21.2.1.7"));
+}
+
+TEST(StringFormat, AnAssociativeArrayOfIntIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int v[int] = '{1:2};\n"
+      "  initial $display(\"%s\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "a string format specifier applied to an unpacked "
+                            "array requires elements of type byte",
+                            3, "21.2.1.7"));
+}
+
+TEST(StringFormat, DISABLED_AnAssociativeArrayOfBytePrintsInIndexOrder) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  byte v[int];\n"
+                       "  initial begin\n"
+                       "    v[3] = \"c\";\n"
+                       "    v[1] = \"a\";\n"
+                       "    v[2] = \"b\";\n"
+                       "    $display(\"%s\", v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "abc\n");
+}
+
+TEST(StringFormat, DISABLED_AnUnpackedStructIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  struct { byte a; byte b; } v;\n"
+      "  initial $display(\"%s\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "a string format specifier",
+                            3, "21.2.1.7"));
+}
+
+TEST(StringFormat, DISABLED_AnUnpackedUnionIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  union { byte a; byte b; } v;\n"
+      "  initial $display(\"%s\", v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "a string format specifier",
+                            3, "21.2.1.7"));
+}
+
 }  // namespace

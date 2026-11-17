@@ -270,4 +270,223 @@ TEST(HierarchicalNameFormat, StaticInitializerNamesItsInstance) {
             "top.u1.u2\n");
 }
 
+TEST(HierarchicalNameFormat,
+     DISABLED_AnUnnamedForkInsideANamedBlockNamesTheBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial begin : b\n"
+                       "    fork\n"
+                       "      $display(\"%m\");\n"
+                       "    join\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.b\n");
+}
+
+TEST(HierarchicalNameFormat, DISABLED_ANamedForkWithJoinNamesTheFork) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial begin\n"
+                       "    fork : f\n"
+                       "      $display(\"%m\");\n"
+                       "    join\n"
+                       "    #1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.f\n");
+}
+
+TEST(HierarchicalNameFormat, DISABLED_ANamedForkWithJoinAnyNamesTheFork) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial begin\n"
+                       "    fork : f\n"
+                       "      $display(\"%m\");\n"
+                       "    join_any\n"
+                       "    #1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.f\n");
+}
+
+TEST(HierarchicalNameFormat, DISABLED_ANamedForkWithJoinNoneNamesTheFork) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial begin\n"
+                       "    fork : f\n"
+                       "      $display(\"%m\");\n"
+                       "    join_none\n"
+                       "    #1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.f\n");
+}
+
+TEST(HierarchicalNameFormat, DISABLED_ANamedBlockInsideANamedForkNamesBoth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial fork : f\n"
+                       "    begin : b\n"
+                       "      $display(\"%m\");\n"
+                       "    end\n"
+                       "  join\n"
+                       "endmodule\n",
+                       f),
+            "chip.f.b\n");
+}
+
+TEST(HierarchicalNameFormat, DISABLED_AnUnnamedForkInsideATaskNamesTheTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  task tk;\n"
+                       "    fork\n"
+                       "      $display(\"%m\");\n"
+                       "    join\n"
+                       "  endtask\n"
+                       "  initial tk;\n"
+                       "endmodule\n",
+                       f),
+            "chip.tk\n");
+}
+
+TEST(HierarchicalNameFormat,
+     DISABLED_AForkJoinNoneInsideAFunctionNamesTheFunction) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  function void fn();\n"
+                       "    fork\n"
+                       "      $display(\"%m\");\n"
+                       "    join_none\n"
+                       "  endfunction\n"
+                       "  initial begin\n"
+                       "    fn();\n"
+                       "    #1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.fn\n");
+}
+
+TEST(HierarchicalNameFormat, AForkInAProcedureOfAModuleNamesTheEnclosingScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  logic go = 0;\n"
+                       "  always @(go) fork\n"
+                       "    $display(\"%m\");\n"
+                       "  join\n"
+                       "  initial #1 go = 1;\n"
+                       "endmodule\n",
+                       f),
+            "chip\n");
+}
+
+TEST(HierarchicalNameFormat,
+     AForkInAProcedureOfAnInterfaceNamesTheEnclosingScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  logic go = 0;\n"
+                       "  always @(go) fork\n"
+                       "    $display(\"%m\");\n"
+                       "  join\n"
+                       "  initial #1 go = 1;\n"
+                       "endinterface\n"
+                       "module chip;\n"
+                       "  ifc u();\n"
+                       "endmodule\n",
+                       f),
+            "chip.u\n");
+}
+
+TEST(HierarchicalNameFormat,
+     AForkInAProcedureOfAProgramNamesTheEnclosingScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program prg;\n"
+                       "  initial fork\n"
+                       "    $display(\"%m\");\n"
+                       "  join\n"
+                       "endprogram\n"
+                       "module chip;\n"
+                       "  prg u();\n"
+                       "endmodule\n",
+                       f),
+            "chip.u\n");
+}
+
+TEST(HierarchicalNameFormat,
+     AForkInAProcedureOfAGenerateBlockNamesTheEnclosingScope) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  if (1) begin : g\n"
+                       "    logic go = 0;\n"
+                       "    always @(go) fork\n"
+                       "      $display(\"%m\");\n"
+                       "    join\n"
+                       "    initial #1 go = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.g\n");
+}
+
+TEST(HierarchicalNameFormat, ALabelledImmediateAssertionInAForkNamesTheLabel) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial fork\n"
+                       "    a1: assert (1) $display(\"%m\");\n"
+                       "  join\n"
+                       "endmodule\n",
+                       f),
+            "chip.a1\n");
+}
+
+TEST(HierarchicalNameFormat, TheSameStatementsInABeginEndNameTheBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chip;\n"
+                       "  initial begin : b\n"
+                       "    begin\n"
+                       "      $display(\"%m\");\n"
+                       "    end\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "chip.b\n");
+}
+
+TEST(HierarchicalNameFormat,
+     DISABLED_APackageFunctionNamesThePackageAndTheFunction) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pkg;\n"
+      "  function void pf();\n"
+      "    $display(\"%m\");\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module chip;\n"
+      "  initial pkg::pf();\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("pkg"), std::string::npos) << out;
+  EXPECT_NE(out.find("pf"), std::string::npos) << out;
+}
+
+TEST(HierarchicalNameFormat, DISABLED_AClassMethodNamesTheClassAndTheMethod) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module chip;\n"
+      "  class C;\n"
+      "    static function void cm();\n"
+      "      $display(\"%m\");\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  initial C::cm();\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find('C'), std::string::npos) << out;
+  EXPECT_NE(out.find("cm"), std::string::npos) << out;
+}
+
 }  // namespace

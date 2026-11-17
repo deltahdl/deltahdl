@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_stmt.h"
 
@@ -53,6 +54,46 @@ TEST(IoSystemTaskParsing, MonitorBinaryHexOctalNames) {
               "    $monitoro(a);\n"
               "  end\n"
               "endmodule\n"));
+}
+
+TEST(IoSystemTaskParsing, DISABLED_MonitoronWithAnArgumentListIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a;\n"
+      "  initial $monitoron(a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "$monitoron takes no argument list", 3, "21.2.3"));
+}
+
+TEST(IoSystemTaskParsing, DISABLED_MonitoronWithEmptyParenthesesIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a;\n"
+      "  initial $monitoron();\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "$monitoron takes no argument list", 3, "21.2.3"));
+}
+
+TEST(IoSystemTaskParsing, DISABLED_MonitoroffWithAnArgumentListIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a;\n"
+      "  initial $monitoroff(a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "$monitoroff takes no argument list", 3,
+                            "21.2.3"));
+}
+
+TEST(IoSystemTaskParsing, DISABLED_MonitoroffWithEmptyParenthesesIsReported) {
+  auto r = Parse(
+      "module t;\n"
+      "  logic a;\n"
+      "  initial $monitoroff();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "$monitoroff takes no argument list", 3,
+                            "21.2.3"));
 }
 
 }  // namespace

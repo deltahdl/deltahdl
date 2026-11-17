@@ -391,4 +391,88 @@ TEST(IoMonitorSim, MonitorRedisplaysWhenItsOwnInstancesVariableChanges) {
             "0 0\n5 1\n10 0\n");
 }
 
+TEST(IoMonitorSim, DISABLED_AHierarchicalReferenceToAnotherInstanceRedisplays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c;\n"
+                       "  logic r;\n"
+                       "  initial begin\n"
+                       "    r = 0;\n"
+                       "    #5 r = 1;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  c u();\n"
+                       "  initial $monitor(\"%0t %b\", $time, u.r);\n"
+                       "endmodule\n",
+                       f),
+            "0 0\n5 1\n");
+}
+
+TEST(IoMonitorSim,
+     DISABLED_AHierarchicalReferenceIntoAParameterizedInstanceRedisplays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c #(parameter int P = 1);\n"
+                       "  logic r;\n"
+                       "  initial begin\n"
+                       "    r = 0;\n"
+                       "    #5 r = 1;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  c #(.P(2)) u();\n"
+                       "  initial $monitor(\"%0t %b\", $time, u.r);\n"
+                       "endmodule\n",
+                       f),
+            "0 0\n5 1\n");
+}
+
+TEST(IoMonitorSim, ABareArgumentToMonitorPrintsInItsRadix) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int v = 10;\n"
+                       "  initial $monitor(v);\n"
+                       "endmodule\n",
+                       f),
+            "         10\n");
+}
+
+TEST(IoMonitorSim, ABareArgumentToMonitorbPrintsInItsRadix) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int v = 10;\n"
+                       "  initial $monitorb(v);\n"
+                       "endmodule\n",
+                       f),
+            "00000000000000000000000000001010\n");
+}
+
+TEST(IoMonitorSim, ABareArgumentToMonitoroPrintsInItsRadix) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int v = 10;\n"
+                       "  initial $monitoro(v);\n"
+                       "endmodule\n",
+                       f),
+            "00000000012\n");
+}
+
+TEST(IoMonitorSim, ABareArgumentToMonitorhPrintsInItsRadix) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int v = 10;\n"
+                       "  initial $monitorh(v);\n"
+                       "endmodule\n",
+                       f),
+            "0000000a\n");
+}
+
+TEST(IoMonitorSim, AnEmptyArgumentPrintsASpace) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial $monitor(\"a\",,\"b\");\n"
+                       "endmodule\n",
+                       f),
+            "a b\n");
+}
+
 }  // namespace

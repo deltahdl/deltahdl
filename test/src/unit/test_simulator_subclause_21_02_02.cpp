@@ -200,4 +200,13 @@ TEST(IoStrobeSim, StrobeReadsTheScopeOfItsCall) {
   EXPECT_EQ(out, "t.u.blk\nt.u.blk.tk 3 9\nt.u.g[0]\nt.u.g[1]\n");
 }
 
+TEST(StrobeSim, EscapesInAStrobeLiteralPrintAsTheirCharacters) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial $strobe(\"a\\tb\\\\c\\\"d\\101\");\n"
+                       "endmodule\n",
+                       f),
+            "a\tb\\c\"dA\n");
+}
+
 }  // namespace

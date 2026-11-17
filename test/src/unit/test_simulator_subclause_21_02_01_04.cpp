@@ -560,4 +560,16 @@ TEST(StrengthFormat, InterfaceNetNamedThroughThePortAndTheInstance) {
   EXPECT_EQ(out, "top Pu1\ndrv Pu1\n");
 }
 
+TEST(StrengthFormat, DISABLED_AScalarVariableIsShownWithAStrength) {
+  SimFixture f;
+  std::string out = CaptureDisplayOutput(
+      "module m;\n"
+      "  logic r = 1;\n"
+      "  initial #1 $display(\"%v\", r);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1\n");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 }  // namespace

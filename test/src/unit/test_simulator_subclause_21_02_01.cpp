@@ -327,4 +327,292 @@ TEST(IoDisplayWriteSim, ConversionsTakingNoArgumentAreNotCounted) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+TEST(IoDisplayWriteSim, DisplaybWithoutParenthesesPrintsANewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $displayb;\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\n|");
+}
+
+TEST(IoDisplayWriteSim, DisplaybWithEmptyParenthesesPrintsANewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $displayb();\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\n|");
+}
+
+TEST(IoDisplayWriteSim, DisplayoWithoutParenthesesPrintsANewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $displayo;\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\n|");
+}
+
+TEST(IoDisplayWriteSim, DisplayoWithEmptyParenthesesPrintsANewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $displayo();\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\n|");
+}
+
+TEST(IoDisplayWriteSim, DisplayhWithoutParenthesesPrintsANewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $displayh;\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\n|");
+}
+
+TEST(IoDisplayWriteSim, DisplayhWithEmptyParenthesesPrintsANewline) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $displayh();\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "\n|");
+}
+
+TEST(IoDisplayWriteSim, WritebWithoutParenthesesPrintsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $writeb;\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "|");
+}
+
+TEST(IoDisplayWriteSim, WritebWithEmptyParenthesesPrintsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $writeb();\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "|");
+}
+
+TEST(IoDisplayWriteSim, WriteoWithoutParenthesesPrintsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $writeo;\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "|");
+}
+
+TEST(IoDisplayWriteSim, WriteoWithEmptyParenthesesPrintsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $writeo();\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "|");
+}
+
+TEST(IoDisplayWriteSim, WritehWithoutParenthesesPrintsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $writeh;\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "|");
+}
+
+TEST(IoDisplayWriteSim, WritehWithEmptyParenthesesPrintsNothing) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $writeh();\n"
+                       "    $write(\"|\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "|");
+}
+
+TEST(IoDisplayWriteSim, ABareArgumentToWritebPrintsBinary) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [3:0] v = 4'd10;\n"
+                       "  initial $writeb(v);\n"
+                       "endmodule\n",
+                       f),
+            "1010");
+}
+
+TEST(IoDisplayWriteSim, ABareArgumentToWriteoPrintsOctal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [5:0] v = 6'd10;\n"
+                       "  initial $writeo(v);\n"
+                       "endmodule\n",
+                       f),
+            "12");
+}
+
+TEST(IoDisplayWriteSim, AShortageInWriteIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $write(\"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, AShortageInStrobeIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $strobe(\"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, AShortageInMonitorIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $monitor(\"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, AShortageInFdisplayIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $fdisplay(32'h8000_0001, \"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, AShortageInFwriteIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $fwrite(32'h8000_0001, \"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, AShortageInFstrobeIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $fstrobe(32'h8000_0001, \"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, AShortageInFmonitorIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a = 5;\n"
+      "  initial $fmonitor(32'h8000_0001, \"%0d %h\", a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      3, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, ALonePercentVIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  initial $display(\"[%v]\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      2, "21.2.1"));
+}
+
+TEST(IoDisplayWriteSim, ALonePercentSIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  initial $display(\"[%s]\");\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(),
+      "a string literal has more format specifications than arguments after it",
+      2, "21.2.1"));
+}
+
 }  // namespace
