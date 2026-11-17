@@ -48,3 +48,22 @@ TEST(ResetAllSimulation, LeavesTheModulesBeforeItTheirUnconnectedDrive) {
                                  f),
             "1 z\n");
 }
+
+TEST(ResetAllSimulation, AModuleAfterTimescaleThenResetallRunsAtTheDefault) {
+  SimFixture without;
+  auto expected = PreprocessAndCapture(
+      "module t;\n"
+      "  initial $printtimescale;\n"
+      "endmodule\n",
+      without);
+  SimFixture f;
+  auto got = PreprocessAndCapture(
+      "`timescale 1us / 1ns\n"
+      "`resetall\n"
+      "module t;\n"
+      "  initial $printtimescale;\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(got, expected);
+  EXPECT_EQ(got.find("1us"), std::string::npos) << got;
+}
