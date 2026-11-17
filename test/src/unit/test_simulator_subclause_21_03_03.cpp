@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -417,6 +418,175 @@ TEST(StringFormatTaskSim, SwriteAndSformatWriteClassProperties) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "v=5 s=ab\n[h=12] 00006162\n");
+}
+
+TEST(StringFormatTaskSim, SwriteFamilyMixesLiteralsAndExpressionsAsFwrite) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  logic [7:0] a, b;\n"
+      "  initial begin\n"
+      "    a = 8'd5; b = 8'hff;\n"
+      "    $swrite(s, \"a=\", a, \" b=%h\", b, \" end\"); $display(\"[%s]\", "
+      "s);\n"
+      "    $swriteh(s, \"a=\", a, \" b=\", b); $display(\"[%s]\", s);\n"
+      "    $swriteb(s, a, \" and %d\", b, \";\"); $display(\"[%s]\", s);\n"
+      "    $swriteo(s, \"a=\", a, \" b=%d\", b); $display(\"[%s]\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "[a=  5 b=ff end]\n[a=05 b=ff]\n[00000101 and 255;]\n"
+            "[a=005 b=255]\n");
+}
+
+TEST(StringFormatTaskSim, SformatfTooFewArgsWarnsAndContinues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = $sformatf(\"a=%0d b=%0d\", 1);\n"
+      "    $display(\"after\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "does not match supplied argument count", 4,
+                              "21.3.3"));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "after\n");
+}
+
+TEST(StringFormatTaskSim, SformatfTooManyArgsWarnsAndContinues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = $sformatf(\"a=%0d\", 1, 2);\n"
+      "    $display(\"after\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "does not match supplied argument count", 4,
+                              "21.3.3"));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "after\n");
+}
+
+TEST(StringFormatTaskSim, RunTimeFormatMismatchWarnsAndContinues) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s, fmt;\n"
+      "  initial begin\n"
+      "    fmt = \"a=%0d b=%0d\";\n"
+      "    $sformat(s, fmt, 1);\n"
+      "    s = $sformatf(fmt, 1, 2, 3);\n"
+      "    $display(\"after\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "does not match supplied argument count", 5,
+                              "21.3.3"));
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "does not match supplied argument count", 6,
+                              "21.3.3"));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "after\n");
+}
+
+TEST(StringFormatTaskSim, RadixSpecifiersMatchTheDisplayTasks) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  logic [11:0] w = 12'h0a5;\n"
+      "  initial begin\n"
+      "    s = $sformatf(\"%o|%0o|%h|%x|%0h|%0x\", 8'd9, 8'd9, w, w, w, w);\n"
+      "    $display(\"%s\", s);\n"
+      "    $sformat(s, \"%o|%0o|%h|%x|%0h|%0x\", 8'd9, 8'd9, w, w, w, w);\n"
+      "    $display(\"%s\", s);\n"
+      "    $display(\"%o|%0o|%h|%x|%0h|%0x\", 8'd9, 8'd9, w, w, w, w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "011|11|0a5|0a5|a5|a5\n011|11|0a5|0a5|a5|a5\n"
+            "011|11|0a5|0a5|a5|a5\n");
+}
+
+TEST(StringFormatTaskSim, RealSpecifiersMatchTheDisplayTasks) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  initial begin\n"
+      "    s = $sformatf(\"%f|%g|%0.2f|%e\", 1.5, 0.25, 3.14159, 2.5);\n"
+      "    $display(\"%s\", s);\n"
+      "    $sformat(s, \"%f|%g|%0.2f|%e\", 1.5, 0.25, 3.14159, 2.5);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "1.500000|0.25|3.14|2.500000e+00\n"
+            "1.500000|0.25|3.14|2.500000e+00\n");
+}
+
+TEST(StringFormatTaskSim, StrengthSpecifierMatchesTheDisplayTasks) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  string s;\n"
+      "  wire a = 1'b1;\n"
+      "  tri b;\n"
+      "  initial begin\n"
+      "    #1 s = $sformatf(\"%v|%v\", a, b);\n"
+      "    $display(\"%s\", s);\n"
+      "    $sformat(s, \"%v|%v\", a, b);\n"
+      "    $display(\"%s\", s);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1|HiZ\nSt1|HiZ\n");
+}
+
+TEST(StringFormatTaskSim, RawSpecifiersCarryTheBytesFwriteWrites) {
+  SimFixture f;
+  const std::string kPath = "/tmp/deltahdl_t210303_raw.bin";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [31:0] su, fu;\n"
+      "  logic [63:0] sz, fz;\n"
+      "  logic [7:0] w = 8'ha5;\n"
+      "  logic [3:0] z = 4'bz1x0;\n"
+      "  integer fd, n;\n"
+      "  initial begin\n"
+      "    $sformat(su, \"%u\", w);\n"
+      "    $sformat(sz, \"%z\", z);\n"
+      "    fd = $fopen(\"" +
+          kPath +
+          "\", \"wb\");\n"
+          "    $fwrite(fd, \"%u\", w);\n"
+          "    $fwrite(fd, \"%z\", z);\n"
+          "    $fclose(fd);\n"
+          "    fd = $fopen(\"" +
+          kPath +
+          "\", \"rb\");\n"
+          "    n = $fread(fu, fd);\n"
+          "    n = $fread(fz, fd);\n"
+          "    $fclose(fd);\n"
+          "    $display(\"%0d %0d\", su === fu, sz === fz);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1\n");
+  std::remove(kPath.c_str());
 }
 
 }  // namespace
