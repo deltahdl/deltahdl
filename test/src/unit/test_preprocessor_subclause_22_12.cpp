@@ -9,6 +9,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "fixture_preprocessor.h"
+#include "helpers_include_test_dir.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
@@ -498,4 +499,184 @@ TEST(Preprocessor, ReportBelowALineDirectiveNamingTheEmptyName) {
                           "%\n",
                           f, arena);
   EXPECT_EQ(FirstErrorLocation(f), ":5:1");
+}
+
+static std::string WithIncludeDir(const std::string& src,
+                                  const IncludeTestDir& dir,
+                                  PreprocFixture& f) {
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(dir.dir.string());
+  return Preprocess(src, f, cfg);
+}
+
+TEST(Preprocessor, Line_InsideAnIncludedFileRenamesTheRestOfThatFile) {
+  IncludeTestDir dir;
+  dir.WriteFile("named.svh",
+                "`line 50 \"fake.svh\" 0\n"
+                "inner `__FILE__ `__LINE__\n");
+  PreprocFixture f;
+  auto out = WithIncludeDir("`include \"named.svh\"\n", dir, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("inner \"fake.svh\" 50"), std::string::npos) << out;
+}
+
+TEST(Preprocessor, Line_RestoredAfterAnIncludeWhenSetBeforeIt) {
+  IncludeTestDir dir;
+  dir.WriteFile("plain.svh", "// plain\n");
+  PreprocFixture f;
+  auto out = WithIncludeDir(
+      "`line 100 \"over.v\" 0\n"
+      "`include \"plain.svh\"\n"
+      "after `__FILE__ `__LINE__\n",
+      dir, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("after \"over.v\" 101"), std::string::npos) << out;
+}
+
+TEST(Preprocessor, Line_NestedIncludeRestoresTheOuterIncludedFile) {
+  IncludeTestDir dir;
+  dir.WriteFile("b.svh", "// inner\n");
+  auto outer = dir.WriteFile("a.svh",
+                             "// outer\n"
+                             "`include \"b.svh\"\n"
+                             "outer `__FILE__ `__LINE__\n");
+  PreprocFixture f;
+  auto out = WithIncludeDir("`include \"a.svh\"\n", dir, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("outer \"" + outer.string() + "\" 3"), std::string::npos)
+      << out;
+}
+
+TEST(Preprocessor, DISABLED_Line_SetInsideAnIncludeIsUndoneWhenTheIncludeEnds) {
+  IncludeTestDir dir;
+  dir.WriteFile("sets.svh",
+                "`line 70 \"inner.svh\" 0\n"
+                "// body\n");
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, [&] {
+    PreprocConfig cfg;
+    cfg.include_dirs.push_back(dir.dir.string());
+    return cfg;
+  }());
+  auto fid = f.mgr.AddFile("top.sv",
+                           "`include \"sets.svh\"\n"
+                           "after `__FILE__ `__LINE__\n");
+  auto out = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("after \"top.sv\" 2"), std::string::npos) << out;
+}
+
+TEST(Preprocessor, DISABLED_Line_AnIncludedFileTakesItsOwnNameAndLineOne) {
+  IncludeTestDir dir;
+  auto inc = dir.WriteFile("own.svh", "inside `__FILE__ `__LINE__\n");
+  PreprocFixture f;
+  auto out = WithIncludeDir(
+      "`line 300 \"over.sv\" 0\n"
+      "`include \"own.svh\"\n",
+      dir, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("inside \"" + inc.string() + "\" 1"), std::string::npos)
+      << out;
+}
+
+TEST(Preprocessor, DISABLED_Line_ASecondSourceFileTakesItsOwnNameAndLineOne) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(f.mgr.AddFile("first.sv", "`line 300 \"over.sv\" 0\n"));
+  auto out =
+      pp.Preprocess(f.mgr.AddFile("second.sv", "second `__FILE__ `__LINE__\n"));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("second \"second.sv\" 1"), std::string::npos) << out;
+}
+
+TEST(Preprocessor, DISABLED_Line_ARealOrBasedNumberIsRejected) {
+  for (const char* number : {"1.5", "8'd5"}) {
+    PreprocFixture f;
+    Preprocess(std::string("`line ") + number + " \"f.sv\" 0\n", f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "invalid `line directive: missing or invalid line number", 1, "22.12"))
+        << number;
+  }
+}
+
+TEST(Preprocessor, DISABLED_Line_ANumberPast32BitsIsNotWrapped) {
+  for (const char* number : {"4294967297", "99999999999999999999"}) {
+    PreprocFixture f;
+    auto out = Preprocess(
+        std::string("`line ") + number + " \"f.sv\" 0\n`__LINE__\n", f);
+    bool reported = f.diag.HasErrors();
+    EXPECT_TRUE(reported || out.find(number) != std::string::npos)
+        << number << " gave " << out;
+  }
+}
+
+TEST(Preprocessor, DISABLED_Line_CodeBeforeTheDirectiveIsRejected) {
+  for (const char* before : {"wire x; ", "/* c */ "}) {
+    PreprocFixture f;
+    Preprocess(
+        std::string("module t;\n") + before + "`line 1 \"f.v\" 0\nendmodule\n",
+        f);
+    bool reported = false;
+    for (const auto& d : f.diag.Diagnostics()) {
+      reported = reported || (d.severity == DiagSeverity::kError &&
+                              d.loc.line == 2 && d.subclause == "22.12");
+    }
+    EXPECT_TRUE(reported) << before;
+  }
+}
+
+TEST(Preprocessor, Line_CommentsOnTheLinesAroundTheDirectiveAreAccepted) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "// above\n"
+      "`line 20 \"f.v\" 0\n"
+      "// below\n"
+      "at `__LINE__\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("at 21"), std::string::npos) << out;
+}
+
+struct LineHost {
+  const char* opener;
+  const char* closer;
+};
+
+TEST(Preprocessor, Line_AcceptedAndAppliedInsideEveryBody) {
+  for (const auto& h : {
+           LineHost{"package p;\n", "endpackage\n"},
+           LineHost{"class k;\n", "endclass\n"},
+           LineHost{"module m;\nfunction void f();\n",
+                    "endfunction\nendmodule\n"},
+           LineHost{"module m;\ntask tk();\n", "endtask\nendmodule\n"},
+           LineHost{"interface i;\n", "endinterface\n"},
+           LineHost{"program g;\n", "endprogram\n"},
+           LineHost{"", ""},
+       }) {
+    PreprocFixture f;
+    auto out = Preprocess(std::string(h.opener) +
+                              "`line 77 \"h.v\" 0\n"
+                              "localparam int L = `__LINE__;\n" +
+                              h.closer,
+                          f);
+    EXPECT_FALSE(f.diag.HasErrors()) << h.opener;
+    EXPECT_NE(out.find("L = 77;"), std::string::npos) << h.opener << out;
+  }
+}
+
+TEST(Preprocessor, Line_NamingAnotherDirectoryLeavesIncludeSearchAlone) {
+  IncludeTestDir dir;
+  dir.WriteFile("real/x.svh", "from_the_real_directory\n");
+  auto other = dir.WriteFile("other/x.svh", "from_the_named_directory\n");
+  const std::string kTopText = "`line 1 \"" +
+                               (other.parent_path() / "top.sv").string() +
+                               "\" 0\n`include \"x.svh\"\n";
+  auto top = dir.WriteFile("real/top.sv", kTopText);
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto out = pp.Preprocess(f.mgr.AddFile(top.string(), kTopText));
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("from_the_real_directory"), std::string::npos) << out;
+  EXPECT_EQ(out.find("from_the_named_directory"), std::string::npos) << out;
 }
