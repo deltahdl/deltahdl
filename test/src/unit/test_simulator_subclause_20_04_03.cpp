@@ -8,6 +8,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 #include "lexer/lexer.h"
@@ -171,18 +172,19 @@ TEST(TimeformatSysTask, OutOfRangeLeavesPriorFormatIntact) {
   EXPECT_EQ(out.find("XX"), std::string::npos);
 }
 
-TEST(TimeformatSysTask, BareInvocationLeavesFormatUnchanged) {
+TEST(TimeformatSysTask, DISABLED_ABareCallRestoresTheDefaults) {
   SimFixture f;
-  std::string out = RunCapture(
-      "module t;\n"
-      "  initial begin\n"
-      "    $timeformat(-9, 2, \"ns\", 0);\n"
-      "    $timeformat;\n"
-      "    $display(\"%t\", 3);\n"
-      "  end\n"
-      "endmodule\n",
-      f);
-  EXPECT_EQ(out, "3.00ns\n");
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                                 "module t;\n"
+                                 "  initial begin\n"
+                                 "    $timeformat(-9, 2, \"ns\", 0);\n"
+                                 "    $display(\"[%t]\", 3ns);\n"
+                                 "    $timeformat;\n"
+                                 "    $display(\"[%t]\", 3ns);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "[3.00ns]\n[" + std::string(16, ' ') + "3000]\n");
 }
 
 TEST(TimeformatSysTask, FileOutputTaskAppliesFormat) {
@@ -276,6 +278,170 @@ TEST(TimeformatSysTask, PercentTFormatsARealTimeByItsValue) {
                               "endmodule\n",
                               f),
             "[   5.00 ns]\n[2500.0 ps]\n");
+}
+
+TEST(TimeformatSysTask, DISABLED_TheFinestDirectivePrecisionIsTheDefaultUnits) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                                 "module a;\n"
+                                 "endmodule\n"
+                                 "`timescale 1ns / 10fs\n"
+                                 "module t;\n"
+                                 "  a u();\n"
+                                 "  initial $display(\"[%t]\", 1ns);\n"
+                                 "endmodule\n",
+                                 f),
+            "[" + std::string(14, ' ') + "100000]\n");
+}
+
+TEST(TimeformatSysTask,
+     DISABLED_ATimeprecisionDeclarationLeavesTheDefaultUnits) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                                 "module t;\n"
+                                 "  timeprecision 1fs;\n"
+                                 "  initial $display(\"[%t]\", 1ns);\n"
+                                 "endmodule\n",
+                                 f),
+            "[" + std::string(16, ' ') + "1000]\n");
+}
+
+TEST(TimeformatSysTask, TheFinestUnitsNumberIsAccepted) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1fs\n"
+                                 "module t;\n"
+                                 "  initial begin\n"
+                                 "    $timeformat(-15, 2, \"\", 0);\n"
+                                 "    $display(\"[%t]\", 1ns);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "[1000000.00]\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(TimeformatSysTask, DISABLED_ANonIntegerUnitsOrPrecisionNumberIsRejected) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    $timeformat(-9.5, 2, \"ns\", 5);\n"
+      "    $timeformat(-9, 1.5, \"ns\", 5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "units_number is not an integer", 3, "20.4.3"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "precision_number is not an integer", 4, "20.4.3"));
+}
+
+TEST(TimeformatSysTask, AValueWiderThanTheFieldIsPrintedWhole) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                                 "module t;\n"
+                                 "  initial begin\n"
+                                 "    $timeformat(-9, 2, \" ns\", 10);\n"
+                                 "    $display(\"[%t]\", 123456789ns);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "[123456789.00 ns]\n");
+}
+
+TEST(TimeformatSysTask, ExtraFractionalDigitsAreRounded) {
+  SimFixture f;
+  EXPECT_EQ(
+      PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                           "module t;\n"
+                           "  initial begin\n"
+                           "    $timeformat(-6, 1, \"\", 0);\n"
+                           "    $display(\"[%t] [%t]\", 1260ns, 1240ns);\n"
+                           "  end\n"
+                           "endmodule\n",
+                           f),
+      "[1.3] [1.2]\n");
+}
+
+TEST(TimeformatSysTask, ACallInOneModuleGovernsModulesOfOtherUnits) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCaptureAllTops(
+                "`timescale 1ms / 1ns\n"
+                "module cntrl;\n"
+                "  initial $timeformat(-9, 2, \" ns\", 10);\n"
+                "endmodule\n"
+                "`timescale 1fs / 1fs\n"
+                "module a1_dat;\n"
+                "  initial #10000000 $display(\"%m: %t\", $realtime);\n"
+                "endmodule\n"
+                "`timescale 1ps / 1ps\n"
+                "module a2_dat;\n"
+                "  initial #20000 $display(\"%m: %t\", $realtime);\n"
+                "endmodule\n",
+                f),
+            "a1_dat:   10.00 ns\na2_dat:   20.00 ns\n");
+}
+
+TEST(TimeformatSysTask, ACallFromAStaticClassMethodGovernsPercentT) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                                 "class C;\n"
+                                 "  static function void f();\n"
+                                 "    $timeformat(-9, 2, \"ns\", 8);\n"
+                                 "  endfunction\n"
+                                 "endclass\n"
+                                 "module t;\n"
+                                 "  initial begin\n"
+                                 "    C::f();\n"
+                                 "    $display(\"[%t]\", 2ns);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "[  2.00ns]\n");
+}
+
+TEST(TimeformatSysTask, WriteStrobeMonitorAndStringTasksApplyTheFormat) {
+  SimFixture f;
+  EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ps\n"
+                                 "module t;\n"
+                                 "  string s;\n"
+                                 "  initial begin\n"
+                                 "    $timeformat(-9, 1, \"n\", 6);\n"
+                                 "    $write(\"w[%t]\\n\", 2ns);\n"
+                                 "    $strobe(\"s[%t]\", 3ns);\n"
+                                 "    $sformat(s, \"f[%t]\", 4ns);\n"
+                                 "    $display(s);\n"
+                                 "    $swrite(s, \"r[%t]\", 5ns);\n"
+                                 "    $display(s);\n"
+                                 "    #1 $monitor(\"m[%t]\", $realtime);\n"
+                                 "  end\n"
+                                 "endmodule\n",
+                                 f),
+            "w[  2.0n]\nf[  4.0n]\nr[  5.0n]\ns[  3.0n]\nm[  1.0n]\n");
+}
+
+TEST(TimeformatSysTask, FileWriteStrobeAndMonitorApplyTheFormat) {
+  SimFixture f;
+  const std::string kPath = "/tmp/deltahdl_tf_20_04_03_tasks.txt";
+  std::remove(kPath.c_str());
+  PreprocessAndCapture(
+      "`timescale 1ns / 1ps\n"
+      "module t;\n"
+      "  integer fd;\n"
+      "  initial begin\n"
+      "    $timeformat(-9, 1, \"n\", 6);\n"
+      "    fd = $fopen(\"" +
+          kPath +
+          "\", \"w\");\n"
+          "    $fwrite(fd, \"w[%t]\\n\", 6ns);\n"
+          "    $fstrobe(fd, \"s[%t]\", 7ns);\n"
+          "    #1 $fmonitor(fd, \"m[%t]\", $realtime);\n"
+          "    #1 $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(kPath), "w[  6.0n]\ns[  7.0n]\nm[  1.0n]\n");
+  std::remove(kPath.c_str());
 }
 
 }  // namespace

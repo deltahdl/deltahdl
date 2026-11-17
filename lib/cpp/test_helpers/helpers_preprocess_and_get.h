@@ -6,6 +6,7 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <string_view>
 
 #include "elaborator/elaborator.h"
 #include "fixture_simulator.h"
@@ -59,7 +60,8 @@ inline uint64_t PreprocessAndGet(const std::string& src, const char* var_name,
   return RunPreprocessedSim(f, fid, var_name, pp, prop);
 }
 
-inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
+inline std::string PreprocessAndCaptureTops(const std::string& src,
+                                            SimFixture& f, bool every_top) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, {});
   auto preprocessed = pp.Preprocess(fid);
@@ -75,7 +77,7 @@ inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
   Elaborator elab(f.arena, f.diag, cu);
-  auto* design = elab.Elaborate(cu->modules.back()->name);
+  auto* design = elab.Elaborate(every_top ? std::string_view() : TopNameOf(cu));
   if (design != nullptr) {
     Lowerer lowerer(f.ctx, f.arena, f.diag);
     lowerer.Lower(design);
@@ -83,6 +85,15 @@ inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   }
   std::cout.rdbuf(old_buf);
   return captured.str();
+}
+
+inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
+  return PreprocessAndCaptureTops(src, f, false);
+}
+
+inline std::string PreprocessAndCaptureAllTops(const std::string& src,
+                                               SimFixture& f) {
+  return PreprocessAndCaptureTops(src, f, true);
 }
 
 inline uint64_t RunUnderKeywordVersion(const char* spec,
