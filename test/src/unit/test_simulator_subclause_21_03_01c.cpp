@@ -6,6 +6,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_placeholder_paths.h"
 #include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
@@ -14,23 +15,16 @@ using namespace delta;
 namespace {
 
 std::string FilePath(const std::string& tag, int index) {
-  return "/tmp/deltahdl_t210301c_" + tag + "_" + std::to_string(index);
+  return PlaceholderPath("t210301c", tag, index);
 }
 
-std::string RunWithPaths(const std::string& tag, std::string src,
+std::string RunWithPaths(const std::string& tag, const std::string& src,
                          SimFixture& f) {
-  for (int i = 0; i < 4; ++i) {
-    const std::string kToken = "<P" + std::to_string(i) + ">";
-    for (size_t at = src.find(kToken); at != std::string::npos;
-         at = src.find(kToken)) {
-      src.replace(at, kToken.size(), FilePath(tag, i));
-    }
-  }
-  return RunCapture(src, f);
+  return RunWithPlaceholderPaths("t210301c", tag, src, f);
 }
 
 void RemovePaths(const std::string& tag) {
-  for (int i = 0; i < 4; ++i) std::remove(FilePath(tag, i).c_str());
+  RemovePlaceholderPaths("t210301c", tag);
 }
 
 TEST(OpeningAndClosingFiles, TypeWTruncatesAnExistingFile) {
