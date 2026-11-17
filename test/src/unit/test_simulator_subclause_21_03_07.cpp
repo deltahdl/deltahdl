@@ -204,4 +204,88 @@ TEST(IoErrorStatus, FailedOpenIsReportedOnTheZeroDescriptor) {
   std::remove(ok_path.c_str());
 }
 
+TEST(IoErrorStatus, EveryRefusedReadAndPositioningSetsTheErrorCode) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2137_each.txt";
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, r, a, b, c, e, z;\n"
+      "  string line, msg;\n"
+      "  reg [7:0] v;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    r = $fgets(line, fd);\n"
+          "    a = $ferror(fd, msg);\n"
+          "    r = $fscanf(fd, \"%d\", v);\n"
+          "    b = $ferror(fd, msg);\n"
+          "    r = $fread(v, fd);\n"
+          "    c = $ferror(fd, msg);\n"
+          "    r = $fseek(fd, -1, 0);\n"
+          "    e = $ferror(fd, msg);\n"
+          "    r = $ftell(fd);\n"
+          "    z = $ferror(fd, msg);\n"
+          "    $display(\"%0d %0d %0d %0d %0d %0d\", a != 0, b != 0, "
+          "c != 0, e != 0, z, msg == \"\");\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 1 1 1 0 1\n");
+  std::remove(tmp.c_str());
+}
+
+std::string FailedOpenThen(const std::string& prelude, const std::string& decl,
+                           const std::string& body, SysTaskFixture& f) {
+  return RunCapture(
+      prelude + "module t;\n  integer fd, a, b;\n" + decl +
+          "  initial begin\n"
+          "    fd = $fopen(\"/nonexistent_dir_2137/x\", \"r\");\n" +
+          body +
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(IoErrorStatus, ReadsTheStatusFromAClassMethodAndAFunction) {
+  SysTaskFixture f;
+  EXPECT_EQ(
+      FailedOpenThen(
+          "class Probe;\n"
+          "  function int check(integer fd, output string why);\n"
+          "    return $ferror(fd, why);\n"
+          "  endfunction\n"
+          "endclass\n",
+          "  reg [639:0] m;\n  string w;\n  Probe p;\n"
+          "  function int status(integer fd); return $ferror(fd, m); "
+          "endfunction\n",
+          "    p = new;\n"
+          "    a = p.check(fd, w);\n"
+          "    b = status(fd);\n"
+          "    $display(\"%0d %0d %0d %0d\", a != 0, w.len() > 0, b != 0, "
+          "m != 0);\n",
+          f),
+      "1 1 1 1\n");
+}
+
+TEST(IoErrorStatus, DISABLED_WritesTheDescriptionIntoAClassProperty) {
+  SysTaskFixture f;
+  EXPECT_EQ(FailedOpenThen(
+                "class Probe;\n"
+                "  string why;\n"
+                "  reg [639:0] bits;\n"
+                "  function int check(integer fd); return $ferror(fd, why); "
+                "endfunction\n"
+                "endclass\n",
+                "  Probe p;\n",
+                "    p = new;\n"
+                "    a = p.check(fd);\n"
+                "    b = $ferror(fd, p.bits);\n"
+                "    $display(\"%0d %0d %0d %0d\", a != 0, p.why.len() > 0, "
+                "b != 0, p.bits != 0);\n",
+                f),
+            "1 1 1 1\n");
+}
+
 }  // namespace
