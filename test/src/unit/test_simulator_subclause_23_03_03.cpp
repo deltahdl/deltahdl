@@ -261,4 +261,84 @@ TEST(PortConnectionKindsRun, DISABLED_AnImportedVariableConnectsByPosition) {
             "7\n");
 }
 
+std::string InoutWidthRun(const std::string& child, const std::string& actual,
+                          SimFixture& f) {
+  return RunCapture(
+      child + "module t;\n  wire " + actual + " w;\n  c u(w);\nendmodule\n", f);
+}
+
+TEST(InoutPortWidthRun, DISABLED_AnAnsiInoutKeepsItsDeclaredWidth) {
+  for (const char* actual : {"[9:0]", "[1:0]"}) {
+    SimFixture f;
+    EXPECT_EQ(InoutWidthRun("module c(inout [3:0] a);\n"
+                            "  initial $display(\"%0d\", $bits(a));\n"
+                            "endmodule\n",
+                            actual, f),
+              "4\n")
+        << actual;
+  }
+}
+
+TEST(InoutPortWidthRun, DISABLED_ANonAnsiInoutKeepsItsDeclaredWidth) {
+  for (const char* actual : {"[9:0]", "[1:0]"}) {
+    SimFixture f;
+    EXPECT_EQ(InoutWidthRun("module c(a);\n  inout [3:0] a;\n"
+                            "  initial $display(\"%0d\", $bits(a));\n"
+                            "endmodule\n",
+                            actual, f),
+              "4\n")
+        << actual;
+  }
+}
+
+TEST(InoutPortWidthRun, DISABLED_AnExplicitNetInoutKeepsItsDeclaredWidth) {
+  SimFixture f;
+  EXPECT_EQ(InoutWidthRun("module c(inout wire [3:0] a);\n"
+                          "  initial $display(\"%0d\", $bits(a));\n"
+                          "endmodule\n",
+                          "[9:0]", f),
+            "4\n");
+}
+
+TEST(InoutPortWidthRun, DISABLED_InterfaceAndProgramInoutsKeepTheirWidth) {
+  for (const char* child :
+       {"interface c(inout [3:0] a);\n"
+        "  initial $display(\"%0d\", $bits(a));\nendinterface\n",
+        "program c(inout [3:0] a);\n"
+        "  initial $display(\"%0d\", $bits(a));\nendprogram\n"}) {
+    SimFixture f;
+    EXPECT_EQ(InoutWidthRun(child, "[9:0]", f), "4\n") << child;
+  }
+}
+
+TEST(InoutPortWidthRun, DISABLED_ANarrowPortDrivesOnlyTheLowBitsOfAWideActual) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(inout [3:0] a);\n  assign a = 4'hF;\n"
+                       "endmodule\n"
+                       "module t;\n  wire [9:0] w;\n  c u(w);\n"
+                       "  initial #1 $display(\"%b\", w);\nendmodule\n",
+                       f),
+            "zzzzzz1111\n");
+}
+
+TEST(InoutPortWidthRun, AValueOnTheActualsLowBitsReachesThePort) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(inout [3:0] a);\n"
+                       "  initial #1 $display(\"%b\", a[3:0]);\n"
+                       "endmodule\n"
+                       "module t;\n  wire [9:0] w;\n  assign w = 10'h3A5;\n"
+                       "  c u(w);\nendmodule\n",
+                       f),
+            "0101\n");
+}
+
+TEST(InoutPortWidthRun, AnInoutOfTheActualsWidthKeepsThatWidth) {
+  SimFixture f;
+  EXPECT_EQ(InoutWidthRun("module c(inout [3:0] a);\n"
+                          "  initial $display(\"%0d\", $bits(a));\n"
+                          "endmodule\n",
+                          "[3:0]", f),
+            "4\n");
+}
+
 }  // namespace

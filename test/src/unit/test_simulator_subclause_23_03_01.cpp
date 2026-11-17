@@ -133,4 +133,35 @@ TEST(TopLevelModulesAndRoot, ParallelTopsKeepTheirOwnDeclarations) {
                     {"t2.r3", 2u}});
 }
 
+TEST(RootedNameRun, AnUnrootedNameThatCouldBeLocalIsLocal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module X;\n  logic [3:0] v = 4'd1;\nendmodule\n"
+                        "module leaf;\n  logic [3:0] v = 4'd2;\nendmodule\n"
+                        "module t;\n  leaf X();\n"
+                        "  initial #1 $display(\"%0d %0d\", X.v, $root.X.v);\n"
+                        "endmodule\n",
+                        f),
+      "2 1\n");
+}
+
+TEST(RootedNameRun, ARootedNameRunsThroughInstancesAndNamedBlocks) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module amod;\n"
+                        "  initial begin : keep\n    static logic hold = 1;\n"
+                        "  end\nendmodule\n"
+                        "module wave;\n  amod a();\n"
+                        "  initial begin : wave1\n    begin : innerwave\n"
+                        "      static logic hold = 0;\n    end\n  end\n"
+                        "endmodule\n"
+                        "module t;\n"
+                        "  initial #1 $display(\"%b %b\", "
+                        "$root.wave.a.keep.hold, "
+                        "$root.wave.wave1.innerwave.hold);\n"
+                        "endmodule\n",
+                        f),
+      "1 0\n");
+}
+
 }  // namespace

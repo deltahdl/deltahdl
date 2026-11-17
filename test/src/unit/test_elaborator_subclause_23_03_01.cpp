@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -223,6 +224,30 @@ TEST(TopLevelModules, DollarRootMultiLevelPathResolves) {
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(RootedNameElaboration,
+     DISABLED_ARootedNameThroughANestedInstanceIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module s0;\n  logic v;\nendmodule\nmodule t;\n  s0 s();\n"
+      "  initial #1 $display(\"%b\", $root.s.v);\nendmodule\n",
+      f, "t");
+  bool reported = false;
+  for (const auto& d : f.diag.Diagnostics()) {
+    reported = reported ||
+               (d.severity == delta::DiagSeverity::kError && d.loc.line == 6);
+  }
+  EXPECT_TRUE(reported);
+}
+
+TEST(RootedNameElaboration, ARootedNameThroughATopLevelInstanceIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module s;\n  logic v;\nendmodule\nmodule t;\n"
+      "  initial #1 $display(\"%b\", $root.s.v);\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
