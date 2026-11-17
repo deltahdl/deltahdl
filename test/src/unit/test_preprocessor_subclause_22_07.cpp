@@ -7,6 +7,7 @@
 #include "fixture_parser.h"
 #include "fixture_preprocessor.h"
 #include "fixture_preprocessor_timescale.h"
+#include "helpers_include_test_dir.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
@@ -539,3 +540,74 @@ TEST(Preprocessor, Timescale_IllegalInsideAHeaderSplitAcrossLines) {
 }
 
 }  // namespace
+
+TEST(Preprocessor, Timescale_UpperCaseUnitIsRejected) {
+  PreprocFixture f;
+  Preprocess("`timescale 1NS / 1PS\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
+                            "22.7"));
+}
+
+TEST(Preprocessor, Timescale_UpperCasePrecisionIsRejected) {
+  PreprocFixture f;
+  Preprocess("`timescale 1ns / 1Ps\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "invalid `timescale precision", 1, "22.7"));
+}
+
+TEST(Preprocessor, Timescale_NonIntegerMagnitudeIsRejected) {
+  PreprocFixture f;
+  Preprocess("`timescale 1.0ns / 1ps\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "invalid `timescale unit", 1,
+                            "22.7"));
+}
+
+TEST(Preprocessor, Timescale_OperandsFromTextMacros) {
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile(
+      "<test>", "`define TU 1us\n`define TP 1ns\n`timescale `TU / `TP\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_TRUE(pp.HasTimescale());
+  EXPECT_EQ(pp.CurrentTimescale().unit, TimeUnit::kUs);
+  EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kNs);
+}
+
+TEST(Preprocessor, Timescale_ReachingAModuleThroughAnIncludeIsRejected) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("ts.svh", "`timescale 1us / 1ns\n");
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "module m;\n`include \"ts.svh\"\nendmodule\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(fid);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 1,
+                            "22.7"));
+}
+
+TEST(Preprocessor, Timescale_ReachingAModuleThroughAMacroIsRejected) {
+  PreprocFixture f;
+  Preprocess("`define TS `timescale 1ns / 1ps\nmodule m;\n`TS\nendmodule\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 3,
+                            "22.7"));
+}
+
+TEST(Preprocessor, Timescale_AfterANestedEndmoduleInsideTheOuterIsRejected) {
+  PreprocFixture f;
+  Preprocess(
+      "module outer;\nmodule inner;\nendmodule\n`timescale 1ns / 1ps\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "`timescale illegal inside a design element", 4,
+                            "22.7"));
+}
+
+TEST(Preprocessor, Timescale_InsideAClassAtCompilationUnitScopeIsAccepted) {
+  PreprocFixture f;
+  Preprocess("class c;\n`timescale 1ns / 1ps\nendclass\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}

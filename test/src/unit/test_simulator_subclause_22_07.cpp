@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
+#include "helpers_include_test_dir.h"
 #include "helpers_preprocess_and_get.h"
 
 TEST(TimescaleSimulation, TimescaleModuleSimulatesCorrectly) {
@@ -231,4 +232,78 @@ TEST(TimescaleSimulation, APackageClassTaskRunsInThePackagesUnit) {
                                  "endmodule\n",
                                  f),
             "3000\n");
+}
+
+static std::string RunTimescaled(const std::string& src) {
+  SimFixture f;
+  return PreprocessAndCapture(src, f);
+}
+
+TEST(TimescaleSimulation, AOnePicosecondPrecisionKeepsThreeDecimals) {
+  EXPECT_EQ(RunTimescaled("`timescale 1ns / 1ps\n"
+                          "module t;\n"
+                          "  initial begin #1.23456 $display(\"%f\", "
+                          "$realtime); end\n"
+                          "endmodule\n"),
+            "1.235000\n");
+}
+
+TEST(TimescaleSimulation, ATenthOfAUnitPrecisionRoundsTheDelay) {
+  EXPECT_EQ(RunTimescaled("`timescale 10us / 100ns\n"
+                          "module t;\n"
+                          "  initial begin #1.234 $display(\"%f\", "
+                          "$realtime); end\n"
+                          "endmodule\n"),
+            "1.230000\n");
+}
+
+TEST(TimescaleSimulation, ARealDelayVariableKeepsItsOwnValue) {
+  EXPECT_EQ(RunTimescaled("`timescale 10 ns / 1 ns\n"
+                          "module t;\n"
+                          "  real d = 1.55;\n"
+                          "  initial begin #d $display(\"%f %f\", $realtime, "
+                          "d); end\n"
+                          "endmodule\n"),
+            "1.600000 1.550000\n");
+}
+
+TEST(TimescaleSimulation, OperandsFromTextMacrosRoundTheSameWay) {
+  EXPECT_EQ(RunTimescaled("`define TU 1ns\n`define TP 100ps\n"
+                          "`timescale `TU / `TP\n"
+                          "module t;\n"
+                          "  initial begin #1.46 $display(\"%f\", "
+                          "$realtime); end\n"
+                          "endmodule\n"),
+            "1.500000\n");
+}
+
+TEST(TimescaleSimulation, AnInterfaceAndAProgramAfterTheDirectiveTakeIt) {
+  auto out = RunTimescaled(
+      "`timescale 1us / 1ns\n"
+      "interface i;\n  initial $printtimescale;\nendinterface\n"
+      "program p;\n  initial $printtimescale;\nendprogram\n"
+      "module t;\n  i ii();\n  p pp();\nendmodule\n");
+  EXPECT_NE(out.find("Time scale of (t.ii) is 1us / 1ns"), std::string::npos)
+      << out;
+  EXPECT_NE(out.find("Time scale of (t.pp) is 1us / 1ns"), std::string::npos)
+      << out;
+}
+
+TEST(TimescaleSimulation, DISABLED_ACheckerAfterTheDirectiveTakesIt) {
+  auto out = RunTimescaled(
+      "`timescale 1us / 1ns\n"
+      "checker ck;\nendchecker\n"
+      "module t;\n  ck cc();\n  initial $printtimescale(t.cc);\nendmodule\n");
+  EXPECT_NE(out.find("Time scale of (t.cc) is 1us / 1ns"), std::string::npos)
+      << out;
+}
+
+TEST(TimescaleSimulation, ADirectiveInAnIncludedFileGovernsTheNextElement) {
+  IncludeTestDir tmp;
+  auto inc = tmp.WriteFile("ts.svh", "`timescale 1us / 1ns\n");
+  auto out =
+      RunTimescaled("`include \"" + inc.string() +
+                    "\"\n"
+                    "module t;\n  initial $printtimescale;\nendmodule\n");
+  EXPECT_EQ(out, "Time scale of (t) is 1us / 1ns\n");
 }
