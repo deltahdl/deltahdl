@@ -648,4 +648,162 @@ TEST(Coverage, BothBuildOrdersReadTheSameCoverage) {
   std::remove(kPath.c_str());
 }
 
+TEST(Coverage, GetCoverageOfLiveTypesHittingNoBinIsZero) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [1:0] x;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint x { bins b[] = {[1:3]}; }\n"
+                       "  endgroup\n"
+                       "  covergroup dg;\n"
+                       "    coverpoint x { bins b = {2}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  dg d = new;\n"
+                       "  initial begin\n"
+                       "    c.sample(); d.sample();\n"
+                       "    $display(\"%0.2f\", $get_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "0.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(Coverage, GetCoverageAveragesLiveTypesFromSource) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  bit [1:0] x;\n"
+                       "  covergroup cg;\n"
+                       "    coverpoint x { bins b[] = {[0:1]}; }\n"
+                       "  endgroup\n"
+                       "  covergroup dg;\n"
+                       "    coverpoint x { bins b[] = {[0:3]}; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  dg d = new;\n"
+                       "  initial begin\n"
+                       "    c.sample(); d.sample();\n"
+                       "    $display(\"%0.2f\", $get_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "37.50\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+struct CallingContext {
+  const char* open;
+  const char* helpers;
+  const char* name_db;
+  const char* load_db;
+  const char* overall;
+  const char* close;
+};
+
+const CallingContext kInFunction = {
+    "module t;\n",
+    "  function automatic void name_db(string p);\n"
+    "    $set_coverage_db_name(p);\n"
+    "  endfunction\n"
+    "  function automatic void load_db(string p);\n"
+    "    $load_coverage_db(p);\n"
+    "  endfunction\n"
+    "  function automatic real overall();\n"
+    "    return $get_coverage();\n"
+    "  endfunction\n",
+    "name_db",
+    "load_db",
+    "overall()",
+    "endmodule\n"};
+
+const CallingContext kInTask = {"module t;\n",
+                                "  real r;\n"
+                                "  task automatic name_db(string p);\n"
+                                "    $set_coverage_db_name(p);\n"
+                                "  endtask\n"
+                                "  task automatic load_db(string p);\n"
+                                "    $load_coverage_db(p);\n"
+                                "    r = $get_coverage();\n"
+                                "  endtask\n",
+                                "name_db",
+                                "load_db",
+                                "r",
+                                "endmodule\n"};
+
+const CallingContext kInClassMethod = {
+    "class D;\n"
+    "  function void name_db(string p);\n"
+    "    $set_coverage_db_name(p);\n"
+    "  endfunction\n"
+    "  function void load_db(string p);\n"
+    "    $load_coverage_db(p);\n"
+    "  endfunction\n"
+    "  function real overall();\n"
+    "    return $get_coverage();\n"
+    "  endfunction\n"
+    "endclass\n"
+    "module t;\n",
+    "  D d = new;\n",
+    "d.name_db",
+    "d.load_db",
+    "d.overall()",
+    "endmodule\n"};
+
+const CallingContext kInProgram = {"program t;\n",          "",
+                                   "$set_coverage_db_name", "$load_coverage_db",
+                                   "$get_coverage()",       "endprogram\n"};
+
+std::string ContextRun(const CallingContext& ctx, const std::string& body) {
+  return std::string(ctx.open) +
+         "  covergroup cg with function sample(bit [1:0] a);\n"
+         "    coverpoint a { bins b[] = {[0:3]}; }\n"
+         "  endgroup\n"
+         "  cg c = new;\n" +
+         ctx.helpers + "  initial begin\n" + body + "  end\n" + ctx.close;
+}
+
+std::string SaveThenLoadIn(const CallingContext& ctx, const std::string& path) {
+  std::remove(path.c_str());
+  SimFixture first;
+  RunCapture(ContextRun(ctx, std::string("    ") + ctx.name_db + "(\"" + path +
+                                 "\");\n    c.sample(0); c.sample(1);\n"),
+             first);
+  first.ctx.CoverageData().SaveNamedCoverageDb();
+  SimFixture second;
+  std::string printed =
+      RunCapture(ContextRun(ctx, std::string("    c.sample(2);\n    ") +
+                                     ctx.load_db + "(\"" + path +
+                                     "\");\n"
+                                     "    $display(\"%0.2f %0.2f\", " +
+                                     ctx.overall + ", cg::get_coverage());\n"),
+                 second);
+  std::remove(path.c_str());
+  return printed;
+}
+
+TEST(Coverage, DatabaseTasksCalledFromAFunction) {
+  EXPECT_EQ(SaveThenLoadIn(kInFunction,
+                           testing::TempDir() + "delta_cov_19_09_func.db"),
+            "75.00 75.00\n");
+}
+
+TEST(Coverage, DatabaseTasksCalledFromATask) {
+  EXPECT_EQ(
+      SaveThenLoadIn(kInTask, testing::TempDir() + "delta_cov_19_09_task.db"),
+      "75.00 75.00\n");
+}
+
+TEST(Coverage, DatabaseTasksCalledFromAClassMethod) {
+  EXPECT_EQ(SaveThenLoadIn(kInClassMethod,
+                           testing::TempDir() + "delta_cov_19_09_class.db"),
+            "75.00 75.00\n");
+}
+
+TEST(Coverage, DatabaseTasksCalledFromAProgramBlock) {
+  EXPECT_EQ(SaveThenLoadIn(kInProgram,
+                           testing::TempDir() + "delta_cov_19_09_prog.db"),
+            "75.00 75.00\n");
+}
+
 }  // namespace
