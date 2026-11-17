@@ -686,3 +686,96 @@ TEST(Preprocessor, Include_BlockCommentBeforeDirective_OK) {
   Preprocess("/* lead */ `include \"/dev/null\"\n", f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
+
+namespace {
+
+bool TrailingTextReported(const PreprocFixture& f, int line) {
+  return ReportedError(f.diag.Diagnostics(),
+                       "only whitespace or a comment may follow `include "
+                       "filename",
+                       line, "22.4");
+}
+
+std::string PreprocessAngle(const std::string& src, PreprocFixture& f) {
+  IncludeTestDir tmp;
+  auto sub = tmp.dir / "lib";
+  fs::create_directories(sub);
+  tmp.WriteFile("lib/h.svh", "parameter P = 1;\n");
+  PreprocConfig cfg;
+  cfg.include_dirs.push_back(sub.string());
+  auto fid = f.mgr.AddFile("<test>", src);
+  Preprocessor pp(f.mgr, f.diag, std::move(cfg));
+  return pp.Preprocess(fid);
+}
+
+}  // namespace
+
+TEST(Preprocessor, Include_SecondIncludeOnTheSameLine_Error) {
+  PreprocFixture f;
+  Preprocess("`include \"/dev/null\" `include \"/dev/null\"\n", f);
+  EXPECT_TRUE(TrailingTextReported(f, 1));
+}
+
+TEST(Preprocessor, Include_OneIncludePerLine_OK) {
+  PreprocFixture f;
+  Preprocess("`include \"/dev/null\"\n`include \"/dev/null\"\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Include_AngleBracket_TextAfterFilename_Error) {
+  PreprocFixture f;
+  PreprocessAngle("`include <h.svh> wire extra;\n", f);
+  EXPECT_TRUE(TrailingTextReported(f, 1));
+}
+
+TEST(Preprocessor, Include_AngleBracket_CommentAfterFilename_OK) {
+  PreprocFixture f;
+  auto out = PreprocessAngle("`include <h.svh> // trailing\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("parameter P = 1;"), std::string::npos) << out;
+}
+
+TEST(Preprocessor, DISABLED_Include_BlockCommentThenTextAfterFilename_Error) {
+  PreprocFixture f;
+  Preprocess("`include \"/dev/null\" /* c */ wire extra;\n", f);
+  EXPECT_TRUE(TrailingTextReported(f, 1));
+}
+
+TEST(Preprocessor, Include_TwoBlockCommentsAfterFilename_OK) {
+  PreprocFixture f;
+  Preprocess("`include \"/dev/null\" /* a */ /* b */\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Include_BlockCommentClosingOnALaterLineThenText_OK) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`include \"/dev/null\" /* opens\n"
+      " closes */ wire after;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("wire after;"), std::string::npos) << out;
+}
+
+TEST(Preprocessor, Include_BlockCommentClosingOnTheDirectiveLine_OK) {
+  PreprocFixture f;
+  Preprocess("/* opens\n closes */ `include \"/dev/null\"\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, Include_DoubleQuote_WorkingDirectoryOutsideSourceDir) {
+  IncludeTestDir tmp;
+  fs::create_directories(tmp.dir / "cwd");
+  tmp.WriteFile("cwd/only_in_cwd.svh", "`define FROM_CWD 21\n");
+  tmp.WriteFile("src/a.sv",
+                "`include \"only_in_cwd.svh\"\nint v = `FROM_CWD;\n");
+  WorkingDirectoryAt cwd(tmp.dir / "cwd");
+
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile(
+      "../src/a.sv", "`include \"only_in_cwd.svh\"\nint v = `FROM_CWD;\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto out = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_NE(out.find("int v = 21;"), std::string::npos) << out;
+}

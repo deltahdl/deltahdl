@@ -99,3 +99,110 @@ TEST(IncludeFileSimulation, ConditionalIncludeSelectsActiveBranch) {
                                  "result");
   EXPECT_EQ(result, 200u);
 }
+
+static uint64_t RunWithPiece(const std::string& piece,
+                             const std::string& main_src) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("piece.svh", piece);
+  return PreprocessAndGet(tmp, main_src, "result");
+}
+
+TEST(IncludeFileSimulation, IncludedInsideAPackageBody) {
+  EXPECT_EQ(RunWithPiece("parameter int P = 7;\n",
+                         "package pk;\n"
+                         "`include \"piece.svh\"\n"
+                         "endpackage\n"
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  initial result = pk::P;\n"
+                         "endmodule\n"),
+            7u);
+}
+
+TEST(IncludeFileSimulation, IncludedInsideAClassBody) {
+  EXPECT_EQ(RunWithPiece("int v = 8;\n",
+                         "class c;\n"
+                         "`include \"piece.svh\"\n"
+                         "endclass\n"
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  c o;\n"
+                         "  initial begin\n"
+                         "    o = new;\n"
+                         "    result = o.v;\n"
+                         "  end\n"
+                         "endmodule\n"),
+            8u);
+}
+
+TEST(IncludeFileSimulation, IncludedInsideAnInterfaceBody) {
+  EXPECT_EQ(RunWithPiece("logic [7:0] w = 8'd9;\n",
+                         "interface ifc;\n"
+                         "`include \"piece.svh\"\n"
+                         "endinterface\n"
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  ifc i();\n"
+                         "  initial #1 result = i.w;\n"
+                         "endmodule\n"),
+            9u);
+}
+
+TEST(IncludeFileSimulation, IncludedInsideAProgramBody) {
+  EXPECT_EQ(RunWithPiece("initial o = 8'd11;\n",
+                         "program p(output logic [7:0] o);\n"
+                         "`include \"piece.svh\"\n"
+                         "endprogram\n"
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  p pi(result);\n"
+                         "endmodule\n"),
+            11u);
+}
+
+TEST(IncludeFileSimulation, IncludedInsideAFunctionBody) {
+  EXPECT_EQ(RunWithPiece("return 12;\n",
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  function automatic int f();\n"
+                         "`include \"piece.svh\"\n"
+                         "  endfunction\n"
+                         "  initial result = f();\n"
+                         "endmodule\n"),
+            12u);
+}
+
+TEST(IncludeFileSimulation, IncludedAmongATasksStatements) {
+  EXPECT_EQ(RunWithPiece("o = 8'd13;\n",
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  task automatic tk(output logic [7:0] o);\n"
+                         "`include \"piece.svh\"\n"
+                         "  endtask\n"
+                         "  initial tk(result);\n"
+                         "endmodule\n"),
+            13u);
+}
+
+TEST(IncludeFileSimulation, IncludedInsideAGenerateBlock) {
+  EXPECT_EQ(RunWithPiece("logic [7:0] gv = 8'd14;\n",
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  if (1) begin : g\n"
+                         "`include \"piece.svh\"\n"
+                         "  end\n"
+                         "  initial #1 result = g.gv;\n"
+                         "endmodule\n"),
+            14u);
+}
+
+TEST(IncludeFileSimulation, IncludedAsAStatementOfAnInitialBlock) {
+  EXPECT_EQ(RunWithPiece("result = 8'd15;\n",
+                         "module t;\n"
+                         "  logic [7:0] result;\n"
+                         "  initial begin\n"
+                         "`include \"piece.svh\"\n"
+                         "  end\n"
+                         "endmodule\n"),
+            15u);
+}
