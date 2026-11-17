@@ -294,4 +294,80 @@ TEST(BitsSim, AUserSystemFunctionIsSizedWithoutItsCalltfRunning) {
   EXPECT_EQ(calls, 0);
 }
 
+std::string RunBits(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(BitsSim, AnEmptyDynamicArrayAndAnUnsetStringAreZeroBits) {
+  EXPECT_EQ(RunBits("module t;\n"
+                    "  int d[];\n"
+                    "  string s;\n"
+                    "  initial begin\n"
+                    "    $display(\"%0d %0d\", $bits(d), $bits(s));\n"
+                    "    d = new[2];\n"
+                    "    s = \"ab\";\n"
+                    "    $display(\"%0d %0d\", $bits(d), $bits(s));\n"
+                    "  end\n"
+                    "endmodule\n"),
+            "0 0\n64 16\n");
+}
+
+TEST(BitsSim, DISABLED_AnEmptyAssociativeArrayAndAnEmptyStringAreZeroBits) {
+  EXPECT_EQ(RunBits("module t;\n"
+                    "  int aa[int];\n"
+                    "  string e = \"\";\n"
+                    "  initial begin\n"
+                    "    $display(\"%0d %0d\", $bits(aa), $bits(e));\n"
+                    "    aa[5] = 1;\n"
+                    "    e = \"abc\";\n"
+                    "    $display(\"%0d %0d\", $bits(aa), $bits(e));\n"
+                    "  end\n"
+                    "endmodule\n"),
+            "0 0\n32 24\n");
+}
+
+TEST(BitsSim, DISABLED_ATypedefSizedByBitsOfAnUnpackedStructHoldsItsBits) {
+  EXPECT_EQ(
+      RunBits("module t;\n"
+              "  typedef struct {\n"
+              "    logic valid;\n"
+              "    bit [8:1] data;\n"
+              "  } MyType;\n"
+              "  typedef bit [$bits(MyType):1] MyBits;\n"
+              "  typedef bit [$bits(MyType) - 1 : 0] MyLow;\n"
+              "  MyType m;\n"
+              "  MyBits b;\n"
+              "  initial begin\n"
+              "    m.valid = 1;\n"
+              "    m.data = 8'hA5;\n"
+              "    b = MyBits'(m);\n"
+              "    $display(\"%0d %0d %0d %0d %h\", $bits(MyType), $bits(m),\n"
+              "      $bits(MyBits), $bits(MyLow), b);\n"
+              "  end\n"
+              "endmodule\n"),
+      "9 9 9 9 1a5\n");
+}
+
+TEST(BitsSim, DISABLED_APackageArrayNamedThroughItsPackageCountsEveryElement) {
+  EXPECT_EQ(
+      RunBits("package pk;\n"
+              "  int pa[4];\n"
+              "  byte pm[2][3];\n"
+              "endpackage\n"
+              "module t;\n"
+              "  initial $display(\"%0d %0d\", $bits(pk::pa), $bits(pk::pm));\n"
+              "endmodule\n"),
+      "128 48\n");
+}
+
+TEST(BitsSim, DISABLED_TheResultIsASignedFourStateInteger) {
+  EXPECT_EQ(RunBits("module t;\n"
+                    "  logic [31:0] v;\n"
+                    "  initial $display(\"%0d %s\", $bits(v) - 33,\n"
+                    "    $typename($bits(v)));\n"
+                    "endmodule\n"),
+            "-1 integer\n");
+}
+
 }  // namespace

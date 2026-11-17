@@ -6,6 +6,7 @@
 #include "builders_ast.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/evaluation.h"
 
 using namespace delta;
@@ -394,6 +395,331 @@ TEST(TypenameSim,
             "I bit[3:0]\nm logic[7:0] shortint byte\nm int shortint byte\nP "
             "shortint\n");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+std::string RunTypename(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(TypenameSim, DISABLED_AnEnumerationConstantIsOfItsEnumType) {
+  EXPECT_EQ(
+      RunTypename("package pk;\n"
+                  "  typedef enum {PA, PB} pe_t;\n"
+                  "endpackage\n"
+                  "class Packet;\n"
+                  "  typedef enum {OK, ERR_UNDERFLOW} err_t;\n"
+                  "  function string own();\n"
+                  "    return $typename(ERR_UNDERFLOW);\n"
+                  "  endfunction\n"
+                  "endclass\n"
+                  "module top;\n"
+                  "  typedef enum {A = 1, B} et;\n"
+                  "  enum {X, Y} av;\n"
+                  "  Packet p = new;\n"
+                  "  initial begin\n"
+                  "    $display(\"%s\", $typename(B));\n"
+                  "    $display(\"%s\", $typename(pk::PB));\n"
+                  "    $display(\"%0d\", $typename(Y) == $typename(av));\n"
+                  "    $display(\"%0d\", $typename(Packet::ERR_UNDERFLOW) ==\n"
+                  "      $typename(p.ERR_UNDERFLOW));\n"
+                  "    $display(\"%0d\", p.own() ==\n"
+                  "      $typename(Packet::ERR_UNDERFLOW));\n"
+                  "    $display(\"%s\", $typename(p.ERR_UNDERFLOW));\n"
+                  "  end\n"
+                  "endmodule\n"),
+      "enum{A=32'sd1,B=32'sd2}top.et\n"
+      "enum{PA=32'sd0,PB=32'sd1}pk::pe_t\n1\n1\n1\n"
+      "enum{OK=32'sd0,ERR_UNDERFLOW=32'sd1}$unit::Packet::err_t\n");
+}
+
+TEST(TypenameSim, AFunctionCallArgumentIsNeverCalled) {
+  EXPECT_EQ(
+      RunTypename("module top;\n"
+                  "  int counter = 0;\n"
+                  "  function int bump();\n"
+                  "    counter++;\n"
+                  "    return counter;\n"
+                  "  endfunction\n"
+                  "  initial begin\n"
+                  "    $display(\"%0d\", $typename(bump()) == \"\");\n"
+                  "    $display(\"%0d\", $typename(bump() + 1) == \"\");\n"
+                  "    $display(\"%0d\", counter);\n"
+                  "  end\n"
+                  "endmodule\n"),
+      "0\n0\n0\n");
+}
+
+TEST(TypenameSim, AWholeMultidimensionalArrayWritesEveryRange) {
+  EXPECT_EQ(
+      RunTypename("module top;\n"
+                  "  int m[2][3];\n"
+                  "  byte r[3:1][0:1];\n"
+                  "  initial $display(\"%s %s\", $typename(m), $typename(r));\n"
+                  "endmodule\n"),
+      "int$[0:1][0:2] byte$[3:1][0:1]\n");
+}
+
+TEST(TypenameSim, DISABLED_AVariablySizedArrayWritesItsDimension) {
+  EXPECT_EQ(
+      RunTypename("module top;\n"
+                  "  int d[];\n"
+                  "  int q[$];\n"
+                  "  int b[$:4];\n"
+                  "  int a[string];\n"
+                  "  int w[*];\n"
+                  "  int i[int];\n"
+                  "  initial begin\n"
+                  "    $display(\"%s %s %s\", $typename(d), $typename(q),\n"
+                  "      $typename(b));\n"
+                  "    $display(\"%s %s %s\", $typename(a), $typename(w),\n"
+                  "      $typename(i));\n"
+                  "  end\n"
+                  "endmodule\n"),
+      "int$[] int$[$] int$[$:4]\nint$[string] int$[*] int$[int]\n");
+}
+
+TEST(TypenameSim, APredefinedWidthTypeDiffersFromItsSizedVector) {
+  EXPECT_EQ(RunTypename(
+                "module top;\n"
+                "  int a; bit signed [31:0] b;\n"
+                "  integer c; logic signed [31:0] d;\n"
+                "  byte e; bit signed [7:0] g;\n"
+                "  shortint h; bit signed [15:0] j;\n"
+                "  longint k; bit signed [63:0] l;\n"
+                "  initial begin\n"
+                "    $display(\"%s|%s|%s|%s|%s\", $typename(a), $typename(c),\n"
+                "      $typename(e), $typename(h), $typename(k));\n"
+                "    $display(\"%s|%s|%s|%s|%s\", $typename(b), $typename(d),\n"
+                "      $typename(g), $typename(j), $typename(l));\n"
+                "    $display(\"%0d\", $typename(int) != $typename(bit signed "
+                "[31:0]));\n"
+                "  end\n"
+                "endmodule\n"),
+            "int|integer|byte|shortint|longint\n"
+            "bit signed[31:0]|logic signed[31:0]|bit signed[7:0]|bit "
+            "signed[15:0]|bit signed[63:0]\n1\n");
+}
+
+TEST(TypenameSim, DISABLED_AStringMethodCalledOnTheResultActsOnTheName) {
+  EXPECT_EQ(
+      RunTypename("module top;\n"
+                  "  int n;\n"
+                  "  initial $display(\"%0d %0d %s\", $typename(n).len(),\n"
+                  "    $typename(logic [7:0]).len(), $typename(n).toupper());\n"
+                  "endmodule\n"),
+      "3 10 INT\n");
+}
+
+TEST(TypenameSim, AnExplicitDefaultSigningIsLeftOut) {
+  EXPECT_EQ(
+      RunTypename(
+          "module top;\n"
+          "  logic unsigned [3:0] a;\n"
+          "  byte signed b;\n"
+          "  integer signed c;\n"
+          "  shortint signed d;\n"
+          "  longint signed e;\n"
+          "  bit unsigned [2:0] g;\n"
+          "  initial begin\n"
+          "    $display(\"%s|%s|%s|%s|%s|%s\", $typename(a), $typename(b),\n"
+          "      $typename(c), $typename(d), $typename(e), $typename(g));\n"
+          "    $display(\"%s|%s|%s\", $typename(int signed),\n"
+          "      $typename(logic unsigned [3:0]), $typename(byte signed));\n"
+          "  end\n"
+          "endmodule\n"),
+      "logic[3:0]|byte|integer|shortint|longint|bit[2:0]\n"
+      "int|logic[3:0]|byte\n");
+}
+
+TEST(TypenameSim, DISABLED_ASignedNetKeepsItsSigning) {
+  EXPECT_EQ(RunTypename(
+                "module top (input signed [3:0] p);\n"
+                "  wire logic signed ns;\n"
+                "  wire logic nn;\n"
+                "  wire signed [3:0] vs;\n"
+                "  trireg signed [3:0] tr;\n"
+                "  trireg (small) signed [3:0] cap2;\n"
+                "  wire integer wi;\n"
+                "  initial begin\n"
+                "    $display(\"%s|%s|%s|%s\", $typename(ns), $typename(nn),\n"
+                "      $typename(vs), $typename(tr));\n"
+                "    $display(\"%s|%s|%s\", $typename(cap2), $typename(wi),\n"
+                "      $typename(p));\n"
+                "  end\n"
+                "endmodule\n"),
+            "logic signed|logic|logic signed[3:0]|logic signed[3:0]\n"
+            "logic signed[3:0]|integer|logic signed[3:0]\n");
+}
+
+TEST(TypenameSim, DISABLED_ASignedNetOfEveryNetTypeKeepsItsSigning) {
+  EXPECT_EQ(RunTypename(
+                "module top;\n"
+                "  tri signed [1:0] a;\n"
+                "  wand signed [1:0] b;\n"
+                "  wor signed [1:0] c;\n"
+                "  triand signed [1:0] d;\n"
+                "  trior signed [1:0] e;\n"
+                "  tri0 signed [1:0] g;\n"
+                "  tri1 signed [1:0] h;\n"
+                "  uwire signed [1:0] i;\n"
+                "  supply0 signed [1:0] j;\n"
+                "  supply1 signed [1:0] k;\n"
+                "  initial $display(\"%s|%s|%s|%s|%s|%s|%s|%s|%s|%s\",\n"
+                "    $typename(a), $typename(b), $typename(c), $typename(d),\n"
+                "    $typename(e), $typename(g), $typename(h), $typename(i),\n"
+                "    $typename(j), $typename(k));\n"
+                "endmodule\n"),
+            "logic signed[1:0]|logic signed[1:0]|logic signed[1:0]|logic "
+            "signed[1:0]|logic signed[1:0]|logic signed[1:0]|logic "
+            "signed[1:0]|logic signed[1:0]|logic signed[1:0]|logic "
+            "signed[1:0]\n");
+}
+
+TEST(TypenameSim, DISABLED_ALiteralAndACallAreOfTheirSelfDeterminedTypes) {
+  std::string out = RunTypename(
+      "module top;\n"
+      "  function int fi();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  function byte fb();\n"
+      "    return 1;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    $display(\"%s\", $typename(0));\n"
+      "    $display(\"%s|%s\", $typename(fi()), $typename(fb()));\n"
+      "  end\n"
+      "endmodule\n");
+  auto newline = out.find('\n');
+  ASSERT_NE(newline, std::string::npos) << out;
+  std::string literal = out.substr(0, newline);
+  EXPECT_TRUE(literal == "int" || literal == "integer" ||
+              literal == "logic signed[31:0]")
+      << literal;
+  EXPECT_EQ(out.substr(newline + 1), "int|byte\n");
+}
+
+TEST(TypenameSim, AnUnresolvedNameIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  initial begin\n"
+      "    $display(\"%s\", $typename(no_such_var));\n"
+      "    $display(\"%s\", $typename(no_such_var + 1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'no_such_var'",
+                            3, "23.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'no_such_var'",
+                            4, "23.9"));
+}
+
+TEST(TypenameSim, AnonymousUnionsAndUnpackedStructsGetGeneratedNames) {
+  EXPECT_EQ(RunTypename("module top;\n"
+                        "  union {int a; bit b;} u;\n"
+                        "  struct {bit a; byte b;} s;\n"
+                        "  initial begin\n"
+                        "    $display(\"%s\", $typename(u));\n"
+                        "    $display(\"%s\", $typename(union {int a;}));\n"
+                        "    $display(\"%s\", $typename(s));\n"
+                        "  end\n"
+                        "endmodule\n"),
+            "union{int a;bit b;}top.u$u\nunion{int a;}top.u$type\n"
+            "struct{bit a;byte b;}top.s$s\n");
+}
+
+TEST(TypenameSim, APackageTypeIsPrefixedWithItsPackage) {
+  EXPECT_EQ(RunTypename("package A;\n"
+                        "  typedef struct {bit a; byte b;} ps_t;\n"
+                        "endpackage\n"
+                        "module top;\n"
+                        "  A::ps_t s;\n"
+                        "  initial $display(\"%s\", $typename(s));\n"
+                        "endmodule\n"),
+            "struct{bit a;byte b;}A::ps_t\n");
+}
+
+TEST(TypenameSim, DISABLED_AScopedTypeNamedAsTheArgumentIsPrefixed) {
+  EXPECT_EQ(RunTypename("package A;\n"
+                        "  typedef struct {bit a; byte b;} ps_t;\n"
+                        "  typedef enum {M, N} pe_t;\n"
+                        "endpackage\n"
+                        "class R; endclass\n"
+                        "module top;\n"
+                        "  initial begin\n"
+                        "    $display(\"%s\", $typename(A::ps_t));\n"
+                        "    $display(\"%s\", $typename(A::pe_t));\n"
+                        "    $display(\"%s\", $typename(R));\n"
+                        "  end\n"
+                        "endmodule\n"),
+            "struct{bit a;byte b;}A::ps_t\nenum{M=32'sd0,N=32'sd1}A::pe_t\n"
+            "$unit::R\n");
+}
+
+TEST(TypenameSim, DISABLED_AClassScopedTypedefIsWrittenOutBehindItsClass) {
+  EXPECT_EQ(
+      RunTypename("class K;\n"
+                  "  typedef struct {bit x;} ks_t;\n"
+                  "  typedef enum {P, Q} ke_t;\n"
+                  "endclass\n"
+                  "module top;\n"
+                  "  K::ks_t k;\n"
+                  "  K::ke_t e;\n"
+                  "  initial begin\n"
+                  "    $display(\"%s\", $typename(k));\n"
+                  "    $display(\"%s\", $typename(e));\n"
+                  "    $display(\"%s\", $typename(K::ks_t));\n"
+                  "  end\n"
+                  "endmodule\n"),
+      "struct{bit x;}$unit::K::ks_t\nenum{P=32'sd0,Q=32'sd1}$unit::K::ke_t\n"
+      "struct{bit x;}$unit::K::ks_t\n");
+}
+
+TEST(TypenameSim, DISABLED_AnInterfaceOrProgramTypeIsPrefixedWithItsOwnScope) {
+  EXPECT_EQ(RunTypename("interface I;\n"
+                        "  typedef struct {bit y;} is_t;\n"
+                        "  is_t v;\n"
+                        "  initial #1 $display(\"%s\", $typename(v));\n"
+                        "endinterface\n"
+                        "program P;\n"
+                        "  typedef struct {bit z;} pg_t;\n"
+                        "  pg_t w;\n"
+                        "  initial #2 $display(\"%s\", $typename(w));\n"
+                        "endprogram\n"
+                        "module top;\n"
+                        "  I i();\n"
+                        "  P p();\n"
+                        "endmodule\n"),
+            "struct{bit y;}top.i.is_t\nstruct{bit z;}top.p.pg_t\n");
+}
+
+TEST(TypenameSim, ATypedefOfATypedefResolvesToTheInnerStructure) {
+  EXPECT_EQ(RunTypename("module top;\n"
+                        "  typedef struct {bit a;} s1_t;\n"
+                        "  typedef s1_t s2_t;\n"
+                        "  s2_t v;\n"
+                        "  initial begin\n"
+                        "    $display(\"%s\", $typename(s2_t));\n"
+                        "    $display(\"%s\", $typename(v));\n"
+                        "  end\n"
+                        "endmodule\n"),
+            "struct{bit a;}top.s1_t\nstruct{bit a;}top.s1_t\n");
+}
+
+TEST(TypenameSim, DISABLED_AClassScopedTypedefOfABuiltInTypeResolves) {
+  EXPECT_EQ(
+      RunTypename(
+          "class C;\n"
+          "  typedef bit [3:0] T;\n"
+          "endclass\n"
+          "module top;\n"
+          "  C::T v;\n"
+          "  initial $display(\"%s %s\", $typename(C::T), $typename(v));\n"
+          "endmodule\n"),
+      "bit[3:0] bit[3:0]\n");
 }
 
 }  // namespace

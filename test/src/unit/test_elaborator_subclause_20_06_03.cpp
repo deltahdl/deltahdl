@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -76,6 +78,26 @@ TEST(IsunboundedElab, AHierarchicalNameOfAVariableIsRejected) {
       f.diag.Diagnostics(),
       "'$isunbounded' asks about a parameter, so its argument must name one", 5,
       "20.6.3"));
+}
+
+TEST(IsunboundedElab, DISABLED_NoArgumentOrTwoArgumentsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t #(parameter A = $, parameter B = 1, parameter C = 2);\n"
+      "  initial begin\n"
+      "    $display(\"%b\", $isunbounded());\n"
+      "    $display(\"%b\", $isunbounded(B, C));\n"
+      "    $display(\"%b\", $isunbounded(A));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "$isunbounded takes exactly one argument", line,
+                              "20.6.3"))
+        << "line " << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 }  // namespace

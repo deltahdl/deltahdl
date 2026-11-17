@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 
 #include "elaborator/const_eval.h"
@@ -297,6 +299,220 @@ TEST(TypenameConstEval, WhatTheModuleCannotResolveIsLeftUnfolded) {
   for (std::string_view name : {"A", "B", "C", "D", "E", "F", "G", "H"}) {
     EXPECT_EQ(FoldedChars(design, name), "") << name;
   }
+}
+
+TEST(TypenameArguments, DISABLED_NoArgumentOrTwoArgumentsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic a, b;\n"
+      "  parameter string P = $typename();\n"
+      "  initial $display(\"%s\", $typename());\n"
+      "  initial $display(\"%s\", $typename(a, b));\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 4u, 5u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "$typename takes exactly one argument", line,
+                              "20.6.1"))
+        << "line " << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(TypenameArguments, OneExpressionOrOneTypeIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a;\n"
+             "  parameter string P = $typename(a);\n"
+             "  initial $display(\"%s %s\", $typename(a), $typename(int));\n"
+             "endmodule\n"));
+}
+
+constexpr const char* kTypenameConstantMessage =
+    "$typename cannot serve as an elaboration-time constant ";
+
+TEST(SubroutineCallExprElaboration,
+     DISABLED_TypenameRejectsAQueueElementAndAHandleProperty) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int p;\n"
+      "endclass\n"
+      "module m;\n"
+      "  int q[$];\n"
+      "  C h;\n"
+      "  parameter string T = $typename(q[0]);\n"
+      "  parameter string U = $typename(h.p);\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {7u, 8u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string(kTypenameConstantMessage) +
+                                  "when its argument selects an element of a "
+                                  "dynamic object",
+                              line, "20.6.1"))
+        << "line " << line;
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(SubroutineCallExprElaboration,
+     DISABLED_TypenameAcceptsAMemberOfALocalStruct) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  typedef struct {logic [3:0] f;} st_t;\n"
+             "  st_t st;\n"
+             "  parameter string T = $typename(st.f);\n"
+             "endmodule\n"));
+}
+
+TEST(SubroutineCallExprElaboration,
+     DISABLED_TypenameRejectsAHierarchicalReferenceInEveryConstantContext) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module sub;\n"
+      "  logic x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub s();\n"
+      "  logic [$typename(s.x) == \"logic\" : 0] pd;\n"
+      "  logic ud [$typename(s.x) == \"logic\" : 0];\n"
+      "  if ($typename(s.x) == \"logic\") begin : g1\n"
+      "  end\n"
+      "  case ($typename(s.x) == \"logic\")\n"
+      "    1: begin : g2 end\n"
+      "    default: begin : g3 end\n"
+      "  endcase\n"
+      "  for (genvar i = 0; i < ($typename(s.x) == \"logic\"); i++) begin : "
+      "g4\n"
+      "  end\n"
+      "  localparam bit L = $typename(s.x) == \"logic\";\n"
+      "endmodule\n",
+      f, "top");
+  for (uint32_t line : {6u, 7u, 8u, 10u, 14u, 16u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string(kTypenameConstantMessage) +
+                                  "when its argument is a hierarchical "
+                                  "reference",
+                              line, "20.6.1"))
+        << "line " << line;
+  }
+}
+
+TEST(
+    SubroutineCallExprElaboration,
+    DISABLED_TypenameRejectsAHierarchicalReferenceInPackageInterfaceAndProgram) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  parameter string P = $typename(top.x);\n"
+      "endpackage\n"
+      "interface I;\n"
+      "  parameter string P = $typename(top.x);\n"
+      "endinterface\n"
+      "program G;\n"
+      "  parameter string P = $typename(top.x);\n"
+      "endprogram\n"
+      "module top;\n"
+      "  logic x;\n"
+      "  I i();\n"
+      "  G g();\n"
+      "endmodule\n",
+      f, "top");
+  for (uint32_t line : {2u, 5u, 8u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string(kTypenameConstantMessage) +
+                                  "when its argument is a hierarchical "
+                                  "reference",
+                              line, "20.6.1"))
+        << "line " << line;
+  }
+}
+
+TEST(SubroutineCallExprElaboration,
+     TypenameAcceptsAHierarchicalReferenceOutsideAConstant) {
+  EXPECT_TRUE(
+      ElabOk("module sub;\n"
+             "  logic x;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  sub s();\n"
+             "  int q[$];\n"
+             "  initial $display(\"%s %s\", $typename(s.x), $typename(q[0]));\n"
+             "endmodule\n"));
+}
+
+TEST(TypenameConstEval, DISABLED_EveryKindOfOperandFoldsToItsName) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  typedef bit w_t;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  class K; endclass\n"
+      "  typedef enum {X, Y} e_t;\n"
+      "  K h;\n"
+      "  p::w_t pw;\n"
+      "  real r;\n"
+      "  string s;\n"
+      "  int q[2];\n"
+      "  int m[2][3];\n"
+      "  localparam string A = $typename(h);\n"
+      "  localparam string B = $typename(pw);\n"
+      "  localparam string C = $typename(X);\n"
+      "  localparam string D = $typename(-r);\n"
+      "  localparam string E = $typename({s});\n"
+      "  localparam string F = $typename(q[0:1]);\n"
+      "  localparam string G = $typename(m[1][2]);\n"
+      "  localparam string H = $typename(type(r));\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(FoldedChars(design, "A"), "top.K");
+  EXPECT_EQ(FoldedChars(design, "B"), "bit");
+  EXPECT_EQ(FoldedChars(design, "C"), "enum{X=32'sd0,Y=32'sd1}top.e_t");
+  EXPECT_EQ(FoldedChars(design, "D"), "real");
+  EXPECT_EQ(FoldedChars(design, "E"), "string");
+  EXPECT_EQ(FoldedChars(design, "F"), "int$[0:1]");
+  EXPECT_EQ(FoldedChars(design, "G"), "int");
+  EXPECT_EQ(FoldedChars(design, "H"), "real");
+}
+
+TEST(TypenameConstEval, AWholeMultidimensionalArrayFoldsWithEveryRange) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int m[2][3];\n"
+      "  localparam string M = $typename(m);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(FoldedChars(design, "M"), "int$[0:1][0:2]");
+}
+
+TEST(TypenameConstEval, DISABLED_AVariablySizedArrayFoldsWithItsDimension) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  int d[];\n"
+      "  int q[$];\n"
+      "  int a[string];\n"
+      "  int w[*];\n"
+      "  int i[int];\n"
+      "  localparam string D = $typename(d);\n"
+      "  localparam string Q = $typename(q);\n"
+      "  localparam string A = $typename(a);\n"
+      "  localparam string W = $typename(w);\n"
+      "  localparam string I = $typename(i);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(FoldedChars(design, "D"), "int$[]");
+  EXPECT_EQ(FoldedChars(design, "Q"), "int$[$]");
+  EXPECT_EQ(FoldedChars(design, "A"), "int$[string]");
+  EXPECT_EQ(FoldedChars(design, "W"), "int$[*]");
+  EXPECT_EQ(FoldedChars(design, "I"), "int$[int]");
 }
 
 }  // namespace

@@ -187,4 +187,97 @@ TEST(RangeSystemFunctionSim, OverrideNamingADollarParameterIsUnbounded) {
       "1 0\n");
 }
 
+std::string RunIsunbounded(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(RangeSystemFunctionSim,
+     DISABLED_AClassScopedOrGenerateScopedNameIsAnswered) {
+  EXPECT_EQ(RunIsunbounded(
+                "class C #(int N = 1);\n"
+                "endclass\n"
+                "module t;\n"
+                "  if (1) begin : g\n"
+                "    localparam Q = $;\n"
+                "    localparam B = 2;\n"
+                "  end\n"
+                "  initial $display(\"%b %b %b %b\", $isunbounded(C#($)::N),\n"
+                "    $isunbounded(C#(4)::N), $isunbounded(g.Q),\n"
+                "    $isunbounded(g.B));\n"
+                "endmodule\n"),
+            "1 0 1 0\n");
+}
+
+TEST(RangeSystemFunctionSim, DISABLED_APackageParameterIsAnswered) {
+  EXPECT_EQ(
+      RunIsunbounded("package pk;\n"
+                     "  parameter Q = $;\n"
+                     "  parameter R = 4;\n"
+                     "endpackage\n"
+                     "module t;\n"
+                     "  initial $display(\"%b %b\", $isunbounded(pk::Q),\n"
+                     "    $isunbounded(pk::R));\n"
+                     "endmodule\n"),
+      "1 0\n");
+}
+
+TEST(RangeSystemFunctionSim, DISABLED_AGenerateConditionSelectsTheBlock) {
+  std::string out = RunIsunbounded(
+      "package pk;\n"
+      "  parameter Q = $;\n"
+      "endpackage\n"
+      "interface qtc #(parameter int min_quiet = 0,\n"
+      "                parameter int max_quiet = 0) (input logic clk);\n"
+      "  if (!$isunbounded(max_quiet) && (max_quiet == 0)) begin : quiet\n"
+      "    initial $display(\"%m\");\n"
+      "  end else begin : bounded\n"
+      "    initial $display(\"%m\");\n"
+      "  end\n"
+      "  if ($isunbounded(pk::Q)) begin : yes\n"
+      "    initial $display(\"%m\");\n"
+      "  end\n"
+      "endinterface\n"
+      "module t;\n"
+      "  logic clk;\n"
+      "  qtc #(0, 0) a(clk);\n"
+      "  qtc #(0, $) b(clk);\n"
+      "endmodule\n");
+  EXPECT_NE(out.find("a.quiet"), std::string::npos) << out;
+  EXPECT_NE(out.find("b.bounded"), std::string::npos) << out;
+  EXPECT_EQ(out.find("a.bounded"), std::string::npos) << out;
+  EXPECT_EQ(out.find("b.quiet"), std::string::npos) << out;
+  EXPECT_NE(out.find("a.yes"), std::string::npos) << out;
+  EXPECT_NE(out.find("b.yes"), std::string::npos) << out;
+}
+
+TEST(RangeSystemFunctionSim, DISABLED_ALocalparamInitializerIsAnswered) {
+  EXPECT_EQ(RunIsunbounded("package pk;\n"
+                           "  parameter Q = $;\n"
+                           "endpackage\n"
+                           "module m #(parameter P = 3);\n"
+                           "  localparam bit U = $isunbounded(P);\n"
+                           "  localparam bit V = $isunbounded(pk::Q);\n"
+                           "  initial #(U ? 1 : 2) $display(\"%b %b\", U, V);\n"
+                           "endmodule\n"
+                           "module t;\n"
+                           "  m #(.P($)) u();\n"
+                           "  m v();\n"
+                           "endmodule\n"),
+            "1 1\n0 1\n");
+}
+
+TEST(RangeSystemFunctionSim,
+     DISABLED_AModuleParameterOverriddenToDollarIsUnbounded) {
+  EXPECT_EQ(RunIsunbounded("module m #(parameter P = 1);\n"
+                           "  initial #($isunbounded(P) ? 1 : 2)\n"
+                           "    $display(\"%b\", $isunbounded(P));\n"
+                           "endmodule\n"
+                           "module t;\n"
+                           "  m #(.P($)) u();\n"
+                           "  m u2();\n"
+                           "endmodule\n"),
+            "1\n0\n");
+}
+
 }  // namespace
