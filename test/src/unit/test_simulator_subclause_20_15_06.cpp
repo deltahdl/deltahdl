@@ -141,4 +141,20 @@ TEST(StochasticQueueStatus, ExamReportsStatus) {
   EXPECT_EQ(out[1], "0");
 }
 
+TEST(StochasticQueueStatus, ZeroQueueTypeIsUnsupported) {
+  auto out = RunBody(
+      "    $q_initialize(1, 0, 4, st);\n"
+      "    $display(\"%0d\", st);\n");
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0], "4");
+}
+
+TEST(StochasticQueueStatus, NegativeQueueTypeIsUnsupported) {
+  auto out = RunBody(
+      "    $q_initialize(1, -1, 4, st);\n"
+      "    $display(\"%0d\", st);\n");
+  ASSERT_EQ(out.size(), 1u);
+  EXPECT_EQ(out[0], "4");
+}
+
 }  // namespace

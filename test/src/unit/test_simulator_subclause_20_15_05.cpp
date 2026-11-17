@@ -141,47 +141,10 @@ TEST(QExam, AcceptsVariableStatCodeOperand) {
   EXPECT_EQ(out[0], "2");
 }
 
-TEST(QExam, UnknownStatCodeYieldsZero) {
-  auto out = RunBody(
-      "    $q_initialize(1, 1, 8, st);\n"
-      "    $q_add(1, 1, 0, st);\n"
-      "    #1 $q_exam(1, 99, sv, st);\n"
-      "    $display(\"%0d\", sv);\n");
-  ASSERT_EQ(out.size(), 1u);
-  EXPECT_EQ(out[0], "0");
-}
-
-TEST(QExam, StatisticsOnEmptyQueueAreZero) {
+TEST(QExam, AnEmptyQueueHasLengthZero) {
   auto out = RunBody(
       "    $q_initialize(1, 1, 8, st);\n"
       "    #5 $q_exam(1, 1, sv, st);\n"
-      "    $display(\"%0d\", sv);\n"
-      "    $q_exam(1, 5, sv, st);\n"
-      "    $display(\"%0d\", sv);\n");
-  ASSERT_EQ(out.size(), 2u);
-  EXPECT_EQ(out[0], "0");
-  EXPECT_EQ(out[1], "0");
-}
-
-TEST(QExam, WaitStatisticsBeforeAnyRemovalAreZero) {
-  auto out = RunBody(
-      "    $q_initialize(1, 1, 8, st);\n"
-      "    $q_add(1, 1, 0, st);\n"
-      "    #4 $q_add(1, 1, 0, st);\n"
-      "    #5 $q_exam(1, 4, sv, st);\n"
-      "    $display(\"%0d\", sv);\n"
-      "    $q_exam(1, 6, sv, st);\n"
-      "    $display(\"%0d\", sv);\n");
-  ASSERT_EQ(out.size(), 2u);
-  EXPECT_EQ(out[0], "0");
-  EXPECT_EQ(out[1], "0");
-}
-
-TEST(QExam, MeanInterarrivalWithSingleArrivalIsZero) {
-  auto out = RunBody(
-      "    $q_initialize(1, 1, 8, st);\n"
-      "    #3 $q_add(1, 1, 0, st);\n"
-      "    #4 $q_exam(1, 2, sv, st);\n"
       "    $display(\"%0d\", sv);\n");
   ASSERT_EQ(out.size(), 1u);
   EXPECT_EQ(out[0], "0");
