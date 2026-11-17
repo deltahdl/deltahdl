@@ -16,7 +16,7 @@ TEST(FileOpenCloseElaboration, DISABLED_FopenWithNoArgumentIsReported) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "$fopen takes a filename and an optional type", 4,
+                            "$fopen takes a filename and an optional type", 3,
                             "21.3.1"));
 }
 
@@ -29,7 +29,7 @@ TEST(FileOpenCloseElaboration, DISABLED_FopenWithThreeArgumentsIsReported) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "$fopen takes a filename and an optional type", 4,
+                            "$fopen takes a filename and an optional type", 3,
                             "21.3.1"));
 }
 
@@ -54,7 +54,7 @@ TEST(FileOpenCloseElaboration, DISABLED_FcloseWithNoArgumentIsReported) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "$fclose takes one descriptor", 4, "21.3.1"));
+                            "$fclose takes one descriptor", 3, "21.3.1"));
 }
 
 TEST(FileOpenCloseElaboration, DISABLED_FcloseWithTwoArgumentsIsReported) {
@@ -66,7 +66,7 @@ TEST(FileOpenCloseElaboration, DISABLED_FcloseWithTwoArgumentsIsReported) {
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "$fclose takes one descriptor", 4, "21.3.1"));
+                            "$fclose takes one descriptor", 3, "21.3.1"));
 }
 
 TEST(FileOpenCloseElaboration, FcloseWithOneDescriptorIsAccepted) {
@@ -137,7 +137,7 @@ TEST(FileOpenCloseElaboration, DISABLED_TheTypeLiteralXIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "the type argument of $fopen does not name a way to open a file", 4,
+      "the type argument of $fopen does not name a way to open a file", 3,
       "21.3.1"));
 }
 
@@ -151,7 +151,7 @@ TEST(FileOpenCloseElaboration, DISABLED_TheTypeLiteralRwIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "the type argument of $fopen does not name a way to open a file", 4,
+      "the type argument of $fopen does not name a way to open a file", 3,
       "21.3.1"));
 }
 
@@ -165,7 +165,7 @@ TEST(FileOpenCloseElaboration, DISABLED_TheTypeLiteralWxIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "the type argument of $fopen does not name a way to open a file", 4,
+      "the type argument of $fopen does not name a way to open a file", 3,
       "21.3.1"));
 }
 
@@ -179,7 +179,7 @@ TEST(FileOpenCloseElaboration, DISABLED_TheTypeLiteralEmptyIsReported) {
       f);
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
-      "the type argument of $fopen does not name a way to open a file", 4,
+      "the type argument of $fopen does not name a way to open a file", 3,
       "21.3.1"));
 }
 
