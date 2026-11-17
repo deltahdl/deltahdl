@@ -182,4 +182,160 @@ TEST(CovergroupInstanceSim, UserCrossBinReplacesTheProductsItSelects) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+std::string CrossBinHits(const std::string& body, const std::string& samples) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [2:0] x; bit [1:0] y; bit en;\n"
+      "  covergroup cg;\n"
+      "    cx: coverpoint x { bins b0 = {0}; bins b1 = {1}; bins b23 = "
+      "{[2:3]};\n"
+      "      bins b45 = {[4:5]}; bins b67 = {[6:7]}; }\n"
+      "    cy: coverpoint y { bins c0 = {0}; bins c1 = {1}; bins c2 = {2}; }\n"
+      "    xy: cross cx, cy {\n" +
+          body +
+          "    }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n" +
+          samples +
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const CoverGroup* group = f.ctx.CoverageData().FindGroup("c");
+  if (group == nullptr || group->crosses.empty()) return "no cross";
+  std::string hits;
+  for (const CrossBin& bin : group->crosses[0].bins) {
+    hits += bin.name + "=" + std::to_string(bin.bin_tuples.size()) + ":" +
+            std::to_string(bin.hit_count) + " ";
+  }
+  return hits;
+}
+
+TEST(CovergroupInstanceSim, BinsofOneBinSelectsOnlyThatBinsProducts) {
+  EXPECT_EQ(CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                         "      bins one = binsof(cx.b23);\n",
+                         "    x = 3; y = 2; c.sample();\n"
+                         "    x = 4; y = 2; c.sample();\n"),
+            "one=3:1 ");
+}
+
+TEST(CovergroupInstanceSim, NegatedBinsofSelectsBinsHoldingNoneOfTheValues) {
+  EXPECT_EQ(CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                         "      bins neg = ! binsof(cx) intersect {1, 5};\n",
+                         "    x = 4; y = 0; c.sample();\n"
+                         "    x = 6; y = 0; c.sample();\n"),
+            "neg=9:1 ");
+}
+
+TEST(CovergroupInstanceSim, EveryIntersectRangeFormSelectsOverlappingBins) {
+  EXPECT_EQ(CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                         "      bins r = binsof(cx) intersect {[1:2]};\n"
+                         "      bins lo = binsof(cx) intersect {[$:1]};\n"
+                         "      bins hi = binsof(cx) intersect {[5:$]};\n"
+                         "      bins pm = binsof(cx) intersect {[3 +/- 1]};\n"
+                         "      bins pc = binsof(cx) intersect {[6 +%- 20]};\n",
+                         "    x = 2; y = 1; c.sample();\n"),
+            "r=6:1 lo=6:0 hi=6:0 pm=6:1 pc=6:0 ");
+}
+
+TEST(CovergroupInstanceSim, AndLeavesOutAProductOnlyOneOperandSelects) {
+  EXPECT_EQ(CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                         "      bins a = binsof(cx) intersect {0} &&\n"
+                         "               binsof(cy) intersect {1};\n"
+                         "      bins o = binsof(cx) intersect {0} ||\n"
+                         "               binsof(cy) intersect {1};\n"
+                         "      bins p = binsof(cx) intersect {0} &&\n"
+                         "               (binsof(cy) intersect {1} ||\n"
+                         "                binsof(cy) intersect {2});\n",
+                         "    x = 0; y = 0; c.sample();\n"
+                         "    x = 4; y = 1; c.sample();\n"
+                         "    x = 4; y = 2; c.sample();\n"
+                         "    x = 0; y = 2; c.sample();\n"),
+            "a=1:0 o=7:3 p=2:1 ");
+}
+
+TEST(CovergroupInstanceSim, ACrossBinCountsOncePerSampleMatchingAnyProduct) {
+  EXPECT_EQ(
+      CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                   "      bins two = binsof(cx.b0) && binsof(cy) intersect "
+                   "{[0:1]};\n",
+                   "    x = 0; y = 0; c.sample();\n"
+                   "    x = 0; y = 1; c.sample();\n"
+                   "    x = 0; y = 2; c.sample();\n"
+                   "    x = 0; y = 1; c.sample();\n"),
+      "two=2:3 ");
+}
+
+TEST(CovergroupInstanceSim, AFalseBinIffGuardLeavesOnlyThatBinUncounted) {
+  EXPECT_EQ(CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                         "      bins g = binsof(cx.b1) iff (en);\n"
+                         "      bins u = binsof(cy.c2);\n",
+                         "    en = 0; x = 1; y = 2; c.sample();\n"
+                         "    en = 1; x = 1; y = 0; c.sample();\n"),
+            "g=3:1 u=5:1 ");
+}
+
+TEST(CovergroupInstanceSim, ABinsofOfACrossedVariableNamesItsCoverpoint) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] a; bit b; int n, t;\n"
+                       "  covergroup cg;\n"
+                       "    ab: cross a, b {\n"
+                       "      option.cross_retain_auto_bins = 0;\n"
+                       "      bins s = binsof(a) intersect {2};\n"
+                       "    }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    a = 2; b = 1; c.sample();\n"
+                       "    void'(c.ab.get_inst_coverage(n, t));\n"
+                       "    $display(\"%0d %0d\", n, t);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, RetainAutoBinsOffInACrossBodyLeavesOnlyUserBins) {
+  EXPECT_EQ(CrossBinHits("      option.cross_retain_auto_bins = 0;\n"
+                         "      bins s = binsof(cx.b0);\n",
+                         "    x = 7; y = 1; c.sample();\n"),
+            "s=3:0 ");
+}
+
+TEST(CovergroupInstanceSim, AutomaticCrossBinsStayForProductsNoUserBinSelects) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] a, b; int n, t;\n"
+                 "  covergroup cg;\n"
+                 "    option.cross_retain_auto_bins = 0;\n"
+                 "    ca: coverpoint a { bins a0 = {0}; bins a1 = {1}; }\n"
+                 "    cb: coverpoint b { bins b0 = {0}; bins b1 = {1}; }\n"
+                 "    xu: cross ca, cb { bins s = binsof(ca.a0); }\n"
+                 "    xn: cross ca, cb;\n"
+                 "    xk: cross ca, cb {\n"
+                 "      option.cross_retain_auto_bins = 1;\n"
+                 "      bins s = binsof(ca.a0);\n"
+                 "    }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    a = 1; b = 1; c.sample();\n"
+                 "    void'(c.xu.get_inst_coverage(n, t)); $write(\"%0d %0d "
+                 "\", n, t);\n"
+                 "    void'(c.xn.get_inst_coverage(n, t)); $write(\"%0d %0d "
+                 "\", n, t);\n"
+                 "    void'(c.xk.get_inst_coverage(n, t)); $display(\"%0d "
+                 "%0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 1 1 4 1 3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

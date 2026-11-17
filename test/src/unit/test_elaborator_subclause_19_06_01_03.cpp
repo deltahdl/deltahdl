@@ -3,6 +3,8 @@
 #include <vector>
 
 #include "elaborator/cross_automatic_types.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -51,6 +53,53 @@ TEST(CrossAutomaticTypes, CrossTypeNamesAreImplicitTypedefs) {
   EXPECT_EQ(kCrossValTypeName, "CrossValType");
   EXPECT_EQ(kCrossQueueTypeName, "CrossQueueType");
   EXPECT_FALSE(IsImplicitCrossTypedefName("SomeOtherType"));
+}
+
+TEST(CrossAutomaticTypes, ACrossTypeNamedInTheModuleIsUndeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg;\n"
+      "    ca: coverpoint a; cb: coverpoint b;\n"
+      "    X: cross ca, cb {\n"
+      "      function CrossQueueType mk(); endfunction\n"
+      "      bins s = mk();\n"
+      "    }\n"
+      "  endgroup\n"
+      "  CrossQueueType q0;\n"
+      "  CrossValType v0;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'CrossQueueType' does not "
+                            "precede this reference to it",
+                            10, "6.18"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'CrossValType' does not "
+                            "precede this reference to it",
+                            11, "6.18"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(CrossAutomaticTypes, DISABLED_ACrossTypeNamedInTheCovergroupIsUndeclared) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg;\n"
+      "    ca: coverpoint a { bins s[] = {[0:3]} with "
+      "($bits(CrossValType) > 0); }\n"
+      "    cb: coverpoint b;\n"
+      "    X: cross ca, cb;\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "declaration of type 'CrossValType' does not "
+                            "precede this reference to it",
+                            4, "6.18"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

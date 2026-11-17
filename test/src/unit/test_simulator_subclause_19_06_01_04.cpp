@@ -152,4 +152,51 @@ TEST(CovergroupInstanceSim,
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+std::string SetBinTuples(const char* group_name) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [1:0] a, b;\n"
+      "  typedef struct { bit [1:0] ca; bit [1:0] cb; } pv_t;\n"
+      "  typedef pv_t pq_t[$];\n"
+      "  typedef struct { bit [3:0] w; } other_t;\n"
+      "  other_t oq[$] = '{ '{4'h5} };\n"
+      "  covergroup cg (int lim);\n"
+      "    ca: coverpoint a { bins lo = {[0:1]}; bins hi = {[2:3]}; }\n"
+      "    cb: coverpoint b { bins lo = {[0:1]}; bins hi = {[2:3]}; }\n"
+      "    X: cross ca, cb {\n"
+      "      function CrossQueueType mk(int n);\n"
+      "        for (int i = 0; i < n; i++) mk.push_back('{i, i});\n"
+      "      endfunction\n"
+      "      bins d = '{ '{0,0}, '{2,0} };\n"
+      "      bins m2 = '{ '{0,0}, '{1,1}, '{0,2} } matches 2;\n"
+      "      bins all = '{ '{0,2}, '{0,3}, '{1,2}, '{1,3}, '{2,2} } "
+      "matches $;\n"
+      "      bins fn = mk(lim);\n"
+      "      bins cst = pq_t'(oq);\n"
+      "    }\n"
+      "  endgroup\n"
+      "  cg c = new(1);\n"
+      "  cg g = new(3);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  const CoverGroup* group = f.ctx.CoverageData().FindGroup(group_name);
+  if (group == nullptr || group->crosses.empty()) return "no cross";
+  std::string tuples;
+  for (const CrossBin& bin : group->crosses[0].bins) {
+    if (bin.name.rfind('<', 0) == 0) continue;
+    tuples += bin.name + "=" + std::to_string(bin.bin_tuples.size()) + " ";
+  }
+  return tuples;
+}
+
+TEST(CovergroupInstanceSim, SetPoliciesOverMultiValueBinsFromSource) {
+  EXPECT_EQ(SetBinTuples("c"), "d=2 m2=1 all=1 fn=1 cst=1 ");
+}
+
+TEST(CovergroupInstanceSim, ACrossFunctionOfAFormalGivesBinsPerInstance) {
+  EXPECT_EQ(SetBinTuples("g"), "d=2 m2=1 all=1 fn=2 cst=1 ");
+}
+
 }  // namespace

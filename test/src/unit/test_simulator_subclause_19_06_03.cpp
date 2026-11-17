@@ -153,4 +153,55 @@ TEST(CovergroupInstanceSim, IllegalSelectionJoinedByAndIsRunTimeError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
+TEST(CovergroupInstanceSim, IllegalProductsLeaveTheCoverageCountFromSource) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] a, b; int n, t;\n"
+                 "  covergroup cg;\n"
+                 "    ca: coverpoint a { bins a0 = {0}; bins a1 = {1}; }\n"
+                 "    cb: coverpoint b { bins b0 = {0}; bins b1 = {1}; }\n"
+                 "    X: cross ca, cb { illegal_bins il = binsof(cb.b1); "
+                 "}\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    a = 1; b = 0; c.sample();\n"
+                 "    void'(c.X.get_inst_coverage(n, t));\n"
+                 "    $display(\"%0d %0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, AnIllegalProductIgnoredOrInABinIsStillAnError) {
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit [1:0] a, b;\n"
+      "  covergroup cg;\n"
+      "    ca: coverpoint a { bins a0 = {0}; bins a1 = {1}; }\n"
+      "    cb: coverpoint b { bins b0 = {0}; bins b1 = {1}; }\n"
+      "    X: cross ca, cb {\n"
+      "      bins sel = binsof(ca.a1);\n"
+      "      ignore_bins ig = binsof(cb.b1);\n"
+      "      illegal_bins il = binsof(ca.a1) && binsof(cb.b1);\n"
+      "    }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    a = 1; b = 0; c.sample();\n"
+      "    a = 1; b = 1; c.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sampled values of cross 'X' fall in its illegal "
+                            "bins 'il'",
+                            15, "19.6.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
 }  // namespace

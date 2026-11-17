@@ -100,4 +100,32 @@ TEST(CovergroupInstanceSim, IgnoreBinsExcludeTheirProducts) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
+TEST(CovergroupInstanceSim, AnIgnoredProductLeavesAnotherCrossBinFromSource) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] a, b; int n, t;\n"
+                 "  covergroup cg;\n"
+                 "    ca: coverpoint a { bins a0 = {0}; bins a1 = {1}; }\n"
+                 "    cb: coverpoint b { bins b0 = {0}; bins b1 = {1}; }\n"
+                 "    X: cross ca, cb {\n"
+                 "      bins sel = binsof(ca.a0);\n"
+                 "      ignore_bins ig = binsof(cb.b1);\n"
+                 "    }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    a = 0; b = 1; c.sample();\n"
+                 "    void'(c.X.get_inst_coverage(n, t));\n"
+                 "    $display(\"%0d %0d\", n, t);\n"
+                 "    a = 0; b = 0; c.sample();\n"
+                 "    void'(c.X.get_inst_coverage(n, t));\n"
+                 "    $display(\"%0d %0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0 2\n1 2\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

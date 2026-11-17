@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -106,6 +107,40 @@ TEST(Coverage, MixedEmptyAndNonEmptyTransitionSequences) {
   auto bins = CoverageDB::BinsofYield(&cp);
   auto hit = CoverageDB::SelectBinsByIntersect(bins, {9}, false);
   EXPECT_EQ(hit, (std::vector<size_t>{0}));
+}
+
+TEST(CovergroupInstanceSim,
+     BinsofOverATransitionBinFromSourceUsesItsLastValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v, w; int n, t;\n"
+                 "  covergroup cg;\n"
+                 "    cv: coverpoint v { bins tr = (1 => 2 => 3);\n"
+                 "      bins z = {0}; }\n"
+                 "    cw: coverpoint w { bins w0 = {0}; bins w1 = {1}; }\n"
+                 "    xl: cross cv, cw {\n"
+                 "      option.cross_retain_auto_bins = 0;\n"
+                 "      bins last = binsof(cv) intersect {3};\n"
+                 "    }\n"
+                 "    xm: cross cv, cw {\n"
+                 "      option.cross_retain_auto_bins = 0;\n"
+                 "      bins mid = binsof(cv) intersect {2};\n"
+                 "    }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    w = 1; v = 1; c.sample(); v = 2; c.sample();\n"
+                 "    v = 3; c.sample();\n"
+                 "    void'(c.xl.get_inst_coverage(n, t));\n"
+                 "    $display(\"%0d %0d\", n, t);\n"
+                 "    void'(c.xm.get_inst_coverage(n, t));\n"
+                 "    $display(\"%0d %0d\", n, t);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 1\n0 0\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace

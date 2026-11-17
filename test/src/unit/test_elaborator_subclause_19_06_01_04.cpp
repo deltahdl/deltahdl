@@ -89,4 +89,39 @@ TEST(CrossSetExpression, QueueOfIntegralRealOrStringElementsIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
+TEST(CrossSetExpression, DISABLED_AnIncompatibleCallSliceOrStructQueueIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  bit [1:0] a, b;\n"
+      "  typedef struct { bit [1:0] ca; } one_t;\n"
+      "  one_t oq[$];\n"
+      "  int q[$] = '{1, 2};\n"
+      "  function automatic int f(); return 1; endfunction\n"
+      "  covergroup cg;\n"
+      "    ca: coverpoint a; cb: coverpoint b;\n"
+      "    X: cross ca, cb {\n"
+      "      bins e1 = f();\n"
+      "      bins e2 = q[0:1];\n"
+      "      bins e3 = oq;\n"
+      "      bins ok = '{ '{1, 1} };\n"
+      "    }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the cross_set_expression 'f()' of bin 'e1' is no "
+                            "queue of the cross's CrossValType",
+                            10, "19.6.1.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the cross_set_expression 'q[0:1]' of bin 'e2' is "
+                            "no queue of the cross's CrossValType",
+                            11, "19.6.1.4"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the cross_set_expression 'oq' of bin 'e3' is no "
+                            "queue of the cross's CrossValType",
+                            12, "19.6.1.4"));
+  EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
 }  // namespace
