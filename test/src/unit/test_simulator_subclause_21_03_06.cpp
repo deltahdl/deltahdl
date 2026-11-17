@@ -336,4 +336,50 @@ TEST(FlushingOutput, ArrayElementExpressionArgument) {
   std::remove(tmp.c_str());
 }
 
+TEST(FlushingOutput, FlushFromAClassMethodAndAFunctionPublishesBytes) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_21306_places.txt";
+  std::remove(tmp.c_str());
+  std::string out = RunCapture(
+      "class Sink;\n"
+      "  function void push(integer fd); $fflush(fd); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  integer fd, r, a, b;\n"
+      "  Sink k;\n"
+      "  function int peek();\n"
+      "    int c;\n"
+      "    r = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(r);\n"
+          "    $fclose(r);\n"
+          "    return c;\n"
+          "  endfunction\n"
+          "  function void flush_all(); $fflush(); endfunction\n"
+          "  initial begin\n"
+          "    k = new;\n"
+          "    fd = $fopen(\"" +
+          tmp +
+          "\", \"w\");\n"
+          "    $fwrite(fd, \"h\");\n"
+          "    k.push(fd);\n"
+          "    a = peek();\n"
+          "    $fwrite(fd, \"i\");\n"
+          "    flush_all();\n"
+          "    r = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    b = $fgetc(r);\n"
+          "    b = $fgetc(r);\n"
+          "    $fclose(r);\n"
+          "    $display(\"%c %c\", a, b);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "h i\n");
+  std::remove(tmp.c_str());
+}
+
 }  // namespace
