@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
+#include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_port_connection_elab.h"
@@ -241,6 +243,46 @@ TEST(WildcardPortConnectionElaboration,
                             "'.q' requires equivalent data types", 8,
                             "23.3.2.4"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "'.r'", 8, "23.3.2.4"));
+}
+
+bool AnErrorAtLine(const ElabFixture& f, uint32_t line) {
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == delta::DiagSeverity::kError && d.loc.line == line) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(WildcardConnectionRules, ADissimilarPairThatWarnsExplicitlyIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(inout wand w);\nendmodule\nmodule t;\n  wor w;\n"
+      "  c u(.*);\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit .* port connection '.w' between dissimilar net types", 5,
+      "23.3.2.4"));
+}
+
+TEST(WildcardConnectionRules,
+     DISABLED_ADissimilarPairThatDoesNotWarnIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(inout wand w);\nendmodule\nmodule t;\n  wire w;\n"
+      "  c u(.*);\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(WildcardConnectionRules, DISABLED_APortWithNoDefaultAndNoSignalIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(input a);\nendmodule\nmodule t;\n  c u(.*);\nendmodule\n", f,
+      "t");
+  EXPECT_TRUE(AnErrorAtLine(f, 4));
 }
 
 }  // namespace

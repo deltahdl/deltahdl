@@ -285,4 +285,40 @@ TEST(ImplicitNamedPortConnectionElaboration, ImportedNamesAreDeclared) {
                             "23.3.2.3"));
 }
 
+TEST(ImplicitNamedConnectionRules, ASignalDeclaredAfterTheConnectionIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(input a);\nendmodule\nmodule t;\n  c u(.a);\n  wire a;\n"
+      "endmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit named port connection '.a' requires "
+                            "signal 'a' to be declared in the instantiating "
+                            "scope",
+                            4, "23.3.2.3"));
+}
+
+TEST(ImplicitNamedConnectionRules, ADissimilarPairThatDoesNotWarnIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(inout wand w);\nendmodule\nmodule t;\n  wire w;\n"
+      "  c u(.w);\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(ImplicitNamedConnectionRules,
+     ADissimilarPairThatWarnsExplicitlyIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c(inout wand w);\nendmodule\nmodule t;\n  wor w;\n"
+      "  c u(.w);\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "implicit named port connection '.w' between dissimilar net types", 5,
+      "23.3.2.3"));
+}
+
 }  // namespace

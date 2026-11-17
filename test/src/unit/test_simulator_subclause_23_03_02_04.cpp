@@ -100,4 +100,52 @@ TEST(WildcardPortConnectionSimulation,
             "5a 22\n");
 }
 
+TEST(WildcardConnectionRun, AnInterfacePortTakesTheLikeNamedInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface bus;\n  logic r;\nendinterface\n"
+                       "module c(bus b);\n"
+                       "  initial #1 $display(\"%b\", b.r);\n"
+                       "endmodule\n"
+                       "module t;\n  bus b();\n  initial b.r = 1;\n"
+                       "  c u(.*);\nendmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(WildcardConnectionRun, AMissingSignalLeavesTheDefaultInPlace) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(input a = 1);\n"
+                       "  initial #1 $display(\"%b\", a);\n"
+                       "endmodule\n"
+                       "module t;\n  c u(.*);\nendmodule\n",
+                       f),
+            "1\n");
+}
+
+std::string WildcardImportRun(const std::string& connections, SimFixture& f) {
+  return RunCapture(
+      "package p;\n  logic wc = 1;\n  logic wd = 1;\nendpackage\n"
+      "module child(input wc, wd);\n"
+      "  initial #1 $display(\"%b %b\", wc, wd);\n"
+      "endmodule\n"
+      "module t;\n  import p::*;\n  child u0(" +
+          connections + ");\nendmodule\n",
+      f);
+}
+
+TEST(WildcardConnectionRun, AWildcardAloneImportsNoName) {
+  SimFixture f;
+  EXPECT_EQ(WildcardImportRun(".*", f), "z z\n");
+}
+
+TEST(WildcardConnectionRun, AnImplicitNamedConnectionBesideItImportsTheName) {
+  SimFixture f;
+  EXPECT_EQ(WildcardImportRun(".*, .wc", f), "1 z\n");
+}
+
+TEST(WildcardConnectionRun, DISABLED_ANamedConnectionBesideItImportsTheName) {
+  SimFixture f;
+  EXPECT_EQ(WildcardImportRun(".*, .wd(wd)", f), "z 1\n");
+}
+
 }  // namespace

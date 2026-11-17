@@ -98,4 +98,14 @@ TEST(ImplicitNamedPortConnectionSimulation, ConnectionReachesAnImportedName) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(ImplicitNamedConnectionRun, AnEarlierImplicitNetIsTheConnectionsTarget) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module c(input a);\n"
+                       "  initial #1 $display(\"%b\", a);\n"
+                       "endmodule\n"
+                       "module t;\n  assign a = 1'b1;\n  c u(.a);\nendmodule\n",
+                       f),
+            "1\n");
+}
+
 }  // namespace
