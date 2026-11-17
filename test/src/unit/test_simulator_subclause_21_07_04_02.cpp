@@ -4,7 +4,9 @@
 #include <string>
 
 #include "common/types.h"
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_vcd_dump_run.h"
+#include "helpers_text_lines.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_writer.h"
@@ -148,6 +150,87 @@ TEST_F(ExtendedVcdNodeInfoSim, NetPortUsesPortKeywordWithItsIndexRange) {
   EXPECT_NE(content.find("$var port 1 <1 en $end"), std::string::npos)
       << content;
   EXPECT_EQ(content.find("$var wire"), std::string::npos) << content;
+}
+
+class NodeInformationOfRealPorts : public ExtendedVcdFromSource {
+ protected:
+  std::string Entries(const std::string& design, const std::string& scope) {
+    RunSource(design);
+    auto content = DumpFile("nodes.vcd");
+    std::string entries;
+    std::string inside;
+    for (const auto& line : AllLines(content)) {
+      auto toks = Tokens(line);
+      if (toks.size() >= 3 && toks[0] == "$scope")
+        inside = LastSegment(toks[2]);
+      if (!toks.empty() && toks[0] == "$upscope") inside.clear();
+      if (toks.size() != 6 || toks[0] != "$var" || inside != scope) continue;
+      if (!entries.empty()) entries += ", ";
+      entries += toks[1] + " " + toks[2] + " " + toks[3] + " " + toks[4];
+    }
+    return entries;
+  }
+};
+
+TEST_F(NodeInformationOfRealPorts,
+       DISABLED_CodesStartAtZeroInDeclarationOrder) {
+  EXPECT_EQ(Entries("module dut(zz, mm, aa);\n"
+                    "  output zz;\n"
+                    "  input [0:3] mm;\n"
+                    "  input aa;\n"
+                    "  assign zz = aa;\n"
+                    "endmodule\n"
+                    "module t;\n"
+                    "  logic a = 1'b0;\n"
+                    "  logic [0:3] m = 4'h0;\n"
+                    "  wire z;\n"
+                    "  dut u(z, m, a);\n"
+                    "  initial $dumpports(u, \"nodes.vcd\");\n"
+                    "endmodule\n",
+                    "u"),
+            "port 1 <0 zz, port [0:3] <1 mm, port 1 <2 aa");
+}
+
+TEST_F(NodeInformationOfRealPorts, DISABLED_ThePortDeclarationsRangeIsDumped) {
+  EXPECT_EQ(Entries("module dut(w);\n"
+                    "  input [0:3] w;\n"
+                    "  wire [0:3] w;\n"
+                    "endmodule\n"
+                    "module t;\n"
+                    "  logic [0:3] v = 4'h0;\n"
+                    "  dut u(v);\n"
+                    "  initial $dumpports(u, \"nodes.vcd\");\n"
+                    "endmodule\n",
+                    "u"),
+            "port [0:3] <0 w");
+}
+
+TEST_F(NodeInformationOfRealPorts, APortTypedByAVectorTypedefTakesItsRange) {
+  EXPECT_EQ(Entries("typedef logic [3:0] nibble_t;\n"
+                    "module dut(input nibble_t n);\n"
+                    "endmodule\n"
+                    "module t;\n"
+                    "  logic [3:0] v = 4'h0;\n"
+                    "  dut u(v);\n"
+                    "  initial $dumpports(u, \"nodes.vcd\");\n"
+                    "endmodule\n",
+                    "u"),
+            "port [3:0] <0 n");
+}
+
+TEST_F(NodeInformationOfRealPorts,
+       DISABLED_ConcatenatedPortMembersAreSeparate) {
+  EXPECT_EQ(Entries("module dut({A, b}, ci);\n"
+                    "  input A, b, ci;\n"
+                    "endmodule\n"
+                    "module t;\n"
+                    "  logic [1:0] ab = 2'b01;\n"
+                    "  logic c = 1'b0;\n"
+                    "  dut u(ab, c);\n"
+                    "  initial $dumpports(u, \"nodes.vcd\");\n"
+                    "endmodule\n",
+                    "u"),
+            "port 1 <0 A, port 1 <1 b, port 1 <2 ci");
 }
 
 }  // namespace

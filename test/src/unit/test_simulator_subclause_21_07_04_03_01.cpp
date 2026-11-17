@@ -2,7 +2,9 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
 
@@ -240,6 +242,106 @@ TEST_F(ExtendedVcdStateCharacterSim, InoutEndsPickTheConflictCharacter) {
         << code << "\n"
         << content;
   }
+}
+
+struct StateCase {
+  const char* direction;
+  const char* inside;
+  const char* outside;
+  char state;
+};
+
+const StateCase kEveryStateCharacter[] = {
+    {"input", "", "assign @ = 1'b0", 'D'},
+    {"input", "", "assign @ = 1'b1", 'U'},
+    {"input", "", "assign @ = 1'bx", 'N'},
+    {"input", "", "assign @ = 1'bz", 'Z'},
+    {"inout", "assign (weak0, weak1) @ = 1'b0", "assign @ = 1'b0", 'd'},
+    {"inout", "assign (weak0, weak1) @ = 1'b1", "assign @ = 1'b1", 'u'},
+    {"output", "assign @ = 1'b0", "", 'L'},
+    {"output", "assign @ = 1'b1", "", 'H'},
+    {"output", "assign @ = 1'bx", "", 'X'},
+    {"output", "assign @ = 1'bz", "", 'T'},
+    {"inout", "assign @ = 1'b0", "assign (weak0, weak1) @ = 1'b0", 'l'},
+    {"inout", "assign @ = 1'b1", "assign (weak0, weak1) @ = 1'b1", 'h'},
+    {"inout", "assign @ = 1'b0", "assign @ = 1'b0", '0'},
+    {"inout", "assign @ = 1'b1", "assign @ = 1'b1", '1'},
+    {"inout", "assign @ = 1'bx", "assign @ = 1'bx", '?'},
+    {"inout", "", "", 'F'},
+    {"inout", "assign @ = 1'b1", "assign @ = 1'b0", 'A'},
+    {"inout", "assign @ = 1'bx", "assign @ = 1'b0", 'a'},
+    {"inout", "assign @ = 1'b0", "assign @ = 1'b1", 'B'},
+    {"inout", "assign @ = 1'bx", "assign @ = 1'b1", 'b'},
+    {"inout", "assign @ = 1'b0", "assign @ = 1'bx", 'C'},
+    {"inout", "assign @ = 1'b1", "assign @ = 1'bx", 'c'},
+    {"inout", "assign @ = 1'bz", "assign @ = 1'bz", 'f'},
+};
+
+class StateCharactersOfRealPorts : public ExtendedVcdFromSource {};
+
+TEST_F(StateCharactersOfRealPorts, EachStateComesFromThePortsTwoEnds) {
+  std::vector<PortEnds> ports;
+  for (const auto& entry : kEveryStateCharacter) {
+    ports.push_back({entry.direction, entry.inside, entry.outside});
+  }
+  auto content = RunEnds(ports);
+  for (size_t i = 0; i < ports.size(); ++i) {
+    std::string port = "p" + std::to_string(i);
+    auto record = Checkpoint(content, "$dumpports", "u", port);
+    EXPECT_EQ(record.substr(0, 1),
+              std::string(1, kEveryStateCharacter[i].state))
+        << port << " " << ports[i].direction << " inside '" << ports[i].inside
+        << "' outside '" << ports[i].outside << "'\n"
+        << content;
+  }
+}
+
+TEST_F(StateCharactersOfRealPorts,
+       AnInputChangeIsWrittenWithTheInputCharacters) {
+  RunSource(
+      "module dut(input i);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic v = 1'b0;\n"
+      "  dut u(v);\n"
+      "  initial begin\n"
+      "    $dumpports(u, \"in.vcd\");\n"
+      "    #1 v = 1'b1;\n"
+      "    #1 v = 1'bx;\n"
+      "    #1 v = 1'bz;\n"
+      "    #1 v = 1'b0;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto content = DumpFile("in.vcd");
+  EXPECT_EQ(StatesFor(content, PortCode(content, "u", "i")), "DUNZD")
+      << content;
+}
+
+TEST_F(StateCharactersOfRealPorts,
+       AnOutputChangeIsWrittenWithTheOutputCharacters) {
+  RunSource(
+      "module dut(output o);\n"
+      "  logic v = 1'b0;\n"
+      "  assign o = v;\n"
+      "  initial begin\n"
+      "    #1 v = 1'b1;\n"
+      "    #1 v = 1'bx;\n"
+      "    #1 v = 1'bz;\n"
+      "    #1 v = 1'b0;\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire o;\n"
+      "  dut u(o);\n"
+      "  initial begin\n"
+      "    $dumpports(u, \"out.vcd\");\n"
+      "    #6;\n"
+      "  end\n"
+      "endmodule\n");
+  auto content = DumpFile("out.vcd");
+  EXPECT_EQ(StatesFor(content, PortCode(content, "u", "o")), "LHXTL")
+      << content;
 }
 
 }  // namespace

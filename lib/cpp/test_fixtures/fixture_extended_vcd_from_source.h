@@ -10,8 +10,91 @@
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
+struct PortEnds {
+  std::string direction;
+  std::string inside;
+  std::string outside;
+};
+
 class ExtendedVcdFromSource : public VcdDumpFromSourceTestBase {
  protected:
+  static std::string Named(const std::string& text, const std::string& name) {
+    std::string out;
+    for (char ch : text) {
+      if (ch == '@') {
+        out += name;
+      } else {
+        out += ch;
+      }
+    }
+    return out;
+  }
+
+  static std::string EndsDesign(const std::vector<PortEnds>& ports,
+                                const std::string& child_items,
+                                const std::string& top_items) {
+    std::string header;
+    std::string inside;
+    std::string wires;
+    std::string outside;
+    std::string connections;
+    for (size_t i = 0; i < ports.size(); ++i) {
+      std::string port = "p" + std::to_string(i);
+      std::string wire = "w" + std::to_string(i);
+      std::string sep = i == 0 ? "" : ", ";
+      header += sep;
+      header += ports[i].direction;
+      header += ' ';
+      header += port;
+      connections += sep + wire;
+      wires += "  wire " + wire + ";\n";
+      if (!ports[i].inside.empty()) {
+        inside += "  " + Named(ports[i].inside, port) + ";\n";
+      }
+      if (!ports[i].outside.empty()) {
+        outside += "  " + Named(ports[i].outside, wire) + ";\n";
+      }
+    }
+    return "module dut(" + header + ");\n" + inside + child_items +
+           "endmodule\n"
+           "module t;\n" +
+           wires + outside + top_items + "  dut u(" + connections +
+           ");\n"
+           "  initial begin\n"
+           "    $dumpports(u, \"ends.vcd\");\n"
+           "    #1;\n"
+           "  end\n"
+           "endmodule\n";
+  }
+
+  std::string RunEnds(const std::vector<PortEnds>& ports,
+                      const std::string& child_items = "",
+                      const std::string& top_items = "") {
+    RunSource(EndsDesign(ports, child_items, top_items));
+    return DumpFile("ends.vcd");
+  }
+
+  static std::string Records(const std::string& text, const std::string& code) {
+    std::string records;
+    for (const auto& line : AllLines(text)) {
+      auto toks = Tokens(line);
+      if (toks.size() != 2 || toks[1] != code || toks[0].size() < 4 ||
+          toks[0][0] != 'p') {
+        continue;
+      }
+      if (!records.empty()) records += ' ';
+      records += toks[0].substr(1);
+    }
+    return records;
+  }
+
+  static std::string Checkpoint(const std::string& content,
+                                const std::string& keyword,
+                                const std::string& scope,
+                                const std::string& port) {
+    return Records(Section(content, keyword), PortCode(content, scope, port));
+  }
+
   static std::string LastSegment(const std::string& scope) {
     auto dot = scope.rfind('.');
     return dot == std::string::npos ? scope : scope.substr(dot + 1);

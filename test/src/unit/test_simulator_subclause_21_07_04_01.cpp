@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
@@ -586,6 +587,208 @@ TEST_F(ExtendedVcdVersionCommands, FourStateVersionTextCarriesNoDumpportsCall) {
   auto version = VersionSectionOf(DumpFile("vars.vcd"));
   ASSERT_FALSE(version.empty()) << DumpFile("vars.vcd");
   EXPECT_FALSE(Holds(version, "$dumpports")) << version;
+}
+
+bool IsExtendedDeclarationKeyword(const std::string& t) {
+  return t == "$comment" || t == "$date" || t == "$enddefinitions" ||
+         t == "$scope" || t == "$timescale" || t == "$upscope" || t == "$var" ||
+         t == "$version";
+}
+
+bool IsExtendedSimulationKeyword(const std::string& t) {
+  return t == "$dumpports" || t == "$dumpportsoff" || t == "$dumpportson" ||
+         t == "$dumpportsall";
+}
+
+std::string DeclarationBodyViolation(const std::vector<std::string>& toks,
+                                     size_t i, size_t end) {
+  if (toks[i] == "$var" &&
+      (end - i != 5 || toks[i + 1] != "port" || !IsPortSize(toks[i + 2]) ||
+       !IsPortIdentifierCode(toks[i + 3]))) {
+    return "not a port $var: " + toks[i + 1];
+  }
+  if (toks[i] == "$scope" && (end - i != 3 || toks[i + 1] != "module")) {
+    return "not a module $scope: " + toks[i + 1];
+  }
+  return "";
+}
+
+std::string StrictDeclarationViolation(const std::vector<std::string>& toks,
+                                       size_t& i) {
+  while (i < toks.size() && toks[i] != "$enddefinitions") {
+    const std::string& keyword = toks[i];
+    if (!IsExtendedDeclarationKeyword(keyword)) {
+      return "not a declaration keyword: " + keyword;
+    }
+    size_t end = i + 1;
+    while (end < toks.size() && toks[end] != "$end") ++end;
+    if (end == toks.size()) return "unterminated " + keyword;
+    std::string err = DeclarationBodyViolation(toks, i, end);
+    if (!err.empty()) return err;
+    i = end + 1;
+  }
+  if (i + 1 >= toks.size() || toks[i + 1] != "$end") {
+    return "no $enddefinitions $end";
+  }
+  i += 2;
+  return "";
+}
+
+std::string StrictValueChangeViolation(const std::vector<std::string>& toks,
+                                       size_t& i) {
+  const std::string& t = toks[i];
+  if (t.size() < 4 || t[0] != 'p' || t.size() != 4 ||
+      !IsPortValueChars(t.substr(1, 1)) || !IsStrengthDigit(t[2]) ||
+      !IsStrengthDigit(t[3])) {
+    return "not a port value change: " + t;
+  }
+  if (i + 1 >= toks.size() || !IsPortIdentifierCode(toks[i + 1])) {
+    return "no port identifier code after " + t;
+  }
+  i += 2;
+  return "";
+}
+
+std::string StrictSimulationViolation(const std::vector<std::string>& toks,
+                                      size_t& i) {
+  while (i < toks.size()) {
+    const std::string& t = toks[i];
+    if ((t[0] == '#' && IsDecimal(t.substr(1))) ||
+        IsExtendedSimulationKeyword(t) || t == "$end") {
+      ++i;
+    } else if (t == "$vcdclose") {
+      if (i + 2 >= toks.size() || toks[i + 1][0] != '#' ||
+          toks[i + 2] != "$end") {
+        return "malformed $vcdclose";
+      }
+      i += 3;
+    } else {
+      std::string err = StrictValueChangeViolation(toks, i);
+      if (!err.empty()) return err;
+    }
+  }
+  return "";
+}
+
+std::string StrictExtendedViolation(const std::string& content) {
+  auto toks = Tokens(content);
+  size_t i = 0;
+  std::string err = StrictDeclarationViolation(toks, i);
+  if (!err.empty()) return err;
+  return StrictSimulationViolation(toks, i);
+}
+
+class ExtendedFileFromARun : public ExtendedVcdFromSource {
+ protected:
+  std::string RunScalarPorts() {
+    RunSource(
+        "module dut(input a, output b);\n"
+        "  assign b = a;\n"
+        "endmodule\n"
+        "module t;\n"
+        "  logic a = 1'b0;\n"
+        "  wire b;\n"
+        "  dut u(a, b);\n"
+        "  initial begin\n"
+        "    $dumpports(u, \"run.vcd\");\n"
+        "    #10 a = 1'b1;\n"
+        "    #10 $dumpportsall;\n"
+        "    #10 $dumpportsoff;\n"
+        "    #10 $dumpportson;\n"
+        "    #10 a = 1'bx;\n"
+        "    #10 a = 1'bz;\n"
+        "  end\n"
+        "endmodule\n");
+    return DumpFile("run.vcd");
+  }
+};
+
+TEST_F(ExtendedFileFromARun, DISABLED_TheWholeFileFollowsTheExtendedSyntax) {
+  auto content = RunScalarPorts();
+  EXPECT_EQ(StrictExtendedViolation(content), "") << content;
+}
+
+TEST_F(ExtendedFileFromARun, SectionsAreKeyedByTheDumpportsFamily) {
+  auto content = RunScalarPorts();
+  auto toks = Tokens(content);
+  EXPECT_EQ(CountToken(toks, "$dumpports"), 1u) << content;
+  EXPECT_EQ(CountToken(toks, "$dumpportsall"), 1u) << content;
+  EXPECT_EQ(CountToken(toks, "$dumpportsoff"), 1u) << content;
+  EXPECT_EQ(CountToken(toks, "$dumpportson"), 1u) << content;
+  for (const char* keyword : {"$dumpvars", "$dumpall", "$dumpoff", "$dumpon"}) {
+    EXPECT_EQ(CountToken(toks, keyword), 0u) << keyword << "\n" << content;
+  }
+}
+
+TEST_F(ExtendedFileFromARun, SharedConstructsAreWrittenAsInTheFourStateFile) {
+  RunSource(
+      "module dut(input a, output b);\n"
+      "  assign b = a;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic a = 1'b0;\n"
+      "  wire b;\n"
+      "  dut u(a, b);\n"
+      "  initial begin\n"
+      "    $dumpfile(\"four.vcd\");\n"
+      "    $dumpvars(0, u);\n"
+      "    $dumpports(u, \"run.vcd\");\n"
+      "    #10;\n"
+      "  end\n"
+      "endmodule\n");
+  auto extended = DumpFile("run.vcd");
+  auto four = DumpFile("four.vcd");
+  EXPECT_EQ(Section(extended, "$timescale"), Section(four, "$timescale"))
+      << extended << four;
+  for (const auto& tok : Tokens(extended)) {
+    EXPECT_NE(tok[0], '*') << tok << "\n" << extended;
+  }
+  for (const char* keyword :
+       {"$date", "$version", "$timescale", "$enddefinitions"}) {
+    EXPECT_EQ(CountToken(Tokens(extended), keyword), 1u) << keyword << "\n"
+                                                         << extended;
+    EXPECT_EQ(CountToken(Tokens(four), keyword), 1u) << keyword << "\n" << four;
+  }
+}
+
+TEST_F(ExtendedFileFromARun, DISABLED_ARealPortIsWrittenAtSixteenDigits) {
+  RunSource(
+      "module dut(input real rp);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  real r = 0.0;\n"
+      "  dut u(r);\n"
+      "  initial begin\n"
+      "    $dumpports(u, \"real.vcd\");\n"
+      "    #1 r = 1.0 / 3.0;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto content = DumpFile("real.vcd");
+  auto code = PortCode(content, "u", "rp");
+  EXPECT_NE(content.find("0.3333333333333333 " + code + "\n"),
+            std::string::npos)
+      << content;
+}
+
+TEST_F(ExtendedFileFromARun, AVectorPortIsWrittenWhole) {
+  RunSource(
+      "module dut(input [3:0] n);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [3:0] v = 4'b0000;\n"
+      "  dut u(v[3:0]);\n"
+      "  initial begin\n"
+      "    $dumpports(u, \"vector.vcd\");\n"
+      "    #1 v = 4'b1010;\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto content = DumpFile("vector.vcd");
+  auto code = PortCode(content, "u", "n");
+  EXPECT_EQ(StatesFor(content, code), "DDDDUDUD") << content;
+  EXPECT_NE(content.find(" [3:0] " + code + " n "), std::string::npos)
+      << content;
 }
 
 }  // namespace

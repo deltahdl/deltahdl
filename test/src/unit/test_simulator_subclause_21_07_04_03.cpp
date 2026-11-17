@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common/types.h"
+#include "fixture_extended_vcd_from_source.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
@@ -216,6 +217,89 @@ TEST_F(ExtendedVcdStrengthFromSource,
       "  assign (weak0, weak1) w = 1'b1;\n"
       "  assign (weak0, weak1) w = 1'b0;\n");
   EXPECT_EQ(PortRecord(content, "w"), "?|33") << content;
+}
+
+class StrengthDigitsOfRealPorts : public ExtendedVcdFromSource {
+ protected:
+  std::string RecordOf(const PortEnds& ends, const std::string& top = "") {
+    auto content = RunEnds({ends}, "", top);
+    return Checkpoint(content, "$dumpports", "u", "p0") + " | " + content;
+  }
+};
+
+TEST_F(StrengthDigitsOfRealPorts, AnUndrivenPortIsHighImpedance) {
+  EXPECT_EQ(RecordOf({"input", "", ""}).substr(0, 3), "Z00");
+}
+
+TEST_F(StrengthDigitsOfRealPorts, AWeakAssignmentGivesTheWeakDigit) {
+  EXPECT_EQ(
+      RecordOf({"output", "assign (weak0, weak1) @ = 1'b0", ""}).substr(0, 3),
+      "L30");
+}
+
+TEST_F(StrengthDigitsOfRealPorts, APullAssignmentGivesThePullDigit) {
+  EXPECT_EQ(
+      RecordOf({"output", "assign (pull0, pull1) @ = 1'b1", ""}).substr(0, 3),
+      "H05");
+}
+
+TEST_F(StrengthDigitsOfRealPorts, APullupGivesThePullDigit) {
+  EXPECT_EQ(RecordOf({"output", "pullup (@)", ""}).substr(0, 3), "H05");
+}
+
+TEST_F(StrengthDigitsOfRealPorts, APlainAssignmentGivesTheStrongDigit) {
+  EXPECT_EQ(RecordOf({"input", "", "assign @ = 1'b1"}).substr(0, 3), "U06");
+}
+
+TEST_F(StrengthDigitsOfRealPorts, DISABLED_ASupplyOneNetGivesTheSupplyDigit) {
+  RunSource(
+      "module dut(input i);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  supply1 vdd;\n"
+      "  dut u(vdd);\n"
+      "  initial $dumpports(u, \"sup.vcd\");\n"
+      "endmodule\n");
+  auto content = DumpFile("sup.vcd");
+  EXPECT_EQ(Checkpoint(content, "$dumpports", "u", "i"), "U07") << content;
+}
+
+TEST_F(StrengthDigitsOfRealPorts, DISABLED_ASupplyZeroNetGivesTheSupplyDigit) {
+  RunSource(
+      "module dut(input i);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  supply0 gnd;\n"
+      "  dut u(gnd);\n"
+      "  initial $dumpports(u, \"sup.vcd\");\n"
+      "endmodule\n");
+  auto content = DumpFile("sup.vcd");
+  EXPECT_EQ(Checkpoint(content, "$dumpports", "u", "i"), "D70") << content;
+}
+
+TEST_F(StrengthDigitsOfRealPorts, DISABLED_TriregChargeGivesTheChargeDigits) {
+  RunSource(
+      "module dut(output trireg (small) ts, output trireg (medium) tm,\n"
+      "           output trireg (large) tl);\n"
+      "  logic en = 1'b1;\n"
+      "  assign ts = en ? 1'b0 : 1'bz;\n"
+      "  assign tm = en ? 1'b1 : 1'bz;\n"
+      "  assign tl = en ? 1'b0 : 1'bz;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  wire ts, tm, tl;\n"
+      "  dut u(ts, tm, tl);\n"
+      "  initial begin\n"
+      "    $dumpports(u, \"charge.vcd\");\n"
+      "    #1 u.en = 1'b0;\n"
+      "    #1 $dumpportsall(\"charge.vcd\");\n"
+      "    #1;\n"
+      "  end\n"
+      "endmodule\n");
+  auto content = DumpFile("charge.vcd");
+  EXPECT_EQ(Checkpoint(content, "$dumpportsall", "u", "ts"), "L10") << content;
+  EXPECT_EQ(Checkpoint(content, "$dumpportsall", "u", "tm"), "H02") << content;
+  EXPECT_EQ(Checkpoint(content, "$dumpportsall", "u", "tl"), "L40") << content;
 }
 
 }  // namespace
