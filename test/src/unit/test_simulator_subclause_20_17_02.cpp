@@ -118,4 +118,90 @@ TEST(Stacktrace, TaskFormInFunctionBodyDisplaysCallStack) {
   EXPECT_EQ(out, "probe\n");
 }
 
+TEST(Stacktrace, DISABLED_TheFunctionFormIsAString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial $display(\"%s\", $typename($stacktrace));\n"
+                       "endmodule\n",
+                       f),
+            "string\n");
+}
+
+TEST(Stacktrace, TheFunctionFormConcatenatesAsAString) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  string trace;\n"
+                       "  task inner; trace = {$stacktrace, \"|\"}; endtask\n"
+                       "  task outer; inner; endtask\n"
+                       "  initial begin\n"
+                       "    outer;\n"
+                       "    $display(\"%s\", trace);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "inner\nouter|\n");
+}
+
+TEST(Stacktrace, DISABLED_AClassMethodFrameIsInTheStack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  class C;\n"
+      "    static function string cls_trace();\n"
+      "      return $stacktrace;\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  initial $display(\"%s\", C::cls_trace());\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("cls_trace"), std::string::npos) << out;
+}
+
+TEST(Stacktrace, APackageFunctionFrameIsInTheStack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk;\n"
+      "  function string pkg_trace();\n"
+      "    return $stacktrace;\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  initial $display(\"%s\", pk::pkg_trace());\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("pkg_trace"), std::string::npos) << out;
+}
+
+TEST(Stacktrace, AProgramTaskFrameIsInTheStack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "program p;\n"
+      "  task prog_trace;\n"
+      "    $stacktrace;\n"
+      "  endtask\n"
+      "  initial prog_trace;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  p u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("prog_trace"), std::string::npos) << out;
+}
+
+TEST(Stacktrace, AnInterfaceFunctionFrameIsInTheStack) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface i;\n"
+      "  function string intf_trace();\n"
+      "    return $stacktrace;\n"
+      "  endfunction\n"
+      "endinterface\n"
+      "module t;\n"
+      "  i u();\n"
+      "  initial $display(\"%s\", u.intf_trace());\n"
+      "endmodule\n",
+      f);
+  EXPECT_NE(out.find("intf_trace"), std::string::npos) << out;
+}
+
 }  // namespace

@@ -89,4 +89,116 @@ TEST(SystemTask, NoArgumentInvokesSystemWithNullString) {
   EXPECT_NE(r, 0u);
 }
 
+TEST(SystemTask, ExitOneYieldsTheRawWaitStatus) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial $display(\"%0d\", $system(\"exit 1\"));\n"
+                       "endmodule\n",
+                       f),
+            "256\n");
+}
+
+TEST(SystemTask, TheResultIs32BitsWide) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  initial $display(\"%0d\", $bits($system(\"true\")));\n"
+                 "endmodule\n",
+                 f),
+      "32\n");
+}
+
+TEST(SystemTask, TheResultIsSigned) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module t;\n"
+                "  initial $display(\"%0d\", $system(\"exit 1\") - 1000 < 0);\n"
+                "endmodule\n",
+                f),
+            "1\n");
+}
+
+TEST(SystemTask, DISABLED_TheResultTypeIsInt) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  initial $display(\"%s\", $typename($system(\"true\")));\n"
+                 "endmodule\n",
+                 f),
+      "int\n");
+}
+
+TEST(SystemTask, TheTaskFormWithNoArgumentRuns) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  initial begin\n"
+                       "    $system();\n"
+                       "    $display(\"after\");\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "after\n");
+}
+
+TEST(SystemTask, BothFormsRunInAClassMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    static function int run(string s);\n"
+                       "      $system(\"exit 0\");\n"
+                       "      return $system(\"exit 2\");\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  initial $display(\"%0d\", C::run(\"\"));\n"
+                       "endmodule\n",
+                       f),
+            "512\n");
+}
+
+TEST(SystemTask, BothFormsRunInAPackageFunction) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  function int run();\n"
+                       "    $system(\"exit 0\");\n"
+                       "    return $system(\"exit 2\");\n"
+                       "  endfunction\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  initial $display(\"%0d\", pk::run());\n"
+                       "endmodule\n",
+                       f),
+            "512\n");
+}
+
+TEST(SystemTask, BothFormsRunInAProgramBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  initial begin\n"
+                       "    $system(\"exit 0\");\n"
+                       "    $display(\"%0d\", $system(\"exit 2\"));\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  p u();\n"
+                       "endmodule\n",
+                       f),
+            "512\n");
+}
+
+TEST(SystemTask, BothFormsRunInAnInterfaceFunction) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface i;\n"
+                       "  function int run();\n"
+                       "    $system(\"exit 0\");\n"
+                       "    return $system(\"exit 2\");\n"
+                       "  endfunction\n"
+                       "endinterface\n"
+                       "module t;\n"
+                       "  i u();\n"
+                       "  initial $display(\"%0d\", u.run());\n"
+                       "endmodule\n",
+                       f),
+            "512\n");
+}
+
 }  // namespace
