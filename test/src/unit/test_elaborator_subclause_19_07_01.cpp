@@ -95,4 +95,31 @@ TEST(TypeOptionValues, NonConstantValueIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
+TEST(TypeOptionValues, AClassPropertyOrAVariableInACrossTypeOptionIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  bit v; int w;\n"
+      "  covergroup cg; type_option.weight = w; coverpoint v; endgroup\n"
+      "  function new; cg = new; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  bit [1:0] a, b; int w = 2;\n"
+      "  parameter int P = 3;\n"
+      "  covergroup g2;\n"
+      "    ca: coverpoint a; cb: coverpoint b;\n"
+      "    x: cross ca, cb { type_option.weight = w; }\n"
+      "    y: cross ca, cb { type_option.weight = P; }\n"
+      "  endgroup\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {3u, 11u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "type option 'weight' is set with 'w', which is "
+                              "no constant",
+                              line, "19.7.1"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
 }  // namespace

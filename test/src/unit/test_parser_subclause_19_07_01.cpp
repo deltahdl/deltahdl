@@ -62,4 +62,34 @@ TEST_F(VerifyParseTest, TypeOptionAtALevelThatTakesItIsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
+TEST_F(VerifyParseTest, CovergroupWideTypeOptionsAtACrossAreErrors) {
+  Parse(R"(
+    module m;
+      covergroup cg @(posedge clk);
+        type_option.weight = 2;
+        type_option.goal = 90;
+        type_option.comment = "g";
+        type_option.strobe = 1;
+        type_option.merge_instances = 1;
+        type_option.distribute_first = 1;
+        type_option.real_interval = 2.0;
+        a: coverpoint x;
+        b: coverpoint y;
+        ab: cross a, b { type_option.merge_instances = 1; }
+        ba: cross a, b { type_option.distribute_first = 1; }
+      endgroup
+    endmodule
+  )");
+  for (auto [line, member] :
+       std::initializer_list<std::tuple<uint32_t, const char*>>{
+           {13u, "merge_instances"}, {14u, "distribute_first"}}) {
+    EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                              std::string("coverage option 'type_option.") +
+                                  member +
+                                  "' may not be specified at the cross level",
+                              line, "19.7.1"));
+  }
+  EXPECT_EQ(diag_.ErrorCount(), 2u);
+}
+
 }  // namespace

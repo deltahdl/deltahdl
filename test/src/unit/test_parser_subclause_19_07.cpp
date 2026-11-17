@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <initializer_list>
+#include <string>
+#include <tuple>
+#include <utility>
 
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
@@ -308,6 +312,116 @@ TEST_F(VerifyParseTest, TypeOptionNamingCovergroupFormalIsError) {
                               "expression; covergroup formal 'k' is not one",
                               line, "19.7.1"));
   }
+}
+
+TEST_F(VerifyParseTest, SameOptionInTwoCoverpointOrCrossBodiesAccepted) {
+  Parse(R"(
+    module m;
+      bit [1:0] x, y;
+      covergroup cg;
+        a: coverpoint x { option.weight = 1; type_option.goal = 3; }
+        b: coverpoint y { option.weight = 2; type_option.goal = 4; }
+        ab: cross a, b { option.goal = 1; type_option.comment = "a"; }
+        ba: cross b, a { option.goal = 2; type_option.comment = "b"; }
+      endgroup
+    endmodule
+  )");
+  EXPECT_FALSE(diag_.HasErrors());
+}
+
+TEST_F(VerifyParseTest,
+       DISABLED_AnOptionSetTwiceInOneCoverpointOrCrossIsError) {
+  Parse(R"(
+    module m;
+      bit [1:0] x, y;
+      covergroup cg;
+        a: coverpoint x { option.weight = 1; option.weight = 2; }
+        b: coverpoint y { type_option.goal = 3; type_option.goal = 4; }
+        ab: cross a, b { option.goal = 1; option.goal = 2; }
+        ba: cross b, a { type_option.comment = "a"; type_option.comment = "b"; }
+      endgroup
+    endmodule
+  )");
+  for (auto [line, option] :
+       std::initializer_list<std::pair<uint32_t, const char*>>{
+           {5u, "option.weight"},
+           {6u, "type_option.goal"},
+           {7u, "option.goal"},
+           {8u, "type_option.comment"}}) {
+    EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                              std::string("coverage option '") + option +
+                                  "' is assigned more than once in the same "
+                                  "covergroup definition",
+                              line, "19.7"));
+  }
+  EXPECT_EQ(diag_.ErrorCount(), 4u);
+}
+
+TEST_F(VerifyParseTest, ADuplicateOptionIsAnErrorInEveryScope) {
+  Parse(R"(
+    bit gx;
+    covergroup gcu; option.goal = 1; option.goal = 2; coverpoint gx; endgroup
+    package p;
+      bit v;
+      covergroup g; option.goal = 1; option.goal = 2; coverpoint v; endgroup
+    endpackage
+    interface i;
+      bit v;
+      covergroup g; option.goal = 1; option.goal = 2; coverpoint v; endgroup
+    endinterface
+    program pr;
+      bit v;
+      covergroup g; option.goal = 1; option.goal = 2; coverpoint v; endgroup
+    endprogram
+    checker ck(bit v);
+      covergroup g; option.goal = 1; option.goal = 2; coverpoint v; endgroup
+    endchecker
+  )");
+  for (uint32_t line : {3u, 6u, 10u, 14u, 17u}) {
+    EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                              "coverage option 'option.goal' is assigned more "
+                              "than once in the same covergroup definition",
+                              line, "19.7"));
+  }
+  EXPECT_EQ(diag_.ErrorCount(), 5u);
+}
+
+TEST_F(VerifyParseTest, InstanceOptionsAtALevelThatDoesNotTakeThemAreErrors) {
+  Parse(R"(
+    module m;
+      bit [1:0] x, y;
+      covergroup cg;
+        a: coverpoint x {
+          option.name = "n";
+          option.get_inst_coverage = 1;
+          option.cross_retain_auto_bins = 1;
+          option.weight = 2; option.goal = 90; option.comment = "c";
+        }
+        b: coverpoint y;
+        ab: cross a, b {
+          option.name = "n";
+          option.per_instance = 1;
+          option.detect_overlap = 1;
+          option.at_least = 2; option.goal = 80; option.comment = "d";
+        }
+      endgroup
+    endmodule
+  )");
+  for (auto [line, member, level] :
+       std::initializer_list<std::tuple<uint32_t, const char*, const char*>>{
+           {6u, "name", "coverpoint"},
+           {7u, "get_inst_coverage", "coverpoint"},
+           {8u, "cross_retain_auto_bins", "coverpoint"},
+           {13u, "name", "cross"},
+           {14u, "per_instance", "cross"},
+           {15u, "detect_overlap", "cross"}}) {
+    EXPECT_TRUE(ReportedError(diag_.Diagnostics(),
+                              std::string("coverage option 'option.") + member +
+                                  "' may not be specified at the " + level +
+                                  " level",
+                              line, "19.7"));
+  }
+  EXPECT_EQ(diag_.ErrorCount(), 6u);
 }
 
 }  // namespace

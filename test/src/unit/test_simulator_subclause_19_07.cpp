@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <cstdio>
+#include <initializer_list>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_tagged_file.h"
 #include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
@@ -414,6 +419,369 @@ TEST(CovergroupInstanceSim, NegativeWeightSetAtRunTimeIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "the weight -5 is negative",
                             12, "19.7"));
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
+}
+
+TEST(CovergroupInstanceSim, ANegativeWeightWrittenAtEveryLevelIsReported) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] a, b;\n"
+                 "  covergroup cg;\n"
+                 "    ca: coverpoint a; cb: coverpoint b; x: cross ca, cb;\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    c.option.weight = -4;\n"
+                 "    c.x.option.weight = -5; c.x.option.weight = 0;\n"
+                 "    cg::ca::type_option.weight = -6;\n"
+                 "    cg::ca::type_option.weight = 0;\n"
+                 "    cg::x::type_option.weight = -7;\n"
+                 "    cg::x::type_option.weight = 2;\n"
+                 "    $display(\"%0d %0d %0d %0d\", c.option.weight,\n"
+                 "             c.x.option.weight, "
+                 "cg::ca::type_option.weight,\n"
+                 "             cg::x::type_option.weight);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1 0 0 2\n");
+  for (auto [line, weight] :
+       std::initializer_list<std::pair<uint32_t, const char*>>{
+           {8u, "-4"}, {9u, "-5"}, {10u, "-6"}, {12u, "-7"}}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        std::string("the weight ") + weight + " is negative", line, "19.7"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 4u);
+}
+
+TEST(CovergroupInstanceSim, InstanceOptionsReadTheirDefaultsAtEveryLevel) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [1:0] v, y;\n"
+          "  covergroup cg;\n"
+          "    cp: coverpoint v; cy: coverpoint y; x: cross cp, cy;\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    $display(\"%0d %0d [%s] %0d %0d %0d %0d %0d %0d %0d\",\n"
+          "      c.option.weight, c.option.goal, c.option.comment,\n"
+          "      c.option.at_least, c.option.auto_bin_max,\n"
+          "      c.option.cross_num_print_missing,\n"
+          "      c.option.cross_retain_auto_bins, c.option.detect_overlap,\n"
+          "      c.option.per_instance, c.option.get_inst_coverage);\n"
+          "    $display(\"%0d %0d [%s] %0d %0d %0d\", c.cp.option.weight,\n"
+          "      c.cp.option.goal, c.cp.option.comment, c.cp.option.at_least,\n"
+          "      c.cp.option.auto_bin_max, c.cp.option.detect_overlap);\n"
+          "    $display(\"%0d %0d [%s] %0d %0d %0d\", c.x.option.weight,\n"
+          "      c.x.option.goal, c.x.option.comment, c.x.option.at_least,\n"
+          "      c.x.option.cross_num_print_missing,\n"
+          "      c.x.option.cross_retain_auto_bins);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "1 100 [] 1 64 0 1 0 0 0\n1 100 [] 1 64 0\n1 100 [] 1 0 1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, UnnamedInstancesReadDistinctNames) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  bit v;\n"
+                       "  covergroup cg; coverpoint v; endgroup\n"
+                       "  cg c = new;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  bit v;\n"
+                       "  covergroup cg; coverpoint v; endgroup\n"
+                       "  cg k = new, k2 = new;\n"
+                       "  sub s1(); sub s2();\n"
+                       "  initial $display(\"%0d %0d %0d\",\n"
+                       "    k.option.name != k2.option.name,\n"
+                       "    s1.c.option.name != s2.c.option.name,\n"
+                       "    k.option.name != \"\");\n"
+                       "endmodule\n",
+                       f),
+            "1 1 1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, AnOptionTakesTheValuesHeldWhenItsInstanceIsBuilt) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit v;\n"
+                       "  int mv = 5;\n"
+                       "  function int rd(); return mv * 2; endfunction\n"
+                       "  covergroup cg (int w);\n"
+                       "    option.weight = w;\n"
+                       "    option.goal = mv;\n"
+                       "    option.at_least = rd();\n"
+                       "    coverpoint v;\n"
+                       "  endgroup\n"
+                       "  cg k, k2;\n"
+                       "  initial begin\n"
+                       "    k = new(2);\n"
+                       "    mv = 7;\n"
+                       "    k2 = new(5);\n"
+                       "    mv = 9;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d\", "
+                       "k.option.weight,\n"
+                       "      k2.option.weight, k.option.goal, "
+                       "k2.option.goal,\n"
+                       "      k.option.at_least, k2.option.at_least);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "2 5 5 7 10 14\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, AProceduralOptionWriteChangesOnlyItsInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit v;\n"
+                       "  covergroup cg;\n"
+                       "    option.goal = 90;\n"
+                       "    cp: coverpoint v;\n"
+                       "  endgroup\n"
+                       "  cg k = new, k2 = new;\n"
+                       "  initial begin\n"
+                       "    k.option.goal = 50; k2.cp.option.weight = 4;\n"
+                       "    $display(\"%0d %0d %0d %0d\", k.option.goal, "
+                       "k2.option.goal,\n"
+                       "      k.cp.option.weight, k2.cp.option.weight);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "50 90 1 4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim,
+     AtLeastSetInACoverpointBodyLeavesFewerHitsUncovered) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] v;\n"
+                 "  covergroup cg;\n"
+                 "    cx: coverpoint v { option.at_least = 2; bins one = "
+                 "{1}; }\n"
+                 "    cy: coverpoint v { bins one = {1}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    v = 1; c.sample();\n"
+                 "    $display(\"%0.2f %0.2f\", c.cx.get_inst_coverage(),\n"
+                 "             c.cy.get_inst_coverage());\n"
+                 "    c.sample();\n"
+                 "    $display(\"%0.2f\", c.cx.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0.00 100.00\n100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, ProceduralGoalNameAndCrossPrintMissingReadBack) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit v, y;\n"
+                 "  covergroup cg;\n"
+                 "    cp: coverpoint v; cy: coverpoint y; x: cross cp, cy;\n"
+                 "  endgroup\n"
+                 "  cg k = new;\n"
+                 "  initial begin\n"
+                 "    k.option.goal = 50; k.option.name = \"nm\";\n"
+                 "    k.x.option.cross_num_print_missing = 3;\n"
+                 "    $display(\"%0d %s %0d\", k.option.goal, "
+                 "k.option.name,\n"
+                 "             k.x.option.cross_num_print_missing);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "50 nm 3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageOptionSim, AutoBinMaxSetAtTheCovergroupIsItsCoverpointsDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [3:0] v, u;\n"
+          "  covergroup cg; cp: coverpoint v; endgroup\n"
+          "  covergroup cd;\n"
+          "    option.auto_bin_max = 4;\n"
+          "    cp: coverpoint v;\n"
+          "    cq: coverpoint u { option.auto_bin_max = 2; }\n"
+          "  endgroup\n"
+          "  cg c = new; cd d = new;\n"
+          "  initial begin\n"
+          "    v = 0; u = 0; c.sample(); d.sample();\n"
+          "    $display(\"%0.2f %0.2f %0.2f %0d\", c.cp.get_inst_coverage(),\n"
+          "      d.cp.get_inst_coverage(), d.cq.get_inst_coverage(),\n"
+          "      d.cp.option.auto_bin_max);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "6.25 25.00 50.00 4\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageOptionSim, OnlyTheDefaultingOptionsPassToCoverpointsAndCrosses) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "module top;\n"
+                "  bit [1:0] v, y;\n"
+                "  covergroup cg;\n"
+                "    cp: coverpoint v; cy: coverpoint y; x: cross cp, cy;\n"
+                "  endgroup\n"
+                "  covergroup cd;\n"
+                "    option.cross_retain_auto_bins = 0;\n"
+                "    option.weight = 3; option.goal = 70; option.comment = "
+                "\"gc\";\n"
+                "    cp: coverpoint v; cy: coverpoint y; x: cross cp, cy;\n"
+                "  endgroup\n"
+                "  cg c = new; cd d = new;\n"
+                "  initial begin\n"
+                "    $display(\"%0d %0d\", c.x.option.cross_retain_auto_bins,\n"
+                "             d.x.option.cross_retain_auto_bins);\n"
+                "    $display(\"%0d %0d [%s] %0d %0d [%s]\", "
+                "d.cp.option.weight,\n"
+                "      d.cp.option.goal, d.cp.option.comment, "
+                "d.x.option.weight,\n"
+                "      d.x.option.goal, d.x.option.comment);\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "1 0\n1 100 [] 1 100 []\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageOptionSim, AnInstanceWithoutPerInstanceStillFeedsItsType) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit [1:0] v;\n"
+                       "  covergroup cg;\n"
+                       "    option.per_instance = 0;\n"
+                       "    coverpoint v { bins b[] = {[0:3]}; }\n"
+                       "  endgroup\n"
+                       "  cg k = new, k2 = new;\n"
+                       "  initial begin\n"
+                       "    v = 0; k.sample(); v = 1; k2.sample(); v = 2; "
+                       "k2.sample();\n"
+                       "    $display(\"%0.2f\", cg::get_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "37.50\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+}
+
+TEST(CoverageOptionSim, GetInstCoverageWithMergedInstancesKeepsEachOwn) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [3:0] v;\n"
+                 "  covergroup mg (bit gi);\n"
+                 "    option.get_inst_coverage = gi;\n"
+                 "    type_option.merge_instances = 1;\n"
+                 "    px: coverpoint v { bins b1 = {1}; bins b2 = {2}; }\n"
+                 "  endgroup\n"
+                 "  covergroup ng (bit gi);\n"
+                 "    option.get_inst_coverage = gi;\n"
+                 "    px: coverpoint v { bins b1 = {1}; bins b2 = {2}; }\n"
+                 "  endgroup\n"
+                 "  mg g = new(1), h = new(0);\n"
+                 "  ng n1 = new(1), n2 = new(0);\n"
+                 "  initial begin\n"
+                 "    v = 1; g.sample(); n1.sample();\n"
+                 "    v = 2; h.sample(); n2.sample(); n2.sample();\n"
+                 "    v = 1; n2.sample();\n"
+                 "    $display(\"%0.2f %0.2f %0.2f\", mg::get_coverage(),\n"
+                 "      g.get_inst_coverage(), h.get_inst_coverage());\n"
+                 "    $display(\"%0.2f %0.2f %0.2f\", ng::get_coverage(),\n"
+                 "      n1.get_inst_coverage(), n2.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "100.00 50.00 100.00\n75.00 50.00 100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+static std::string SavedDatabase(const std::string& src,
+                                 const std::string& name) {
+  const std::string kPath = testing::TempDir() + name;
+  SimFixture f;
+  RunCapture(src, f);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+  f.ctx.CoverageData().SaveCoverageDbFile(kPath);
+  std::string text = ReadFileText(kPath);
+  std::remove(kPath.c_str());
+  return text;
+}
+
+TEST(CoverageOptionSim, AnInstanceWithPerInstanceIsSavedInTheDatabase) {
+  const std::string kSaved = SavedDatabase(
+      "module top;\n"
+      "  bit [1:0] v;\n"
+      "  covergroup cg;\n"
+      "    option.per_instance = 1;\n"
+      "    coverpoint v { bins lo = {0}; bins hi = {3}; }\n"
+      "  endgroup\n"
+      "  cg kfirst = new, ksecond = new;\n"
+      "  initial begin\n"
+      "    v = 0; kfirst.sample(); v = 3; ksecond.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      "delta_cov_19_07_per_instance.db");
+  EXPECT_NE(kSaved.find("kfirst"), std::string::npos);
+  EXPECT_NE(kSaved.find("ksecond"), std::string::npos);
+}
+
+TEST(CoverageOptionSim, DISABLED_AnInstancesGoalAndCommentAreSaved) {
+  const std::string kSaved = SavedDatabase(
+      "module top;\n"
+      "  bit a, b;\n"
+      "  covergroup cg;\n"
+      "    option.goal = 83; option.comment = \"inst note\";\n"
+      "    ca: coverpoint a { option.goal = 61; option.comment = \"cp note\"; "
+      "}\n"
+      "    cb: coverpoint b;\n"
+      "    x: cross ca, cb { option.goal = 47; option.comment = \"x note\"; }\n"
+      "  endgroup\n"
+      "  cg c = new, c2 = new;\n"
+      "  initial begin\n"
+      "    c2.option.goal = 29; c2.option.comment = \"second note\";\n"
+      "    a = 0; b = 0; c.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      "delta_cov_19_07_goal.db");
+  for (const char* text : {"inst note", "cp note", "x note", "second note",
+                           " 83", " 61", " 47", " 29"}) {
+    EXPECT_NE(kSaved.find(text), std::string::npos) << text;
+  }
+}
+
+TEST(CoverageOptionSim, MissingCrossBinsAreSavedInTheDatabase) {
+  const std::string kSaved = SavedDatabase(
+      "module top;\n"
+      "  bit a, b;\n"
+      "  covergroup cg;\n"
+      "    ca: coverpoint a; cb: coverpoint b;\n"
+      "    x: cross ca, cb { option.cross_num_print_missing = 2; "
+      "}\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin a = 0; b = 0; c.sample(); end\n"
+      "endmodule\n",
+      "delta_cov_19_07_missing.db");
+  EXPECT_NE(kSaved.find("<auto[0],auto[1]>"), std::string::npos);
+  EXPECT_NE(kSaved.find("<auto[1],auto[0]>"), std::string::npos);
 }
 
 }  // namespace

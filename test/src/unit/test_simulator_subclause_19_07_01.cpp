@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstdio>
 #include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "fixture_tagged_file.h"
 #include "helpers_reported_error.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
@@ -217,6 +219,190 @@ TEST(TypeOptionSim, ATypeOptionWrittenBeforeAnInstanceHoldsForIt) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "all 3 70 0\n4 []\n");
+}
+
+TEST(TypeOptionSim, MergeDistributeAndRealIntervalReadTheirDefaults) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  real r;\n"
+                       "  covergroup cg; cr: coverpoint r { bins b = "
+                       "{[0.0:1.0]}; } endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial $display(\"%0d %0d %0.1f %0.1f\",\n"
+                       "    cg::type_option.merge_instances,\n"
+                       "    cg::type_option.distribute_first,\n"
+                       "    cg::type_option.real_interval,\n"
+                       "    cg::cr::type_option.real_interval);\n"
+                       "endmodule\n",
+                       f),
+            "0 0 1.0 1.0\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeOptionSim, DistributeFirstWrittenProcedurallyHolds) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit v;\n"
+                 "  covergroup cg; coverpoint v; endgroup\n"
+                 "  initial begin\n"
+                 "    cg::type_option.distribute_first = 1;\n"
+                 "    $display(\"%0d\", cg::type_option.distribute_first);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "1\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeOptionSim, ACovergroupRealIntervalIsItsCoverpointsDefault) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  real r;\n"
+                 "  covergroup cg;\n"
+                 "    type_option.real_interval = 0.5;\n"
+                 "    cr: coverpoint r { bins s[] = {[1.0:3.0]}; }\n"
+                 "    cw: coverpoint r { type_option.real_interval = 2.0;\n"
+                 "      bins s[] = {[1.0:3.0]}; }\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial begin\n"
+                 "    r = 1.2; c.sample();\n"
+                 "    $display(\"%0.1f %0.1f %0.2f %0.2f\",\n"
+                 "      cg::cr::type_option.real_interval,\n"
+                 "      cg::cw::type_option.real_interval,\n"
+                 "      c.cr.get_inst_coverage(), c.cw.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "0.5 2.0 25.00 100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeOptionSim, CovergroupTypeWeightGoalAndCommentDoNotPassDown) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [1:0] a, b;\n"
+                 "  covergroup cg;\n"
+                 "    type_option.weight = 4; type_option.goal = 60;\n"
+                 "    type_option.comment = \"t\";\n"
+                 "    ca: coverpoint a; cb: coverpoint b; x: cross ca, cb;\n"
+                 "  endgroup\n"
+                 "  cg c = new;\n"
+                 "  initial $display(\"%0d %0d [%s] %0d %0d [%s]\",\n"
+                 "    cg::ca::type_option.weight, cg::ca::type_option.goal,\n"
+                 "    cg::ca::type_option.comment, cg::x::type_option.weight,\n"
+                 "    cg::x::type_option.goal, cg::x::type_option.comment);\n"
+                 "endmodule\n",
+                 f),
+      "1 100 [] 1 100 []\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeCoverageSim, MergeInstancesOffAveragesInstancesByTheirWeights) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  bit [3:0] v;\n"
+                 "  covergroup ng (int w);\n"
+                 "    option.weight = w;\n"
+                 "    px: coverpoint v { bins b1 = {1}; bins b2 = {2};\n"
+                 "      bins b3 = {3}; bins b4 = {4}; }\n"
+                 "  endgroup\n"
+                 "  ng n1 = new(1), n2 = new(3);\n"
+                 "  initial begin\n"
+                 "    v = 1; n1.sample();\n"
+                 "    for (int i = 1; i <= 4; i++) begin v = i; n2.sample(); "
+                 "end\n"
+                 "    $display(\"%0.2f %0.2f %0.2f\", ng::get_coverage(),\n"
+                 "      n1.get_inst_coverage(), n2.get_inst_coverage());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "81.25 25.00 100.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeCoverageSim, ACrossTypeWeightWeighsItInTypeCoverageAlone) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit a, b;\n"
+                       "  covergroup cg;\n"
+                       "    option.get_inst_coverage = 1;\n"
+                       "    type_option.merge_instances = 1;\n"
+                       "    ca: coverpoint a { bins one = {1}; }\n"
+                       "    cb: coverpoint b { bins one = {1}; }\n"
+                       "    x: cross ca, cb { type_option.weight = 3; }\n"
+                       "  endgroup\n"
+                       "  cg c = new;\n"
+                       "  initial begin\n"
+                       "    a = 1; b = 0; c.sample();\n"
+                       "    $display(\"%0.2f %0.2f\", cg::get_coverage(),\n"
+                       "             c.get_inst_coverage());\n"
+                       "    cg::x::type_option.weight = 0;\n"
+                       "    $display(\"%0.2f\", cg::get_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "20.00 33.33\n50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeCoverageSim, DISABLED_ACovergroupTypeWeightWeighsItInGlobalCoverage) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  bit a;\n"
+                       "  covergroup g1;\n"
+                       "    type_option.weight = 3;\n"
+                       "    p: coverpoint a { bins one = {1}; }\n"
+                       "  endgroup\n"
+                       "  covergroup g2;\n"
+                       "    option.weight = 5;\n"
+                       "    p: coverpoint a { bins zero = {0}; }\n"
+                       "  endgroup\n"
+                       "  g1 k1 = new; g2 k2 = new;\n"
+                       "  initial begin\n"
+                       "    a = 1; k1.sample(); k2.sample();\n"
+                       "    $display(\"%0.2f\", $get_coverage());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "75.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(TypeOptionSim, DISABLED_ATypesGoalAndCommentAreSaved) {
+  const std::string kPath = testing::TempDir() + "delta_cov_19_07_01_goal.db";
+  SimFixture f;
+  RunCapture(
+      "module top;\n"
+      "  bit a, b;\n"
+      "  covergroup cg;\n"
+      "    option.comment = \"inst note\";\n"
+      "    type_option.goal = 73; type_option.comment = \"group note\";\n"
+      "    ca: coverpoint a { type_option.goal = 64; }\n"
+      "    cb: coverpoint b;\n"
+      "    x: cross ca, cb { type_option.comment = \"x type note\"; }\n"
+      "  endgroup\n"
+      "  covergroup cd; type_option.comment = \"other type\"; coverpoint a; "
+      "endgroup\n"
+      "  cg c = new; cd d = new;\n"
+      "  initial begin\n"
+      "    cg::x::type_option.goal = 52; cg::cb::type_option.comment = \"cb "
+      "type note\";\n"
+      "    a = 0; b = 0; c.sample(); d.sample();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  f.ctx.CoverageData().SaveCoverageDbFile(kPath);
+  const std::string kSaved = ReadFileText(kPath);
+  std::remove(kPath.c_str());
+  for (const char* text : {"group note", "x type note", "cb type note",
+                           "other type", " 73", " 64", " 52"}) {
+    EXPECT_NE(kSaved.find(text), std::string::npos) << text;
+  }
 }
 
 }  // namespace
