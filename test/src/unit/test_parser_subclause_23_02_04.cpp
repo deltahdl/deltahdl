@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -479,6 +484,55 @@ TEST(ModuleItemsParsing, ErrorNonModuleItemInBody) {
       "endmodule\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
+}
+
+bool ErrorAtUnder(const std::string& src, uint32_t line,
+                  const char* subclause) {
+  auto r = Parse(src);
+  const std::vector<Diagnostic>& diags = r.diags;
+  for (const auto& d : diags) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line &&
+        d.subclause == subclause) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(ModuleBodyStatements, ProceduralBlocksAndCallsAreNotModuleItems) {
+  for (const char* item : {"begin end", "#1;", "@(y);", "$display(\"x\");"}) {
+    EXPECT_TRUE(ErrorAtUnder(
+        std::string("module m;\nlogic y;\n") + item + "\nendmodule\n", 3,
+        "23.2.4"))
+        << item;
+  }
+}
+
+TEST(ModuleBodyStatements,
+     DISABLED_AssignmentsAndStatementIfsAreNotModuleItems) {
+  for (const char* item :
+       {"y = 1;", "y <= 1;", "if (1) y = 1;", "if (1) begin : g y = 1; end"}) {
+    EXPECT_TRUE(ErrorAtUnder(
+        std::string("module m;\nlogic y;\n") + item + "\nendmodule\n", 3,
+        "23.2.4"))
+        << item;
+  }
+  EXPECT_TRUE(ErrorAtUnder(
+      "module o;\nmodule i;\nlogic y;\ny = 1;\nendmodule\nendmodule\n", 4,
+      "23.2.4"));
+}
+
+TEST(ModuleBodyStatements, TheSameStatementsAreAcceptedInsideInitial) {
+  auto r = Parse(
+      "module m;\nlogic y;\ninitial begin\n"
+      "  y = 1;\n  y <= 1;\n  if (1) y = 1;\n  case (1) 1: ; endcase\n"
+      "  begin end\n  #1;\n  @(y);\n  $display(\"x\");\nend\nendmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ModuleBodyStatements, AGenerateCaseWithAnEmptyItemIsAccepted) {
+  auto r = Parse("module m;\ncase (1) 1: ; endcase\nendmodule\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

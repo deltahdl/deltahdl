@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/elaborator_helpers.h"
 #include "fixture_elaborator.h"
@@ -471,6 +472,35 @@ TEST(NonAnsiStylePortDeclarations, AVarDeclaredPortIsACompleteVariable) {
                             "redeclaration of port 'b' that has a complete "
                             "port declaration",
                             4, "23.2.2.1"));
+}
+
+TEST(NonAnsiStylePortDeclarations,
+     DISABLED_ANameUsedByAnImplicitAndAnExplicitPortIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(a, .a(b));\n"
+      "  input a;\n"
+      "  input b;\n"
+      "endmodule\n",
+      f, "m");
+  bool reported = false;
+  for (const auto& d : f.diag.Diagnostics()) {
+    reported = reported || (d.severity == delta::DiagSeverity::kError &&
+                            d.loc.line == 1 && d.subclause == "23.2.2.1");
+  }
+  EXPECT_TRUE(reported);
+}
+
+TEST(NonAnsiStylePortDeclarations,
+     DistinctImplicitAndExplicitNamesAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(a, .c(b));\n"
+      "  input a;\n"
+      "  input b;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

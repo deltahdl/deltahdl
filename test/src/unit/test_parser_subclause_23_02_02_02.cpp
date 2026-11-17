@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
@@ -318,6 +323,38 @@ TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortAssignmentPattern) {
   EXPECT_EQ(port.name, "P1");
   ASSERT_NE(port.port_expr, nullptr);
   EXPECT_EQ(port.port_expr->kind, ExprKind::kAssignmentPattern);
+}
+
+bool ErrorAtUnder(const std::string& src, uint32_t line,
+                  const char* subclause) {
+  auto r = Parse(src);
+  const std::vector<Diagnostic>& diags = r.diags;
+  for (const auto& d : diags) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line &&
+        d.subclause == subclause) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(OnePortStyle, AnExpressionAfterAnAnsiDeclarationIsRejected) {
+  EXPECT_TRUE(
+      ErrorAtUnder("module m(input a, {b, c});\nendmodule\n", 1, "23.2.2.2"));
+}
+
+TEST(OnePortStyle, DISABLED_ABodyPortDeclarationAfterAnAnsiHeaderIsRejected) {
+  EXPECT_TRUE(
+      ErrorAtUnder("module m(input a);\ninput b;\nendmodule\n", 2, "23.2.2.2"));
+  EXPECT_TRUE(
+      ErrorAtUnder("module m();\ninput a;\nendmodule\n", 2, "23.2.2.2"));
+}
+
+TEST(OnePortStyle, EachStyleOnItsOwnIsAccepted) {
+  EXPECT_FALSE(Parse("module m(input a, input b);\nendmodule\n").has_errors);
+  EXPECT_FALSE(
+      Parse("module m(a, {b, c});\ninput a, b, c;\nendmodule\n").has_errors);
+  EXPECT_FALSE(Parse("module m();\nendmodule\n").has_errors);
 }
 
 }  // namespace

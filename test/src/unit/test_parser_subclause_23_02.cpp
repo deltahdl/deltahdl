@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 #include "common/diagnostic.h"
 #include "fixture_parser.h"
@@ -66,7 +67,8 @@ TEST(ModuleDefinitions, MultipleModulesInSource) {
 
 bool ReportedUnderModuleDefinitionsAt(const std::string& src, uint32_t line) {
   auto r = Parse(src);
-  for (const auto& d : r.diags.Peek()) {
+  const std::vector<Diagnostic>& diags = r.diags;
+  for (const auto& d : diags) {
     if (d.severity == DiagSeverity::kError && d.loc.line == line &&
         d.subclause == "23.2") {
       return true;

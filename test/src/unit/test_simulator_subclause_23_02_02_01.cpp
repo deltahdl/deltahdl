@@ -76,4 +76,46 @@ TEST(NonAnsiPortExpressionSimulation, ConcatPortAndTwoPortsOnOneInout) {
             "pe 1001 w2 6\n");
 }
 
+TEST(NonAnsiPortExpressionSimulation,
+     ASignedVariableDeclarationMakesThePortSigned) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m(f);\n"
+                       "  output [7:0] f;\n"
+                       "  logic signed [7:0] f;\n"
+                       "  assign f = -8'sd3;\n"
+                       "  initial #1 $display(\"%0d %0d\", f, f < 0);\n"
+                       "endmodule\n"
+                       "module t;\n  wire [7:0] w;\n  m u(w);\nendmodule\n",
+                       f),
+            "-3 1\n");
+}
+
+TEST(NonAnsiPortExpressionSimulation, ANamedConnectionReachesAnEscapedPort) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child(\\a+b );\n"
+                       "  input \\a+b ;\n"
+                       "  initial #1 $display(\"%b\", \\a+b );\n"
+                       "endmodule\n"
+                       "module t;\n  wire w = 1'b1;\n"
+                       "  child c(.\\a+b (w));\nendmodule\n",
+                       f),
+            "1\n");
+}
+
+TEST(NonAnsiPortExpressionSimulation,
+     DISABLED_AConcatenatedPortCarriesValuesBothWays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m(.p({a, e}));\n"
+                       "  input a;\n"
+                       "  output e;\n"
+                       "  assign e = ~a;\n"
+                       "endmodule\n"
+                       "module t;\n  wire [1:0] w;\n"
+                       "  assign w[1] = 1'b1;\n  m u(w);\n"
+                       "  initial #1 $display(\"%b %b\", u.a, w[0]);\n"
+                       "endmodule\n",
+                       f),
+            "1 0\n");
+}
+
 }  // namespace

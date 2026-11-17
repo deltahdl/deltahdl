@@ -405,4 +405,30 @@ TEST(NonAnsiStylePortDeclarations, AVarDeclaredPortIsAVariable) {
   EXPECT_EQ(mod->ports[2].direction, Direction::kRef);
 }
 
+TEST(NonAnsiInterconnectPorts,
+     DISABLED_ASignedAnsiInterconnectPortCitesThisRule) {
+  auto r = Parse("module m(inout interconnect signed a);\nendmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "interconnect port 'a' shall not be declared signed", 1,
+      "23.2.2.1"));
+}
+
+TEST(NonAnsiInterconnectPorts, DISABLED_ASignedBodyInterconnectPortIsRejected) {
+  auto r = Parse("module m(a);\n  inout interconnect signed a;\nendmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "interconnect port 'a' shall not be declared signed", 2,
+      "23.2.2.1"));
+}
+
+TEST(NonAnsiInterconnectPorts,
+     DISABLED_AnUnsignedBodyInterconnectPortIsAccepted) {
+  auto r = Parse("module m(a);\n  inout interconnect a;\nendmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(NonAnsiInterconnectPorts, AnUnsignedAnsiInterconnectPortIsAccepted) {
+  auto r = Parse("module m(inout interconnect a);\nendmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
