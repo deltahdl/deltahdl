@@ -4,10 +4,12 @@
 #include <cstdio>
 #include <fstream>
 #include <ios>
+#include <string>
 
 #include "builders_systask.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_placeholder_paths.h"
 #include "helpers_temp_file.h"
 #include "simulator/evaluation.h"
 
@@ -464,6 +466,80 @@ TEST(FileReadFunctions, FreadReadsBinary) {
   auto* close_expr = MkSysCall(f.arena, "$fclose", {MkInt(f.arena, fd)});
   EvalExpr(close_expr, f.ctx, f.arena);
   std::remove(tmp.c_str());
+}
+
+std::string ReadEveryWayThrough(const std::string& tag, const std::string& open,
+                                SysTaskFixture& f) {
+  SeedFile(PlaceholderPath("t210304", tag, 0), "7 xyz\n");
+  std::string out = RunWithPlaceholderPaths(
+      "t210304", tag,
+      "module t;\n"
+      "  integer fd, c, g, s, r, v;\n"
+      "  reg [31:0] line, val;\n"
+      "  initial begin\n"
+      "    line = 32'h41414141; val = 32'haabbccdd; v = 42;\n"
+      "    fd = " +
+          open +
+          ";\n"
+          "    c = $fgetc(fd);\n"
+          "    g = $fgets(line, fd);\n"
+          "    s = $fscanf(fd, \"%d\", v);\n"
+          "    r = $fread(val, fd);\n"
+          "    $display(\"c=%0d g=%0d line=%h s=%0d v=%0d r=%0d val=%h\", c, "
+          "g, line, s, v, r, val);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  RemovePlaceholderPaths("t210304", tag);
+  return out;
+}
+
+constexpr const char* kEveryReadRefused =
+    "c=-1 g=0 line=41414141 s=0 v=42 r=0 val=aabbccdd\n";
+
+TEST(FileReadFunctions, AppendTypeRefusesEveryReadFunction) {
+  SysTaskFixture f;
+  EXPECT_EQ(ReadEveryWayThrough("a", "$fopen(\"<P0>\", \"a\")", f),
+            kEveryReadRefused);
+}
+
+TEST(FileReadFunctions, BinaryAppendTypeRefusesEveryReadFunction) {
+  SysTaskFixture f;
+  EXPECT_EQ(ReadEveryWayThrough("ab", "$fopen(\"<P0>\", \"ab\")", f),
+            kEveryReadRefused);
+}
+
+TEST(FileReadFunctions, BinaryWriteTypeRefusesEveryReadFunction) {
+  SysTaskFixture f;
+  EXPECT_EQ(ReadEveryWayThrough("wb", "$fopen(\"<P0>\", \"wb\")", f),
+            kEveryReadRefused);
+}
+
+TEST(FileReadFunctions, AMultichannelDescriptorRefusesEveryReadFunction) {
+  SysTaskFixture f;
+  EXPECT_EQ(ReadEveryWayThrough("mcd", "$fopen(\"<P0>\")", f),
+            kEveryReadRefused);
+}
+
+TEST(FileReadFunctions, ReadTypeAllowsEveryReadFunction) {
+  SysTaskFixture f;
+  std::string out = ReadEveryWayThrough("r", "$fopen(\"<P0>\", \"r\")", f);
+  EXPECT_EQ(out.substr(0, out.find(" val=")),
+            "c=55 g=4 line=2078797a s=-1 v=42 r=0");
+}
+
+TEST(FileReadFunctions, ReadRejectedOnStandardErrorDescriptor) {
+  SysTaskFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer c;\n"
+      "  initial begin\n"
+      "    c = $fgetc(32'h8000_0002);\n"
+      "    $display(\"c=%0d\", c);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "c=-1\n");
 }
 
 }  // namespace
