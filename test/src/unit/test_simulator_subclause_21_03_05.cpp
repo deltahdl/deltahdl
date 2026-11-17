@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_placeholder_paths.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -495,6 +497,148 @@ TEST(FilePositioning, AppendUpdateOutputAlsoLandsAtEnd) {
           "endmodule\n",
       f);
   EXPECT_NE(out.find("abcQ"), std::string::npos) << out;
+  std::remove(tmp.c_str());
+}
+
+std::string AppendThenReadBack(const std::string& tag, const std::string& type,
+                               const std::string& body, SysTaskFixture& f) {
+  SeedFile(PlaceholderPath("t2135", tag, 0), "abc");
+  std::string out = RunWithPlaceholderPaths(
+      "t2135", tag,
+      "module t;\n"
+      "  integer fd, r, p, c;\n"
+      "  string line;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"<P0>\", \"" +
+          type + "\");\n" + body +
+          "    $fclose(fd);\n"
+          "    fd = $fopen(\"<P0>\", \"r\");\n"
+          "    while ($fgets(line, fd)) $write(\"%s\", line);\n"
+          "    $display;\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  RemovePlaceholderPaths("t2135", tag);
+  return out;
+}
+
+constexpr const char* kSeekWriteTell =
+    "    r = $fseek(fd, 0, 0);\n"
+    "    $fwrite(fd, \"QR\");\n"
+    "    p = $ftell(fd);\n"
+    "    $write(\"%0d \", p);\n";
+
+TEST(FilePositioning, AppendUpdateLeavesThePositionAtTheEndOfTheOutput) {
+  SysTaskFixture f;
+  EXPECT_EQ(AppendThenReadBack("aplus_tell", "a+",
+                               "    r = $fseek(fd, 0, 0);\n"
+                               "    $fwrite(fd, \"Q\");\n"
+                               "    p = $ftell(fd);\n"
+                               "    c = $fgetc(fd);\n"
+                               "    $write(\"%0d %0d \", p, c);\n",
+                               f),
+            "4 -1 abcQ\n");
+}
+
+TEST(FilePositioning, BinaryAppendOutputLandsAtTheEnd) {
+  SysTaskFixture f;
+  EXPECT_EQ(AppendThenReadBack("ab", "ab", kSeekWriteTell, f), "5 abcQR\n");
+}
+
+TEST(FilePositioning, BinaryAppendUpdateOutputLandsAtTheEnd) {
+  SysTaskFixture f;
+  EXPECT_EQ(AppendThenReadBack("apb", "a+b", kSeekWriteTell, f), "5 abcQR\n");
+}
+
+TEST(FilePositioning, BinaryAppendUpdateOtherSpellingLandsAtTheEnd) {
+  SysTaskFixture f;
+  EXPECT_EQ(AppendThenReadBack("abp", "ab+", kSeekWriteTell, f), "5 abcQR\n");
+}
+
+TEST(FilePositioning, AppendOutputAfterRewindLandsAtTheEnd) {
+  SysTaskFixture f;
+  for (const char* type : {"a", "a+"}) {
+    EXPECT_EQ(AppendThenReadBack(std::string("rw") + (type[1] ? "p" : ""), type,
+                                 "    r = $rewind(fd);\n"
+                                 "    $fwrite(fd, \"Z\");\n"
+                                 "    p = $ftell(fd);\n"
+                                 "    $write(\"%0d \", p);\n",
+                                 f),
+              "4 abcZ\n")
+        << type;
+  }
+}
+
+TEST(FilePositioning, EveryOutputTaskOnAnAppendFileLandsAtTheEnd) {
+  SysTaskFixture f;
+  EXPECT_EQ(AppendThenReadBack("tasks", "a",
+                               "    r = $fseek(fd, 0, 0);\n"
+                               "    $fwriteh(fd, 4'ha);\n"
+                               "    r = $fseek(fd, 0, 0);\n"
+                               "    $fstrobe(fd, \"s\");\n"
+                               "    #1 r = $fseek(fd, 0, 0);\n"
+                               "    $fmonitor(fd, \"m\");\n"
+                               "    #1 r = $fseek(fd, 0, 0);\n"
+                               "    $fdisplay(fd, \"d\");\n",
+                               f),
+            "abcas\nm\nd\n\n");
+}
+
+TEST(FilePositioning, SeekToANegativePositionFailsAndKeepsThePosition) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_negative.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, a, b, p, c;\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    c = $fgetc(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    a = $fseek(fd, -1, 0);\n"
+          "    b = $fseek(fd, -3, 1);\n"
+          "    p = $ftell(fd);\n"
+          "    c = $fgetc(fd);\n"
+          "    $display(\"%0d %0d %0d %c\", a, b, p, c);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "-1 -1 2 c\n");
+  std::remove(tmp.c_str());
+}
+
+TEST(FilePositioning, PositioningFromAClassMethodAndAFunction) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_2135_places.txt";
+  SeedFile(tmp, "abcdef");
+  std::string out = RunCapture(
+      "class Cursor;\n"
+      "  function int jump(integer fd); return $fseek(fd, -2, 2); endfunction\n"
+      "  function int where(integer fd); return $ftell(fd); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  integer fd, a, b, c, d;\n"
+      "  Cursor k;\n"
+      "  function int back(integer fd); return $rewind(fd); endfunction\n"
+      "  initial begin\n"
+      "    k = new;\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"r\");\n"
+          "    a = k.jump(fd);\n"
+          "    b = k.where(fd);\n"
+          "    c = back(fd);\n"
+          "    d = $fgetc(fd);\n"
+          "    $display(\"%0d %0d %0d %c\", a, b, c, d);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 4 0 a\n");
   std::remove(tmp.c_str());
 }
 
