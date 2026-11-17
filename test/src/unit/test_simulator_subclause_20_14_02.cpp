@@ -3,6 +3,7 @@
 #include <charconv>
 #include <string>
 #include <system_error>
+#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -25,6 +26,7 @@ unsigned WarnCount(const std::string& body) {
       "module t;\n"
       "  integer seed;\n"
       "  integer v;\n"
+      "  integer m;\n"
       "  initial begin\n"
       "    seed = 1;\n" +
           body +
@@ -216,6 +218,10 @@ TEST(DistributionFunctions, UniformDegenerateInterval) {
   for (long long v : vals) EXPECT_EQ(v, 42);
 }
 
+unsigned WarnCountWithM(const std::string& body) {
+  return WarnCount("    m = 0;\n" + body);
+}
+
 TEST(DistributionFunctions, ExponentialMeanPositivity) {
   EXPECT_GE(WarnCount("    v = $dist_exponential(seed, 0);\n"), 1u);
   EXPECT_EQ(WarnCount("    v = $dist_exponential(seed, 5);\n"), 0u);
@@ -287,6 +293,178 @@ TEST(DistributionFunctions, ADrawIsASignedInteger) {
                  "endmodule\n",
                  f),
       "1\n");
+}
+
+constexpr std::pair<const char*, const char*> kSixDistributions[] = {
+    {"$dist_normal", "s, 0, 100"}, {"$dist_exponential", "s, 5"},
+    {"$dist_poisson", "s, 5"},     {"$dist_chi_square", "s, 3"},
+    {"$dist_t", "s, 4"},           {"$dist_erlang", "s, 2, 7"}};
+
+constexpr std::pair<const char*, const char*> kSevenDistributions[] = {
+    {"$dist_uniform", "s, 0, 10"}, {"$dist_normal", "s, 0, 100"},
+    {"$dist_exponential", "s, 5"}, {"$dist_poisson", "s, 5"},
+    {"$dist_chi_square", "s, 3"},  {"$dist_t", "s, 4"},
+    {"$dist_erlang", "s, 2, 7"}};
+
+std::string DistCall(const std::pair<const char*, const char*>& fn,
+                     const char* seed) {
+  std::string args = fn.second;
+  std::string call = fn.first;
+  call += "(";
+  call += seed;
+  call += args.substr(1);
+  call += ")";
+  return call;
+}
+
+std::string RunDistBody(const std::string& decls, const std::string& body) {
+  SimFixture f;
+  return RunCapture(
+      decls + "module t;\n  int s = 1, r = 1, a, b;\n" + body + "endmodule\n",
+      f);
+}
+
+TEST(DistributionFunctions, EverySeedOfTheOtherSixAdvances) {
+  for (const auto& fn : kSixDistributions) {
+    std::string body = "  initial begin\n    a = " + DistCall(fn, "s") +
+                       ";\n    $display(\"%0d\", s != 1);\n  end\n";
+    EXPECT_EQ(RunDistBody("", body), "1\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions, AnInstancePropertySeedIsWrittenBackFromAMethod) {
+  for (const auto& fn : kSevenDistributions) {
+    std::string decls =
+        "class C;\n  int p = 1;\n  function int draw();\n    return " +
+        DistCall(fn, "p") + ";\n  endfunction\nendclass\n";
+    std::string body =
+        "  C h = new;\n  initial begin\n    a = h.draw();\n    b = " +
+        DistCall(fn, "r") +
+        ";\n    $display(\"%0d %0d\", a == b, h.p == r);\n  end\n";
+    EXPECT_EQ(RunDistBody(decls, body), "1 1\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions, AStaticPropertySeedIsWrittenBack) {
+  for (const auto& fn : kSevenDistributions) {
+    std::string decls =
+        "class C;\n  static int p = 1;\n  static function int draw();\n    "
+        "return " +
+        DistCall(fn, "p") + ";\n  endfunction\nendclass\n";
+    std::string body =
+        "  initial begin\n    a = C::draw();\n    b = " + DistCall(fn, "r") +
+        ";\n    $display(\"%0d %0d\", a == b, C::p == r);\n  end\n";
+    EXPECT_EQ(RunDistBody(decls, body), "1 1\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions, AQueueElementSeedIsWrittenBack) {
+  for (const auto& fn : kSevenDistributions) {
+    std::string body =
+        "  int q[$] = '{1};\n  initial begin\n    a = " + DistCall(fn, "q[0]") +
+        ";\n    b = " + DistCall(fn, "r") +
+        ";\n    $display(\"%0d %0d\", a == b, q[0] == r);\n  end\n";
+    EXPECT_EQ(RunDistBody("", body), "1 1\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions,
+     DISABLED_APropertySeedIsWrittenBackDespiteAModuleVariableOfItsName) {
+  for (const auto& fn : kSevenDistributions) {
+    std::string decls =
+        "class C;\n  int s = 1;\n  function int draw();\n    return " +
+        DistCall(fn, "s") + ";\n  endfunction\nendclass\n";
+    std::string body =
+        "  C h = new;\n  initial begin\n    s = 100;\n    a = h.draw();\n    b "
+        "= " +
+        DistCall(fn, "r") +
+        ";\n    $display(\"%0d %0d %0d\", a == b, h.s == r, s);\n  end\n";
+    EXPECT_EQ(RunDistBody(decls, body), "1 1 100\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions, ANegativeArgumentThatMustBePositiveIsReported) {
+  for (const char* call :
+       {"$dist_poisson(seed, m)", "$dist_chi_square(seed, m)",
+        "$dist_t(seed, m)", "$dist_erlang(seed, m, 7)",
+        "$dist_erlang(seed, 2, m)"}) {
+    std::string body = "    m = -1;\n    v = ";
+    body += call;
+    body += ";\n";
+    EXPECT_GE(WarnCountWithM(body), 1u) << call;
+  }
+}
+
+TEST(DistributionFunctions, ANegativeNormalMeanDrawsWithoutAReport) {
+  EXPECT_EQ(WarnCountWithM("    m = -1;\n    v = $dist_normal(seed, m, 4);\n"),
+            0u);
+}
+
+TEST(DistributionFunctions, AStartAboveTheEndIsAcceptedAndReturnsTheStart) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  int seed = 1;\n"
+                 "  initial $display(\"%0d\", $dist_uniform(seed, 5, 2));\n"
+                 "endmodule\n",
+                 f),
+      "5\n");
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(DistributionFunctions, EveryResultIsSignedWhenUsedDirectly) {
+  for (const auto& fn : kSevenDistributions) {
+    std::string body =
+        "  initial $display(\"%0d\", " + DistCall(fn, "s") + " > -1);\n";
+    EXPECT_EQ(RunDistBody("", body), "1\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions, NormalAndTDrawsAreNegativeWithoutAnIntermediate) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  int s = 1;\n"
+      "  bit normal_negative, t_negative;\n"
+      "  initial begin\n"
+      "    repeat (100) begin\n"
+      "      if ($dist_normal(s, 0, 100) < 0) normal_negative = 1;\n"
+      "      if ($dist_t(s, 1) < 0) t_negative = 1;\n"
+      "    end\n"
+      "    $display(\"%0d %0d\", normal_negative, t_negative);\n"
+      "    $display(\"%0d\", $dist_normal(s, -1000, 1));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out.substr(0, 5), "1 1\n-");
+  EXPECT_LT(Values(out.substr(4)).at(0), -990);
+}
+
+TEST(DistributionFunctions, EveryResultIs32BitsWide) {
+  for (const auto& fn : kSevenDistributions) {
+    std::string body =
+        "  initial $display(\"%0d\", $bits(" + DistCall(fn, "s") + "));\n";
+    EXPECT_EQ(RunDistBody("", body), "32\n") << fn.first;
+  }
+}
+
+TEST(DistributionFunctions, DISABLED_ARealArgumentIsTakenAsAnIntegerValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  int s = 1, v;\n"
+                       "  bit in_range = 1, reached_three;\n"
+                       "  initial begin\n"
+                       "    repeat (400) begin\n"
+                       "      v = $dist_uniform(s, 0.4, 2.6);\n"
+                       "      if (v < 0 || v > 3) in_range = 0;\n"
+                       "      if (v == 3) reached_three = 1;\n"
+                       "    end\n"
+                       "    $display(\"%0d %0d\", in_range, reached_three);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 1\n");
 }
 
 }  // namespace
