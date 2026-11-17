@@ -324,4 +324,33 @@ TEST(ReadingALineAtATime, FgetsIntoFormalsAndClassProperties) {
   std::remove(tmp.c_str());
 }
 
+TEST(ReadingALineAtATime,
+     DISABLED_UnpackedByteArrayTakesOneCharacterPerElement) {
+  SysTaskFixture f;
+  const std::string kPath = "/tmp/deltahdl_213442_bytes.txt";
+  SeedFile(kPath, "Hi\nmore\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  byte b [0:7];\n"
+      "  byte u [4];\n"
+      "  integer fd, c, c2;\n"
+      "  initial begin\n"
+      "    foreach (b[i]) b[i] = 0;\n"
+      "    fd = $fopen(\"" +
+          kPath +
+          "\", \"r\");\n"
+          "    c = $fgets(b, fd);\n"
+          "    $display(\"c=%0d b=%0d %0d %0d %0d\", c, b[0], b[1], b[2], "
+          "b[3]);\n"
+          "    c2 = $fgets(u, fd);\n"
+          "    $display(\"c2=%0d u=%0d %0d %0d %0d\", c2, u[0], u[1], u[2], "
+          "u[3]);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "c=3 b=72 105 10 0\nc2=4 u=109 111 114 101\n");
+  std::remove(kPath.c_str());
+}
+
 }  // namespace
