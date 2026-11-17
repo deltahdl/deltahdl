@@ -111,4 +111,152 @@ TEST_F(AssertControlCallbacks, AControlNamingAssertionsRaisesTheirReasons) {
   EXPECT_TRUE(g_system_reasons.empty());
 }
 
+constexpr std::pair<const char*, int> kWholeDesignControls[] = {
+    {"$asserton", cbAssertionSysOn},
+    {"$assertkill", cbAssertionSysKill},
+    {"$assertpasson", cbAssertionSysEnablePassAction},
+    {"$assertpassoff", cbAssertionSysDisablePassAction},
+    {"$assertfailon", cbAssertionSysEnableFailAction},
+    {"$assertfailoff", cbAssertionSysDisableFailAction},
+    {"$assertnonvacuouson", cbAssertionSysEnableNonvacuousAction},
+    {"$assertvacuousoff", cbAssertionSysDisableVacuousAction},
+    {"$assertcontrol(1)", cbAssertionSysLock},
+    {"$assertcontrol(2)", cbAssertionSysUnlock},
+    {"$assertcontrol(3)", cbAssertionSysOn},
+    {"$assertcontrol(4)", cbAssertionSysOff},
+    {"$assertcontrol(6)", cbAssertionSysEnablePassAction},
+    {"$assertcontrol(7)", cbAssertionSysDisablePassAction},
+    {"$assertcontrol(8)", cbAssertionSysEnableFailAction},
+    {"$assertcontrol(9)", cbAssertionSysDisableFailAction},
+    {"$assertcontrol(10)", cbAssertionSysEnableNonvacuousAction},
+    {"$assertcontrol(11)", cbAssertionSysDisableVacuousAction}};
+
+constexpr int kSystemReasons[] = {cbAssertionSysOn,
+                                  cbAssertionSysOff,
+                                  cbAssertionSysKill,
+                                  cbAssertionSysLock,
+                                  cbAssertionSysUnlock,
+                                  cbAssertionSysEnablePassAction,
+                                  cbAssertionSysDisablePassAction,
+                                  cbAssertionSysEnableFailAction,
+                                  cbAssertionSysDisableFailAction,
+                                  cbAssertionSysEnableNonvacuousAction,
+                                  cbAssertionSysDisableVacuousAction};
+
+TEST_F(AssertControlCallbacks,
+       EveryControlWithoutArgumentsRaisesItsSystemReason) {
+  for (int reason : kSystemReasons) {
+    s_cb_data cb = {};
+    cb.reason = reason;
+    cb.cb_rtn = &RecordSystemReason;
+    ASSERT_NE(vpi_register_cb(&cb), nullptr);
+  }
+  std::string src = "module top;\n  initial begin\n    #1;\n";
+  std::vector<int> expected;
+  for (const auto& [call, reason] : kWholeDesignControls) {
+    src += "    ";
+    src += call;
+    src += ";\n";
+    expected.push_back(reason);
+  }
+  src += "  end\nendmodule\n";
+  Run(src);
+  ASSERT_GE(g_system_reasons.size(), expected.size());
+  std::vector<int> tail(
+      g_system_reasons.end() - static_cast<long>(expected.size()),
+      g_system_reasons.end());
+  EXPECT_EQ(tail, expected);
+}
+
+struct NamingControl {
+  const char* call;
+  int first;
+  int second;
+};
+
+constexpr NamingControl kNamingControls[] = {
+    {"$asserton(0, a1)", cbAssertionEnable, 0},
+    {"$assertcontrol(1, 15, 7, 0, a1)", cbAssertionLock, 0},
+    {"$assertcontrol(2, 15, 7, 0, a1)", cbAssertionUnlock, 0},
+    {"$assertcontrol(3, 15, 7, 0, a1)", cbAssertionEnable, 0},
+    {"$assertcontrol(4, 15, 7, 0, a1)", cbAssertionDisable, 0},
+    {"$assertcontrol(5, 15, 7, 0, a1)", cbAssertionReset, cbAssertionDisable},
+    {"$assertpasson(0, a1)", cbAssertionEnablePassAction, 0},
+    {"$assertpassoff(0, a1)", cbAssertionDisablePassAction, 0},
+    {"$assertfailon(0, a1)", cbAssertionEnableFailAction, 0},
+    {"$assertfailoff(0, a1)", cbAssertionDisableFailAction, 0},
+    {"$assertnonvacuouson(0, a1)", cbAssertionEnableNonvacuousAction, 0},
+    {"$assertvacuousoff(0, a1)", cbAssertionDisableVacuousAction, 0},
+    {"$assertcontrol(6, 31, 7, 0, a1)", cbAssertionEnablePassAction, 0},
+    {"$assertcontrol(7, 31, 7, 0, a1)", cbAssertionDisablePassAction, 0},
+    {"$assertcontrol(8, 31, 7, 0, a1)", cbAssertionEnableFailAction, 0},
+    {"$assertcontrol(9, 31, 7, 0, a1)", cbAssertionDisableFailAction, 0},
+    {"$assertcontrol(10, 31, 7, 0, a1)", cbAssertionEnableNonvacuousAction, 0},
+    {"$assertcontrol(11, 31, 7, 0, a1)", cbAssertionDisableVacuousAction, 0}};
+
+PLI_INT32 PlaceEveryReasonOnA1(PLI_BYTE8*) {
+  PlaceOn("a1",
+          {cbAssertionEnable, cbAssertionDisable, cbAssertionReset,
+           cbAssertionLock, cbAssertionUnlock, cbAssertionEnablePassAction,
+           cbAssertionDisablePassAction, cbAssertionEnableFailAction,
+           cbAssertionDisableFailAction, cbAssertionEnableNonvacuousAction,
+           cbAssertionDisableVacuousAction});
+  return 0;
+}
+
+TEST_F(AssertControlCallbacks,
+       EveryControlNamingAnAssertionRaisesItsReasonOnIt) {
+  s_vpi_systf_data place = {};
+  place.type = vpiSysTask;
+  place.tfname = VpiText("$place");
+  place.calltf = &PlaceEveryReasonOnA1;
+  ASSERT_NE(vpi_register_systf(&place), nullptr);
+  std::string src =
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  a1: assert property (@(posedge clk) 1);\n"
+      "  initial begin\n"
+      "    $place;\n";
+  std::vector<std::pair<int, std::string>> expected;
+  for (const auto& control : kNamingControls) {
+    src += "    ";
+    src += control.call;
+    src += ";\n";
+    expected.emplace_back(control.first, "a1");
+    if (control.second != 0) expected.emplace_back(control.second, "a1");
+  }
+  src += "  end\nendmodule\n";
+  Run(src);
+  EXPECT_EQ(g_assertion_reasons, expected);
+}
+
+PLI_INT32 PlaceDisableOnEveryAssertion(PLI_BYTE8*) {
+  PlaceOn("a1", {cbAssertionDisable});
+  PlaceOn("a2", {cbAssertionDisable});
+  return 0;
+}
+
+TEST_F(AssertControlCallbacks,
+       AControlNamingAScopeRaisesTheReasonOnTheAssertionsItSelects) {
+  s_vpi_systf_data place = {};
+  place.type = vpiSysTask;
+  place.tfname = VpiText("$place");
+  place.calltf = &PlaceDisableOnEveryAssertion;
+  ASSERT_NE(vpi_register_systf(&place), nullptr);
+  Run("module top;\n"
+      "  logic clk = 0;\n"
+      "  a1: assert property (@(posedge clk) 1);\n"
+      "  if (1) begin : g\n"
+      "    a2: assert property (@(posedge clk) 1);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    $place;\n"
+      "    $assertoff(0, g);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(
+      g_assertion_reasons,
+      (std::vector<std::pair<int, std::string>>{{cbAssertionDisable, "a2"}}));
+}
+
 }  // namespace
