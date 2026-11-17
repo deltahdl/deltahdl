@@ -537,4 +537,353 @@ TEST(ElabSeverityTask, MessageFormatsAnArgumentWiderThanSixtyFourBits) {
       "elaboration INFO in scope 'm': 123456789abcdef012", 2, "20.10.1"));
 }
 
+TEST(ElabSeverityTask,
+     AnErrorInANonTopInstanceAndItsGenerateBlockBlocksSimulation) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  $error(\"sub-level\");\n"
+      "  if (1) begin : gb\n"
+      "    $error(\"sub-generate\");\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': sub-level", 2, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': sub-generate", 4, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 2u);
+}
+
+TEST(ElabSeverityTask, AnErrorInAnInterfaceProgramAndCheckerBlocksSimulation) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "interface I;\n"
+      "  $error(\"in-interface\");\n"
+      "endinterface\n"
+      "program G;\n"
+      "  $error(\"in-program\");\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  $error(\"in-checker\");\n"
+      "endchecker\n"
+      "module t;\n"
+      "  I i();\n"
+      "  G g();\n"
+      "  c c1();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': in-interface", 2, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': in-program", 5, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': in-checker", 8, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 3u);
+}
+
+TEST(ElabSeverityTask, AFatalInAInterfaceBlocksSimulation) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "interface I;\n"
+      "  $fatal(1, \"stop-here\");\n"
+      "endinterface\n"
+      "module t;\n"
+      "  I i();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': stop-here", 2, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 1u);
+}
+
+TEST(ElabSeverityTask, AFatalInAProgramBlocksSimulation) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "program G;\n"
+      "  $fatal(1, \"stop-here\");\n"
+      "endprogram\n"
+      "module t;\n"
+      "  G g();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': stop-here", 2, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 1u);
+}
+
+TEST(ElabSeverityTask, AFatalInACheckerBlocksSimulation) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "checker c;\n"
+      "  $fatal(1, \"stop-here\");\n"
+      "endchecker\n"
+      "module t;\n"
+      "  c c1();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': stop-here", 2, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 1u);
+}
+
+TEST(ElabSeverityTask, AFatalInANonTopModuleBlocksSimulation) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  $fatal(1, \"stop-here\");\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedError(ef.diag.Diagnostics(), "': stop-here", 2, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 1u);
+}
+
+TEST(ElabSeverityTask,
+     AWarningAndInfoInAnInterfaceProgramAndCheckerLeaveSimulationOpen) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "interface I;\n"
+      "  $warning(\"in-interface\");\n"
+      "endinterface\n"
+      "program G;\n"
+      "  $info(\"in-program\");\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  $warning(\"in-checker\");\n"
+      "endchecker\n"
+      "module t;\n"
+      "  I i();\n"
+      "  G g();\n"
+      "  c c1();\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedWarning(ef.diag.Diagnostics(), "': in-interface", 2, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedWarning(ef.diag.Diagnostics(), "': in-program", 5, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedWarning(ef.diag.Diagnostics(), "': in-checker", 8, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 0u);
+}
+
+TEST(ElabSeverityTask, AParameterCheckRunsForEachInstanceItSelects) {
+  ElabFixture ef;
+  ElaborateSrc(
+      "module test #(N = 1) (input [N-1:0] in, output [N-1:0] out);\n"
+      "  if ((N < 1) || (N > 8))\n"
+      "    $error(\"Parameter N has an invalid value of %0d\", N);\n"
+      "  assign out = in;\n"
+      "endmodule\n"
+      "module t;\n"
+      "  logic [8:0] a;\n"
+      "  logic [3:0] b;\n"
+      "  test #(.N(9)) x(a, a);\n"
+      "  test #(.N(4)) y(b, b);\n"
+      "  test #(.N(0)) z(b[0], b[1]);\n"
+      "endmodule\n",
+      ef, "t");
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "': Parameter N has an invalid value of 9", 3,
+                            "20.10.1"));
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "': Parameter N has an invalid value of 0", 3,
+                            "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 2u);
+}
+
+TEST(ElabSeverityTask, ALoopRunsTheTaskOnceForEachIteration) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  for (genvar i = 0; i < 3; i++) begin : L\n"
+      "    $info(\"iteration %0d\", i);\n"
+      "  end\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(design->simulation_blocked);
+  EXPECT_TRUE(
+      ReportedWarning(ef.diag.Diagnostics(), "': iteration 0", 3, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedWarning(ef.diag.Diagnostics(), "': iteration 1", 3, "20.10.1"));
+  EXPECT_TRUE(
+      ReportedWarning(ef.diag.Diagnostics(), "': iteration 2", 3, "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 0u);
+}
+
+TEST(ElabSeverityTask, DISABLED_AMessageNamesTheInstancePathNotTheDefinition) {
+  ElabFixture ef;
+  ElaborateSrc(
+      "interface I;\n"
+      "  $info(\"i\");\n"
+      "endinterface\n"
+      "checker c;\n"
+      "  $info(\"c\");\n"
+      "endchecker\n"
+      "module sub;\n"
+      "  $info(\"s\");\n"
+      "  if (1) begin : gb\n"
+      "    $info(\"g\");\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  I i();\n"
+      "  c c1();\n"
+      "  sub u();\n"
+      "endmodule\n",
+      ef, "t");
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.i': i", 2,
+                              "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.c1': c", 5,
+                              "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.u': s", 8,
+                              "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.u.gb': g", 10,
+                              "20.10.1"));
+}
+
+TEST(ElabSeverityTask,
+     DISABLED_AMessageInAGenerateLoopIterationNamesItWithBrackets) {
+  ElabFixture ef;
+  ElaborateSrc(
+      "module t;\n"
+      "  for (genvar i = 0; i < 2; i++) begin\n"
+      "    $info(\"hi %0d\", i);\n"
+      "  end\n"
+      "  for (genvar j = 0; j < 1; j++) begin : L\n"
+      "    $info(\"named\");\n"
+      "  end\n"
+      "endmodule\n",
+      ef, "t");
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.genblk1[0]': hi 0",
+                              3, "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.genblk1[1]': hi 1",
+                              3, "20.10.1"));
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't.L[0]': named", 6,
+                              "20.10.1"));
+}
+
+TEST(ElabSeverityTask,
+     DISABLED_AConstantFunctionReachingATaskNamesTheScopeItIsFoldedIn) {
+  ElabFixture ef;
+  ElaborateSrc(
+      "module sub;\n"
+      "  function automatic int cf(int x);\n"
+      "    if (x > 3) $warning(\"big %0d\", x);\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  localparam int P = cf(5);\n"
+      "endmodule\n"
+      "module t;\n"
+      "  sub u();\n"
+      "endmodule\n",
+      ef, "t");
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration WARNING in scope 't.u': big 5", 3,
+                              "20.10.1"));
+}
+
+TEST(ElabSeverityTask, AVariableArgumentToAWarningOrInfoIsReported) {
+  ElabFixture ef;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [7:0] x;\n"
+      "  $warning(\"x=%0d\", x);\n"
+      "  $info(\"%0d\", x);\n"
+      "endmodule\n",
+      ef, "t");
+  EXPECT_TRUE(ReportedError(
+      ef.diag.Diagnostics(),
+      "argument to $warning must be a constant expression", 3, "20.10.1"));
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "argument to $info must be a constant expression",
+                            4, "20.10.1"));
+}
+
+TEST(ElabSeverityTask, AUserConstantFunctionIsAnAcceptedArgument) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function automatic int dbl(int a);\n"
+      "    return 2 * a;\n"
+      "  endfunction\n"
+      "  $info(\"dbl=%0d\", dbl(3));\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(design->simulation_blocked);
+  EXPECT_TRUE(ReportedWarning(ef.diag.Diagnostics(),
+                              "elaboration INFO in scope 't': dbl=6", 5,
+                              "20.10.1"));
+  EXPECT_EQ(ef.diag.ErrorCount(), 0u);
+}
+
+TEST(ElabSeverityTask,
+     DISABLED_AFunctionReadingAVariableIsReportedAsAnArgument) {
+  ElabFixture ef;
+  ElaborateSrc(
+      "module t;\n"
+      "  int v;\n"
+      "  function int rd();\n"
+      "    return v;\n"
+      "  endfunction\n"
+      "  $info(\"%0d\", rd());\n"
+      "endmodule\n",
+      ef, "t");
+  EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
+                            "argument to $info must be a constant expression",
+                            6, "20.10.1"));
+}
+
+TEST(ElabSeverityTask,
+     ATaskInsideAProcedureOfAGenerateBlockTaskFunctionOrFinalStaysRunTime) {
+  ElabFixture ef;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  if (1) begin : g\n"
+      "    initial $fatal(1, \"a\");\n"
+      "  end\n"
+      "  task tk();\n"
+      "    $fatal(1, \"b\");\n"
+      "  endtask\n"
+      "  function int fn();\n"
+      "    $error(\"c\");\n"
+      "    return 0;\n"
+      "  endfunction\n"
+      "  final $error(\"d\");\n"
+      "endmodule\n",
+      ef, "t");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(design->simulation_blocked);
+  EXPECT_EQ(ef.diag.ErrorCount(), 0u);
+}
+
 }  // namespace
