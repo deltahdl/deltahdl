@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -200,6 +204,63 @@ TEST(ModuleInstantiationElaboration, ModulePortTakesNoSequenceOrEventActual) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "23.3.2"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 7, "23.3.2"));
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "23.3.2"));
+}
+
+bool ErrorAtLineUnder(const ElabFixture& f, uint32_t line,
+                      const char* subclause) {
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError && d.loc.line == line &&
+        d.subclause == subclause) {
+      return true;
+    }
+  }
+  return false;
+}
+
+TEST(PortlessInstanceConnections,
+     DISABLED_AConnectionToAPortlessModuleIsAnError) {
+  for (const char* conn : {"x", ".*"}) {
+    ElabFixture f;
+    ElaborateSrc(std::string("module child;\nendmodule\nmodule t;\n  wire x;\n"
+                             "  child u0(") +
+                     conn + ");\nendmodule\n",
+                 f, "t");
+    EXPECT_TRUE(ErrorAtLineUnder(f, 5, "23.3.2")) << conn;
+  }
+}
+
+TEST(PortlessInstanceConnections,
+     EmptyParenthesesOnAPortlessModuleAreAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child;\nendmodule\nmodule t;\n  child u0();\nendmodule\n", f,
+      "t");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PortlessInstanceConnections, AnInstanceWithoutParenthesesIsAnError) {
+  for (const char* child :
+       {"module child(input a);\nendmodule\n", "module child;\nendmodule\n"}) {
+    ElabFixture f;
+    ElaborateSrcAllowingParseErrors(
+        std::string(child) + "module t;\n  child u0;\nendmodule\n", f, "t");
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "instantiation of module 'child' has no port connection list", 4,
+        "23.3.2"))
+        << child;
+  }
+}
+
+TEST(MixedConnectionStyles, OrderedAndImplicitNamedInOneInstanceIsAnError) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(
+      "module sub(input a, b);\nendmodule\nmodule t;\n  wire a, b;\n"
+      "  sub u1(a, .b);\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ordered and named port connections cannot be mixed", 5, "23.3.2"));
 }
 
 }  // namespace

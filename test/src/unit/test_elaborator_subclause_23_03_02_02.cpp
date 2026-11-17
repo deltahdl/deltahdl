@@ -264,4 +264,32 @@ TEST(NamedPortConnectionElaboration, EachPortConnectedOnceIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(PortConnectedOnce, AnImplicitAndAnExplicitConnectionToOnePortIsAnError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module A(input i, output o, inout e);\nendmodule\n"
+      "module t;\n  wire i, b, c, d;\n"
+      "  A ia(.i, .i(b), .o(c), .e(d));\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "port 'i' of module 'A' is connected more than once", 5, "23.3.2.2"));
+}
+
+TEST(PortConnectedOnce, EachPortConnectedTwiceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module A(input i, output o, inout e);\nendmodule\n"
+      "module t;\n  wire a, b, c, d, e, f;\n"
+      "  A ia(.i(a), .i(b), .o(c), .o(d), .e(e), .e(f));\nendmodule\n",
+      f, "t");
+  for (const char* port : {"i", "o", "e"}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              std::string("port '") + port +
+                                  "' of module 'A' is connected more than once",
+                              5, "23.3.2.2"))
+        << port;
+  }
+}
+
 }  // namespace
