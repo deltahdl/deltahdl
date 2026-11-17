@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "builders_ast.h"
 #include "builders_systask.h"
@@ -287,6 +288,163 @@ TEST(UtilitySystemTaskTest, BitVectorFunctionReturnWidths) {
   EXPECT_EQ(EvalExpr(onehot, f.ctx, f.arena).width, 1u);
   EXPECT_EQ(EvalExpr(onehot0, f.ctx, f.arena).width, 1u);
   EXPECT_EQ(EvalExpr(isunknown, f.ctx, f.arena).width, 1u);
+}
+
+std::string RunBitVector(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(BitVectorFunctionSim,
+     DISABLED_ASignedIntResultKeepsTheEnclosingExpressionSigned) {
+  EXPECT_EQ(RunBitVector("module t;\n"
+                         "  logic [7:0] v = 8'b0000_0111;\n"
+                         "  initial $display(\"%0d %0d %0d %0d %s %s %s %s\", "
+                         "($countones(v) - 5) < 0,\n"
+                         "    $countones(v) > -1, ($countbits(v, 1) - 5) < 0, "
+                         "$countbits(v, 1) > -1,\n"
+                         "    $typename($countbits(v, 1)), "
+                         "$typename($countones(v)), $typename($onehot(v)),\n"
+                         "    $typename($onehot0(v)));\n"
+                         "endmodule\n"),
+            "1 1 1 1 int int bit bit\n");
+}
+
+TEST(BitVectorFunctionSim, AContinuousAssignmentFollowsItsOperand) {
+  EXPECT_EQ(RunBitVector("module t;\n"
+                         "  logic [7:0] v = 8'b0000_0011;\n"
+                         "  int c;\n"
+                         "  assign c = $countones(v);\n"
+                         "  initial begin\n"
+                         "    #1 $display(\"%0d\", c);\n"
+                         "    v = 8'b1111_0111;\n"
+                         "    #1 $display(\"%0d\", c);\n"
+                         "  end\n"
+                         "endmodule\n"),
+            "2\n7\n");
+}
+
+TEST(BitVectorFunctionSim, AClassMethodAPackageFunctionAndALetUseTheResult) {
+  EXPECT_EQ(RunBitVector(
+                "package pk;\n"
+                "  function automatic int ones(logic [7:0] x);\n"
+                "    return $countones(x);\n"
+                "  endfunction\n"
+                "endpackage\n"
+                "class C;\n"
+                "  function bit hot(logic [3:0] x);\n"
+                "    return $onehot(x);\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  let my_one_hot_known(myvec) = (($countones(myvec) == 1) &&\n"
+                "                                 ($countbits(myvec, 'x, 'z) "
+                "== 0));\n"
+                "  C h = new;\n"
+                "  initial $display(\"%0d %0d %0d %0d\", pk::ones(8'hF0), "
+                "h.hot(4'b0100),\n"
+                "    my_one_hot_known(4'b0100), my_one_hot_known(4'b01x0));\n"
+                "endmodule\n"),
+            "4 1 1 0\n");
+}
+
+TEST(BitVectorFunctionSim, ARandomizedValueSatisfiesABitVectorConstraint) {
+  EXPECT_EQ(RunBitVector("class C;\n"
+                         "  rand bit [7:0] b;\n"
+                         "  constraint c { $countones(b) == 3; }\n"
+                         "endclass\n"
+                         "module t;\n"
+                         "  C h = new;\n"
+                         "  int ok = 1;\n"
+                         "  initial begin\n"
+                         "    repeat (8) begin\n"
+                         "      void'(h.randomize());\n"
+                         "      if ($countones(h.b) != 3) ok = 0;\n"
+                         "    end\n"
+                         "    $display(\"%0d\", ok);\n"
+                         "  end\n"
+                         "endmodule\n"),
+            "1\n");
+}
+
+TEST(BitVectorFunctionSim, OnehotZeroIgnoresXAndZBits) {
+  EXPECT_EQ(RunBitVector("module t;\n"
+                         "  initial $display(\"%0d %0d %0d\", "
+                         "$onehot0(8'bxx00_0000), $onehot0(8'bx000_0001),\n"
+                         "    $onehot0(8'bz001_0001));\n"
+                         "endmodule\n"),
+            "1 1 0\n");
+}
+
+TEST(BitVectorFunctionSim, OnehotCountsOnlyItsOnesBesideXAndZBits) {
+  EXPECT_EQ(RunBitVector("module t;\n"
+                         "  initial $display(\"%0d %0d %0d %0d\", "
+                         "$onehot(8'b0000_x100), $onehot(8'b0000_z100),\n"
+                         "    $onehot(8'b0x00_z000), $onehot(8'b0x01_0100));\n"
+                         "endmodule\n"),
+            "1 1 0 0\n");
+}
+
+TEST(BitVectorFunctionSim, AStringAndAnUnpackedStructAreStreamed) {
+  EXPECT_EQ(
+      RunBitVector("module t;\n"
+                   "  typedef struct {logic [3:0] a; logic [3:0] b;} s_t;\n"
+                   "  string s = \"AC\";\n"
+                   "  s_t st;\n"
+                   "  initial begin\n"
+                   "    st.a = 4'b0111;\n"
+                   "    st.b = 4'b000x;\n"
+                   "    $display(\"%0d %0d %0d\", $countones(s), "
+                   "$countones(st), $isunknown(st));\n"
+                   "  end\n"
+                   "endmodule\n"),
+      "5 3 1\n");
+}
+
+TEST(BitVectorFunctionSim, BitSelectsOfAVariableAreControlBitsInAnAssertion) {
+  EXPECT_EQ(RunBitVector("module t;\n"
+                         "  logic [1:0] bad_bits;\n"
+                         "  logic [31:0] myvec;\n"
+                         "  logic done;\n"
+                         "  int fails = 0;\n"
+                         "  initial begin\n"
+                         "    myvec = 32'h0000_00zz;\n"
+                         "    done = 0;\n"
+                         "    bad_bits[0] = 'x;\n"
+                         "    bad_bits[1] = 'x;\n"
+                         "    a1: assert ($countbits(myvec, bad_bits[0], "
+                         "bad_bits[1]) == 0) else fails++;\n"
+                         "    done = 1;\n"
+                         "    bad_bits[0] = 'x;\n"
+                         "    bad_bits[1] = 'z;\n"
+                         "    a2: assert ($countbits(myvec, bad_bits[0], "
+                         "bad_bits[1]) == 0) else fails++;\n"
+                         "    $display(\"%0d %0d\", fails, $countbits(myvec, "
+                         "bad_bits[0], bad_bits[1]));\n"
+                         "  end\n"
+                         "endmodule\n"),
+            "1 8\n");
+}
+
+TEST(BitVectorFunctionSim, AZControlBitCountsOnlyZBits) {
+  EXPECT_EQ(RunBitVector("module t;\n"
+                         "  logic [7:0] v = 8'bzzx1_x0zz;\n"
+                         "  initial $display(\"%0d %0d\", $countbits(v, 1'bz), "
+                         "$countbits(v, 1'bx));\n"
+                         "endmodule\n"),
+            "4 2\n");
+}
+
+TEST(BitVectorFunctionSim, UnbasedUnsizedLiteralsAreControlBits) {
+  EXPECT_EQ(
+      RunBitVector(
+          "module t;\n"
+          "  logic [7:0] v = 8'bz1x0_110x;\n"
+          "  initial $display(\"%0d %0d %0d %0d %0d\", $countbits(v, '1), "
+          "$countbits(v, '0),\n"
+          "    $countbits(v, 'x), $countbits(v, 'z), $countbits(v, '1, '1));\n"
+          "endmodule\n"),
+      "3 2 2 1 3\n");
 }
 
 }  // namespace

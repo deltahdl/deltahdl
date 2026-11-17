@@ -9,6 +9,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "fixture_evaluator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -280,6 +281,206 @@ TEST(BitVectorFunctionArgs,
              "  initial u = $isunknown(vif.sig);\n"
              "endmodule\n",
              f));
+}
+
+TEST(BitVectorFunctionElab, AVariableOfANonBitStreamTypeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  shortreal sr;\n"
+      "  realtime rt;\n"
+      "  chandle ch;\n"
+      "  event ev;\n"
+      "  real ra[2];\n"
+      "  bit r[4];\n"
+      "  initial begin\n"
+      "    r[0] = $onehot(sr);\n"
+      "    r[1] = $onehot(rt);\n"
+      "    r[2] = $isunknown(ch);\n"
+      "    r[3] = $onehot0(ev);\n"
+      "    r[0] = $isunknown(ra);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$onehot' works on bit-stream values, and its expression "
+                    "argument's type is not a bit-stream type",
+                    9, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$onehot' works on bit-stream values, and its expression "
+                    "argument's type is not a bit-stream type",
+                    10, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$isunknown' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    11, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$onehot0' works on bit-stream values, and its expression "
+                    "argument's type is not a bit-stream type",
+                    12, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$isunknown' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    13, "20.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 5u);
+}
+
+TEST(BitVectorFunctionElab,
+     DISABLED_ARealLiteralOrAStructWithARealMemberIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct {int a; real b;} sr_t;\n"
+      "  sr_t s;\n"
+      "  int n, m;\n"
+      "  initial begin\n"
+      "    n = $countones(1.5);\n"
+      "    m = $countbits(s, 1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$countones' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    6, "20.9"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "'$countbits' works on bit-stream values, and its "
+                    "expression argument's type is not a bit-stream type",
+                    7, "20.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(BitVectorFunctionElab, AnIntegralUnpackedStructAndAStringAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  typedef struct {int a; logic [3:0] b;} s_t;\n"
+             "  s_t s;\n"
+             "  string str;\n"
+             "  int n, m;\n"
+             "  initial begin\n"
+             "    n = $countones(s);\n"
+             "    m = $countbits(str, 0);\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(BitVectorFunctionElab, ACountbitsCallWithNoArgumentIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int n;\n"
+      "  initial n = $countbits();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'$countbits' requires at least one control_bit argument", 3, "20.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(BitVectorFunctionElab, EachOneOperandFunctionWithOneArgumentIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  logic [3:0] c;\n"
+             "  int n;\n"
+             "  bit a, b, d;\n"
+             "  initial begin\n"
+             "    n = $countones(c);\n"
+             "    a = $onehot(c);\n"
+             "    b = $onehot0(c);\n"
+             "    d = $isunknown(c);\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(BitVectorFunctionElab,
+     DISABLED_AOneOperandFunctionWithNoneOrTwoArgumentsIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  logic [3:0] c;\n"
+      "  int r[8];\n"
+      "  initial begin\n"
+      "    r[0] = $countones();\n"
+      "    r[1] = $onehot();\n"
+      "    r[2] = $onehot0();\n"
+      "    r[3] = $isunknown();\n"
+      "    r[4] = $countones(c, c);\n"
+      "    r[5] = $onehot(c, c);\n"
+      "    r[6] = $onehot0(c, c);\n"
+      "    r[7] = $isunknown(c, 1'b1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$countones' takes exactly one argument", 5,
+                            "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$onehot' takes exactly one argument", 6, "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$onehot0' takes exactly one argument", 7,
+                            "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$isunknown' takes exactly one argument", 8,
+                            "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$countones' takes exactly one argument", 9,
+                            "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$onehot' takes exactly one argument", 10,
+                            "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$onehot0' takes exactly one argument", 11,
+                            "20.9"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'$isunknown' takes exactly one argument", 12,
+                            "20.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 8u);
+}
+
+TEST(BitVectorFunctionElab,
+     ACallWithConstantArgumentsFoldsWhereAConstantIsRequired) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "package pk;\n"
+      "  localparam int PO = $countones(8'hF1);\n"
+      "endpackage\n"
+      "module m;\n"
+      "  localparam logic [7:0] P = 8'h0F;\n"
+      "  logic [$countones(P) - 1 : 0] v;\n"
+      "  localparam int W = $bits(v);\n"
+      "  localparam int L = $countbits(8'b1010_0000, 2'b10);\n"
+      "  localparam int Q = pk::PO;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "W"), 4);
+  EXPECT_EQ(ParamValue(design, "L"), 6);
+  EXPECT_EQ(ParamValue(design, "Q"), 5);
+}
+
+TEST(BitVectorFunctionElab, DISABLED_AConstantOperandWithXOrZBitsFolds) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m;\n"
+      "  localparam int X = $isunknown(4'b10x1);\n"
+      "  localparam int Z = $countbits(4'bz0x1, 1'bz);\n"
+      "  localparam int K = $isunknown(4'b1001);\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ParamValue(design, "X"), 1);
+  EXPECT_EQ(ParamValue(design, "Z"), 1);
+  EXPECT_EQ(ParamValue(design, "K"), 0);
 }
 
 }  // namespace
