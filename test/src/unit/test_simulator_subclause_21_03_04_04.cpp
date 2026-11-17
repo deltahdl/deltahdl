@@ -641,4 +641,97 @@ TEST(FreadBinary, ChildInstanceUnpackedUnionReadsFirstMemberOnly) {
   std::remove(tmp.c_str());
 }
 
+TEST(FreadBinary, DescendingMemoryWithoutStartLoadsFromLowestAddress) {
+  SysTaskFixture f;
+  std::string tmp = "/tmp/deltahdl_213404_down_default.bin";
+  SeedBytes(tmp, {0x33, 0x44});
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer fd, code;\n"
+      "  bit [7:0] down [20:10];\n"
+      "  initial begin\n"
+      "    fd = $fopen(\"" +
+          tmp +
+          "\", \"rb\");\n"
+          "    code = $fread(down, fd);\n"
+          "    $display(\"code=%0d d10=%h d11=%h d12=%h d20=%h\", code, "
+          "down[10],\n"
+          "             down[11], down[12], down[20]);\n"
+          "    $fclose(fd);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "code=2 d10=33 d11=44 d12=00 d20=00\n");
+  std::remove(tmp.c_str());
+}
+
+std::string FreadInto(const std::string& tag, const std::string& prelude,
+                      const std::string& body, SysTaskFixture& f) {
+  std::string tmp = "/tmp/deltahdl_213404_" + tag + ".bin";
+  SeedBytes(tmp, {0xAA, 0xBB, 0xCC, 0xDD});
+  std::string out = RunCapture(prelude +
+                                   "module t;\n"
+                                   "  integer fd, n;\n"
+                                   "  C c;\n"
+                                   "  bit [15:0] v;\n"
+                                   "  task get(output bit [15:0] o, output "
+                                   "integer k); k = $fread(o, fd); endtask\n"
+                                   "  initial begin\n"
+                                   "    c = new;\n"
+                                   "    fd = $fopen(\"" +
+                                   tmp + "\", \"rb\");\n" + body +
+                                   "    $fclose(fd);\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                               f);
+  std::remove(tmp.c_str());
+  return out;
+}
+
+constexpr const char* kPropertyClass =
+    "class C;\n"
+    "  bit [7:0] m [0:1];\n"
+    "  bit [15:0] w;\n"
+    "  function int loadm(integer fd); return $fread(m, fd); endfunction\n"
+    "  function int loadw(integer fd); return $fread(w, fd); endfunction\n"
+    "endclass\n";
+
+TEST(FreadBinary, ReadsIntoATaskOutputFormal) {
+  SysTaskFixture f;
+  EXPECT_EQ(FreadInto("task", kPropertyClass,
+                      "    get(v, n);\n"
+                      "    $display(\"%0d %h\", n, v);\n",
+                      f),
+            "2 aabb\n");
+}
+
+TEST(FreadBinary, DISABLED_IntegralPropertyTakesTheBytesInAMethod) {
+  SysTaskFixture f;
+  EXPECT_EQ(FreadInto("propw", kPropertyClass,
+                      "    n = c.loadw(fd);\n"
+                      "    $display(\"%0d %h\", n, c.w);\n",
+                      f),
+            "2 aabb\n");
+}
+
+TEST(FreadBinary, DISABLED_MemoryPropertyTakesTheBytesInAMethod) {
+  SysTaskFixture f;
+  EXPECT_EQ(FreadInto("propm", kPropertyClass,
+                      "    n = c.loadm(fd);\n"
+                      "    $display(\"%0d %h %h\", n, c.m[0], c.m[1]);\n",
+                      f),
+            "2 aa bb\n");
+}
+
+TEST(FreadBinary, DISABLED_PropertiesTakeTheBytesThroughAHandle) {
+  SysTaskFixture f;
+  EXPECT_EQ(FreadInto("handle", kPropertyClass,
+                      "    n = $fread(c.w, fd);\n"
+                      "    $write(\"%0d %h \", n, c.w);\n"
+                      "    n = $fread(c.m, fd);\n"
+                      "    $display(\"%0d %h %h\", n, c.m[0], c.m[1]);\n",
+                      f),
+            "2 aabb 2 cc dd\n");
+}
+
 }  // namespace
