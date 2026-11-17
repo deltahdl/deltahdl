@@ -274,4 +274,220 @@ TEST(TypeCoverageSim,
   EXPECT_EQ(out, "25.00 25.00 0.00\n");
 }
 
+std::string RunSource(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(CovergroupCoverageSim, ItemsAreAveragedByTheirOptionWeight) {
+  EXPECT_EQ(
+      RunSource(
+          "module t;\n"
+          "  bit [1:0] a, b;\n"
+          "  covergroup cg;\n"
+          "    pa: coverpoint a { option.weight = 3; bins x[] = {[0:3]}; }\n"
+          "    pb: coverpoint b { option.weight = 1; bins y[] = {[0:3]}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    for (int i = 0; i < 4; i++) begin a = i; c.sample(); end\n"
+          "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+          "  end\n"
+          "endmodule\n"),
+      "81.25\n");
+}
+
+TEST(CovergroupCoverageSim, AFullyIgnoredCoverpointLeavesTheInstanceAverage) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit a;\n"
+                      "  bit [1:0] b;\n"
+                      "  covergroup cg;\n"
+                      "    pa: coverpoint a { ignore_bins i = {0, 1}; }\n"
+                      "    pb: coverpoint b { bins y[] = {[0:3]}; }\n"
+                      "  endgroup\n"
+                      "  cg c = new;\n"
+                      "  initial begin\n"
+                      "    b = 0; c.sample();\n"
+                      "    b = 1; c.sample();\n"
+                      "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "50.00\n");
+}
+
+TEST(CovergroupCoverageSim, AFullyIgnoredCrossLeavesTheInstanceAverage) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit [1:0] a, b;\n"
+                      "  covergroup cg;\n"
+                      "    pa: coverpoint a { bins x[] = {[0:1]}; }\n"
+                      "    pb: coverpoint b { bins y[] = {[0:1]}; }\n"
+                      "    xy: cross pa, pb { ignore_bins all = binsof(pa); }\n"
+                      "  endgroup\n"
+                      "  cg c = new;\n"
+                      "  initial begin\n"
+                      "    a = 0; b = 0; c.sample();\n"
+                      "    a = 1; c.sample();\n"
+                      "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "75.00\n");
+}
+
+const char kZeroDenominatorGroups[] =
+    "  covergroup ex;\n"
+    "    coverpoint a { ignore_bins i = {0, 1}; }\n"
+    "  endgroup\n"
+    "  covergroup zw;\n"
+    "    pa: coverpoint a { option.weight = 0; }\n"
+    "    pb: coverpoint b { option.weight = 0; }\n"
+    "    x: cross pa, pb { option.weight = 0; }\n"
+    "  endgroup\n"
+    "  covergroup em;\n"
+    "  endgroup\n";
+
+TEST(CovergroupCoverageSim, AZeroDenominatorGroupOfNonzeroWeightReadsZero) {
+  std::string src =
+      std::string(
+          "module t;\n"
+          "  bit a, b;\n"
+          "  int n, m, p, q;\n") +
+      kZeroDenominatorGroups +
+      "  ex c1 = new;\n"
+      "  zw c2 = new;\n"
+      "  em c3 = new;\n"
+      "  initial begin\n"
+      "    a = 1; b = 1; c1.sample(); c2.sample(); c3.sample();\n"
+      "    void'(c1.get_inst_coverage(n, m));\n"
+      "    void'(ex::get_coverage(p, q));\n"
+      "    $display(\"%0.2f %0.2f %0d %0d %0d %0d\",\n"
+      "      c1.get_inst_coverage(), ex::get_coverage(), n, m, p, q);\n"
+      "    void'(c2.get_inst_coverage(n, m));\n"
+      "    void'(zw::get_coverage(p, q));\n"
+      "    $display(\"%0.2f %0.2f %0d %0d %0d %0d\",\n"
+      "      c2.get_inst_coverage(), zw::get_coverage(), n, m, p, q);\n"
+      "    void'(c3.get_inst_coverage(n, m));\n"
+      "    void'(em::get_coverage(p, q));\n"
+      "    $display(\"%0.2f %0.2f %0d %0d %0d %0d\",\n"
+      "      c3.get_inst_coverage(), em::get_coverage(), n, m, p, q);\n"
+      "  end\n"
+      "endmodule\n";
+  EXPECT_EQ(RunSource(src),
+            "0.00 0.00 0 0 0 0\n"
+            "0.00 0.00 0 0 0 0\n"
+            "0.00 0.00 0 0 0 0\n");
+}
+
+TEST(CovergroupCoverageSim, AZeroDenominatorGroupOfZeroWeightReadsOneHundred) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit a;\n"
+                      "  covergroup ex;\n"
+                      "    option.weight = 0;\n"
+                      "    coverpoint a { ignore_bins i = {0, 1}; }\n"
+                      "  endgroup\n"
+                      "  ex c = new;\n"
+                      "  initial begin\n"
+                      "    a = 1; c.sample();\n"
+                      "    $display(\"%0.2f\", c.get_inst_coverage());\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "100.00\n");
+}
+
+TEST(CovergroupCoverageSim,
+     DISABLED_AZeroDenominatorTypeOfZeroWeightReadsOneHundred) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit a;\n"
+                      "  covergroup ex;\n"
+                      "    option.weight = 0;\n"
+                      "    type_option.weight = 0;\n"
+                      "    coverpoint a { ignore_bins i = {0, 1}; }\n"
+                      "  endgroup\n"
+                      "  ex c = new;\n"
+                      "  initial begin\n"
+                      "    a = 1; c.sample();\n"
+                      "    $display(\"%0.2f %0.2f\", ex::get_coverage(),\n"
+                      "      c.get_coverage());\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "100.00 100.00\n");
+}
+
+TEST(CovergroupCoverageSim, DISABLED_AMergedZeroDenominatorTypeReadsZero) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit a;\n"
+                      "  covergroup gm;\n"
+                      "    type_option.merge_instances = 1;\n"
+                      "    coverpoint a { ignore_bins i = {0, 1}; }\n"
+                      "  endgroup\n"
+                      "  gm m = new;\n"
+                      "  initial begin\n"
+                      "    a = 1; m.sample();\n"
+                      "    $display(\"%0.2f %0.2f\", gm::get_coverage(),\n"
+                      "      m.get_inst_coverage());\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "0.00 0.00\n");
+}
+
+std::string OverallBesideACoveredGroup(const char* zero_group) {
+  return RunSource(std::string("module t;\n"
+                               "  bit a, b;\n"
+                               "  covergroup ok;\n"
+                               "    coverpoint a { bins one = {1}; }\n"
+                               "  endgroup\n") +
+                   kZeroDenominatorGroups +
+                   "  ok c0 = new;\n"
+                   "  " +
+                   zero_group +
+                   " cz = new;\n"
+                   "  initial begin\n"
+                   "    a = 1; b = 1; c0.sample(); cz.sample();\n"
+                   "    $display(\"%0.2f\", $get_coverage());\n"
+                   "  end\n"
+                   "endmodule\n");
+}
+
+TEST(CovergroupCoverageSim,
+     DISABLED_AnAllExcludedGroupLeavesTheOverallCoverage) {
+  EXPECT_EQ(OverallBesideACoveredGroup("ex"), "100.00\n");
+}
+
+TEST(CovergroupCoverageSim, AZeroWeightOrItemlessGroupLeavesTheOverall) {
+  EXPECT_EQ(OverallBesideACoveredGroup("zw"), "100.00\n");
+  EXPECT_EQ(OverallBesideACoveredGroup("em"), "100.00\n");
+}
+
+TEST(CovergroupCoverageSim, OverallCoverageIsFullWithNoInstanceConstructed) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit a;\n"
+                      "  covergroup cg;\n"
+                      "    coverpoint a { bins one = {1}; }\n"
+                      "  endgroup\n"
+                      "  cg c;\n"
+                      "  initial $display(\"%0.2f\", $get_coverage());\n"
+                      "endmodule\n"),
+            "100.00\n");
+}
+
+TEST(CovergroupCoverageSim, OverallCoverageIsFullWhenEveryGroupWeighsZero) {
+  EXPECT_EQ(RunSource("module t;\n"
+                      "  bit a;\n"
+                      "  covergroup g1;\n"
+                      "    option.weight = 0;\n"
+                      "    coverpoint a { bins one = {1}; }\n"
+                      "  endgroup\n"
+                      "  covergroup g2;\n"
+                      "    coverpoint a { bins zero = {0}; bins one = {1}; }\n"
+                      "  endgroup\n"
+                      "  g1 c1 = new;\n"
+                      "  g2 c2 = new;\n"
+                      "  initial begin\n"
+                      "    c2.option.weight = 0;\n"
+                      "    a = 0; c1.sample(); c2.sample();\n"
+                      "    $display(\"%0.2f\", $get_coverage());\n"
+                      "  end\n"
+                      "endmodule\n"),
+            "100.00\n");
+}
+
 }  // namespace

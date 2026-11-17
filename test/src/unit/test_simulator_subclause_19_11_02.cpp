@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -196,6 +197,55 @@ TEST(CrossCoverage, ZeroDenominatorCrossDroppedFromCovergroup) {
   db.Sample(g, {{"keep", 0}});
 
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
+}
+
+std::string RunSource(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(CrossCoverageSim, IllegalBinsProductsLeaveTheDenominator) {
+  EXPECT_EQ(
+      RunSource(
+          "module t;\n"
+          "  bit [1:0] a, b;\n"
+          "  int n, m;\n"
+          "  covergroup cg;\n"
+          "    pa: coverpoint a { bins x[] = {[0:1]}; }\n"
+          "    pb: coverpoint b { bins y[] = {[0:1]}; }\n"
+          "    xy: cross pa, pb {\n"
+          "      illegal_bins il = binsof(pa) intersect {1};\n"
+          "    }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    a = 0; b = 0; c.sample();\n"
+          "    void'(c.xy.get_inst_coverage(n, m));\n"
+          "    $display(\"%0.2f %0d %0d\", c.xy.get_inst_coverage(), n, m);\n"
+          "  end\n"
+          "endmodule\n"),
+      "50.00 1 2\n");
+}
+
+TEST(CrossCoverageSim, AFullyIgnoredCrossReadsZeroAndZeroCounts) {
+  EXPECT_EQ(
+      RunSource(
+          "module t;\n"
+          "  bit [1:0] a, b;\n"
+          "  int n, m;\n"
+          "  covergroup cg;\n"
+          "    pa: coverpoint a { bins x[] = {[0:1]}; }\n"
+          "    pb: coverpoint b { bins y[] = {[0:1]}; }\n"
+          "    xy: cross pa, pb { ignore_bins all = binsof(pa); }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  initial begin\n"
+          "    a = 0; b = 0; c.sample();\n"
+          "    void'(c.xy.get_inst_coverage(n, m));\n"
+          "    $display(\"%0.2f %0d %0d\", c.xy.get_inst_coverage(), n, m);\n"
+          "  end\n"
+          "endmodule\n"),
+      "0.00 0 0\n");
 }
 
 }  // namespace
