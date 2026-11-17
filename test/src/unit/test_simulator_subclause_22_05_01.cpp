@@ -91,3 +91,19 @@ TEST(DefineSimulation, MacroBodyCommentStrippedSimulates) {
       "result");
   EXPECT_EQ(result, 7u);
 }
+
+TEST(DefineSimulation, DirectiveNamesServeAsOrdinaryVariables) {
+  auto result = PreprocessAndGet(
+      "module t;\n"
+      "  int ifdef;\n"
+      "  int define;\n"
+      "  logic [7:0] result;\n"
+      "  initial begin\n"
+      "    ifdef = 4;\n"
+      "    define = ifdef + 1;\n"
+      "    result = define;\n"
+      "  end\n"
+      "endmodule\n",
+      "result");
+  EXPECT_EQ(result, 5u);
+}
