@@ -649,4 +649,48 @@ TEST(Preprocessor, CellMarkPastAnyWhiteSpaceAndLifetime) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "c3"));
 }
 
+TEST(CelldefinePreprocessing, DISABLED_TagsModuleHeaderProducedByAMacro) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  PreprocessWithPP(
+      "`define HEADER module from_macro;\n"
+      "`celldefine\n"
+      "`HEADER\n"
+      "endmodule\n"
+      "`endcelldefine\n",
+      f, pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(IsTaggedAsCell(pp, "from_macro"));
+}
+
+struct CellRegionPlace {
+  const char* opener;
+  const char* closer;
+};
+
+TEST(CelldefinePreprocessing, BothDirectivesAcceptedInsideAnyElement) {
+  for (const auto& p : {
+           CellRegionPlace{"interface i;\n", "endinterface\n"},
+           CellRegionPlace{"program g;\n", "endprogram\n"},
+           CellRegionPlace{"checker c;\n", "endchecker\n"},
+           CellRegionPlace{"class k;\n", "endclass\n"},
+           CellRegionPlace{"class k;\nfunction void f();\n",
+                           "endfunction\nendclass\n"},
+           CellRegionPlace{"module m;\ntask t();\n", "endtask\nendmodule\n"},
+           CellRegionPlace{"module m;\nfunction void f();\n",
+                           "endfunction\nendmodule\n"},
+           CellRegionPlace{"module m;\ngenerate\n", "endgenerate\nendmodule\n"},
+           CellRegionPlace{"module m;\nfor (genvar i = 0; i < 2; i++) begin\n",
+                           "end\nendmodule\n"},
+           CellRegionPlace{"module m;\nif (1) begin\n", "end\nendmodule\n"},
+       }) {
+    PreprocFixture f;
+    Preprocessor pp(f.mgr, f.diag, {});
+    PreprocessWithPP(
+        std::string(p.opener) + "`celldefine\n`endcelldefine\n" + p.closer, f,
+        pp);
+    EXPECT_FALSE(f.diag.HasErrors()) << p.opener;
+  }
+}
+
 }  // namespace
