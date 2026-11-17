@@ -722,4 +722,44 @@ TEST(CovergroupInstanceSim, AnInputFormalKeepsTheValuePassedAtNew) {
             "n=1 t=2\n");
 }
 
+TEST(CovergroupTypeScopeSim,
+     DISABLED_AGenerateBlockCovergroupHidesOneOfTheSameNameOutside) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module top;\n"
+          "  bit [2:0] v; int n, t;\n"
+          "  covergroup cg; coverpoint v { bins b[] = {[0:1]}; }\n"
+          "  endgroup\n"
+          "  cg c = new;\n"
+          "  if (1) begin : g1\n"
+          "    covergroup cg; coverpoint v { bins b[] = {[0:6]}; }\n"
+          "    endgroup\n"
+          "    cg c = new;\n"
+          "    if (1) begin : g2\n"
+          "      covergroup cg; coverpoint v { bins b[] = {[0:3]}; "
+          "}\n"
+          "      endgroup\n"
+          "      cg c = new;\n"
+          "    end\n"
+          "  end\n"
+          "  for (genvar i = 0; i < 1; i++) begin : lp\n"
+          "    covergroup cg; coverpoint v { bins b[] = {[0:2]}; }\n"
+          "    endgroup\n"
+          "    cg c = new;\n"
+          "  end\n"
+          "  initial begin\n"
+          "    void'(c.get_inst_coverage(n, t)); $write(\"%0d \", t);\n"
+          "    void'(g1.c.get_inst_coverage(n, t)); $write(\"%0d \", "
+          "t);\n"
+          "    void'(g1.g2.c.get_inst_coverage(n, t)); "
+          "$write(\"%0d \", t);\n"
+          "    void'(lp[0].c.get_inst_coverage(n, t)); $display(\"%0d\", t);\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "2 7 4 3\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace

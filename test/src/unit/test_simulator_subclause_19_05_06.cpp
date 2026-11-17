@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
 #include "simulator/coverage.h"
@@ -266,6 +267,258 @@ TEST(CovergroupInstanceSim, IllegalTransitionRemovesASequenceContainingIt) {
                        f),
             "n=1 t=2\n");
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+struct IllegalRun {
+  std::string out;
+  std::vector<Diagnostic> diags;
+  uint32_t errors = 0;
+};
+
+IllegalRun RunIllegal(const std::string& design) {
+  SimFixture f;
+  IllegalRun run;
+  run.out = RunCapture(design, f);
+  run.diags = f.diag.Diagnostics();
+  run.errors = f.diag.ErrorCount();
+  return run;
+}
+
+bool ReportsValueAt(const IllegalRun& run, const std::string& point,
+                    int64_t value, uint32_t line) {
+  return ReportedError(run.diags,
+                       "sampled value " + std::to_string(value) +
+                           " of coverpoint '" + point +
+                           "' falls in an illegal bin",
+                       line, "19.5.6");
+}
+
+TEST(IllegalBinsSim, IllegalValuesLeaveTheBinsAfterTheValuesAreSplit) {
+  IllegalRun run = RunIllegal(
+      "module top;\n"
+      "  bit [2:0] v; int n, t;\n"
+      "  covergroup cg;\n"
+      "    pa: coverpoint v { bins s[2] = {[0:3]};\n"
+      "      illegal_bins bad = {0, 1}; }\n"
+      "    pb: coverpoint v { bins x = {1, 2}; bins y = {3};\n"
+      "      illegal_bins bad = {1, 2}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    v = 2; c.sample(); v = 3; c.sample();\n"
+      "    void'(c.pa.get_inst_coverage(n, t));\n"
+      "    $display(\"pa %0d %0d\", n, t);\n"
+      "    void'(c.pb.get_inst_coverage(n, t));\n"
+      "    $display(\"pb %0d %0d\", n, t);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run.out, "pa 1 1\npb 1 1\n");
+  EXPECT_TRUE(ReportsValueAt(run, "pb", 2, 11));
+  EXPECT_EQ(run.errors, 1u);
+}
+
+TEST(IllegalBinsSim, AnIllegalValueLeavesATransitionThroughIt) {
+  IllegalRun run = RunIllegal(
+      "module top;\n"
+      "  bit [2:0] v; int n, t;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins t = (1 => 2); bins o = {5};\n"
+      "      illegal_bins bad = {2}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    v = 1; c.sample();\n"
+      "    v = 2; c.sample();\n"
+      "    void'(c.get_inst_coverage(n, t));\n"
+      "    $display(\"%0d %0d\", n, t);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run.out, "1 2\n");
+  EXPECT_TRUE(ReportsValueAt(run, "v", 2, 10));
+  EXPECT_EQ(run.errors, 1u);
+}
+
+TEST(IllegalBinsSim, AnIllegalTransitionFromSourceIsARunTimeError) {
+  IllegalRun run = RunIllegal(
+      "module top;\n"
+      "  bit [2:0] v; int n, t;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins o = {0}; illegal_bins bad = (1 => 2); }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    v = 1; c.sample(); v = 2; c.sample();\n"
+      "    v = 0; c.sample(); v = 2; c.sample();\n"
+      "    v = 1; c.sample();\n"
+      "    v = 2; c.sample();\n"
+      "    void'(c.get_inst_coverage(n, t));\n"
+      "    $display(\"%0d %0d\", n, t);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run.out, "1 1\n");
+  EXPECT_TRUE(ReportsValueAt(run, "v", 2, 8));
+  EXPECT_TRUE(ReportsValueAt(run, "v", 2, 11));
+  EXPECT_EQ(run.errors, 2u);
+}
+
+TEST(IllegalBinsSim, AnIllegalBinOutranksIgnoreBinsAndOtherBins) {
+  IllegalRun run = RunIllegal(
+      "module top;\n"
+      "  bit [2:0] v; int n, t;\n"
+      "  covergroup cg;\n"
+      "    pa: coverpoint v { bins b[] = {[0:3]}; ignore_bins ig = {1};\n"
+      "      illegal_bins bad = {1}; }\n"
+      "    pb: coverpoint v { bins ok = {[0:3]}; illegal_bins bad = {2}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    v = 1; c.sample();\n"
+      "    v = 2; c.sample();\n"
+      "    void'(c.pa.get_inst_coverage(n, t));\n"
+      "    $display(\"pa %0d %0d\", n, t);\n"
+      "    void'(c.pb.get_inst_coverage(n, t));\n"
+      "    $display(\"pb %0d %0d\", n, t);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run.out, "pa 1 3\npb 1 1\n");
+  EXPECT_TRUE(ReportsValueAt(run, "pa", 1, 10));
+  EXPECT_TRUE(ReportsValueAt(run, "pb", 2, 11));
+  EXPECT_EQ(run.errors, 2u);
+}
+
+TEST(IllegalBinsSim, EveryFormOfIllegalBinReportsItsValues) {
+  IllegalRun run = RunIllegal(
+      "module top;\n"
+      "  bit [2:0] v; int n, t;\n"
+      "  int arr[2] = '{1, 5};\n"
+      "  covergroup c1;\n"
+      "    pa: coverpoint v { bins b[] = {[0:7]};\n"
+      "      wildcard illegal_bins bad = {3'b1??}; }\n"
+      "  endgroup\n"
+      "  covergroup c2;\n"
+      "    pb: coverpoint v { bins b[] = {[0:7]};\n"
+      "      illegal_bins bad[] = {[2:3], 6}; }\n"
+      "  endgroup\n"
+      "  covergroup c3;\n"
+      "    pc: coverpoint v { bins b[] = {[0:7]};\n"
+      "      illegal_bins bad = {[0:7]} with (item % 2 == 1); }\n"
+      "  endgroup\n"
+      "  covergroup c4;\n"
+      "    pd: coverpoint v { bins b[] = {[0:7]}; illegal_bins bad = arr; }\n"
+      "  endgroup\n"
+      "  c1 g1 = new; c2 g2 = new; c3 g3 = new; c4 g4 = new;\n"
+      "  initial begin\n"
+      "    v = 3; g1.sample();\n"
+      "    v = 5; g1.sample();\n"
+      "    v = 4; g2.sample();\n"
+      "    v = 6; g2.sample();\n"
+      "    v = 4; g3.sample();\n"
+      "    v = 3; g3.sample();\n"
+      "    v = 4; g4.sample();\n"
+      "    v = 5; g4.sample();\n"
+      "    void'(g1.get_inst_coverage(n, t)); $display(\"%0d %0d\", n, t);\n"
+      "    void'(g2.get_inst_coverage(n, t)); $display(\"%0d %0d\", n, t);\n"
+      "    void'(g3.get_inst_coverage(n, t)); $display(\"%0d %0d\", n, t);\n"
+      "    void'(g4.get_inst_coverage(n, t)); $display(\"%0d %0d\", n, t);\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run.out, "1 4\n1 5\n1 4\n1 6\n");
+  EXPECT_TRUE(ReportsValueAt(run, "pa", 5, 22));
+  EXPECT_TRUE(ReportsValueAt(run, "pb", 6, 24));
+  EXPECT_TRUE(ReportsValueAt(run, "pc", 3, 26));
+  EXPECT_TRUE(ReportsValueAt(run, "pd", 5, 28));
+  EXPECT_EQ(run.errors, 4u);
+}
+
+TEST(IllegalBinsSim, DISABLED_ADefaultIllegalBinReportsWhatItCatches) {
+  IllegalRun run = RunIllegal(
+      "module top;\n"
+      "  bit [2:0] v;\n"
+      "  covergroup c1;\n"
+      "    pa: coverpoint v { bins a = {1}; illegal_bins rest = default; }\n"
+      "  endgroup\n"
+      "  covergroup c2;\n"
+      "    pb: coverpoint v { bins t = (1 => 2);\n"
+      "      illegal_bins rest = default sequence; }\n"
+      "  endgroup\n"
+      "  c1 g1 = new; c2 g2 = new;\n"
+      "  initial begin\n"
+      "    v = 1; g1.sample();\n"
+      "    v = 2; g1.sample();\n"
+      "    v = 1; g2.sample(); v = 2; g2.sample();\n"
+      "    v = 4; g2.sample();\n"
+      "    $display(\"done\");\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(run.out, "done\n");
+  EXPECT_TRUE(ReportsValueAt(run, "pa", 2, 13));
+  EXPECT_TRUE(ReportsValueAt(run, "pb", 4, 15));
+  EXPECT_EQ(run.errors, 2u);
+}
+
+TEST(IllegalBinsSim, IllegalBinsReportInEveryPlace) {
+  IllegalRun run = RunIllegal(
+      "covergroup ucg (ref bit [1:0] v);\n"
+      "  pu: coverpoint v { bins b[] = {[0:3]}; illegal_bins bad = {2}; }\n"
+      "endgroup\n"
+      "package pk;\n"
+      "  covergroup pcg (ref bit [1:0] v);\n"
+      "    pp: coverpoint v { bins b[] = {[0:3]}; illegal_bins bad = {2}; }\n"
+      "  endgroup\n"
+      "endpackage\n"
+      "interface ifc;\n"
+      "  bit [1:0] v;\n"
+      "  covergroup icg;\n"
+      "    pi: coverpoint v { bins b[] = {[0:3]}; illegal_bins bad = {2}; }\n"
+      "  endgroup\n"
+      "  icg c = new;\n"
+      "  initial #1 begin v = 3; c.sample(); v = 2; c.sample(); end\n"
+      "endinterface\n"
+      "program pg;\n"
+      "  bit [1:0] v;\n"
+      "  covergroup gcg;\n"
+      "    pg: coverpoint v { bins b[] = {[0:3]}; illegal_bins bad = {2}; }\n"
+      "  endgroup\n"
+      "  gcg c = new;\n"
+      "  initial #9 begin v = 3; c.sample(); v = 2; c.sample(); end\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class K;\n"
+      "    bit [1:0] w;\n"
+      "    covergroup kcg;\n"
+      "      pk: coverpoint w { bins b[] = {[0:3]}; illegal_bins bad = {2}; }\n"
+      "    endgroup\n"
+      "    function new(); kcg = new; endfunction\n"
+      "  endclass\n"
+      "  bit [1:0] v;\n"
+      "  ifc i();\n"
+      "  pg g();\n"
+      "  pk::pcg p = new(v);\n"
+      "  ucg u = new(v);\n"
+      "  if (1) begin : gen\n"
+      "    bit [1:0] x;\n"
+      "    covergroup bcg;\n"
+      "      bit [1:0] pb: coverpoint x { bins b[] = {[0:3]}; illegal_bins bad "
+      "= {2}; }\n"
+      "    endgroup\n"
+      "    bcg c = new;\n"
+      "    initial #3 begin x = 3; c.sample(); x = 2; c.sample(); end\n"
+      "  end\n"
+      "  initial begin\n"
+      "    automatic K k = new;\n"
+      "    #4 k.w = 3; k.kcg.sample(); k.w = 2; k.kcg.sample();\n"
+      "    v = 3; p.sample(); u.sample();\n"
+      "    v = 2; p.sample();\n"
+      "    u.sample();\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportsValueAt(run, "pi", 2, 15));
+  EXPECT_TRUE(ReportsValueAt(run, "pg", 2, 23));
+  EXPECT_TRUE(ReportsValueAt(run, "pb", 2, 44));
+  EXPECT_TRUE(ReportsValueAt(run, "pk", 2, 48));
+  EXPECT_TRUE(ReportsValueAt(run, "pp", 2, 50));
+  EXPECT_TRUE(ReportsValueAt(run, "pu", 2, 51));
+  EXPECT_EQ(run.errors, 6u);
 }
 
 }  // namespace

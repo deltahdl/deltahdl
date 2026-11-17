@@ -440,4 +440,176 @@ TEST(CovergroupInstanceSim, DISABLED_AZeroSkewClockvarSamplesTheObservedValue) {
   EXPECT_EQ(SimOk(ClockedRun("#0", "bins two = {2};")), "100.00\n");
 }
 
+std::string BinTotals(const std::string& head,
+                      const std::vector<std::string>& points) {
+  std::string reads;
+  for (const std::string& point : points) {
+    reads += "    void'(c." + point +
+             ".get_inst_coverage(n, t)); $write(\"%0d \", t);\n";
+  }
+  return SimOk(head +
+               "  cg c = new(rr, 5);\n"
+               "  initial begin\n" +
+               reads +
+               "    $display;\n"
+               "  end\n"
+               "endmodule\n");
+}
+
+TEST(InferredCoverpointTypeSim, AnOperationTakesItsSelfDeterminedType) {
+  EXPECT_EQ(BinTotals("module top;\n"
+                      "  typedef struct packed { bit [2:0] f; bit g; } s_t;\n"
+                      "  typedef bit [2:0] t3;\n"
+                      "  bit [1:0] a, b; bit [31:0] wide; bit [2:0] rr;\n"
+                      "  t3 td; s_t s; bit [2:0] arr [4];\n"
+                      "  bit [3:0][2:0] pa; bit [2:0] q[$]; int n, t;\n"
+                      "  covergroup cg (ref bit [2:0] r, input int k);\n"
+                      "    c_add: coverpoint a + b;\n"
+                      "    c_cat: coverpoint {a, b};\n"
+                      "    c_eq: coverpoint a == b;\n"
+                      "    c_cond: coverpoint (a[0] ? a : b);\n"
+                      "    c_red: coverpoint &a;\n"
+                      "    c_sh: coverpoint a << 1;\n"
+                      "    c_cast: coverpoint 3'(a);\n"
+                      "    c_sg: coverpoint $signed(a);\n"
+                      "    c_co: coverpoint $countones(a);\n"
+                      "    c_qs: coverpoint q.size();\n"
+                      "    c_ps: coverpoint wide[31:29];\n"
+                      "    c_sl: coverpoint pa[1][1:0];\n"
+                      "    c_pe: coverpoint pa[1];\n"
+                      "    c_ae: coverpoint arr[1];\n"
+                      "    c_sm: coverpoint s.f;\n"
+                      "    c_s: coverpoint s;\n"
+                      "    c_td: coverpoint td;\n"
+                      "    c_ref: coverpoint r;\n"
+                      "    c_in: coverpoint k;\n"
+                      "  endgroup\n",
+                      {"c_add", "c_cat", "c_eq", "c_cond", "c_red", "c_sh",
+                       "c_cast", "c_sg", "c_co", "c_qs", "c_ps", "c_sl", "c_pe",
+                       "c_ae", "c_sm", "c_s", "c_td", "c_ref", "c_in"}),
+            "4 16 2 4 2 4 8 4 64 64 8 4 8 8 8 16 8 8 64 \n");
+}
+
+TEST(InferredCoverpointTypeSim, ScopedNamesAndCallsTakeTheirDeclaredType) {
+  EXPECT_EQ(BinTotals("bit [2:0] uv;\n"
+                      "function automatic bit [2:0] uf(input bit [1:0] x);\n"
+                      "  return {1'b1, x};\n"
+                      "endfunction\n"
+                      "package pk;\n"
+                      "  bit [2:0] pv;\n"
+                      "  function automatic bit [2:0] pf(input bit [1:0] x);\n"
+                      "    return {1'b1, x};\n"
+                      "  endfunction\n"
+                      "endpackage\n"
+                      "module top;\n"
+                      "  class K;\n"
+                      "    static bit [2:0] sp;\n"
+                      "    bit [2:0] hp;\n"
+                      "    static function bit [2:0] sf(input bit [1:0] x);\n"
+                      "      return {1'b1, x};\n"
+                      "    endfunction\n"
+                      "    function bit [2:0] mf(); return hp; endfunction\n"
+                      "  endclass\n"
+                      "  bit [1:0] a; bit [2:0] rr; int n, t;\n"
+                      "  K h = new;\n"
+                      "  covergroup cg (ref bit [2:0] r, input int k);\n"
+                      "    c_uv: coverpoint uv;\n"
+                      "    c_uf: coverpoint uf(a);\n"
+                      "    c_pv: coverpoint pk::pv;\n"
+                      "    c_pf: coverpoint pk::pf(a);\n"
+                      "    c_sp: coverpoint K::sp;\n"
+                      "    c_sf: coverpoint K::sf(a);\n"
+                      "    c_hp: coverpoint h.hp;\n"
+                      "    c_mf: coverpoint h.mf();\n"
+                      "  endgroup\n",
+                      {"c_uv", "c_uf", "c_pv", "c_pf", "c_sp", "c_sf", "c_hp",
+                       "c_mf"}),
+            "8 8 8 8 8 8 8 8 \n");
+}
+
+TEST(InferredCoverpointTypeSim,
+     DISABLED_AHierarchicalNameOrModuleFunctionKeepsItsWidth) {
+  EXPECT_EQ(
+      BinTotals("interface ifc; bit [2:0] sig; endinterface\n"
+                "module leaf; bit [2:0] lx; endmodule\n"
+                "module mid; leaf l(); bit [2:0] sx; endmodule\n"
+                "module top;\n"
+                "  bit [1:0] a; bit [2:0] rr; int n, t;\n"
+                "  mid u(); ifc i(); virtual ifc vif = i;\n"
+                "  function automatic bit [2:0] f3(input bit [1:0] x);\n"
+                "    return {1'b1, x};\n"
+                "  endfunction\n"
+                "  if (1) begin : gen\n"
+                "    bit [2:0] gx;\n"
+                "  end\n"
+                "  covergroup cg (ref bit [2:0] r, input int k);\n"
+                "    c_u: coverpoint u.sx;\n"
+                "    c_top: coverpoint top.u.sx;\n"
+                "    c_two: coverpoint u.l.lx;\n"
+                "    c_ifc: coverpoint i.sig;\n"
+                "    c_vif: coverpoint vif.sig;\n"
+                "    c_gen: coverpoint gen.gx;\n"
+                "    c_fn: coverpoint f3(a);\n"
+                "  endgroup\n",
+                {"c_u", "c_top", "c_two", "c_ifc", "c_vif", "c_gen", "c_fn"}),
+      "8 8 8 8 8 8 8 \n");
+}
+
+TEST(InferredCoverpointTypeSim,
+     DISABLED_AnInterfacePortOrScopeFunctionKeepsItsWidth) {
+  EXPECT_EQ(
+      SimOk(
+          "interface ifc;\n"
+          "  bit [2:0] sig; bit [1:0] a; int n, t;\n"
+          "  function automatic bit [2:0] ifn(input bit [1:0] x);\n"
+          "    return {1'b1, x};\n"
+          "  endfunction\n"
+          "  covergroup icg; coverpoint ifn(a); endgroup\n"
+          "  icg c = new;\n"
+          "  initial #1 begin\n"
+          "    void'(c.get_inst_coverage(n, t)); $display(\"i %0d\", t);\n"
+          "  end\n"
+          "  modport mp (input sig);\n"
+          "endinterface\n"
+          "program pg;\n"
+          "  bit [1:0] a; int n, t;\n"
+          "  function automatic bit [2:0] pfn(input bit [1:0] x);\n"
+          "    return {1'b1, x};\n"
+          "  endfunction\n"
+          "  covergroup gcg; coverpoint pfn(a); endgroup\n"
+          "  gcg c = new;\n"
+          "  initial #9 begin\n"
+          "    void'(c.get_inst_coverage(n, t)); $display(\"p %0d\", t);\n"
+          "  end\n"
+          "endprogram\n"
+          "module user (ifc p, ifc.mp q);\n"
+          "  int n, t;\n"
+          "  covergroup ucg; cp: coverpoint p.sig; cq: coverpoint q.sig;\n"
+          "  endgroup\n"
+          "  ucg c = new;\n"
+          "  initial #3 begin\n"
+          "    void'(c.cp.get_inst_coverage(n, t)); $display(\"pp %0d\", t);\n"
+          "    void'(c.cq.get_inst_coverage(n, t)); $display(\"mp %0d\", t);\n"
+          "  end\n"
+          "endmodule\n"
+          "module top;\n"
+          "  bit [1:0] a;\n"
+          "  ifc i(); pg g(); user us(i, i);\n"
+          "  if (1) begin : gen\n"
+          "    int n, t; bit [2:0] gx;\n"
+          "    function automatic bit [2:0] gf(input bit [1:0] x);\n"
+          "      return {1'b1, x};\n"
+          "    endfunction\n"
+          "    covergroup bcg; cf: coverpoint gf(a); cx: coverpoint gx;\n"
+          "    endgroup\n"
+          "    bcg c = new;\n"
+          "    initial #4 begin\n"
+          "      void'(c.cf.get_inst_coverage(n, t)); $display(\"g %0d\", t);\n"
+          "      void'(c.cx.get_inst_coverage(n, t)); $display(\"x %0d\", t);\n"
+          "    end\n"
+          "  end\n"
+          "endmodule\n"),
+      "i 8\npp 8\nmp 8\ng 8\nx 8\np 8\n");
+}
+
 }  // namespace
