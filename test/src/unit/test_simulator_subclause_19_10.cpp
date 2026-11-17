@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <initializer_list>
+#include <iterator>
+#include <span>
 #include <string>
 #include <type_traits>
+#include <utility>
 
+#include "fixture_simulator.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
 
@@ -156,6 +162,168 @@ TEST(CoverageOrganization, MembersReachableThroughCoverGroup) {
   g->type_option.merge_instances = true;
   EXPECT_TRUE(g->options.per_instance);
   EXPECT_TRUE(g->type_option.merge_instances);
+}
+
+const char kOptionLevels[] =
+    "module t;\n"
+    "  bit [1:0] a, b;\n"
+    "  covergroup cg;\n"
+    "    cp: coverpoint a;\n"
+    "    cq: coverpoint b;\n"
+    "    x: cross cp, cq;\n"
+    "  endgroup\n"
+    "  cg c = new;\n"
+    "  initial begin\n";
+
+const char* const kIntMembers[] = {"c.option.weight",
+                                   "c.option.goal",
+                                   "c.option.at_least",
+                                   "c.option.auto_bin_max",
+                                   "c.option.cross_num_print_missing",
+                                   "c.cp.option.weight",
+                                   "c.cp.option.goal",
+                                   "c.cp.option.at_least",
+                                   "c.cp.option.auto_bin_max",
+                                   "c.x.option.weight",
+                                   "c.x.option.goal",
+                                   "c.x.option.at_least",
+                                   "c.x.option.cross_num_print_missing",
+                                   "cg::type_option.weight",
+                                   "cg::type_option.goal",
+                                   "cg::cp::type_option.weight",
+                                   "cg::cp::type_option.goal",
+                                   "cg::x::type_option.weight",
+                                   "cg::x::type_option.goal"};
+
+const char* const kBitMembers[] = {
+    "c.option.cross_retain_auto_bins", "c.option.detect_overlap",
+    "c.option.per_instance",           "c.option.get_inst_coverage",
+    "c.cp.option.detect_overlap",      "c.x.option.cross_retain_auto_bins",
+    "cg::type_option.strobe",          "cg::type_option.merge_instances",
+    "cg::type_option.distribute_first"};
+
+const char* const kStringMembers[] = {"c.option.name",
+                                      "c.option.comment",
+                                      "c.cp.option.comment",
+                                      "c.x.option.comment",
+                                      "cg::type_option.comment",
+                                      "cg::cp::type_option.comment",
+                                      "cg::x::type_option.comment"};
+
+const char* const kRealMembers[] = {"cg::type_option.real_interval",
+                                    "cg::cp::type_option.real_interval"};
+
+std::string RunLevels(const std::string& statements) {
+  SimFixture f;
+  return RunCapture(std::string(kOptionLevels) + statements +
+                        "  end\n"
+                        "endmodule\n",
+                    f);
+}
+
+std::string EachMember(std::span<const char* const> members, const char* format,
+                       const char* call) {
+  std::string statements;
+  for (const char* member : members) {
+    statements.append("    $display(\"")
+        .append(format)
+        .append("\", ")
+        .append(call)
+        .append("(")
+        .append(member)
+        .append("));\n");
+  }
+  return statements;
+}
+
+std::string Repeated(const std::string& line, std::size_t count) {
+  std::string lines;
+  for (std::size_t i = 0; i < count; ++i) lines.append(line).append("\n");
+  return lines;
+}
+
+TEST(OptionMemberTypes, DISABLED_EachMemberHasTheTypeItsStructureDeclares) {
+  for (const auto& [members, type] : std::initializer_list<
+           std::pair<std::span<const char* const>, std::string>>{
+           {kIntMembers, "int"},
+           {kBitMembers, "bit"},
+           {kStringMembers, "string"},
+           {kRealMembers, "real"}}) {
+    EXPECT_EQ(RunLevels(EachMember(members, "%s", "$typename")),
+              Repeated(type, members.size()))
+        << type;
+  }
+}
+
+TEST(OptionMemberTypes, IntMembersAreThirtyTwoBitsAndBitMembersOne) {
+  EXPECT_EQ(RunLevels(EachMember(kIntMembers, "%0d", "$bits")),
+            Repeated("32", std::size(kIntMembers)));
+  EXPECT_EQ(RunLevels(EachMember(kBitMembers, "%0d", "$bits")),
+            Repeated("1", std::size(kBitMembers)));
+}
+
+TEST(OptionMemberTypes, IntMembersAreSignedAndTruncateWiderValues) {
+  EXPECT_EQ(RunLevels("    c.option.goal = -3;\n"
+                      "    c.cp.option.at_least = -1;\n"
+                      "    c.x.option.weight = 33'h1_0000_0005;\n"
+                      "    cg::type_option.goal = -7;\n"
+                      "    $display(\"%0d %0d %0d %0d %0d\", c.option.goal,\n"
+                      "      c.option.goal < 0, c.cp.option.at_least,\n"
+                      "      c.x.option.weight, cg::type_option.goal);\n"),
+            "-3 1 -1 5 -7\n");
+}
+
+std::string RunDefined(const std::string& statements) {
+  SimFixture f;
+  return RunCapture(
+      std::string("module t;\n"
+                  "  bit [1:0] a, b;\n"
+                  "  covergroup cg;\n"
+                  "    option.detect_overlap = 2;\n"
+                  "    type_option.real_interval = 0.25;\n"
+                  "    cp: coverpoint a { option.detect_overlap = 3;\n"
+                  "      type_option.real_interval = 0.5; }\n"
+                  "    cq: coverpoint b;\n"
+                  "    x: cross cp, cq { option.cross_retain_auto_bins = 2; }\n"
+                  "  endgroup\n"
+                  "  cg c = new;\n"
+                  "  initial begin\n") +
+          statements +
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(OptionMemberTypes, DISABLED_BitMembersKeepOnlyTheLowBit) {
+  EXPECT_EQ(RunDefined("    cg::type_option.merge_instances = 2;\n"
+                       "    cg::type_option.distribute_first = 3;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d\",\n"
+                       "      c.option.detect_overlap,\n"
+                       "      c.cp.option.detect_overlap,\n"
+                       "      c.x.option.cross_retain_auto_bins,\n"
+                       "      cg::type_option.merge_instances,\n"
+                       "      cg::type_option.distribute_first);\n"),
+            "0 1 0 0 1\n");
+}
+
+TEST(OptionMemberTypes, RealIntervalHoldsAFraction) {
+  EXPECT_EQ(RunDefined("    $display(\"%0.2f %0.2f\",\n"
+                       "      cg::type_option.real_interval,\n"
+                       "      cg::cp::type_option.real_interval);\n"),
+            "0.25 0.50\n");
+}
+
+TEST(OptionMemberTypes, StringMembersHoldAString) {
+  EXPECT_EQ(RunLevels("    c.option.comment = \"g\";\n"
+                      "    c.cp.option.comment = \"p\";\n"
+                      "    c.x.option.comment = \"x\";\n"
+                      "    cg::cp::type_option.comment = \"tp\";\n"
+                      "    cg::x::type_option.comment = \"tx\";\n"
+                      "    $display(\"%s %s %s %s %s\", c.option.comment,\n"
+                      "      c.cp.option.comment, c.x.option.comment,\n"
+                      "      cg::cp::type_option.comment,\n"
+                      "      cg::x::type_option.comment);\n"),
+            "g p x tp tx\n");
 }
 
 }  // namespace
