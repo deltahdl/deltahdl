@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_placeholder_paths.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -337,6 +338,65 @@ TEST(ReadCharacterAtATime, UngetcOntoAClosedFdFails) {
       f);
   EXPECT_NE(out.find("code=-1 errnz=1"), std::string::npos) << out;
   std::remove(tmp.c_str());
+}
+
+std::string PushThenRead(const std::string& tag, const std::string& type,
+                         const std::string& push, const std::string& read,
+                         SysTaskFixture& f) {
+  SeedFile(PlaceholderPath("t2134401", tag, 0), "AB 12\nCD");
+  std::string out = RunWithPlaceholderPaths("t2134401", tag,
+                                            "module t;\n"
+                                            "  integer fd, code, n, v;\n"
+                                            "  string s;\n"
+                                            "  byte b [0:2];\n"
+                                            "  initial begin\n"
+                                            "    fd = $fopen(\"<P0>\", \"" +
+                                                type +
+                                                "\");\n"
+                                                "    code = $ungetc(" +
+                                                push +
+                                                ", fd);\n"
+                                                "    " +
+                                                read +
+                                                ";\n"
+                                                "    $fclose(fd);\n"
+                                                "  end\n"
+                                                "endmodule\n",
+                                            f);
+  RemovePlaceholderPaths("t2134401", tag);
+  return out;
+}
+
+TEST(ReadCharacterAtATime, PushedCharacterComesFirstFromFgets) {
+  SysTaskFixture f;
+  EXPECT_EQ(PushThenRead("fgets", "r", "\"Z\"",
+                         "n = $fgets(s, fd); $write(\"%0d [%s]\", n, s)", f),
+            "7 [ZAB 12\n]");
+}
+
+TEST(ReadCharacterAtATime, PushedCharacterComesFirstFromFscanf) {
+  SysTaskFixture f;
+  EXPECT_EQ(PushThenRead("fscanf", "r", "\"7\"",
+                         "n = $fscanf(fd, \"%d\", v); $display(\"%0d %0d\", "
+                         "n, v)",
+                         f),
+            "1 7\n");
+}
+
+TEST(ReadCharacterAtATime, PushedCharacterComesFirstFromFread) {
+  SysTaskFixture f;
+  EXPECT_EQ(PushThenRead("fread", "r", "\"Z\"",
+                         "n = $fread(b, fd); $display(\"%0d %s%s%s\", n, "
+                         "b[0], b[1], b[2])",
+                         f),
+            "3 ZAB\n");
+}
+
+TEST(ReadCharacterAtATime, PushedCharacterComesFirstThroughAnUpdateType) {
+  SysTaskFixture f;
+  EXPECT_EQ(PushThenRead("rplus", "r+", "\"Z\"",
+                         "n = $fgets(s, fd); $write(\"%0d [%s]\", n, s)", f),
+            "7 [ZAB 12\n]");
 }
 
 }  // namespace
