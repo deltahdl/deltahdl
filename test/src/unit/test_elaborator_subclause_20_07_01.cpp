@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -293,6 +295,116 @@ TEST(ArrayQueryVariableDim,
                             "array query function '$right' cannot query "
                             "variable-sized dimension 2 of array 'ra'",
                             6, "20.7.1"));
+}
+
+std::string VariableDimMessage(int dim, const char* array) {
+  std::string m =
+      "array query function '$size' cannot query variable-sized "
+      "dimension ";
+  m += std::to_string(dim);
+  m += " of array '";
+  m += array;
+  m += "'";
+  return m;
+}
+
+TEST(ArrayQueryVariableDim, AFixedDimensionUnderADynamicOneIsQueried) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int a[][3];\n"
+             "  int n;\n"
+             "  initial n = $size(a, 2);\n"
+             "endmodule\n"));
+}
+
+TEST(ArrayQueryVariableDim, AQueueOfDynamicArraysIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int q[$][];\n"
+      "  int n;\n"
+      "  initial n = $size(q, 2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "q"), 4,
+                            "20.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(ArrayQueryVariableDim,
+     DISABLED_AnIntegralIndexedInnerDimensionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a[3][int];\n"
+      "  int n;\n"
+      "  initial n = $size(a, 2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "a"), 4,
+                            "20.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(ArrayQueryVariableDim, AQueryInAModuleTaskOrFunctionIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a[3][];\n"
+      "  function int f();\n"
+      "    return $size(a, 2);\n"
+      "  endfunction\n"
+      "  task t(output int n);\n"
+      "    n = $size(a, 2);\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "a"), 4,
+                            "20.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "a"), 7,
+                            "20.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(ArrayQueryVariableDim,
+     DISABLED_AQueryInAPackageFunctionOrClassMethodIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  function int f();\n"
+      "    int a[3][];\n"
+      "    return $size(a, 2);\n"
+      "  endfunction\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int b[2][$];\n"
+      "  function int g();\n"
+      "    return $size(b, 2);\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "a"), 4,
+                            "20.7.1"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "b"),
+                            10, "20.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+}
+
+TEST(ArrayQueryVariableDim,
+     DISABLED_ACompilationUnitArrayQueriedFromAModuleIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "int ua[3][];\n"
+      "module m;\n"
+      "  int n;\n"
+      "  initial n = $size(ua, 2);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), VariableDimMessage(2, "ua"),
+                            4, "20.7.1"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
 }  // namespace

@@ -648,4 +648,283 @@ TEST(ArrayQuerySim, AnArrayReachedThroughAVirtualInterfaceIsQueried) {
       "16 128 7 0 15 2\n");
 }
 
+std::string RunQuery(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(ArrayQueryValues, APackedStructAndAnEnumAreQueriedAsTheirPackedRange) {
+  EXPECT_EQ(
+      RunQuery("module t;\n"
+               "  typedef struct packed {logic [1:0] a; logic [1:0] b;} ps_t;\n"
+               "  typedef enum logic [5:2] {A, B} e_t;\n"
+               "  ps_t ps;\n"
+               "  e_t e;\n"
+               "  initial $display(\"%0d %0d %0d %0d %0d %0d\", $left(ps), "
+               "$size(ps), $dimensions(ps),\n"
+               "    $left(e), $size(e), $right(e));\n"
+               "endmodule\n"),
+      "3 4 1 5 4 2\n");
+}
+
+TEST(ArrayQueryValues, DimensionsCountsTheDimensionsOfEveryArrayAndVectorKind) {
+  EXPECT_EQ(
+      RunQuery("module t;\n"
+               "  typedef struct packed {logic [1:0] a;} ps_t;\n"
+               "  typedef union packed {logic [1:0] a; bit [1:0] b;} pu_t;\n"
+               "  typedef enum {A, B} e_t;\n"
+               "  bit [3:0] d[];\n"
+               "  byte aa[int];\n"
+               "  ps_t ps;\n"
+               "  pu_t pu;\n"
+               "  e_t e;\n"
+               "  initial $display(\"%0d %0d %0d %0d %0d\", $dimensions(d), "
+               "$dimensions(aa),\n"
+               "    $dimensions(ps), $dimensions(pu), $dimensions(e));\n"
+               "endmodule\n"),
+      "2 2 1 1 1\n");
+}
+
+TEST(ArrayQueryValues, DISABLED_DimensionsIsZeroForEveryNonVectorType) {
+  EXPECT_EQ(RunQuery("class C; endclass\n"
+                     "module t;\n"
+                     "  typedef struct {int a;} us_t;\n"
+                     "  shortreal sr;\n"
+                     "  realtime rt;\n"
+                     "  us_t us;\n"
+                     "  C h;\n"
+                     "  event ev;\n"
+                     "  chandle ch;\n"
+                     "  initial $display(\"%0d %0d %0d %0d %0d %0d\", "
+                     "$dimensions(sr), $dimensions(rt),\n"
+                     "    $dimensions(us), $dimensions(h), $dimensions(ev), "
+                     "$dimensions(ch));\n"
+                     "endmodule\n"),
+            "0 0 0 0 0 0\n");
+}
+
+TEST(ArrayQueryValues,
+     UnpackedDimensionsCountsAnAssociativeArrayAndNothingElse) {
+  EXPECT_EQ(RunQuery("class C; endclass\n"
+                     "module t;\n"
+                     "  typedef struct {int a;} us_t;\n"
+                     "  int as[string];\n"
+                     "  int ai[int];\n"
+                     "  real r;\n"
+                     "  us_t us;\n"
+                     "  C h;\n"
+                     "  initial $display(\"%0d %0d %0d %0d %0d\", "
+                     "$unpacked_dimensions(as),\n"
+                     "    $unpacked_dimensions(ai), $unpacked_dimensions(r), "
+                     "$unpacked_dimensions(us),\n"
+                     "    $unpacked_dimensions(h));\n"
+                     "endmodule\n"),
+            "1 1 0 0 0\n");
+}
+
+TEST(ArrayQueryValues,
+     DISABLED_APerDimensionQueryOfADimensionlessOperandIsUnknown) {
+  EXPECT_EQ(RunQuery("class C; endclass\n"
+                     "module t;\n"
+                     "  typedef struct {int a;} us_t;\n"
+                     "  us_t us;\n"
+                     "  C h;\n"
+                     "  event ev;\n"
+                     "  chandle ch;\n"
+                     "  initial $display(\"%0d %0d %0d %0d\", $size(us), "
+                     "$left(h), $high(ev), $low(ch));\n"
+                     "endmodule\n"),
+            "x x x x\n");
+}
+
+TEST(ArrayQueryValues, ADimensionOutOfRangeAtRunTimeIsUnknown) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int a[2][3];\n"
+                     "  int z = 0, n = -1, p = 4, k = 2;\n"
+                     "  initial $display(\"%0d %0d %0d %0d\", $size(a, z), "
+                     "$left(a, n), $right(a, p),\n"
+                     "    $size(a, k));\n"
+                     "endmodule\n"),
+            "x x x 3\n");
+}
+
+TEST(ArrayQueryValues,
+     DISABLED_AnOutOfRangeOrDimensionlessQueryInAConstantIsUnknown) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int a[2][3];\n"
+                     "  localparam integer M = $size(a, 5);\n"
+                     "  localparam integer R = $size(real);\n"
+                     "  initial $display(\"%0d %0d\", M, R);\n"
+                     "endmodule\n"),
+            "x x\n");
+}
+
+TEST(ArrayQueryValues, DISABLED_ATypeOperatorOverAVariableIsQueriedForItsType) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int fa[4];\n"
+                     "  initial $display(\"%0d %0d\", $size(type(fa)), "
+                     "$dimensions(type(fa)));\n"
+                     "endmodule\n"),
+            "4 2\n");
+}
+
+TEST(ArrayQueryValues,
+     DISABLED_AnElementSelectThatIsAnArrayIsQueriedForTheElement) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int m[2][3];\n"
+                     "  int m3[2][3][4];\n"
+                     "  logic [3:0] u[2][5];\n"
+                     "  int r[2][4:1];\n"
+                     "  int i = 1;\n"
+                     "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d\", "
+                     "$size(m[0]), $size(m3[1][0]),\n"
+                     "    $size(u[1]), $size(u[1], 2), $left(r[0]), "
+                     "$increment(r[0]), $size(m[i]));\n"
+                     "endmodule\n"),
+            "3 4 5 4 4 1 3\n");
+}
+
+TEST(ArrayQueryValues,
+     DISABLED_AnElementSelectThatIsAnAssociativeArrayIsQueriedForTheElement) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int as[3][string];\n"
+                     "  int ai[3][int];\n"
+                     "  initial begin\n"
+                     "    $display(\"%0d %0d %0d\", $size(as[0]), $low(ai[0]), "
+                     "$high(ai[0]));\n"
+                     "    as[0][\"k\"] = 1;\n"
+                     "    ai[0][7] = 1;\n"
+                     "    $display(\"%0d %0d %0d\", $size(as[0]), $low(ai[0]), "
+                     "$high(ai[0]));\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "0 x x\n1 7 7\n");
+}
+
+TEST(ArrayQueryValues, AnElementSelectThatIsADynamicArrayOrQueueStaysCorrect) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int d[3][];\n"
+                     "  int q[3][$];\n"
+                     "  initial begin\n"
+                     "    d[0] = new[4];\n"
+                     "    q[0].push_back(1);\n"
+                     "    q[0].push_back(2);\n"
+                     "    $display(\"%0d %0d\", $size(d[0]), $size(q[0]));\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "4 2\n");
+}
+
+TEST(ArrayQueryValues, ADynamicArrayAndQueueGiveTheirLowAndHighBounds) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int d[];\n"
+                     "  int e[];\n"
+                     "  int q[$];\n"
+                     "  initial begin\n"
+                     "    d = new[3];\n"
+                     "    $display(\"%0d %0d %0d %0d %0d %0d\", $low(d), "
+                     "$high(d), $low(e), $high(e),\n"
+                     "      $low(q), $high(q));\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "0 2 0 -1 0 -1\n");
+}
+
+TEST(ArrayQueryValues,
+     AnAssociativeDimensionsRightIsTheHighestValueOfEveryIndexType) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  typedef struct packed {bit a; bit b;} ix_t;\n"
+                     "  int a4[bit [3:0]];\n"
+                     "  int as[shortint unsigned];\n"
+                     "  int ap[ix_t];\n"
+                     "  int ae[int];\n"
+                     "  initial $display(\"%0d %0d %0d %0d\", $right(a4), "
+                     "$right(as), $right(ap),\n"
+                     "    $size(ae));\n"
+                     "endmodule\n"),
+            "15 65535 3 0\n");
+}
+
+TEST(ArrayQueryValues, IntegerIsQueriedAsAPackedThirtyTwoBitDimension) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  integer v;\n"
+                     "  initial $display(\"%0d %0d %0d %0d\", $left(integer), "
+                     "$left(v), $right(v),\n"
+                     "    $dimensions(v));\n"
+                     "endmodule\n"),
+            "31 31 0 1\n");
+}
+
+TEST(ArrayQueryValues, DISABLED_TheResultIsThirtyTwoBitsWide) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int fa[4];\n"
+                     "  localparam int W = $bits($size(fa));\n"
+                     "  initial $display(\"%0d %0d\", $bits($size(fa)), W);\n"
+                     "endmodule\n"),
+            "32 32\n");
+}
+
+TEST(ArrayQueryValues, ADimensionAtRunTimeMayBeAVariable) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  int a[3][5];\n"
+                     "  int k = 2;\n"
+                     "  initial $display(\"%0d\", $size(a, k));\n"
+                     "endmodule\n"),
+            "5\n");
+}
+
+TEST(ArrayQueryValues, DimensionsAreNumberedThroughATypedefAsIfWrittenOut) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  typedef bit [3:0][1:0] packed_reg;\n"
+                     "  packed_reg n[1:5][2:8];\n"
+                     "  logic [3:0][1:0] w[1:5][2:8];\n"
+                     "  initial begin\n"
+                     "    $display(\"%0d %0d %0d %0d\", $size(n, 1), $size(n, "
+                     "2), $size(n, 3),\n"
+                     "      $size(n, 4));\n"
+                     "    $display(\"%0d %0d %0d %0d\", $size(w, 1), $size(w, "
+                     "2), $size(w, 3),\n"
+                     "      $size(w, 4));\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "5 7 4 2\n5 7 4 2\n");
+}
+
+TEST(ArrayQueryValues, TheStandardsWordAndRamExampleGivesSixteen) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  typedef logic [16:1] Word;\n"
+                     "  Word Ram[0:9];\n"
+                     "  initial $display(\"%0d %0d %0d\", $size(Word), "
+                     "$size(Ram, 2), $size(Ram, 1));\n"
+                     "endmodule\n"),
+            "16 16 10\n");
+}
+
+TEST(ArrayQueryValues,
+     AStringIndexedArrayAndAWildcardOrStructIndexAreAccepted) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  typedef struct packed {bit [1:0] a;} ix_t;\n"
+                     "  int as[string];\n"
+                     "  int aw[*];\n"
+                     "  int ap[ix_t];\n"
+                     "  initial begin\n"
+                     "    aw[5] = 1;\n"
+                     "    ap[2'd2] = 1;\n"
+                     "    $display(\"%0d %0d %0d %0d %0d\", "
+                     "$unpacked_dimensions(as), $size(aw),\n"
+                     "      $low(aw), $left(aw), $size(ap));\n"
+                     "  end\n"
+                     "endmodule\n"),
+            "1 1 5 0 1\n");
+}
+
+TEST(ArrayQueryValues, AVariableDeclaredWithAQueueTypedefIsQueried) {
+  EXPECT_EQ(RunQuery("module t;\n"
+                     "  typedef int qt[$];\n"
+                     "  qt q;\n"
+                     "  initial $display(\"%0d\", $size(q));\n"
+                     "endmodule\n"),
+            "0\n");
+}
+
 }  // namespace

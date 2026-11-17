@@ -99,4 +99,17 @@ TEST(ArrayQueryOverVariableDimensionsSim,
             "3 2 3 3 32\n");
 }
 
+TEST(ArrayQueryOverVariableDimensionsSim,
+     DISABLED_ARunTimeDimensionNamingAVariableSizedOneIsAnError) {
+  SimFixture f;
+  RunCapture(
+      "module t;\n"
+      "  int a[3][];\n"
+      "  int k = 2;\n"
+      "  initial $display(\"%0d\", $size(a, k));\n"
+      "endmodule\n",
+      f);
+  EXPECT_GT(f.diag.ErrorCount(), 0u);
+}
+
 }  // namespace
