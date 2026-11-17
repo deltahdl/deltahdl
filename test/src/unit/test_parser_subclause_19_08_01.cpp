@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 
@@ -376,6 +379,151 @@ TEST(OverriddenSampleMethod, SampleFormalInCrossBinGuardAccepted) {
       endgroup
     endmodule
   )"));
+}
+
+std::string InScope(const char* scope, const char* header, const char* body) {
+  return std::string(scope) + " s;\n  covergroup cg" + header + ";\n" + body +
+         "  endgroup\nend" + scope + "\n";
+}
+
+const char* const kOutputDirection =
+    "a sample method formal argument cannot designate an output direction";
+
+std::string SharedName(const char* name) {
+  return std::string("sample method formal argument '") + name +
+         "' shares the covergroup argument scope and cannot reuse a "
+         "covergroup formal-argument name";
+}
+
+std::string OnlyCoverpointOrGuard(const char* context) {
+  return std::string(
+             "sample method formal argument 'w' may only designate a "
+             "coverpoint or conditional guard expression, not a ") +
+         context;
+}
+
+struct ForbiddenUse {
+  const char* body;
+  uint32_t line;
+  const char* context;
+};
+
+const ForbiddenUse kForbiddenUses[] = {
+    {"    coverpoint v;\n    option.weight = w;\n", 4, "coverage-option value"},
+    {"    coverpoint v;\n    type_option.weight = w;\n", 4,
+     "coverage-option value"},
+    {"    coverpoint v;\n    option.weight = w + 1;\n", 4,
+     "coverage-option value"},
+    {"    coverpoint v { bins b = {[0:w]}; }\n", 3, "bin specification"},
+    {"    coverpoint v { bins b = (w => 1); }\n", 3, "bin specification"},
+    {"    coverpoint v { bins b[] = {[0:7]} with (item < w); }\n", 3,
+     "bin specification"},
+    {"    coverpoint v { bins b[w] = {[0:7]}; }\n", 3, "bin specification"},
+    {"    coverpoint v { illegal_bins b = {w}; }\n", 3, "bin specification"},
+    {"    coverpoint v { option.weight = w; }\n", 3, "coverage-option value"},
+    {"    a: coverpoint v;\n    b: coverpoint u;\n"
+     "    X: cross a, b { option.weight = w; }\n",
+     5, "coverage-option value"},
+    {"    a: coverpoint v;\n    b: coverpoint u;\n"
+     "    X: cross a, b { bins s = binsof(a) intersect {w}; }\n",
+     5, "cross bin select expression"},
+    {"    a: coverpoint v;\n    b: coverpoint u;\n"
+     "    X: cross a, b { bins s = X with (a < w); }\n",
+     5, "cross bin select expression"},
+};
+
+const char* const kAllowedUses[] = {
+    "    coverpoint w;\n",
+    "    coverpoint v iff (w);\n",
+    "    coverpoint v { bins b = {[0:3]} iff (w); }\n",
+    ("    a: coverpoint v;\n    b: coverpoint u;\n"
+     "    X: cross a, b { bins s = binsof(a) iff (w); }\n"),
+    "    coverpoint v;\n    cross v, w;\n",
+};
+
+void ExpectEachForbiddenUseRejected(const char* scope) {
+  for (const auto& use : kForbiddenUses) {
+    SCOPED_TRACE(use.body);
+    auto r = Parse(
+        InScope(scope, " with function sample(int v, int u, int w)", use.body));
+    EXPECT_TRUE(ReportedError(r.diags, OnlyCoverpointOrGuard(use.context),
+                              use.line, "19.8.1"));
+  }
+}
+
+void ExpectEachAllowedUseAccepted(const char* scope) {
+  for (const char* body : kAllowedUses) {
+    SCOPED_TRACE(body);
+    EXPECT_TRUE(ParseOk(
+        InScope(scope, " with function sample(int v, int u, int w)", body)));
+  }
+}
+
+TEST(OverriddenSampleMethod, ClassCovergroupFormalOutsideCoverpointRejected) {
+  ExpectEachForbiddenUseRejected("class");
+}
+
+TEST(OverriddenSampleMethod, ClassCovergroupFormalAsCoverpointAccepted) {
+  ExpectEachAllowedUseAccepted("class");
+}
+
+TEST(OverriddenSampleMethod, PackageCovergroupFormalOutsideCoverpointRejected) {
+  ExpectEachForbiddenUseRejected("package");
+}
+
+TEST(OverriddenSampleMethod, PackageCovergroupFormalAsCoverpointAccepted) {
+  ExpectEachAllowedUseAccepted("package");
+}
+
+void ExpectOutputDirectionsRejected(const char* scope) {
+  for (const char* header : {" with function sample(output int x)",
+                             " with function sample(inout int x)",
+                             " with function sample(int a, output int x)"}) {
+    SCOPED_TRACE(header);
+    auto r = Parse(InScope(scope, header, "    coverpoint x;\n"));
+    EXPECT_TRUE(ReportedError(r.diags, kOutputDirection, 2, "19.8.1"));
+  }
+}
+
+void ExpectInputAndRefAccepted(const char* scope) {
+  for (const char* header : {" with function sample(input int x)",
+                             " with function sample(ref int x)"}) {
+    SCOPED_TRACE(header);
+    EXPECT_TRUE(ParseOk(InScope(scope, header, "    coverpoint x;\n")));
+  }
+}
+
+TEST(OverriddenSampleMethod, ClassCovergroupOutputSampleFormalRejected) {
+  ExpectOutputDirectionsRejected("class");
+}
+
+TEST(OverriddenSampleMethod, ClassCovergroupInputOrRefSampleFormalAllowed) {
+  ExpectInputAndRefAccepted("class");
+}
+
+TEST(OverriddenSampleMethod, PackageCovergroupOutputSampleFormalRejected) {
+  ExpectOutputDirectionsRejected("package");
+}
+
+TEST(OverriddenSampleMethod, PackageCovergroupInputOrRefSampleFormalAllowed) {
+  ExpectInputAndRefAccepted("package");
+}
+
+void ExpectSharedNameRejected(const char* scope) {
+  auto r = Parse(InScope(scope, " (int v) with function sample(int v, bit b)",
+                         "    coverpoint v;\n"));
+  EXPECT_TRUE(ReportedError(r.diags, SharedName("v"), 2, "19.8.1"));
+  EXPECT_TRUE(
+      ParseOk(InScope(scope, " (int w) with function sample(int v, bit b)",
+                      "    coverpoint v;\n")));
+}
+
+TEST(OverriddenSampleMethod, ClassCovergroupNameSharedBetweenListsRejected) {
+  ExpectSharedNameRejected("class");
+}
+
+TEST(OverriddenSampleMethod, PackageCovergroupNameSharedBetweenListsRejected) {
+  ExpectSharedNameRejected("package");
 }
 
 }  // namespace

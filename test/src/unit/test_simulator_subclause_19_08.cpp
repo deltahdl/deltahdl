@@ -9,6 +9,8 @@
 #include "helpers_coverage_point_setup.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_types.h"
+#include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 using namespace delta;
 
@@ -646,6 +648,174 @@ TEST(CoverageMethodSim, ARealCoverpointStopsAndCrossesReportTheirTypeCoverage) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "50.00 75.00 37.50 3/8\n");
+}
+
+TEST(CoverageMethodSim, TypeCoverageThroughTypeOrInstanceIsTheAverage) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  covergroup cg with function sample(bit [1:0] x, bit y);\n"
+      "    cx: coverpoint x { bins b[] = {[0:3]}; }\n"
+      "    cy: coverpoint y;\n"
+      "    xy: cross cx, cy;\n"
+      "  endgroup\n"
+      "  cg c1 = new, c2 = new;\n"
+      "  initial begin\n"
+      "    c1.sample(0, 0);\n"
+      "    c2.sample(1, 1); c2.sample(2, 1);\n"
+      "    $display(\"%0.2f %0.2f %0.2f %0.2f %0.2f\", "
+      "c1.get_inst_coverage(),\n"
+      "             c2.get_inst_coverage(), cg::get_coverage(),\n"
+      "             c1.get_coverage(), c2.get_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "29.17 41.67 35.42 35.42 35.42\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageMethodSim, InstanceCoverageTellsTwoLiveInstancesApart) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  bit [1:0] v;\n"
+      "  covergroup cg;\n"
+      "    coverpoint v { bins b[] = {[0:3]}; }\n"
+      "  endgroup\n"
+      "  cg c1 = new;\n"
+      "  cg c2 = new;\n"
+      "  initial begin\n"
+      "    v = 0; c1.sample();\n"
+      "    v = 1; c2.sample(); v = 2; c2.sample(); v = 3; c2.sample();\n"
+      "    $display(\"%0.2f %0.2f %0.2f %0.2f\", c1.get_inst_coverage(),\n"
+      "             c2.get_inst_coverage(), cg::get_coverage(),\n"
+      "             c1.get_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "25.00 75.00 50.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageMethodSim, AnItemsInstanceValueIsItsCoveredOverItsBins) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int n, m;\n"
+      "  real r;\n"
+      "  covergroup cg with function sample(bit [1:0] x, bit [1:0] y);\n"
+      "    cx: coverpoint x { bins b[] = {[0:2]}; }\n"
+      "    cy: coverpoint y { bins b[] = {[0:3]}; }\n"
+      "    xy: cross cx, cy;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    c.sample(1, 2);\n"
+      "    r = c.cx.get_inst_coverage(n, m);\n"
+      "    $write(\"%0.2f %0d/%0d \", r, n, m);\n"
+      "    r = c.xy.get_inst_coverage(n, m);\n"
+      "    $display(\"%0.2f %0d/%0d\", r, n, m);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "33.33 1/3 8.33 1/12\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageMethodSim, TypeCountsThroughAnInstanceSpanEveryInstance) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  int a, b, c, d, n, m;\n"
+      "  covergroup cg (int xb, yb, ref int x, y);\n"
+      "    coverpoint x {bins xbins[] = {[0:xb]};}\n"
+      "    coverpoint y {bins ybins[] = {[0:yb]};}\n"
+      "  endgroup\n"
+      "  cg cv1 = new(1, 2, a, b);\n"
+      "  cg cv2 = new(3, 6, c, d);\n"
+      "  initial begin\n"
+      "    a = 0; b = 0; c = 2; d = 9;\n"
+      "    cv1.sample(); cv2.sample();\n"
+      "    c = 3; cv2.sample();\n"
+      "    void'(cv1.x.get_coverage(n, m));\n"
+      "    $write(\"%0d/%0d \", n, m);\n"
+      "    void'(cv1.get_coverage(n, m));\n"
+      "    $display(\"%0d/%0d\", n, m);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3/6 4/16\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageMethodSim, StartResumesARealCoverpointAndACross) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  covergroup cg with function sample(real r, bit a, bit b);\n"
+      "    cr: coverpoint r { bins lo = {[0.0:1.0]}; bins hi = {[2.0:3.0]}; }\n"
+      "    ca: coverpoint a;\n"
+      "    cb: coverpoint b;\n"
+      "    ab: cross ca, cb;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial begin\n"
+      "    c.sample(0.5, 0, 0);\n"
+      "    c.cr.stop();\n"
+      "    c.ab.stop();\n"
+      "    c.sample(2.5, 1, 1);\n"
+      "    $write(\"%0.2f %0.2f \", c.cr.get_inst_coverage(),\n"
+      "           c.ab.get_inst_coverage());\n"
+      "    c.cr.start();\n"
+      "    c.ab.start();\n"
+      "    c.sample(2.5, 1, 1);\n"
+      "    $display(\"%0.2f %0.2f\", c.cr.get_inst_coverage(),\n"
+      "             c.ab.get_inst_coverage());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "50.00 25.00 100.00 50.00\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CovergroupInstanceSim, MethodsCalledFromAFinalBlock) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int p;\n"
+      "  covergroup cg with function sample(int x);\n"
+      "    coverpoint x { bins lo = {1}; bins hi = {3}; }\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  final begin\n"
+      "    c.sample(3);\n"
+      "    p = c.get_inst_coverage();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "p");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0u);
+  f.ctx.RunFinalBlocks();
+  EXPECT_EQ(var->value.ToUint64(), 50u);
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
+}
+
+TEST(CoverageMethodSim, ACoverageQueryIsAReal) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  bit v;\n"
+      "  covergroup cg;\n"
+      "    cp: coverpoint v;\n"
+      "  endgroup\n"
+      "  cg c = new;\n"
+      "  initial $display(\"%0d %0d %0d\", $bits(c.get_coverage()),\n"
+      "                   $bits(c.get_inst_coverage()),\n"
+      "                   $bits(c.cp.get_inst_coverage()));\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "64 64 64\n");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 }  // namespace
