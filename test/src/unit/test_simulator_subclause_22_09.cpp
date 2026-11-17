@@ -84,3 +84,92 @@ TEST(UnconnectedDriveSimulation, EachChildTakesTheDriveAtItsDefinition) {
                 f),
             "1 z 0\n");
 }
+
+static std::string RunDrive(const std::string& src) {
+  SimFixture f;
+  return PreprocessAndCapture(src, f);
+}
+
+static std::string Pulled(const char* drive, const std::string& child,
+                          const std::string& top_items,
+                          const std::string& shown) {
+  return std::string("`unconnected_drive ") + drive + "\n" + child +
+         "`nounconnected_drive\nmodule t;\n" + top_items +
+         "  initial #1 $display(" + shown + ");\nendmodule\n";
+}
+
+TEST(UnconnectedDriveSimulation, DISABLED_EveryBitOfAVectorInputIsPulled) {
+  const std::string kChild = "module s(input wire [3:0] a);\nendmodule\n";
+  EXPECT_EQ(RunDrive(Pulled("pull1", kChild, "  s u();\n", "\"%b\", u.a")),
+            "1111\n");
+  EXPECT_EQ(RunDrive(Pulled("pull0", kChild, "  s u();\n", "\"%b\", u.a")),
+            "0000\n");
+}
+
+TEST(UnconnectedDriveSimulation, AVariableInputIsPulled) {
+  const std::string kChild = "module s(input var logic v);\nendmodule\n";
+  EXPECT_EQ(RunDrive(Pulled("pull1", kChild, "  s u();\n", "\"%b\", u.v")),
+            "1\n");
+  EXPECT_EQ(RunDrive(Pulled("pull0", kChild, "  s u();\n", "\"%b\", u.v")),
+            "0\n");
+}
+
+TEST(UnconnectedDriveSimulation, AProgramInputIsPulled) {
+  const std::string kChild =
+      "program p(input wire a);\n  initial #1 $display(\"%b\", a);\n"
+      "endprogram\n";
+  for (const char* drive : {"pull1", "pull0"}) {
+    std::string src = std::string("`unconnected_drive ") + drive + "\n" +
+                      kChild +
+                      "`nounconnected_drive\nmodule t;\n  p u();\n"
+                      "endmodule\n";
+    EXPECT_EQ(RunDrive(src), drive[4] == '1' ? "1\n" : "0\n") << drive;
+  }
+}
+
+TEST(UnconnectedDriveSimulation, AnInterfaceInputIsPulled) {
+  const std::string kChild = "interface i(input wire a);\nendinterface\n";
+  EXPECT_EQ(RunDrive(Pulled("pull1", kChild, "  i u();\n", "\"%b\", u.a")),
+            "1\n");
+  EXPECT_EQ(RunDrive(Pulled("pull0", kChild, "  i u();\n", "\"%b\", u.a")),
+            "0\n");
+}
+
+TEST(UnconnectedDriveSimulation, EmptyNamedAndBlankOrderedConnectionsPull) {
+  EXPECT_EQ(RunDrive(Pulled("pull1", "module s(input wire a);\nendmodule\n",
+                            "  s u(.a());\n", "\"%b\", u.a")),
+            "1\n");
+  EXPECT_EQ(RunDrive(Pulled("pull1",
+                            "module s(input wire a, input wire b);\n"
+                            "endmodule\n",
+                            "  wire y = 0;\n  s u(, y);\n", "\"%b\", u.a")),
+            "1\n");
+}
+
+TEST(UnconnectedDriveSimulation, OutputAndInoutPortsAreNotPulled) {
+  EXPECT_EQ(RunDrive(Pulled("pull1",
+                            "module s(output wire o, inout wire io);\n"
+                            "endmodule\n",
+                            "  s u();\n", "\"%b%b\", u.o, u.io")),
+            "zz\n");
+}
+
+TEST(UnconnectedDriveSimulation, DISABLED_ThePulledValueHasPullStrength) {
+  const std::string kChild = "module s(input wire a);\nendmodule\n";
+  EXPECT_EQ(RunDrive(Pulled("pull1", kChild, "  s u();\n", "\"%v\", u.a")),
+            "Pu1\n");
+  EXPECT_EQ(RunDrive(Pulled("pull0", kChild, "  s u();\n", "\"%v\", u.a")),
+            "Pu0\n");
+}
+
+TEST(UnconnectedDriveSimulation,
+     ProgramAndInterfaceTakeTheirOwnDefinitionsDrive) {
+  EXPECT_EQ(RunDrive("`unconnected_drive pull1\n"
+                     "program p(input wire a);\n"
+                     "  initial #1 $display(\"p %b\", a);\nendprogram\n"
+                     "interface i(input wire a);\nendinterface\n"
+                     "`unconnected_drive pull0\n"
+                     "module t;\n  p pu();\n  i iu();\n"
+                     "  initial #1 $display(\"i %b\", iu.a);\nendmodule\n"),
+            "i 1\np 1\n");
+}

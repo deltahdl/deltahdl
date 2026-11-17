@@ -178,3 +178,57 @@ TEST(Preprocessor, UnconnectedDrive_RecordedAtEachHeader) {
   EXPECT_EQ(list[2].unconnected_drive, NetType::kTri0);
   EXPECT_EQ(list[3].unconnected_drive, NetType::kWire);
 }
+
+TEST(Preprocessor, DISABLED_UnconnectedDrive_ASecondStrengthIsRejected) {
+  PreprocFixture f;
+  Preprocess("`unconnected_drive pull1 pull0\n", f);
+  bool reported = false;
+  for (const auto& d : f.diag.Diagnostics()) {
+    reported = reported || (d.loc.line == 1 && d.subclause == "22.9");
+  }
+  EXPECT_TRUE(reported);
+}
+
+TEST(Preprocessor, UnconnectedDrive_OneStrengthAloneIsAccepted) {
+  PreprocFixture f;
+  Preprocess("`unconnected_drive pull1\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+struct DrivePlacement {
+  const char* opener;
+  const char* closer;
+};
+
+TEST(Preprocessor, UnconnectedDrive_BothDirectivesRejectedInsideElements) {
+  for (const char* directive :
+       {"unconnected_drive pull1", "nounconnected_drive"}) {
+    for (const auto& p : {
+             DrivePlacement{"program p;\n", "endprogram\n"},
+             DrivePlacement{"interface i;\n", "endinterface\n"},
+             DrivePlacement{"checker k;\n", "endchecker\n"},
+             DrivePlacement{"package k;\n", "endpackage\n"},
+             DrivePlacement{"primitive u(output o, input a);\n",
+                            "table 0:0; 1:1; endtable\nendprimitive\n"},
+             DrivePlacement{"config cf;\n", "design t;\nendconfig\n"},
+         }) {
+      PreprocFixture f;
+      std::string name = directive;
+      name = name.substr(0, name.find(' '));
+      Preprocess(std::string(p.opener) + "`" + directive + "\n" + p.closer, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "`" + name + " illegal inside a design element",
+                                2, "22.9"))
+          << directive << " in " << p.opener;
+    }
+  }
+}
+
+TEST(Preprocessor, UnconnectedDrive_BothDirectivesAcceptedInsideAClass) {
+  for (const char* directive :
+       {"unconnected_drive pull1", "nounconnected_drive"}) {
+    PreprocFixture f;
+    Preprocess(std::string("class k;\n`") + directive + "\nendclass\n", f);
+    EXPECT_FALSE(f.diag.HasErrors()) << directive;
+  }
+}
