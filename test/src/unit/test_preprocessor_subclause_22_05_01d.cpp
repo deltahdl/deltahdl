@@ -3,7 +3,9 @@
 #include <string>
 
 #include "fixture_preprocessor.h"
+#include "helpers_include_test_dir.h"
 #include "helpers_reported_error.h"
+#include "preprocessor/preprocessor.h"
 
 using namespace delta;
 
@@ -158,6 +160,161 @@ TEST(MacroTokenBoundary, AnIdentifierDoesNotJoinTheTextAfterTheUsage) {
   auto out = Preprocess("`define P ab\n`define K mod\n`P c;\n`K ule;\n", f);
   EXPECT_FALSE(Holds(out, "abc")) << out;
   EXPECT_FALSE(Holds(out, "module")) << out;
+}
+
+TEST(MacroLineNumber, CommentAndContinuedDefineLinesCount) {
+  PreprocFixture f;
+  auto out =
+      Preprocess("/* a\nb\nc */\n`define M 1 \\\n2\nx = `__LINE__;\n", f);
+  EXPECT_TRUE(Holds(out, "x = 6;")) << out;
+}
+
+TEST(MacroLineNumber, DISABLED_AnActualOnALaterLineTakesItsOwnLine) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define F(a, b) [a|b]\nx = `F(1,\n`__LINE__);\ny = `__LINE__;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "|3]")) << out;
+  EXPECT_TRUE(Holds(out, "y = 4;")) << out;
+}
+
+TEST(MacroLineNumber, InAMacroBodyItTakesTheLineOfTheUsage) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define L `__LINE__\n`define L2 a \\\n`__LINE__\n\nx = `L;\ny = `L2;\n",
+      f);
+  EXPECT_TRUE(Holds(out, "x = 5;")) << out;
+  auto use = out.find("y = a");
+  ASSERT_NE(use, std::string::npos) << out;
+  EXPECT_NE(out.find('6', use), std::string::npos) << out;
+  EXPECT_EQ(out.find('3', use), std::string::npos) << out;
+}
+
+TEST(MacroTokenPasting, TwoFormalsJoinWithoutWhiteSpace) {
+  PreprocFixture f;
+  auto out = Preprocess("`define CAT(a,b) a``b\nv = `CAT(x,y);\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "v = xy;")) << out;
+}
+
+TEST(MacroTokenPasting, TextAndAFormalJoinWithoutWhiteSpace) {
+  PreprocFixture f;
+  auto out = Preprocess("`define PRE(f) sig_``f\nv = `PRE(clk);\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "v = sig_clk;")) << out;
+}
+
+TEST(MacroLateBinding, TextTakesTheInnerDefinitionCurrentAtTheUse) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define O `I\n`define I 1\nx = `O;\n`undef I\n`define I 2\ny = `O;\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "x = 1;")) << out;
+  EXPECT_TRUE(Holds(out, "y = 2;")) << out;
+}
+
+TEST(MacroLateBinding, ADefaultTakesAMacroDefinedAfterTheOuterDefine) {
+  PreprocFixture f;
+  auto out = Preprocess("`define D(a=`J) a\n`define J 9\nx = `D();\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "x = 9;")) << out;
+}
+
+TEST(MacroArgumentExpansion, ADefaultExpandingToAFormalNameAddsNoUse) {
+  PreprocFixture f;
+  auto out =
+      Preprocess("`define B a\n`define M(a=5, b=`B) [a|b]\nx = `M(7);\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "x = [7|a];")) << out;
+}
+
+struct RecursiveCase {
+  const char* src;
+  const char* name;
+  int line;
+};
+
+TEST(MacroRecursion, FunctionLikeRecursionIsReported) {
+  for (const auto& c : {
+           RecursiveCase{"`define R(x) `R(x)\nv = `R(1);\n", "R", 2},
+           RecursiveCase{"`define P(x) `Q(x)\n`define Q(x) `P(x)\nv = `P(1);\n",
+                         "P", 3},
+           RecursiveCase{"`define \\E (x) `\\E (x)\nv = `\\E (1);\n", "\\E", 2},
+       }) {
+    PreprocFixture f;
+    Preprocess(c.src, f);
+    std::string msg = "recursive expansion of macro '";
+    msg += c.name;
+    msg += '\'';
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, c.line, "22.5.1"))
+        << c.src;
+  }
+}
+
+TEST(MacroRecursion, DISABLED_ADefaultMayHoldAUsageOfItsOwnMacro) {
+  PreprocFixture f;
+  auto out = Preprocess("`define F(a=`F(1)) a\nx = `F();\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "x = 1;")) << out;
+}
+
+TEST(MacroTripleQuote,
+     DISABLED_AnEmbeddedUsageInsideAQuotedTripleSpanIsExpanded) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define N 4\n`define T(x) `\"\"\"x `N`\"\"\"\ny = `T(3);\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "y = \"\"\"3 4\"\"\";")) << out;
+}
+
+TEST(MacroTripleQuote, AnEscapedBackslashBeforeTheContinuationIsKept) {
+  PreprocFixture f;
+  auto out = Preprocess(
+      "`define MACRO4(VAL) `\"\"\"line1\\\nline2 - VAL\\\n"
+      "line3 - backslash\\\\\\\nline4`\"\"\"\n"
+      "s = `MACRO4(FOO);\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out,
+                    "s = \"\"\"line1\nline2 - FOO\nline3 - backslash\\\\\n"
+                    "line4\"\"\";"))
+      << out;
+}
+
+TEST(MacroStringLiteral, ATripleQuotedStringInTheTextIsNotSubstituted) {
+  PreprocFixture f;
+  auto out =
+      Preprocess("`define N 4\n`define M(x) \"\"\"x `N\"\"\"\ny = `M(1);\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "y = \"\"\"x `N\"\"\";")) << out;
+}
+
+TEST(MacroStringLiteral, AUsageInsideAStringActualIsNotExpanded) {
+  PreprocFixture f;
+  auto out = Preprocess("`define X 4\n`define S(a) a\nx = `S(\"`X\");\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "x = \"`X\";")) << out;
+}
+
+TEST(MacroStringLiteral, DISABLED_AQuoteThenAQuotedBacktickIsOneString) {
+  PreprocFixture f;
+  auto out = Preprocess("`define Q \"`\"\nx = `Q;\n", f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "x = \"`\";")) << out;
+}
+
+TEST(MacroStringLiteral, AQuotedPathBuiltFromAnActualIsIncluded) {
+  IncludeTestDir tmp;
+  tmp.WriteFile("myfile", "int from_home = 3;\n");
+  PreprocFixture f;
+  auto fid = f.mgr.AddFile((tmp.dir / "top.sv").string(),
+                           "`define home(filename) `\"filename`\"\n"
+                           "`include `home(myfile)\n");
+  Preprocessor pp(f.mgr, f.diag, {});
+  auto out = pp.Preprocess(fid);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_TRUE(Holds(out, "int from_home = 3;")) << out;
 }
 
 }  // namespace
