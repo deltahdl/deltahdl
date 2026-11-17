@@ -667,4 +667,116 @@ TEST(WritememSim, PlainVariableMemoryNameIsReportedAndFileKept) {
   std::remove(path.c_str());
 }
 
+TEST(WritememSim, ACallWithNoArgumentIsReportedUnderEachTaskName) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  initial begin\n"
+      "    $writememh();\n"
+      "    $writememb();\n"
+      "    $display(\"alive\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "alive\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememh takes a file name and a memory name, "
+                            "and this call has fewer",
+                            3, "21.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememb takes a file name and a memory name, "
+                            "and this call has fewer",
+                            4, "21.5"));
+}
+
+TEST(WritememSim, DISABLED_ACallPastTheFinishAddressIsReported) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [0:3];\n"
+      "  initial begin\n"
+      "    $writememh(\"/tmp/deltahdl_t2105_p5h.mem\", m, 0, 3, 9);\n"
+      "    $writememb(\"/tmp/deltahdl_t2105_p5b.mem\", m, 0, 3, 9);\n"
+      "    $writememh(\"/tmp/deltahdl_t2105_p6h.mem\", m, 0, 3, 9, 9);\n"
+      "    $display(\"alive\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "alive\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememh takes a file name, a memory name and "
+                            "at most a start and a finish address",
+                            4, "21.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememb takes a file name, a memory name and "
+                            "at most a start and a finish address",
+                            5, "21.5"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememh takes a file name, a memory name and "
+                            "at most a start and a finish address",
+                            6, "21.5"));
+}
+
+TEST(WritememSim, APackageFunctionDumpsAnArrayPassedByRef) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_pkgref.mem";
+  RunCapture(
+      "package p;\n"
+      "  function automatic void dump(ref logic [7:0] m [0:1]);\n"
+      "    $writememh(\"" +
+          path +
+          "\", m);\n"
+          "  endfunction\n"
+          "endpackage\n"
+          "module t;\n"
+          "  logic [7:0] mem [0:1] = '{8'h1a, 8'h2b};\n"
+          "  initial p::dump(mem);\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "1a\n2b\n");
+  std::remove(path.c_str());
+}
+
+TEST(WritememSim, AProgramBlockDumpsItsArray) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_program.mem";
+  RunCapture(
+      "program pr;\n"
+      "  logic [7:0] mem [0:1];\n"
+      "  initial begin\n"
+      "    mem[0] = 8'h3c;\n"
+      "    #2 mem[1] = 8'h4d;\n"
+      "    $writememb(\"" +
+          path +
+          "\", mem);\n"
+          "  end\n"
+          "endprogram\n",
+      f);
+  EXPECT_EQ(SlurpFile(path), "00111100\n01001101\n");
+  std::remove(path.c_str());
+}
+
+TEST(WritememSim, AnElementSelectIsReportedAndTheFileKept) {
+  SimFixture f;
+  std::string path = "/tmp/deltahdl_t2105_elem.mem";
+  SeedFile(path, "kept\n");
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] m [0:1];\n"
+      "  initial begin\n"
+      "    $writememh(\"" +
+          path +
+          "\", m[1]);\n"
+          "    $display(\"alive\");\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+  EXPECT_EQ(out, "alive\n");
+  EXPECT_EQ(SlurpFile(path), "kept\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$writememh: memory_name is not an unpacked array",
+                            4, "21.5"));
+  std::remove(path.c_str());
+}
+
 }  // namespace

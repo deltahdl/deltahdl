@@ -402,4 +402,38 @@ TEST(WritememAddressSim, StringIndexRejectionNames21_5_3) {
   std::remove(path.c_str());
 }
 
+TEST(WritememAddressSim, DISABLED_ClassHandleAndRealIndicesAreRejected) {
+  for (const char* index : {"C", "real", "shortreal"}) {
+    for (const char* task : {"$writememh", "$writememb"}) {
+      SimFixture f;
+      std::string path = "/tmp/deltahdl_t210503_nonint.mem";
+      SeedFile(path, "KEEP\n");
+      std::string out = RunCapture(
+          "class C;\n"
+          "endclass\n"
+          "module t;\n"
+          "  logic [7:0] aa [" +
+              std::string(index) +
+              "];\n"
+              "  initial begin\n"
+              "    " +
+              task + "(\"" + path +
+              "\", aa);\n"
+              "    $display(\"after\");\n"
+              "  end\n"
+              "endmodule\n",
+          f);
+      EXPECT_EQ(out, "after\n") << index << task;
+      EXPECT_EQ(SlurpFile(path), "KEEP\n") << index << task;
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                std::string(task) +
+                                    ": associative array index must be of an "
+                                    "integral type",
+                                6, "21.5.3"))
+          << index << task;
+      std::remove(path.c_str());
+    }
+  }
+}
+
 }  // namespace
