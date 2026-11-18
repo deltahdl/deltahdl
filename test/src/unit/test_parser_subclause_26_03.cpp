@@ -3,6 +3,7 @@
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -280,6 +281,31 @@ TEST(PackageScopeReference, PackageScopedTypeAsAnAnsiPortType) {
   EXPECT_EQ(ports[0].data_type.scope_name, "A");
   EXPECT_EQ(ports[0].data_type.type_name, "instruction_t");
   EXPECT_EQ(ports[1].name, "b");
+}
+
+TEST(PackageImportSyntax, AnItemWithoutTheScopeOperatorIsRefused) {
+  auto r = Parse(
+      "package p; int x; endpackage\n"
+      "module top; import p; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected '::', got ';'", 2, "26.3"));
+}
+
+TEST(PackageImportSyntax, ATrailingCommaInTheItemListIsRefused) {
+  auto r = Parse(
+      "package p; int x; endpackage\n"
+      "module top; import p::x, ; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "26.3"));
+}
+
+TEST(PackageImportSyntax, AScopeStepAfterTheWildcardIsRefused) {
+  auto r = Parse(
+      "package p; int x; endpackage\n"
+      "module top; import p::*::x; endmodule\n");
+  EXPECT_TRUE(r.has_errors);
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '::'", 2, "26.3"));
 }
 
 }  // namespace
