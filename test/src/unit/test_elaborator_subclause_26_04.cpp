@@ -3,6 +3,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
 
 namespace {
@@ -213,6 +214,34 @@ TEST(PackageImportInHeader,
   EXPECT_EQ(a->dtype->struct_members.size(), 2u);
   EXPECT_EQ(FindVar(design, "M", "data"), nullptr);
   EXPECT_EQ(FindVar(design, "M", "OK"), nullptr);
+}
+
+TEST(PackageImportInHeader, AHeaderImportedConstantIsNotVisibleInALaterModule) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; parameter int W = 5; endpackage\n"
+             "module m import p::*; (); int y = W; endmodule\n"
+             "module top; int y = W; m u(); endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'W'", 3,
+                            "23.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'W'", 2,
+                             "23.9"));
+}
+
+TEST(PackageImportInHeader,
+     DISABLED_AHeaderImportedTypeIsNotDeclaredInALaterModule) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p; typedef logic [5:0] six_t; endpackage\n"
+             "module m import p::*; (); six_t x; endmodule\n"
+             "module top; six_t x; m u(); endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'six_t'", 3,
+                            "23.9"));
 }
 
 }  // namespace

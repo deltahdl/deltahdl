@@ -172,4 +172,38 @@ TEST(ModuleHeaderDefinition, AnsiHeaderTwoSeparatePackageImports) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kImportDecl);
 }
 
+TEST(ModuleHeaderDefinition, AnImportAfterTheParameterPortListIsRefused) {
+  auto r = Parse(
+      "package p; parameter int W = 5; endpackage\n"
+      "module m #(parameter int N = 1) import p::*; (input logic a); "
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'import'", 2, "23.2.1"));
+}
+
+TEST(ModuleHeaderDefinition, AnImportAfterThePortListIsRefused) {
+  auto r = Parse(
+      "package p; parameter int W = 5; endpackage\n"
+      "module m (input logic a) import p::*; ; endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'import'", 2, "23.2.1"));
+}
+
+TEST(ModuleHeaderDefinition, AnImportBeforeTheParameterAndPortListsIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("package p; parameter int W = 5; endpackage\n"
+              "module m import p::*; #(parameter int N = 1) (input logic a); "
+              "endmodule\n"));
+}
+
+TEST(PackageHeader, AnImportInAPackageHeaderIsRefused) {
+  auto r = Parse(
+      "package base; int x; endpackage\n"
+      "package d import base::*; ; endpackage\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'import'", 2, "26.2"));
+  EXPECT_TRUE(
+      ParseOk("package base; int x; endpackage\n"
+              "package d; import base::*; endpackage\n"));
+}
+
 }  // namespace

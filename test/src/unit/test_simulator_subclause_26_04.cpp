@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -109,6 +111,133 @@ TEST(PackageImportInHeaderSim, NamedImportedStructPortOfTheTopHoldsItsMembers) {
   EXPECT_EQ(r->value.ToUint64(), 0xA5123456u);
   EXPECT_EQ(o->value.ToUint64(), 165u);
   EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+constexpr const char* kHeaderPackages =
+    "package p; typedef logic [5:0] six_t; parameter int W = 5; "
+    "typedef enum {E0, E1, E2} e_t; endpackage\n"
+    "package pkg; typedef logic [7:0] byte_t; typedef logic [15:0] word_t; "
+    "parameter int W = 5; endpackage\n";
+
+void ExpectHeaderOutput(const std::string& src, const std::string& expected) {
+  SCOPED_TRACE(src);
+  SimFixture f;
+  EXPECT_EQ(RunCapture(kHeaderPackages + src, f), expected);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PackageImportInHeaderSim, ExplicitlyImportedTypedefSizesABodyVariable) {
+  ExpectHeaderOutput(
+      "module top import p::six_t; (); six_t x; "
+      "initial $display(\"%0d\", $bits(x)); endmodule\n",
+      "6\n");
+}
+
+TEST(PackageImportInHeaderSim, ImportedConstantSizesAnAnsiPortRange) {
+  ExpectHeaderOutput(
+      "module m import p::*; (input [W-1:0] a); "
+      "initial $display(\"%0d\", $bits(a)); endmodule\n"
+      "module top; m u(5'd0); endmodule\n",
+      "5\n");
+}
+
+TEST(PackageImportInHeaderSim, ImportedConstantIsAParameterPortsDefault) {
+  ExpectHeaderOutput(
+      "module top import p::*; #(parameter int N = W) (); "
+      "initial $display(\"%0d\", N); endmodule\n",
+      "5\n");
+}
+
+TEST(PackageImportInHeaderSim, ImportedLiteralIsAnUnconnectedPortsDefault) {
+  ExpectHeaderOutput(
+      "module m import p::*; (input var e_t e = E2); "
+      "initial #1 $display(\"%0d\", e); endmodule\n"
+      "module top; m u(); endmodule\n",
+      "2\n");
+}
+
+TEST(PackageImportInHeaderSim, ImportedTypeOnAParameterAndATypeParameter) {
+  ExpectHeaderOutput(
+      "module top import p::*; #(parameter six_t P = 6'd63, "
+      "parameter type T = six_t) (); T t; "
+      "initial $display(\"%0d %0d\", P, $bits(t)); endmodule\n",
+      "63 6\n");
+}
+
+TEST(PackageImportInHeaderSim, ImportedTypeOnANonAnsiPortDeclaredInTheBody) {
+  ExpectHeaderOutput(
+      "module m import p::*; (a); input six_t a; "
+      "initial $display(\"%0d\", $bits(a)); endmodule\n"
+      "module top; m u(6'd0); endmodule\n",
+      "6\n");
+}
+
+TEST(PackageImportInHeaderSim, InterfaceHeaderImportsSizeItsBodyAndPorts) {
+  ExpectHeaderOutput(
+      "interface ifc import pkg::*; (); byte_t data; endinterface\n"
+      "module top; ifc i(); initial $display(\"%0d\", $bits(i.data)); "
+      "endmodule\n",
+      "8\n");
+  ExpectHeaderOutput(
+      "interface ifc import pkg::byte_t; (input byte_t a); byte_t shadow; "
+      "initial $display(\"%0d %0d\", $bits(a), $bits(shadow)); "
+      "endinterface\n"
+      "module top; ifc i(8'd0); endmodule\n",
+      "8 8\n");
+  ExpectHeaderOutput(
+      "interface ifc import pkg::*; #(parameter int N = W) (); "
+      "initial $display(\"%0d\", N); endinterface\n"
+      "module top; ifc i(); endmodule\n",
+      "5\n");
+}
+
+TEST(PackageImportInHeaderSim, ProgramHeaderImportsSizeItsBodyAndPorts) {
+  ExpectHeaderOutput(
+      "program pg import pkg::byte_t; (input byte_t a); byte_t local_b; "
+      "initial $display(\"%0d %0d\", $bits(a), $bits(local_b)); "
+      "endprogram\n"
+      "module top; pg u(8'd0); endmodule\n",
+      "8 8\n");
+  ExpectHeaderOutput(
+      "program pg import pkg::*; (input word_t a, output word_t b); "
+      "initial $display(\"%0d %0d\", $bits(a), $bits(b)); endprogram\n"
+      "module top; logic [15:0] y; pg u(16'd0, y); endmodule\n",
+      "16 16\n");
+  ExpectHeaderOutput(
+      "program pg import pkg::*; #(parameter int N = W) (input [W-1:0] a); "
+      "initial $display(\"%0d %0d\", N, $bits(a)); endprogram\n"
+      "module top; pg u(5'd0); endmodule\n",
+      "5 5\n");
+}
+
+TEST(PackageImportInHeaderSim, HeaderWithALifetimeOrAnAttribute) {
+  ExpectHeaderOutput(
+      "module automatic top import p::*; #(parameter int N = W) (); "
+      "initial $display(\"%0d %0d\", N, $bits(six_t)); endmodule\n",
+      "5 6\n");
+  ExpectHeaderOutput(
+      "interface automatic ifc import p::*; #(parameter int N = W) (); "
+      "initial $display(\"%0d\", N); endinterface\n"
+      "module top; ifc i(); endmodule\n",
+      "5\n");
+  ExpectHeaderOutput(
+      "program automatic pg import p::*; #(parameter int N = W) (); "
+      "initial $display(\"%0d\", N); endprogram\n"
+      "module top; pg u(); endmodule\n",
+      "5\n");
+  ExpectHeaderOutput(
+      "(* foo *) interface automatic ifc import p::*; "
+      "#(parameter int N = W); initial $display(\"%0d\", N); "
+      "endinterface\n"
+      "module top; ifc i(); endmodule\n",
+      "5\n");
+}
+
+TEST(PackageImportInHeaderSim, MacromoduleHeaderImport) {
+  ExpectHeaderOutput(
+      "macromodule top import p::*; (); six_t x; "
+      "initial $display(\"%0d %0d\", $bits(x), W); endmodule\n",
+      "6 5\n");
 }
 
 }  // namespace
