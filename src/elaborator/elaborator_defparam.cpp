@@ -16,6 +16,7 @@
 #include "elaborator/const_eval_internal.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
+#include "elaborator/elaborator_defparam_block.h"
 #include "elaborator/elaborator_defparam_walk.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
@@ -358,12 +359,16 @@ static void ReportNonConstantDefparam(DiagEngine& diag, SourceLoc loc) {
              Subclause("23.10.1"));
 }
 
-static ScopeMap WriterNames(const DefparamOverride& ovr) {
-  ScopeMap names = ovr.scope;
-  for (const auto& p : ovr.writer->params) {
+ScopeMap DefparamWriterNames(const ScopeMap& scope, const RtlirModule& writer) {
+  ScopeMap names = scope;
+  for (const auto& p : writer.params) {
     if (VisibleAtDefparam(p)) names.try_emplace(p.name, 0);
   }
   return names;
+}
+
+static ScopeMap WriterNames(const DefparamOverride& ovr) {
+  return DefparamWriterNames(ovr.scope, *ovr.writer);
 }
 
 static std::optional<int64_t> EvalDefparamOverride(

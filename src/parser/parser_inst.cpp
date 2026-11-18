@@ -23,6 +23,27 @@ namespace delta {
 
 namespace {
 
+void ReportDuplicateParamNames(
+    DiagEngine& diag,
+    const std::vector<std::pair<std::string_view, Expr*>>& out, size_t start,
+    const std::vector<SourceLoc>& entry_locs) {
+  for (size_t i = 0; i < entry_locs.size(); ++i) {
+    auto name = out[start + i].first;
+    if (name.empty()) continue;
+    for (size_t j = i + 1; j < entry_locs.size(); ++j) {
+      if (out[start + j].first == name) {
+        diag.Error(
+            entry_locs[j],
+            std::format("duplicate parameter name '{}' in parameter value "
+                        "assignment",
+                        name),
+            Subclause("23.10.2.2"));
+        break;
+      }
+    }
+  }
+}
+
 void RecordInstRange(ModuleItem* item) {
   if (item->inst_dims.empty()) return;
   item->inst_range_left = item->inst_dims[0].first;
@@ -181,15 +202,24 @@ void Parser::ParseParamValueAssignment(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   size_t start = out.size();
   std::vector<SourceLoc> entry_locs;
+  auto parse_entry = [&]() {
+    auto loc = CurrentLoc();
+    if (Check(TokenKind::kComma) || Check(TokenKind::kRParen)) {
+      diag_.Error(
+          loc, "an ordered parameter value list cannot leave a position empty",
+          Subclause("23.10.2.1"));
+      return false;
+    }
+    entry_locs.push_back(loc);
+    return ParseParamValueEntry(out);
+  };
   Expect(TokenKind::kLParen, Subclause("23.10.2"));
   if (!Check(TokenKind::kRParen)) {
-    entry_locs.push_back(CurrentLoc());
-    bool named = ParseParamValueEntry(out);
+    bool named = parse_entry();
     bool mixed = false;
     while (Match(TokenKind::kComma)) {
       auto entry_loc = CurrentLoc();
-      entry_locs.push_back(entry_loc);
-      bool next_named = ParseParamValueEntry(out);
+      bool next_named = parse_entry();
       if (!mixed && next_named != named) {
         diag_.Error(
             entry_loc,
@@ -200,21 +230,7 @@ void Parser::ParseParamValueAssignment(
     }
   }
   Expect(TokenKind::kRParen, Subclause("23.10.2"));
-  for (size_t i = 0; i < entry_locs.size(); ++i) {
-    auto name = out[start + i].first;
-    if (name.empty()) continue;
-    for (size_t j = i + 1; j < entry_locs.size(); ++j) {
-      if (out[start + j].first == name) {
-        diag_.Error(
-            entry_locs[j],
-            std::format("duplicate parameter name '{}' in parameter value "
-                        "assignment",
-                        name),
-            Subclause("23.10.2.2"));
-        break;
-      }
-    }
-  }
+  ReportDuplicateParamNames(diag_, out, start, entry_locs);
 }
 
 Expr* Parser::ParsePortActual() {

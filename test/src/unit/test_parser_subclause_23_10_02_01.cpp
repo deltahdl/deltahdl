@@ -9,7 +9,7 @@ using namespace delta;
 
 namespace {
 
-TEST(OrderedParameterValueList, DISABLED_NoPositionMayBeLeftEmpty) {
+TEST(OrderedParameterValueList, NoPositionMayBeLeftEmpty) {
   const char* const kLists[] = {"#(, 5)", "#(1, , 3)", "#(1, )"};
   for (const char* list : kLists) {
     SCOPED_TRACE(list);

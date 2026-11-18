@@ -361,7 +361,7 @@ TEST(DefparamElaboration, NamedBlockLocalparamTakesNoDefparam) {
                             "23.10.1"));
 }
 
-TEST(DefparamElaboration, DISABLED_NamedBlockParameterDefparamNeedsAConstant) {
+TEST(DefparamElaboration, NamedBlockParameterDefparamNeedsAConstant) {
   ElabFixture f;
   ElaborateSrc(
       "module c;\n"
@@ -379,6 +379,24 @@ TEST(DefparamElaboration, DISABLED_NamedBlockParameterDefparamNeedsAConstant) {
                     "defparam right-hand side must be a constant expression "
                     "built from numbers and parameters",
                     7, "23.10.1"));
+}
+
+TEST(DefparamElaboration, NamedBlockParameterDefparamAcceptsAnAggregatePart) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c;\n"
+      "  initial begin : blk\n"
+      "    parameter Q = 3;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  typedef struct { int a; } s_t;\n"
+      "  parameter s_t S = '{a: 7};\n"
+      "  defparam u.blk.Q = S.a;\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
 TEST(DefparamElaboration, ModuleParameterDefparamRefusesASystemFunction) {

@@ -11,6 +11,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_data.h"
 #include "elaborator/elaborator_defparam_walk.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -92,6 +93,12 @@ Expr* BlockParamInit(Expr* value, const ScopeMap& scope, Arena& arena) {
       value->kind == ExprKind::kStringLiteral) {
     return value;
   }
+  if (std::optional<double> real = RealOverrideValue(value, scope)) {
+    auto* literal = arena.Create<Expr>();
+    literal->kind = ExprKind::kRealLiteral;
+    literal->real_val = *real;
+    return literal;
+  }
   std::optional<int64_t> folded = ConstEvalInt(value, scope);
   if (!folded) return nullptr;
   auto* literal = arena.Create<Expr>();
@@ -139,6 +146,14 @@ bool ElaboratorData::ApplyBlockParamDefparam(RtlirModule* mod,
     return true;
   }
   Expr* init = BlockParamInit(d.value, d.scope, d.arena);
+  if (init == nullptr &&
+      !IsConstantExpr(d.value, DefparamWriterNames(d.scope, *mod))) {
+    d.diag.Error(d.loc,
+                 "defparam right-hand side must be a constant expression "
+                 "built from numbers and parameters",
+                 Subclause("23.10.1"));
+    return true;
+  }
   if (init == nullptr) {
     d.diag.Warning(d.loc, "defparam value is not constant",
                    Subclause("23.10.1"));

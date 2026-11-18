@@ -14,6 +14,8 @@ namespace delta {
 const Stmt* FindBlockParamDecl(const RtlirModule& mod, const HierPath& blocks,
                                std::string_view name);
 
+ScopeMap DefparamWriterNames(const ScopeMap& scope, const RtlirModule& writer);
+
 Expr* BlockParamInit(Expr* value, const ScopeMap& scope, Arena& arena);
 
 }  // namespace delta

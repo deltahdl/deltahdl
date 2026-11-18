@@ -501,4 +501,28 @@ TEST(DefparamSimulation,
   }
 }
 
+TEST(DefparamSimulation, ABlockParameterTakesAConstantExpression) {
+  struct Rhs {
+    const char* value;
+    const char* printed;
+  };
+  const Rhs kValues[] = {{"1.5 + 1", "Q 2.50\n"}, {"2 + 3", "Q 5.00\n"}};
+  for (const Rhs& rhs : kValues) {
+    SCOPED_TRACE(rhs.value);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(std::string("module c;\n"
+                                     "  initial begin : blk\n"
+                                     "    parameter real Q = 3.0;\n"
+                                     "    $display(\"Q %0.2f\", Q);\n"
+                                     "  end\n"
+                                     "endmodule\n"
+                                     "module top;\n"
+                                     "  defparam u.blk.Q = ") +
+                             rhs.value + ";\n  c u();\nendmodule\n",
+                         f),
+              rhs.printed);
+    EXPECT_TRUE(f.diag.Diagnostics().empty());
+  }
+}
+
 }  // namespace
