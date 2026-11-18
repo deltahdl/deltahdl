@@ -84,4 +84,170 @@ TEST(BindInstantiation, TargetInstanceListBindsTheListedInstanceAlone) {
             "4\n");
 }
 
+TEST(BindInstantiation, TargetsAtDifferentDepthsEachTakeTheBind) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chk(input var int v);\n"
+                       "endmodule\n"
+                       "module cpu #(parameter int N = 0) ();\n"
+                       "  int n = N;\n"
+                       "endmodule\n"
+                       "module mid;\n"
+                       "  cpu #(2) q();\n"
+                       "endmodule\n"
+                       "bind cpu chk p(n);\n"
+                       "module top;\n"
+                       "  cpu #(1) c();\n"
+                       "  mid m();\n"
+                       "  initial #1 $display(\"%0d %0d\", c.p.v, m.q.p.v);\n"
+                       "endmodule\n",
+                       f),
+            "1 2\n");
+}
+
+TEST(BindInstantiation, DISABLED_AParameterOfTheTargetIsAnActual) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module chk(input var int v);\n"
+                       "  initial #1 $display(\"%0d\", v);\n"
+                       "endmodule\n"
+                       "module cpu #(parameter int N = 0) ();\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  localparam int N = 9;\n"
+                       "  cpu #(4) c();\n"
+                       "  bind cpu chk p(N);\n"
+                       "endmodule\n",
+                       f),
+            "4\n");
+}
+
+TEST(BindInstantiation, AnImplicitNamedConnectionReadsTheTarget) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module probe(input var int a);\n"
+                       "  initial #1 $display(\"%0d\", a);\n"
+                       "endmodule\n"
+                       "module cpu;\n"
+                       "  int a = 7;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  int a = 2;\n"
+                       "  cpu c();\n"
+                       "  bind cpu probe p(.a);\n"
+                       "endmodule\n",
+                       f),
+            "7\n");
+}
+
+TEST(BindInstantiation, DISABLED_EveryInstanceOfTheInstantiationIsBound) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module probe;\n"
+                       "  int k = 3;\n"
+                       "endmodule\n"
+                       "module cpu; endmodule\n"
+                       "module top;\n"
+                       "  cpu c();\n"
+                       "  bind cpu probe p1(), p2();\n"
+                       "  initial #1 $display(\"%0d %0d\", c.p1.k, c.p2.k);\n"
+                       "endmodule\n",
+                       f),
+            "3 3\n");
+}
+
+TEST(BindInstantiation, DISABLED_AnInstanceArrayIsBound) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module probe;\n"
+                       "  int k = 3;\n"
+                       "endmodule\n"
+                       "module cpu; endmodule\n"
+                       "module top;\n"
+                       "  cpu c();\n"
+                       "  bind cpu probe p[1:0]();\n"
+                       "  initial #1 $display(\"%0d %0d\", c.p[1].k, "
+                       "c.p[0].k);\n"
+                       "endmodule\n",
+                       f),
+            "3 3\n");
+}
+
+TEST(BindInstantiation, TheTargetsObjectShadowsTheDirectivesObject) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module probe(input var int v);\n"
+                       "  initial #1 $display(\"%0d\", v);\n"
+                       "endmodule\n"
+                       "module cpu;\n"
+                       "  int a = 5;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  int a = 2;\n"
+                       "  cpu c();\n"
+                       "  bind cpu probe p(a);\n"
+                       "endmodule\n",
+                       f),
+            "5\n");
+}
+
+TEST(BindInstantiation, AnExpressionActualReadsTheTarget) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module probe(input var int x, input var int y,\n"
+                       "             input var int z);\n"
+                       "  initial #1 $display(\"%0d %0d %0d\", x, y, z);\n"
+                       "endmodule\n"
+                       "module cpu;\n"
+                       "  int a = 1;\n"
+                       "  int b = 2;\n"
+                       "  function int f(int i); return i + 3; endfunction\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  int a = 10;\n"
+                       "  int b = 20;\n"
+                       "  int v4 = 9;\n"
+                       "  function int f(int i); return i + 30; endfunction\n"
+                       "  cpu c();\n"
+                       "  bind cpu probe p(a + b, f(1), top.v4);\n"
+                       "endmodule\n",
+                       f),
+            "3 4 9\n");
+}
+
+TEST(BindInstantiation, DISABLED_ATypeBothScopesSeeOverridesATypeParameter) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  typedef logic [11:0] t12;\n"
+                       "endpackage\n"
+                       "module chk #(parameter type T = int) ();\n"
+                       "  initial $display(\"%0d\", $bits(T));\n"
+                       "endmodule\n"
+                       "module cpu;\n"
+                       "  import pk::t12;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  import pk::t12;\n"
+                       "  cpu c();\n"
+                       "  bind cpu chk #(.T(t12)) u();\n"
+                       "endmodule\n",
+                       f),
+            "12\n");
+}
+
+TEST(BindInstantiation, DISABLED_ADefparamReachesInsideTheBoundHierarchy) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module leaf #(parameter W = 1) ();\n"
+                       "endmodule\n"
+                       "module probe;\n"
+                       "  leaf l();\n"
+                       "  leaf l2();\n"
+                       "  defparam l.W = 5;\n"
+                       "  defparam top.c.p.l2.W = 6;\n"
+                       "endmodule\n"
+                       "module c_t;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  c_t c();\n"
+                       "  bind c_t probe p();\n"
+                       "  initial #1 $display(\"%0d %0d\", c.p.l.W, "
+                       "c.p.l2.W);\n"
+                       "endmodule\n",
+                       f),
+            "5 6\n");
+}
+
 }  // namespace

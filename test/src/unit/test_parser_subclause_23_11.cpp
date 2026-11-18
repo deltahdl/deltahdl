@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -125,6 +126,18 @@ TEST(BindDirective, BindInstantiationCarriesPositionalParameterOverride) {
   ASSERT_EQ(inst->inst_params.size(), 1u);
   EXPECT_TRUE(inst->inst_params[0].first.empty());
   EXPECT_NE(inst->inst_params[0].second, nullptr);
+}
+
+TEST(BindDirective, DISABLED_AGateIsNoBindInstantiation) {
+  auto r = Parse(
+      "module cpu;\n"
+      "  wire y, a, b;\n"
+      "endmodule\n"
+      "bind cpu and g(y, a, b);\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a bind instantiation shall instantiate a module, "
+                            "program, interface or checker",
+                            4, "23.11"));
 }
 
 }  // namespace
