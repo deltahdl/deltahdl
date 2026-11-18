@@ -501,4 +501,199 @@ TEST(AnonymousProgramWideSpace,
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(AnonymousProgramWideSpace,
+     ModuleCallingPackageAnonymousProgramFunctionByScopeIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "package pkg;\n"
+      "  program;\n"
+      "    function int f(); return 1; endfunction\n"
+      "  endprogram\n"
+      "endpackage\n"
+      "module top;\n"
+      "  int x;\n"
+      "  initial x = pkg::f();\n"
+      "endmodule\n",
+      8);
+}
+
+TEST(AnonymousProgramWideSpace,
+     ModuleCallingAnonymousProgramTaskThroughUnitScopeIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  initial $unit::t();\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace,
+     ModuleContinuousAssignCallingAnonymousProgramFunctionIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  function int f(); return 1; endfunction\n"
+      "endprogram\n"
+      "module top;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = f();\n"
+      "endmodule\n",
+      6);
+}
+
+TEST(AnonymousProgramWideSpace,
+     ModuleVariableInitializerCallingAnonymousProgramFunctionIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  function int f(); return 1; endfunction\n"
+      "endprogram\n"
+      "module top;\n"
+      "  int x = f();\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace,
+     DISABLED_ACallInAForGenerateBlockOfAModuleIsReported) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g\n"
+      "    initial t();\n"
+      "  end\n"
+      "endmodule\n",
+      6);
+}
+
+TEST(AnonymousProgramWideSpace,
+     DISABLED_ACallInAnIfGenerateBlockOfAModuleIsReported) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    initial t();\n"
+      "  end\n"
+      "endmodule\n",
+      6);
+}
+
+TEST(AnonymousProgramWideSpace,
+     ModuleDeclaringAnonymousProgramCovergroupIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  covergroup cg; endgroup\n"
+      "endprogram\n"
+      "module top;\n"
+      "  cg c;\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace,
+     DISABLED_AModuleClassExtendingAnAnonymousProgramClassIsReported) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  class S; endclass\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class D extends S; endclass\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(
+    AnonymousProgramWideSpace,
+    DISABLED_AModuleClassImplementingAnAnonymousProgramInterfaceClassIsReported) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  interface class IS; endclass\n"
+      "endprogram\n"
+      "module top;\n"
+      "  class D implements IS; endclass\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace, AnInterfaceCallingAnonymousProgramTaskIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  task t(); endtask\n"
+      "endprogram\n"
+      "interface I;\n"
+      "  initial t();\n"
+      "endinterface\n"
+      "module top;\n"
+      "  I i();\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace,
+     ACheckerVariableInitializerCallingAnonymousProgramFunctionIsError) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  function int f(); return 1; endfunction\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  bit b = f();\n"
+      "endchecker\n"
+      "module top;\n"
+      "  ck c();\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace,
+     DISABLED_ACheckerAssertionCallingAnonymousProgramFunctionIsReported) {
+  ExpectProgramWideSpaceRefRejected(
+      "program;\n"
+      "  function bit f(); return 1; endfunction\n"
+      "endprogram\n"
+      "checker ck(input logic clk);\n"
+      "  a1: assert property (@(posedge clk) f());\n"
+      "endchecker\n"
+      "module top;\n"
+      "  logic clk;\n"
+      "  ck c(clk);\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(AnonymousProgramWideSpace,
+     AClassInOneAnonymousProgramExtendsAnotherAnonymousProgramsClass) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "program;\n"
+      "  class B; endclass\n"
+      "endprogram\n"
+      "program;\n"
+      "  class D extends B; endclass\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(AnonymousProgramNameSpaceSharing,
+     CompilationUnitCovergroupAndAnonymousProgramCovergroupSameNameIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "covergroup cg; endgroup\n"
+      "program;\n"
+      "  covergroup cg; endgroup\n"
+      "endprogram\n"
+      "module top; endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'cg' declared in anonymous program collides with "
+                            "name in surrounding package or compilation-unit "
+                            "scope",
+                            3, "24.6"));
+}
+
 }  // namespace

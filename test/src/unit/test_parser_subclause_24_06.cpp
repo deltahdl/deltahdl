@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -50,6 +51,38 @@ TEST(AnonymousProgramNameSpaceSharing,
   EXPECT_FALSE(r.has_errors);
   EXPECT_TRUE(r.cu->programs.empty());
   EXPECT_EQ(CountItemsByKind(r.cu->cu_items, ModuleItemKind::kTaskDecl), 1u);
+}
+
+TEST(AnonymousProgramPlacement, AnAnonymousProgramInsideAModuleIsRejected) {
+  auto r = Parse(
+      "module top;\n"
+      "  program;\n"
+      "    task t(); endtask\n"
+      "  endprogram\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "24.3"));
+}
+
+TEST(AnonymousProgramPlacement, AnAnonymousProgramInsideAnInterfaceIsRejected) {
+  auto r = Parse(
+      "interface I;\n"
+      "  program;\n"
+      "    task t(); endtask\n"
+      "  endprogram\n"
+      "endinterface\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 2, "24.3"));
+}
+
+TEST(AnonymousProgramPlacement, ANamedProgramInsideAModuleIsAccepted) {
+  auto r = Parse(
+      "module top;\n"
+      "  program p;\n"
+      "    task t(); endtask\n"
+      "  endprogram\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
