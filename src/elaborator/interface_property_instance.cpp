@@ -12,6 +12,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
 
 namespace delta {
@@ -137,24 +138,54 @@ ModuleItem* InstanceSequence(const ModuleItem* decl, std::string_view inst,
   return copy;
 }
 
+void RegisterInstanceCopy(const ModuleItem* member, std::string_view inst,
+                          PropertyRegistry& registry, Arena& arena,
+                          RunDeclarations run) {
+  if (member->kind == ModuleItemKind::kSequenceDecl) {
+    ModuleItem* copy = InstanceSequence(member, inst, arena);
+    registry.Register(copy);
+    run.sequences.push_back(copy);
+    return;
+  }
+  if (member->kind != ModuleItemKind::kPropertyDecl ||
+      (member->prop_body_expr == nullptr &&
+       member->prop_body_tree == nullptr)) {
+    return;
+  }
+  ModuleItem* copy = InstanceCopy(member, inst, arena);
+  registry.Register(copy);
+  if (copy->prop_body_tree != nullptr) run.properties.push_back(copy);
+}
+
+ModuleItem* ClockedInBlock(const ModuleItem* decl, const ModuleItem* block,
+                           Arena& arena) {
+  auto* clocked = arena.Create<ModuleItem>(*decl);
+  std::string_view own = decl->name.substr(decl->name.rfind('.') + 1);
+  clocked->name = *arena.Create<std::string>(std::string(block->name) + "." +
+                                             std::string(own));
+  if (clocked->kind == ModuleItemKind::kPropertyDecl &&
+      clocked->prop_clock.empty()) {
+    clocked->prop_clock = block->clocking_event;
+  }
+  if (clocked->kind == ModuleItemKind::kSequenceDecl &&
+      clocked->seq_clock.empty()) {
+    clocked->seq_clock = block->clocking_event;
+  }
+  return clocked;
+}
+
 void RegisterInstanceCopies(const ModuleDecl* ifc, std::string_view inst,
                             PropertyRegistry& registry, Arena& arena,
                             RunDeclarations run) {
   for (const ModuleItem* member : ifc->items) {
-    if (member->kind == ModuleItemKind::kSequenceDecl) {
-      ModuleItem* copy = InstanceSequence(member, inst, arena);
-      registry.Register(copy);
-      run.sequences.push_back(copy);
+    if (member->kind != ModuleItemKind::kClockingBlock) {
+      RegisterInstanceCopy(member, inst, registry, arena, run);
       continue;
     }
-    if (member->kind != ModuleItemKind::kPropertyDecl ||
-        (member->prop_body_expr == nullptr &&
-         member->prop_body_tree == nullptr)) {
-      continue;
+    for (const ModuleItem* decl : member->clocking_decls) {
+      RegisterInstanceCopy(ClockedInBlock(decl, member, arena), inst, registry,
+                           arena, run);
     }
-    ModuleItem* copy = InstanceCopy(member, inst, arena);
-    registry.Register(copy);
-    if (copy->prop_body_tree != nullptr) run.properties.push_back(copy);
   }
 }
 
@@ -165,6 +196,12 @@ void RegisterInterfaceInstanceProperties(const ModuleDecl* decl,
                                          PropertyRegistry& registry,
                                          Arena& arena, RunDeclarations run) {
   if (decl == nullptr || unit == nullptr) return;
+  for (const PortDecl& port : decl->ports) {
+    if (port.data_type.kind != DataTypeKind::kNamed) continue;
+    const ModuleDecl* ifc = FindInterface(port.data_type.type_name, unit);
+    if (ifc == nullptr) continue;
+    RegisterInstanceCopies(ifc, port.name, registry, arena, run);
+  }
   for (const ModuleItem* item : decl->items) {
     if (item->kind != ModuleItemKind::kModuleInst) continue;
     const ModuleDecl* ifc = FindInterface(item->inst_module, unit);

@@ -180,7 +180,7 @@ void CheckResolvedVifClockingAccess(const Expr* e,
                     "'{}' of interface '{}'",
                     block_name, modport_name, vif_it->second),
         Subclause("25.5.5"));
-    cb_item = nullptr;
+    return;
   }
 
   if (!cb_item && !member_exists) {
@@ -413,6 +413,7 @@ struct ModportReach {
   std::string_view modport_name;
   const ModuleDecl* iface = nullptr;
   const ModportDecl* mp = nullptr;
+  bool through_port = false;
 };
 
 bool ReachModport(std::string_view base_name, const IfaceAccessContext& ctx,
@@ -424,6 +425,7 @@ bool ReachModport(std::string_view base_name, const IfaceAccessContext& ctx,
     auto mp_it = ctx.port_mps.find(base_name);
     if (mp_it != ctx.port_mps.end()) reach.modport_name = mp_it->second;
     bound = true;
+    reach.through_port = true;
   } else {
     auto vit = ctx.vifs.find(base_name);
     if (vit != ctx.vifs.end()) {
@@ -445,9 +447,19 @@ void CheckInterfaceObjectMemberAccess(const Expr* e,
   ModportReach reach;
   if (member_name.empty() || !ReachModport(e->lhs->text, ctx, reach)) return;
   const auto* member = FindInterfaceItemByName(reach.iface, member_name);
-  if (member && IsListableInModport(member->kind) &&
-      member->kind != ModuleItemKind::kClockingBlock &&
-      !ModportListsMember(reach.mp, member_name)) {
+  if (member == nullptr || !IsListableInModport(member->kind) ||
+      ModportListsMember(reach.mp, member_name)) {
+    return;
+  }
+  if (member->kind == ModuleItemKind::kClockingBlock) {
+    if (!reach.through_port) return;
+    ctx.diag.Error(
+        e->range.start,
+        std::format("clocking block '{}' is not accessible through modport "
+                    "'{}' of interface '{}'",
+                    member_name, reach.modport_name, reach.iface_type),
+        Subclause("25.5.5"));
+  } else {
     ctx.diag.Error(
         e->range.start,
         std::format(

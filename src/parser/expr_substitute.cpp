@@ -182,25 +182,20 @@ void AppendActualEvents(const EventExpr& ev, Expr* actual, Arena& arena,
   }
 }
 
+static std::string PathName(const Expr* path) {
+  if (path->kind != ExprKind::kMemberAccess) return std::string(path->text);
+  std::string_view joint = path->is_scope_resolution ? "::" : ".";
+  return PathName(path->lhs) + std::string(joint) +
+         std::string(path->rhs->text);
+}
+
 std::string InstanceDeclName(const Expr* instance) {
   if (instance == nullptr) return {};
-  if (instance->kind == ExprKind::kIdentifier) {
-    return std::string(instance->text);
-  }
-  const Expr* path = instance;
   if (instance->kind == ExprKind::kCall) {
     if (!instance->callee.empty()) return std::string(instance->callee);
-    path = instance->lhs;
+    return PathName(instance->lhs);
   }
-  if (path == nullptr || path->kind != ExprKind::kMemberAccess ||
-      path->lhs == nullptr || path->rhs == nullptr ||
-      path->lhs->kind != ExprKind::kIdentifier ||
-      path->rhs->kind != ExprKind::kIdentifier) {
-    return {};
-  }
-  std::string_view joint = path->is_scope_resolution ? "::" : ".";
-  return std::string(path->lhs->text) + std::string(joint) +
-         std::string(path->rhs->text);
+  return PathName(instance);
 }
 
 Expr* SelfDeterminedActual(Expr* actual, Arena& arena) {
