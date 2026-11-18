@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -110,6 +111,31 @@ TEST(NInputGateParsing, OutputMustBeNetLvalue) {
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
                             "28.3"));
+}
+
+TEST(NInputGateParsing, EachGateTakesOneOrTwoDelays) {
+  for (const std::string& gate : {"and", "nand", "or", "nor", "xor", "xnor"}) {
+    for (const std::string& delay : {"#5", "#(2, 3)"}) {
+      std::string src = "module m;\n  ";
+      src += gate;
+      src += " ";
+      src += delay;
+      src += " g(y, a, b);\nendmodule\n";
+      EXPECT_FALSE(Parse(src).has_errors) << gate << " " << delay;
+    }
+  }
+}
+
+TEST(NInputGateParsing, EachGateRejectsThreeDelays) {
+  for (const std::string& gate : {"and", "nand", "or", "nor", "xor", "xnor"}) {
+    std::string src = "module m;\n  ";
+    src += gate;
+    src += " #(1, 2, 3) g(y, a, b);\nendmodule\n";
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(
+        r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"))
+        << gate;
+  }
 }
 
 }  // namespace

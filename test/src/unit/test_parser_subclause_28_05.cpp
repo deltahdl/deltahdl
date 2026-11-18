@@ -99,4 +99,13 @@ TEST(BufNotParsing, TwoValueDelayAccepted) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
+TEST(BufNotParsing, ANotGateRejectsThreeDelays) {
+  auto r = Parse(
+      "module m;\n"
+      "  not #(1, 2, 3) n1(o, i);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
+}
+
 }  // namespace
