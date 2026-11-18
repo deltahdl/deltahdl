@@ -316,4 +316,101 @@ TEST(VirtualInterfaceSim, SubroutinesCalledThroughClassProperties) {
             "method t=7 add=89 static=90\n");
 }
 
+constexpr const char* kNullCallSource =
+    "interface ifc;\n"
+    "  int n;\n"
+    "  task t(); n = 1; endtask\n"
+    "  function int f(); return 2; endfunction\n"
+    "endinterface\n"
+    "module top;\n"
+    "  virtual ifc v;\n"
+    "  int x;\n";
+
+TEST(VirtualInterfaceSim, DISABLED_ATaskCalledThroughNullIsOneFatalError) {
+  SimFixture f;
+  std::string out =
+      RunCapture(std::string(kNullCallSource) +
+                     "  initial begin $display(\"before\"); #1 v.t(); "
+                     "$display(\"after\"); end\n"
+                     "endmodule\n",
+                 f);
+  EXPECT_EQ(out, "before\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 9,
+                            "25.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(VirtualInterfaceSim, DISABLED_AFunctionCalledThroughNullIsOneFatalError) {
+  SimFixture f;
+  std::string out =
+      RunCapture(std::string(kNullCallSource) +
+                     "  initial begin $display(\"before\"); #1 x = v.f(); "
+                     "$display(\"after\"); end\n"
+                     "endmodule\n",
+                 f);
+  EXPECT_EQ(out, "before\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference through a null virtual interface", 9,
+                            "25.9"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(VirtualInterfaceSim, OneDeclarationNamesTwoVirtualInterfaces) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface I; logic x; endinterface\n"
+      "module top;\n"
+      "  I s1(), s2();\n"
+      "  virtual I a, b;\n"
+      "  initial begin\n"
+      "    a = s1;\n"
+      "    b = s2;\n"
+      "    a.x = 1;\n"
+      "    b.x = 0;\n"
+      "    #1 $display(\"%b %b %b\", s1.x, s2.x, a == b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "1 0 0\n");
+}
+
+TEST(VirtualInterfaceSim, AnArrayPatternOfInstancesInitializesEachElement) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface SBus; logic a; endinterface\n"
+      "module top;\n"
+      "  SBus b1(), b2();\n"
+      "  virtual SBus v[2] = '{b1, b2};\n"
+      "  initial begin\n"
+      "    v[0].a = 0;\n"
+      "    v[1].a = 1;\n"
+      "    #1 $display(\"%b %b\", b1.a, b2.a);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "0 1\n");
+}
+
+TEST(VirtualInterfaceSim, AnInstanceOrNullComparesAsTheLeftOperand) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface SBus; logic a; endinterface\n"
+      "module top;\n"
+      "  SBus u(), w();\n"
+      "  virtual SBus v;\n"
+      "  initial begin\n"
+      "    $display(\"%b %b\", null == v, null != v);\n"
+      "    v = u;\n"
+      "    $display(\"%b %b %b %b %b\", u == v, w == v, null == v, u != v,\n"
+      "             null != v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "1 0\n1 0 0 0 1\n");
+}
+
 }  // namespace
