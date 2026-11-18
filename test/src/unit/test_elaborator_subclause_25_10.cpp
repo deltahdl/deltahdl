@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -292,6 +294,38 @@ TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersElaborate) {
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
+}
+
+constexpr const char* kDollarMsg =
+    "'$' may stand only in a queue's dimension or select, a value range's "
+    "bound, a cycle delay range's upper bound, a sequence, property or checker "
+    "argument, or a parameter's value";
+
+constexpr const char* kGenericPortInterfaces =
+    "interface ia; typedef int IT [$]; endinterface\n"
+    "interface ib; typedef int IT [2]; endinterface\n"
+    "module m (interface i);\n"
+    "  typedef i.IT T1;\n"
+    "  T1 v;\n"
+    "  initial $display(\"%0d\", v[$]);\n"
+    "endmodule\n";
+
+TEST(GenericPortTypedefElaboration,
+     DISABLED_ADollarSelectOfAFixedArrayTakenThroughAGenericPortIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kGenericPortInterfaces) +
+                   "module top; ib b(); m ub(b); endmodule\n",
+               f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kDollarMsg, 6, "6.20.7"));
+}
+
+TEST(GenericPortTypedefElaboration,
+     DISABLED_ADollarSelectOfAQueueTakenThroughAGenericPortIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kGenericPortInterfaces) +
+                   "module top; ia a(); m ua(a); endmodule\n",
+               f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace
