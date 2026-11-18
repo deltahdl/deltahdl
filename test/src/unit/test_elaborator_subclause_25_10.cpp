@@ -259,7 +259,8 @@ TEST(InterfaceObjectAccessElaboration,
                     8, "25.5"));
 }
 
-TEST(InterfaceObjectAccessElaboration, GenericModportPortListedAccess_Ok) {
+TEST(InterfaceObjectAccessElaboration,
+     GenericModportPortListedAccessElaboratesCleanly) {
   ElabFixture f;
   ElaborateSrc(
       "interface ebus_i;\n"
@@ -276,11 +277,8 @@ TEST(InterfaceObjectAccessElaboration, GenericModportPortListedAccess_Ok) {
       "  sub s1(ebus.mp);\n"
       "endmodule\n",
       f);
-  EXPECT_FALSE(
-      ReportedError(f.diag.Diagnostics(),
-                    "'Q' is not accessible through modport 'mp' of interface "
-                    "'ebus_i'",
-                    8, "25.5"));
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
 TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersElaborate) {

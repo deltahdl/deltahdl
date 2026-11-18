@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -498,6 +500,219 @@ TEST(ModportElaboration, AssigningAModportInputNetIsNotRefused) {
                              "'w' is an input of modport 'mp' of interface "
                              "'i4' and cannot be the target of an assignment",
                              2, "25.5"));
+}
+
+constexpr const char* kConnectionPicksModport =
+    "interface bus;\n"
+    "  logic s, t;\n"
+    "  modport mp(input t);\n"
+    "endinterface\n";
+
+TEST(InterfaceModportAccess,
+     DISABLED_AModportPickedAtTheConnectionRestrictsAPlainHeader) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kConnectionPicksModport) +
+                   "module child(bus b);\n"
+                   "  logic x, y;\n"
+                   "  initial x = b.t;\n"
+                   "  initial y = b.s;\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  child c(.b(i.mp));\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'s' is not accessible through modport 'mp' of interface 'bus'", 8,
+      "25.5"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "'t' is not accessible through modport 'mp' of interface 'bus'", 7,
+      "25.5"));
+}
+
+TEST(InterfaceModportAccess,
+     AModportPickedAtTheConnectionRestrictsAGenericHeader) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kConnectionPicksModport) +
+                   "module child(interface b);\n"
+                   "  logic x, y;\n"
+                   "  initial x = b.t;\n"
+                   "  initial y = b.s;\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  child c(i.mp);\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'s' is not accessible through modport 'mp' of interface 'bus'", 8,
+      "25.5"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "'t' is not accessible through modport 'mp' of interface 'bus'", 7,
+      "25.5"));
+}
+
+TEST(InterfaceModportAccess, AProgramPortRestrictsToTheListedMembers) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kConnectionPicksModport) +
+                   "program pr(bus.mp b);\n"
+                   "  logic x, y;\n"
+                   "  initial x = b.t;\n"
+                   "  initial y = b.s;\n"
+                   "endprogram\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  pr p(i);\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'s' is not accessible through modport 'mp' of interface 'bus'", 8,
+      "25.5"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "'t' is not accessible through modport 'mp' of interface 'bus'", 7,
+      "25.5"));
+}
+
+TEST(ModportElaboration,
+     DISABLED_AssigningAnInputPickedAtTheConnectionIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface bus;\n"
+      "  logic s, t;\n"
+      "  modport mp(input s, output t);\n"
+      "endinterface\n"
+      "module child(bus b);\n"
+      "  initial b.s = 1;\n"
+      "  initial b.t = 1;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  bus i();\n"
+      "  child c(.b(i.mp));\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'s' is an input of modport 'mp' of interface "
+                            "'bus' and cannot be the target of an assignment",
+                            6, "25.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'t' is an input of modport 'mp' of interface "
+                             "'bus' and cannot be the target of an assignment",
+                             7, "25.5"));
+}
+
+TEST(ModportElaboration, AssigningThroughAPortSelectingNoModportIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("interface bus;\n"
+             "  logic s;\n"
+             "  modport mp(input s);\n"
+             "endinterface\n"
+             "module child(bus b);\n"
+             "  initial b.s = 1;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  bus i();\n"
+             "  child c(.b(i));\n"
+             "endmodule\n"));
+}
+
+constexpr const char* kTwoModports =
+    "interface bus;\n"
+    "  logic s;\n"
+    "  modport a(input s);\n"
+    "  modport b(output s);\n"
+    "endinterface\n";
+
+TEST(InterfaceModportAgreement, DifferentModportsByPositionAreReported) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kTwoModports) +
+                   "module child(bus.a p);\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  child c(i.b);\n"
+                   "  child d(i.a);\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interface port 'p' selects modport 'a' in the module header but 'b' in "
+      "the instance connection; both shall name the same modport",
+      10, "25.5"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface port 'p'", 11, "25.5"));
+}
+
+TEST(InterfaceModportAgreement,
+     DifferentModportsWithAGenericHeaderAreReported) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kTwoModports) +
+                   "module child(interface.a p);\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  child c(.p(i.b));\n"
+                   "  child d(.p(i.a));\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "interface port 'p' selects modport 'a' in the module header but 'b' in "
+      "the instance connection; both shall name the same modport",
+      10, "25.5"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface port 'p'", 11, "25.5"));
+}
+
+constexpr const char* kOneModport =
+    "interface bus;\n"
+    "  logic s;\n"
+    "  modport mp(input s);\n"
+    "endinterface\n";
+
+TEST(InterfaceModportNames,
+     DISABLED_AConnectionNamingAnUndeclaredModportIsReported) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kOneModport) +
+                   "module child(bus b);\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  child c(.b(i.nope));\n"
+                   "  child d(.b(i.mp));\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface 'bus' declares no modport 'nope'", 9,
+                            "25.5"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "declares no modport", 10, "25.5"));
+}
+
+TEST(InterfaceModportNames,
+     DISABLED_AHeaderNamingAnUndeclaredModportIsReported) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kOneModport) +
+                   "module child(bus.nope b);\n"
+                   "endmodule\n"
+                   "module child2(bus.mp b);\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  bus i();\n"
+                   "  child c(i);\n"
+                   "  child2 c2(i);\n"
+                   "endmodule\n",
+               f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface 'bus' declares no modport 'nope'", 5,
+                            "25.5"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "declares no modport", 7, "25.5"));
 }
 
 }  // namespace

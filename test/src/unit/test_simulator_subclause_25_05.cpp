@@ -117,4 +117,119 @@ TEST(ModportConnectionSim,
   EXPECT_EQ(out, "5:1 25 1\n$finish at time 25\n");
 }
 
+std::string RunWithoutErrors(const std::string& src) {
+  SimFixture f;
+  auto out = RunCapture(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return out;
+}
+
+TEST(ModportConnectionSim, ARefItemIsReadAndWrittenThroughTheModportPort) {
+  EXPECT_EQ(RunWithoutErrors("interface bus;\n"
+                             "  int r;\n"
+                             "  modport mp(ref r);\n"
+                             "endinterface\n"
+                             "module child(bus.mp b);\n"
+                             "  initial begin\n"
+                             "    b.r = 5;\n"
+                             "    #1 $display(\"child %0d\", b.r);\n"
+                             "    b.r = b.r + 1;\n"
+                             "  end\n"
+                             "endmodule\n"
+                             "module top;\n"
+                             "  bus i();\n"
+                             "  child c(i);\n"
+                             "  initial #2 $display(\"top %0d\", i.r);\n"
+                             "endmodule\n"),
+            "child 5\ntop 6\n");
+}
+
+TEST(ModportlessPortSim, DISABLED_AStructMemberReadsThroughThePort) {
+  EXPECT_EQ(
+      RunWithoutErrors("interface bus(input logic clk, a);\n"
+                       "  typedef struct packed { logic f; logic g; } ps_t;\n"
+                       "  ps_t s;\n"
+                       "  struct { logic f; } us;\n"
+                       "  always_comb begin s.f = a; s.g = ~a; us.f = a; end\n"
+                       "endinterface\n"
+                       "module m(bus ip, input logic clk);\n"
+                       "  initial #2 $display(\"%b %b %b\", ip.s.f, ip.s.g, "
+                       "ip.us.f);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clk = 0, a = 0;\n"
+                       "  bus ub(clk, a);\n"
+                       "  m u(ub, clk);\n"
+                       "  initial #1 a = 1;\n"
+                       "endmodule\n"),
+      "1 0 1\n");
+}
+
+std::string RunSharedInstance(const std::string& instances) {
+  return RunWithoutErrors(
+      "interface simple_bus;\n"
+      "  logic req, gnt;\n"
+      "endinterface\n"
+      "module memMod(simple_bus a, input logic clk);\n"
+      "  logic avail = 1;\n"
+      "  always @(posedge clk) a.gnt <= a.req & avail;\n"
+      "endmodule\n"
+      "module cpuMod(simple_bus b, input logic clk);\n"
+      "  wire seen = b.gnt;\n"
+      "  initial begin\n"
+      "    b.req = 1;\n"
+      "    #12 b.req = 0;\n"
+      "    #10 b.req = 1;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0, old;\n"
+      "  initial repeat (6) #5 clk = ~clk;\n"
+      "  simple_bus sb_intf();\n" +
+      instances +
+      "  always @(posedge clk) begin\n"
+      "    old = sb_intf.gnt;\n"
+      "    $strobe(\"%0t %b->%b %b %b\", $time, old, sb_intf.gnt, "
+      "sb_intf.req, cpu.seen);\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(ModportlessPortSim, TwoModulesShareOneInstanceThroughNamedConnections) {
+  EXPECT_EQ(RunSharedInstance("  memMod mem(.a(sb_intf), .clk(clk));\n"
+                              "  cpuMod cpu(.b(sb_intf), .clk(clk));\n"),
+            "5 x->1 1 1\n15 1->0 0 0\n25 0->1 1 1\n");
+}
+
+TEST(ModportlessPortSim,
+     TwoModulesShareOneInstanceThroughPositionalConnections) {
+  EXPECT_EQ(RunSharedInstance("  memMod mem(sb_intf, clk);\n"
+                              "  cpuMod cpu(sb_intf, clk);\n"),
+            "5 x->1 1 1\n15 1->0 0 0\n25 0->1 1 1\n");
+}
+
+TEST(ModportlessPortSim, APortSelectingNoModportWritesEveryMember) {
+  EXPECT_EQ(
+      RunWithoutErrors("interface bus;\n"
+                       "  logic a, z;\n"
+                       "  wire w;\n"
+                       "  modport mp(input a);\n"
+                       "endinterface\n"
+                       "module m(bus b);\n"
+                       "  assign b.w = 1;\n"
+                       "  initial begin\n"
+                       "    b.a = 1;\n"
+                       "    b.z = 1;\n"
+                       "    #1 $display(\"in %b %b %b\", b.a, b.z, b.w);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  bus i();\n"
+                       "  m u(.b(i));\n"
+                       "  initial #2 $display(\"a=%b z=%b w=%b\", i.a, i.z, "
+                       "i.w);\n"
+                       "endmodule\n"),
+      "in 1 1 1\na=1 z=1 w=1\n");
+}
+
 }  // namespace

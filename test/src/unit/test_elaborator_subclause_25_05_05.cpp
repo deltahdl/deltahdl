@@ -72,4 +72,34 @@ TEST(ClockingModportElaboration, ClockingBlockWithSignalsThroughInterfacePort) {
              "endmodule\n"));
 }
 
+TEST(
+    ClockingModportElaboration,
+    DISABLED_AClockingBlockAModportOmitsIsReportedOnceThroughAVirtualInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface A_Bus(input logic clk);\n"
+      "  logic req;\n"
+      "  clocking sb @(posedge clk);\n"
+      "    output req;\n"
+      "  endclocking\n"
+      "  modport STB(clocking sb);\n"
+      "  modport TB(input req);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  A_Bus b(clk);\n"
+      "  virtual A_Bus.TB v = b;\n"
+      "  initial v.sb.req <= 1;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "clocking block 'sb' is not accessible through "
+                            "modport 'TB' of interface 'A_Bus'",
+                            13, "25.5.5"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "'sb' is not a clocking block or member of "
+                             "interface 'A_Bus'",
+                             13, "25.9"));
+}
+
 }  // namespace
