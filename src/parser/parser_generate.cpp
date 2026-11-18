@@ -30,6 +30,7 @@ static bool EndsGenerateBlockItems(TokenKind tk, bool else_may_follow) {
 }
 
 void Parser::ParseGenerateItem(std::vector<ModuleItem*>& items) {
+  if (Match(TokenKind::kSemicolon)) return;
   bool design_element = Check(TokenKind::kKwModule) ||
                         Check(TokenKind::kKwMacromodule) ||
                         Check(TokenKind::kKwProgram) ||
@@ -108,7 +109,8 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   } else if (InGenerateBlock()) {
     diag_.Error(loc,
                 "this generate region opens inside a generate block; a "
-                "generate region stands only directly in a module",
+                "generate region stands only directly in the body of a "
+                "module, interface, program or checker",
                 Subclause("27.3"));
   }
   bool saved = in_generate_region_;

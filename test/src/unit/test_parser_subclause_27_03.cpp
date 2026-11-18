@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -297,6 +300,204 @@ TEST(GenerateItemContent, NestedModuleAndGenerateInterfaceClassAreAccepted) {
       "  end\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(GenerateRegion, RegionInACaseGenerateBlockIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate endgenerate\n"
+      "  case (1)\n"
+      "    1: begin : g\n"
+      "      generate endgenerate\n"
+      "    end\n"
+      "    default: ;\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "this generate region opens inside a generate "
+                            "block; a generate region stands only directly in "
+                            "the body of a module, interface, program or "
+                            "checker",
+                            5, "27.3"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(GenerateRegion, RegionInAnInterfaceProgramOrCheckerBlockIsReported) {
+  auto r = Parse(
+      "interface i;\n"
+      "  generate endgenerate\n"
+      "  if (1) begin : g\n"
+      "    generate endgenerate\n"
+      "  end\n"
+      "endinterface\n"
+      "program p;\n"
+      "  generate endgenerate\n"
+      "  if (1) begin : g\n"
+      "    generate endgenerate\n"
+      "  end\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  generate endgenerate\n"
+      "  if (1) begin : g\n"
+      "    generate endgenerate\n"
+      "  end\n"
+      "endchecker\n");
+  for (int line : {4, 10, 16}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "this generate region opens inside a generate "
+                              "block; a generate region stands only directly "
+                              "in the body of a module, interface, program or "
+                              "checker",
+                              line, "27.3"));
+  }
+  EXPECT_EQ(r.diags.size(), 3u);
+}
+
+TEST(GenerateRegion, MissingEndgenerateInAnInterfaceProgramOrChecker) {
+  struct Case {
+    const char* src;
+    const char* msg;
+  };
+  const Case kCases[] = {
+      {"interface i;\n  generate\n    wire w;\nendinterface\n",
+       "expected 'endgenerate', got 'endinterface'"},
+      {"program p;\n  generate\n    logic w;\nendprogram\n",
+       "expected 'endgenerate', got 'endprogram'"},
+      {"checker c;\n  generate\n    logic w;\nendchecker\n",
+       "expected 'endgenerate', got 'endchecker'"},
+  };
+  for (const auto& c : kCases) {
+    auto r = Parse(c.src);
+    EXPECT_TRUE(ReportedError(r.diags, c.msg, 4, "27.3")) << c.src;
+    EXPECT_EQ(r.diags.size(), 1u) << c.src;
+  }
+}
+
+TEST(GenerateRegion, ClosedRegionInAnInterfaceProgramOrCheckerIsAccepted) {
+  auto r = Parse(
+      "interface i;\n  generate\n    wire w;\n  endgenerate\nendinterface\n"
+      "program p;\n  generate\n    logic w;\n  endgenerate\nendprogram\n"
+      "checker c;\n  generate\n    logic w;\n  endgenerate\nendchecker\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(GenerateItemContent, NullItemsInAGenerateBlockAndRegionAreAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    wire a;\n"
+      "    ;\n"
+      "    wire b;\n"
+      "  end\n"
+      "  generate\n"
+      "    ;\n"
+      "    wire c;\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const auto& items = r.cu->modules[0]->items;
+  ASSERT_EQ(items.size(), 2u);
+  EXPECT_EQ(items[0]->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_EQ(items[0]->gen_body.size(), 2u);
+  EXPECT_EQ(items[1]->kind, ModuleItemKind::kNetDecl);
+}
+
+TEST(GenerateItemContent, NullItemsInInterfaceProgramAndCheckerBlocks) {
+  auto r = Parse(
+      "interface i;\n"
+      "  if (1) begin : g ; end\n"
+      "  generate ; endgenerate\n"
+      "endinterface\n"
+      "program p;\n"
+      "  if (1) begin : g ; end\n"
+      "  generate ; endgenerate\n"
+      "endprogram\n"
+      "checker c;\n"
+      "  if (1) begin : g ; end\n"
+      "  generate ; endgenerate\n"
+      "endchecker\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(GenerateItemContent, NullItemAtModuleLevelAndAsASingleItemBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  ;\n"
+      "  for (genvar k = 0; k < 2; k++) ;\n"
+      "  if (1) ; else ;\n"
+      "  case (1) 1: ; endcase\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(GenerateItemContent, ItemsOfEveryReachedKindAreAcceptedInABlock) {
+  auto r = Parse(
+      "module leaf; endmodule\n"
+      "program pg; endprogram\n"
+      "module chk; endmodule\n"
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    genvar gv;\n"
+      "    task automatic t; endtask\n"
+      "    import \"DPI-C\" function int c_abs(int x);\n"
+      "    covergroup cg; endgroup\n"
+      "    final $display(\"f\");\n"
+      "    pg pi();\n"
+      "    bind leaf chk ck();\n"
+      "    (* keep *) logic att;\n"
+      "    for (gv = 0; gv < 1; gv++) begin : l end\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  const ModuleDecl* m = nullptr;
+  for (auto* mod : r.cu->modules) {
+    if (mod->name == "m") m = mod;
+  }
+  ASSERT_NE(m, nullptr);
+  ASSERT_EQ(m->items.size(), 1u);
+  std::vector<ModuleItemKind> kinds;
+  bool attribute_kept = false;
+  for (auto* item : m->items[0]->gen_body) {
+    kinds.push_back(item->kind);
+    if (item->kind == ModuleItemKind::kVarDecl && item->name == "att") {
+      attribute_kept = !item->attrs.empty();
+    }
+  }
+  for (auto kind :
+       {ModuleItemKind::kTaskDecl, ModuleItemKind::kDpiImport,
+        ModuleItemKind::kCovergroupDecl, ModuleItemKind::kFinalBlock,
+        ModuleItemKind::kModuleInst, ModuleItemKind::kBindDirective,
+        ModuleItemKind::kVarDecl, ModuleItemKind::kGenerateFor}) {
+    EXPECT_NE(std::ranges::find(kinds, kind), kinds.end())
+        << static_cast<int>(kind);
+  }
+  EXPECT_TRUE(attribute_kept);
+}
+
+TEST(GenerateItemContent, DesignElementDeclaredInACheckerBlockIsReported) {
+  auto r = Parse(
+      "checker c;\n"
+      "  if (1) begin : g\n"
+      "    module mm; endmodule\n"
+      "    interface ii; endinterface\n"
+      "    program pp; endprogram\n"
+      "    checker cc; endchecker\n"
+      "  end\n"
+      "endchecker\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'module' declares a design element, which is not "
+                            "an item of a generate block or region",
+                            3, "27.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'interface' declares a design element, which is "
+                            "not an item of a generate block or region",
+                            4, "27.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'program' declares a design element, which is not "
+                            "an item of a generate block or region",
+                            5, "27.3"));
 }
 
 }  // namespace
