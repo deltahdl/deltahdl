@@ -454,7 +454,10 @@ TEST(AssertionLabelScopes, DISABLED_ALabelUnderADeclaringUnnamedBlockIsHidden) {
       "    f <= a && c;\n    C2: cover property (f) begin\n"
       "      A3: assert (a);\n    end\n  end\n",
       "  initial $assertoff(0, top.m_i.C2.A3);\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'm_i.C2' is unresolved: "
+                            "'C2' is not declared in module 'm'",
+                            5, "23.6"));
 }
 
 TEST(AssertionLabelScopes, DISABLED_AnUnnamedActionBlocksVariableIsHidden) {
@@ -463,7 +466,10 @@ TEST(AssertionLabelScopes, DISABLED_AnUnnamedActionBlocksVariableIsHidden) {
       "  initial begin : B1\n    A1: assert (a) begin\n      bit d;\n"
       "      d = 1;\n    end\n  end\n",
       "  initial #1 $display(\"%b\", top.m_i.B1.A1.d);\n", f);
-  EXPECT_TRUE(f.diag.HasErrors());
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'A1.d' is unresolved: 'd' "
+                            "is not declared in assertion 'A1'",
+                            5, "23.6"));
 }
 
 TEST(AssertionLabelScopes, AnAssertionLabelNamesItInAControlTask) {
@@ -978,18 +984,6 @@ TEST(AssertionHierarchicalNames, AFirstComponentNamingNothingIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to unresolved identifier 'nosuch'", 3,
                             "23.9"));
-}
-
-TEST(HierarchicalNameTree, LikeNamedPropertiesOfTwoClassesKeepTheirOwn) {
-  SimFixture f;
-  EXPECT_EQ(RunCapture("module t;\n  class a;\n    int p = 1;\n  endclass\n"
-                       "  class b;\n    int p = 2;\n  endclass\n"
-                       "  a x;\n  b y;\n"
-                       "  initial begin\n    x = new;\n    y = new;\n"
-                       "    $display(\"%0d %0d\", x.p, y.p);\n  end\n"
-                       "endmodule\n",
-                       f),
-            "1 2\n");
 }
 
 }  // namespace

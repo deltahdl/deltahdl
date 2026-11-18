@@ -697,4 +697,16 @@ TEST(ScopeRulesSimulation, LikeNamedSequencesOfTwoModulesTriggerTheirOwn) {
   EXPECT_NE(out.find("b at 15\n"), std::string::npos) << out;
 }
 
+TEST(ScopeRulesSimulation, LikeNamedPropertiesOfTwoClassesKeepTheirOwn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n  class a;\n    int p = 1;\n  endclass\n"
+                       "  class b;\n    int p = 2;\n  endclass\n"
+                       "  a x;\n  b y;\n"
+                       "  initial begin\n    x = new;\n    y = new;\n"
+                       "    $display(\"%0d %0d\", x.p, y.p);\n  end\n"
+                       "endmodule\n",
+                       f),
+            "1 2\n");
+}
+
 }  // namespace
