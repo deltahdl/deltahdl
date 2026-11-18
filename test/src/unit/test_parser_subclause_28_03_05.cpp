@@ -152,4 +152,12 @@ TEST(GateLevelModelingParsing, GateArrayTwoUniqueArrayNamesInOneDeclaration) {
   EXPECT_NE(gates[1]->inst_range_right, nullptr);
 }
 
+TEST(GateLevelModelingParsing, ARangeBeforeTheInstanceNameIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  and [0:3] g (o, a, b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '['", 2, "28.3.6"));
+}
+
 }  // namespace

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <string>
 
 #include "common/diagnostic.h"
 #include "fixture_parser.h"
@@ -375,6 +376,49 @@ TEST(SwitchStrengthRejection, TranStrengthRejected) {
       "endmodule\n");
   EXPECT_TRUE(ReportedError(
       r.diags, "drive strength not allowed on this gate type", 3, "28.3.2"));
+}
+
+TEST(GateInstStrengthParsing, TwoStrength0KeywordsAreRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and (strong0, weak0) g(y, a, b);\n"
+      "endmodule");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength on this gate type requires both a "
+                            "strength0 and a strength1 keyword",
+                            3, "28.3.2"));
+}
+
+TEST(GateInstStrengthParsing, TwoStrength1KeywordsAreRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire y, a, b;\n"
+      "  and (strong1, weak1) g(y, a, b);\n"
+      "endmodule");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "drive strength on this gate type requires both a "
+                            "strength0 and a strength1 keyword",
+                            3, "28.3.2"));
+}
+
+TEST(GateInstStrengthParsing, EachPullGateRejectsAHighzPairInBothOrders) {
+  for (const std::string& gate : {"pullup", "pulldown"}) {
+    for (const std::string& pair : {"(highz0, highz1)", "(highz1, highz0)"}) {
+      std::string src = "module m;\n  wire y;\n  ";
+      src += gate;
+      src += " ";
+      src += pair;
+      src += " p(y);\nendmodule\n";
+      auto r = Parse(src);
+      EXPECT_TRUE(ReportedError(r.diags,
+                                "a pull source's strength is a strength0 or "
+                                "strength1 keyword; highz0 and highz1 are "
+                                "neither",
+                                3, "A.3.2"))
+          << gate << " " << pair;
+    }
+  }
 }
 
 }  // namespace

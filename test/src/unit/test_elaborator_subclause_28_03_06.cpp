@@ -202,4 +202,111 @@ TEST(GateArrayConnection, ASubarrayOfTheWrongWidthIsReported) {
                             5, "28.3.6"));
 }
 
+constexpr const char* kInterconnectOnGateArray =
+    "interconnect terminal of a gate or primitive instance array";
+constexpr const char* kInterconnectOnModuleArray =
+    "interconnect connected to a module instance array must have a "
+    "bit-length equal to the instance-array length";
+
+TEST(GateArrayConnection, AScalarInterconnectPortCannotBroadcastAcrossArray) {
+  ElabFixture f;
+  Elaborate(
+      "module m(output interconnect ic);\n"
+      "  wire a, b;\n"
+      "  and g[0:3](ic, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kInterconnectOnGateArray, 3,
+                            "28.3.6"));
+}
+
+TEST(GateArrayConnection, AnInterconnectPortAsWideAsTheArrayElaborates) {
+  ElabFixture f;
+  Elaborate(
+      "module m(output interconnect [3:0] ic);\n"
+      "  wire a, b;\n"
+      "  and g[0:3](ic, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+std::string ModuleArrayOn(const std::string& header, const std::string& decl) {
+  return "module c(input wire p);\nendmodule\n" + header + decl +
+         "  c u[0:3] (.p(ic));\n"
+         "endmodule\n";
+}
+
+TEST(ModuleArrayConnection, DISABLED_AnInterconnectOfAnotherWidthIsReported) {
+  for (const std::string& decl :
+       {"  interconnect ic;\n", "  interconnect [2:0] ic;\n"}) {
+    ElabFixture f;
+    Elaborate(ModuleArrayOn("module m;\n", decl), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kInterconnectOnModuleArray,
+                              5, "28.3.6"))
+        << decl;
+  }
+  ElabFixture f;
+  Elaborate(ModuleArrayOn("module m(input interconnect ic);\n", ""), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kInterconnectOnModuleArray, 4,
+                            "28.3.6"));
+}
+
+TEST(ModuleArrayConnection, AnInterconnectAsWideAsTheArrayElaborates) {
+  ElabFixture f;
+  Elaborate(ModuleArrayOn("module m;\n", "  interconnect [3:0] ic;\n"), f);
+  EXPECT_FALSE(f.has_errors);
+  ElabFixture g;
+  Elaborate(ModuleArrayOn("module m(input interconnect [3:0] ic);\n", ""), g);
+  EXPECT_FALSE(g.has_errors);
+}
+
+constexpr const char* kTerminalWidth =
+    "gate or primitive array terminal width does not match";
+
+std::string InEachBlock(const std::string& block_open,
+                        const std::string& block_close,
+                        const std::string& module_decl, const std::string& prim,
+                        int out_width) {
+  return "primitive u(output y, input a);\n"
+         "  table 0 : 0; 1 : 1; endtable\n"
+         "endprimitive\n"
+         "module m;\n" +
+         module_decl + block_open + "    wire [" +
+         std::to_string(out_width - 1) +
+         ":0] out;\n"
+         "    wire in;\n"
+         "    " +
+         prim + " b [3:0] (out, in);\n" + block_close + "endmodule\n";
+}
+
+struct BlockText {
+  const char* open;
+  const char* close;
+};
+
+constexpr BlockText kBlocks[] = {
+    {"  if (1) begin\n", "  end\n"},
+    {"  case (1) 1: begin\n", "  end endcase\n"},
+    {"  for (genvar i = 0; i < 1; i++) begin\n", "  end\n"}};
+
+TEST(GateArrayConnection, DISABLED_AGenerateBlocksNetIsMeasuredAsDeclared) {
+  for (const auto& [open, close] : kBlocks) {
+    for (const std::string& prim : {"buf", "u"}) {
+      for (const std::string& module_decl : {"", "  wire [3:0] out;\n"}) {
+        ElabFixture f;
+        Elaborate(InEachBlock(open, close, module_decl, prim, 3), f);
+        EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kTerminalWidth,
+                                  module_decl.empty() ? 8 : 9, "28.3.6"))
+            << open << prim << module_decl;
+      }
+      for (const std::string& module_decl : {"", "  wire out;\n"}) {
+        ElabFixture f;
+        Elaborate(InEachBlock(open, close, module_decl, prim, 4), f);
+        EXPECT_FALSE(f.has_errors) << open << prim << module_decl;
+      }
+    }
+  }
+}
+
 }  // namespace

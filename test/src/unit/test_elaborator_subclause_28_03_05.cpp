@@ -34,6 +34,7 @@ TEST(GateArrayElaboration, AbsBoundsFormulaWithNonZeroBounds) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->assigns.size(), 5u);
 }
 
 TEST(GateArrayElaboration, EqualBoundsSingleInstance) {
@@ -46,6 +47,7 @@ TEST(GateArrayElaboration, EqualBoundsSingleInstance) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->assigns.size(), 1u);
 }
 
 TEST(GateArrayElaboration, NoRangeSingleInstanceProducesOneAssign) {
@@ -87,6 +89,7 @@ TEST(GateArrayElaboration, ArrayWidthTerminalConnectsPerInstance) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(design->top_modules[0]->assigns.size(), 5u);
 }
 
 TEST(GateArrayElaboration, NonConstantRangeBoundIsError) {
@@ -169,6 +172,31 @@ TEST(ModuleInstanceArrayElaboration, NonConstantRangeBoundRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance array range bound must be a constant", 4,
                             "28.3.5"));
+}
+
+TEST(GateArrayElaboration, AnArrayNameReusedInAnotherDeclarationIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire [1:0] o, a, b;\n"
+      "  and t[0:1] (o, a, b);\n"
+      "  or t[2:3] (o, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "redeclaration of 't'", 4, "23.9"));
+}
+
+TEST(GateArrayElaboration, TwoArraysWithTheirOwnNamesAreAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  wire [1:0] o, a, b;\n"
+      "  and t[0:1] (o, a, b);\n"
+      "  or u[2:3] (o, a, b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

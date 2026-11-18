@@ -136,4 +136,39 @@ TEST(GateDelayParsing, GateWithoutDelayHasNullDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
+TEST(GateDelayParsing, AnUnnamedPulldownWithADelayIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  pulldown #5 (net1);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
+}
+
+TEST(GateDelayParsing, APullupWithTwoDelaysIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  pullup #(1, 2) (a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
+}
+
+TEST(GateDelayParsing, APulldownWithADelayAfterItsStrengthIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  pulldown (strong0) #3 (b);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
+                            "28.3.3"));
+}
+
+TEST(GateDelayParsing, APulldownWithAStrengthAndNoDelayIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  pulldown (strong0) (b);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

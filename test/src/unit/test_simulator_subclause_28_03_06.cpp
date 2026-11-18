@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
+#include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -336,6 +340,89 @@ TEST(GateArrayRuntime, ASubarrayOrAnUnpackedElementIsSharedOutPerInstance) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "10 10 11 11\n");
+}
+
+class GateArrayElementVpi : public VpiDesignRun {
+ protected:
+  static vpiHandle InputExprOf(vpiHandle gate) {
+    vpiHandle it = vpi_iterate(vpiPrimTerm, gate);
+    if (it == nullptr) return nullptr;
+    vpi_scan(it);
+    vpiHandle in = vpi_scan(it);
+    return in == nullptr ? nullptr : vpi_handle(vpiExpr, in);
+  }
+};
+
+TEST_F(GateArrayElementVpi, AnElementIsReachedByTheArrayNameAndItsIndex) {
+  Run("module top; wire [3:0] y; logic [3:0] a, b;\n"
+      "  and g[3:0] (y, a, b);\n"
+      "endmodule\n");
+  vpiHandle g2 = By("top.g[2]");
+  ASSERT_NE(g2, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, g2), vpiGate);
+  EXPECT_STREQ(vpi_get_str(vpiName, g2), "g[2]");
+}
+
+TEST_F(GateArrayElementVpi, ARangeNotStartingAtZeroNamesItsOwnIndices) {
+  Run("module top; wire [3:0] y; logic [3:0] a, b;\n"
+      "  nand nand_array[1:4] (y, a, b);\n"
+      "endmodule\n");
+  vpiHandle first = By("top.nand_array[1]");
+  vpiHandle last = By("top.nand_array[4]");
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(last, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, first), vpiGate);
+  EXPECT_EQ(vpi_get(vpiType, last), vpiGate);
+  EXPECT_NE(VpiObjectOf(first), VpiObjectOf(last));
+  EXPECT_EQ(By("top.nand_array[0]"), nullptr);
+  EXPECT_EQ(By("top.nand_array[5]"), nullptr);
+}
+
+TEST_F(GateArrayElementVpi, AnAscendingRangeSendsTheLsbToItsRightHandIndex) {
+  Run("module top; wire [3:0] y; logic [3:0] a;\n"
+      "  buf g[0:3] (y, a);\n"
+      "endmodule\n");
+  vpiHandle right = By("top.g[3]");
+  vpiHandle left = By("top.g[0]");
+  ASSERT_NE(right, nullptr);
+  ASSERT_NE(left, nullptr);
+  EXPECT_EQ(VpiObjectOf(InputExprOf(right)),
+            VpiObjectOf(vpi_handle_by_index(By("top.a"), 0)));
+  EXPECT_EQ(VpiObjectOf(InputExprOf(left)),
+            VpiObjectOf(vpi_handle_by_index(By("top.a"), 3)));
+}
+
+std::string BlockArrayShown(const std::string& block_open,
+                            const std::string& block_close,
+                            const std::string& prim) {
+  SimFixture f;
+  return RunCapture(std::string("primitive u(output y, input a);\n"
+                                "  table 0 : 0; 1 : 1; endtable\n"
+                                "endprimitive\n"
+                                "module top;\n"
+                                "  wire out;\n") +
+                        block_open +
+                        "    wire [3:0] out;\n"
+                        "    wire in;\n"
+                        "    assign in = 1'b1;\n"
+                        "    " +
+                        prim +
+                        " b [3:0] (out, in);\n"
+                        "    initial #1 $display(\"%b\", out);\n" +
+                        block_close + "endmodule\n",
+                    f);
+}
+
+TEST(GateArrayRuntime, DISABLED_AGenerateBlocksNetIsSharedOutPerInstance) {
+  const std::pair<std::string, std::string> kBlocks[] = {
+      {"  if (1) begin\n", "  end\n"},
+      {"  case (1) 1: begin\n", "  end endcase\n"},
+      {"  for (genvar i = 0; i < 1; i++) begin\n", "  end\n"}};
+  for (const auto& [open, close] : kBlocks) {
+    for (const std::string& prim : {"buf", "u"}) {
+      EXPECT_EQ(BlockArrayShown(open, close, prim), "1111\n") << open << prim;
+    }
+  }
 }
 
 }  // namespace
