@@ -137,6 +137,20 @@ inline std::string RunCaptureDesign(
   return captured.str();
 }
 
+inline std::string RunCaptureThroughFinals(
+    RtlirDesign* (*elaborate)(const std::string&, SimFixture&),
+    const std::string& src, SimFixture& f) {
+  std::ostringstream captured;
+  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
+  auto* design = elaborate(src, f);
+  if (design != nullptr) {
+    LowerAndRun(design, f);
+    f.scheduler.EndSimulation();
+  }
+  std::cout.rdbuf(old_buf);
+  return captured.str();
+}
+
 inline std::string RunCapture(const std::string& src, SimFixture& f) {
   return RunCaptureDesign(ElaborateSrc, src, f);
 }

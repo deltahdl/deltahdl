@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include <iostream>
-#include <sstream>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -130,16 +128,9 @@ TEST(StructuredProcedureSimulation, FinalExecutesOnlyOnce) {
 
 std::string RunThroughTheFinalProcedures(const std::string& src) {
   SimFixture f;
-  std::ostringstream captured;
-  std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
-  auto* design = ElaborateSrc(src, f);
-  if (design != nullptr) {
-    LowerAndRun(design, f);
-    f.scheduler.EndSimulation();
-  }
-  std::cout.rdbuf(old_buf);
+  auto out = RunCaptureThroughFinals(ElaborateSrc, src, f);
   EXPECT_FALSE(f.diag.HasErrors());
-  return captured.str();
+  return out;
 }
 
 TEST(StructuredProcedureSimulation, EveryProcedureKindRunsInAnInterface) {
