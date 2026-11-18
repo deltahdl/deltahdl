@@ -108,4 +108,23 @@ TEST(BufNotParsing, ANotGateRejectsThreeDelays) {
       r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
 
+TEST(BufNotParsing, ANotGateWithOneTerminalIsRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire o;\n"
+      "  not n1(o);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "incorrect number of terminals for gate instance", 3, "28.3"));
+}
+
+TEST(BufNotParsing, ANotGateWithAnOutputAndAnInputIsAccepted) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire o, i;\n"
+      "  not n1(o, i);\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

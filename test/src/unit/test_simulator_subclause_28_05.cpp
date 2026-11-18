@@ -243,4 +243,98 @@ TEST(BufNotSimulation, ProductionNoDelaySpecHasZeroPropagationDelay) {
   EXPECT_EQ(b.bval, 0u);
 }
 
+constexpr const char* kBufNotLevels[] = {"1'b0", "1'b1", "1'bx", "1'bz"};
+
+std::string EachInputShown(const std::string& decls,
+                           const std::string& outputs) {
+  std::string src = "module m;\n  logic i;\n";
+  src += decls;
+  src += "  initial begin\n";
+  for (const char* level : kBufNotLevels) {
+    src += "    i = ";
+    src += level;
+    src += "; #1 $write(\"";
+    src += outputs;
+    src += " \");\n";
+  }
+  src += "    $display;\n  end\nendmodule\n";
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(BufNotSimulation, EveryOutputOfAMultiOutputGateTakesTheTableValue) {
+  EXPECT_EQ(EachInputShown("  wire o1, o2, o3;\n  buf b(o1, o2, o3, i);\n",
+                           "%b%b%b\", o1, o2, o3, \""),
+            "000 111 xxx xxx \n");
+  EXPECT_EQ(EachInputShown("  wire o1, o2, o3;\n  not n(o1, o2, o3, i);\n",
+                           "%b%b%b\", o1, o2, o3, \""),
+            "111 000 xxx xxx \n");
+}
+
+TEST(BufNotSimulation, ANotInstanceArrayInvertsEachBit) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  logic [3:0] a;\n"
+      "  wire [3:0] y;\n"
+      "  not n[3:0](y, a);\n"
+      "  initial begin a = 4'b10xz; #1 $display(\"%b\", y); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "01xx\n");
+}
+
+TEST(BufNotSimulation, AGateInAGenerateBlockDrivesTheTableValue) {
+  EXPECT_EQ(EachInputShown("  wire [1:0] p, q;\n"
+                           "  for (genvar k = 0; k < 2; k++) begin : g\n"
+                           "    buf b(p[k], i);\n"
+                           "    not n(q[k], i);\n"
+                           "  end\n",
+                           "%b%b\", p, q, \""),
+            "0011 1100 xxxx xxxx \n");
+  EXPECT_EQ(EachInputShown("  wire p, q;\n"
+                           "  if (1) begin : c\n"
+                           "    buf b(p, i);\n"
+                           "    not n(q, i);\n"
+                           "  end\n",
+                           "%b%b\", p, q, \""),
+            "01 10 xx xx \n");
+}
+
+std::string BufNotTransitionsShown(const std::string& gate,
+                                   const std::string& delay) {
+  std::string src = "module m;\n  logic a;\n  wire y;\n  ";
+  src += gate;
+  src += " ";
+  src += delay;
+  src +=
+      " g(y, a);\n"
+      "  always @(y) $display(\"%0t %b\", $time, y);\n"
+      "  initial begin\n"
+      "    a = 1'b0; #20 a = 1'b1; #20 a = 1'b0;\n"
+      "    #20 a = 1'bx; #20 a = 1'b1; #20 a = 1'bz;\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(BufNotSimulation, OneDelayTimesEveryOutputTransition) {
+  EXPECT_EQ(BufNotTransitionsShown("buf", "#5"),
+            "5 0\n25 1\n45 0\n65 x\n85 1\n105 x\n");
+  EXPECT_EQ(BufNotTransitionsShown("not", "#5"),
+            "5 1\n25 0\n45 1\n65 x\n85 0\n105 x\n");
+}
+
+TEST(BufNotSimulation, AMoveToXTakesTheSmallerOfTwoDelays) {
+  EXPECT_EQ(BufNotTransitionsShown("buf", "#(4, 9)"),
+            "9 0\n24 1\n49 0\n64 x\n84 1\n104 x\n");
+  EXPECT_EQ(BufNotTransitionsShown("buf", "#(9, 4)"),
+            "4 0\n29 1\n44 0\n64 x\n89 1\n104 x\n");
+  EXPECT_EQ(BufNotTransitionsShown("not", "#(4, 9)"),
+            "4 1\n29 0\n44 1\n64 x\n89 0\n104 x\n");
+  EXPECT_EQ(BufNotTransitionsShown("not", "#(9, 4)"),
+            "9 1\n24 0\n49 1\n64 x\n84 0\n104 x\n");
+}
+
 }  // namespace
