@@ -162,4 +162,26 @@ TEST(GenericInterfaceReference, ExplicitNameReachesGenericInterface) {
              "endmodule\n"));
 }
 
+TEST(GenericInterfaceReference,
+     DISABLED_PositionalConnectionCannotReferenceGenericInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus; logic req; endinterface\n"
+      "module memMod(interface a, input logic clk); endmodule\n"
+      "module top; logic clk = 0; simple_bus sb_intf();\n"
+      "  memMod mem(sb_intf, clk);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "positional port connection cannot reference generic interface "
+      "port 'a' of module 'memMod'",
+      4, "25.3.3"));
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(),
+      "positional port connection cannot reference generic interface "
+      "port 'clk' of module 'memMod'",
+      4, "25.3.3"));
+}
+
 }  // namespace

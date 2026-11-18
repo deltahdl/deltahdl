@@ -11,6 +11,10 @@ using namespace delta;
 
 namespace {
 
+constexpr const char* kNonAnsiMsg =
+    "generic interface port must be declared with ANSI-style port "
+    "declarations, not the non-ANSI port style";
+
 TEST(GenericInterfaceReference, SinglePort) {
   auto r = Parse("module m(interface bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -78,6 +82,38 @@ TEST(GenericInterfaceReference, NestedInterfaceInNonAnsiModuleIsNotAPort) {
       "  interface inner; endinterface\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(GenericInterfaceReference, NonAnsiModportReferenceIsError) {
+  auto r = Parse(
+      "interface I; logic x; modport mp(input x); endinterface\n"
+      "module m(a);\n"
+      "  input interface.mp a;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, kNonAnsiMsg, 3, "25.3.3"));
+}
+
+TEST(GenericInterfaceReference, InterfaceAndProgramAnsiHeadersAreAccepted) {
+  auto r = Parse(
+      "interface wrap(interface p, interface.mp pm); endinterface\n"
+      "program pr(interface q); endprogram\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(GenericInterfaceReference, InterfaceNonAnsiHeaderIsError) {
+  auto r = Parse(
+      "interface wrap(p);\n"
+      "  interface p;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags, kNonAnsiMsg, 2, "25.3.3"));
+}
+
+TEST(GenericInterfaceReference, ProgramNonAnsiHeaderIsError) {
+  auto r = Parse(
+      "program pr(q);\n"
+      "  input interface q;\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(r.diags, kNonAnsiMsg, 2, "25.3.3"));
 }
 
 }  // namespace
