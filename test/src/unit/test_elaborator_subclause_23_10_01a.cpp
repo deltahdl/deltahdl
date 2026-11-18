@@ -675,4 +675,32 @@ TEST(DefparamElaboration, RefoldsAnotherParametersDefaultInItsDeclaredWidth) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(DefparamElaboration, LoopIterationCannotTargetTheNextIteration) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module flop #(parameter int xyz = 1) ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  for (genvar i = 0; i < 2; i = i + 1) begin : somename\n"
+      "    flop my_flop();\n"
+      "    if (i == 0) begin : first\n"
+      "      defparam somename[i+1].my_flop.xyz = 9;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  for (auto& c : design->top_modules[0]->children) {
+    if (c.resolved == nullptr) continue;
+    for (auto& p : c.resolved->params) {
+      if (p.name == "xyz") EXPECT_EQ(p.resolved_value, 1);
+    }
+  }
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam inside a generate block or an array of instances "
+                    "reaches a parameter outside that hierarchy",
+                    7, "23.10.1"));
+}
+
 }  // namespace

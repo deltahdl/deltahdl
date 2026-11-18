@@ -472,4 +472,26 @@ TEST(BodyParameterAssignment,
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(OrderedListParameterAssignment,
+     SubroutineAndBlockParametersAreNotCounted) {
+  const char* const kHolders[] = {
+      "  task t;\n    parameter TP = 1;\n  endtask\n",
+      "  initial begin : b\n    parameter BP = 1;\n  end\n",
+  };
+  for (const char* holder : kHolders) {
+    SCOPED_TRACE(holder);
+    ElabFixture f;
+    ElaborateSrc(std::string("module child;\n  parameter W = 4;\n") + holder +
+                     "endmodule\n"
+                     "module top;\n"
+                     "  child #(8, 9) u();\n"
+                     "endmodule\n",
+                 f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "too many positional parameter overrides for module 'child'", 8,
+        "23.10.2.1"));
+  }
+}
+
 }  // namespace

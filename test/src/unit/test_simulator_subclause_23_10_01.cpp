@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
@@ -410,6 +412,93 @@ TEST(DefparamSimulation, ADefparamResizesAnUnpackedDimension) {
                 f),
             "4 3 4 4 1 4\n");
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DefparamSimulation, AProgramInstancesParameterTakesADefparam) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program pr #(parameter int P = 1);\n"
+                       "  initial $display(\"P %0d\", P);\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  pr u();\n"
+                       "  defparam u.P = 5;\n"
+                       "endmodule\n",
+                       f),
+            "P 5\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DefparamSimulation, TheLaterOfTwoAssignmentsInOneStatementWins) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter int A = 1) ();\n"
+                       "  initial $display(\"A %0d\", A);\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child u();\n"
+                       "  defparam u.A = 3, u.A = 4;\n"
+                       "endmodule\n",
+                       f),
+            "A 4\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DefparamSimulation, TheDefparamLaterInTheSourceWinsAcrossModules) {
+  const char* const kChild =
+      "module child #(parameter int A = 1) ();\n"
+      "  initial $display(\"A %0d\", A);\n"
+      "endmodule\n";
+  const char* const kTop =
+      "module top;\n  child u();\n  defparam u.A = 3;\nendmodule\n";
+  const char* const kAnnotate =
+      "module annotate;\n  defparam top.u.A = 4;\nendmodule\n";
+  struct Order {
+    std::string src;
+    const char* printed;
+  };
+  const Order kOrders[] = {
+      {std::string(kChild) + kTop + kAnnotate, "A 4\n"},
+      {std::string(kChild) + kAnnotate + kTop, "A 3\n"},
+  };
+  for (const Order& order : kOrders) {
+    SCOPED_TRACE(order.src);
+    SimFixture f;
+    EXPECT_EQ(RunCaptureAllTops(order.src, f), order.printed);
+    EXPECT_FALSE(f.has_errors);
+  }
+}
+
+TEST(DefparamSimulation,
+     DISABLED_StringAndHandleTargetsTakeAPartOfAnAggregate) {
+  const char* const kParams =
+      "parameter ps_t P = '{s: \"hi\"};\n"
+      "parameter K KA [2] = '{null, null};\n";
+  const char* const kAssigns =
+      "defparam u.T = P.s, u.C = P.s[0], u.H = KA[0];\n";
+  const std::string kPlaces[] = {
+      std::string("  ") + kParams + "  kid u();\n  " + kAssigns,
+      std::string("  ") + kParams + "  if (1) begin : g\n    kid u();\n    " +
+          kAssigns + "  end\n",
+      std::string("  if (1) begin : g\n    ") + kParams + "    kid u();\n    " +
+          kAssigns + "  end\n",
+  };
+  for (const std::string& place : kPlaces) {
+    SCOPED_TRACE(place);
+    SimFixture f;
+    EXPECT_EQ(
+        RunCapture("class K;\nendclass\n"
+                   "typedef struct { string s; } ps_t;\n"
+                   "module kid;\n"
+                   "  parameter string T = \"x\";\n"
+                   "  parameter int C = 0;\n"
+                   "  parameter K H = null;\n"
+                   "  initial $display(\"%s %0d %0d\", T, C, H == null);\n"
+                   "endmodule\n"
+                   "module top;\n" +
+                       place + "endmodule\n",
+                   f),
+        "hi 104 1\n");
+    EXPECT_TRUE(f.diag.Diagnostics().empty());
+  }
 }
 
 }  // namespace

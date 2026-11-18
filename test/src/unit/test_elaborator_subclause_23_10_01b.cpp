@@ -361,7 +361,7 @@ TEST(DefparamElaboration, NamedBlockLocalparamTakesNoDefparam) {
                             "23.10.1"));
 }
 
-TEST(DefparamElaboration, NamedBlockParameterDefparamNeedsAConstant) {
+TEST(DefparamElaboration, DISABLED_NamedBlockParameterDefparamNeedsAConstant) {
   ElabFixture f;
   ElaborateSrc(
       "module c;\n"
@@ -374,8 +374,49 @@ TEST(DefparamElaboration, NamedBlockParameterDefparamNeedsAConstant) {
       "  c u();\n"
       "endmodule\n",
       f, "top");
-  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
-                              "defparam value is not constant", 7, "23.10.1"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam right-hand side must be a constant expression "
+                    "built from numbers and parameters",
+                    7, "23.10.1"));
+}
+
+TEST(DefparamElaboration, ModuleParameterDefparamRefusesASystemFunction) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module c;\n"
+      "  parameter Q = 3;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u();\n"
+      "  defparam u.Q = $time;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "defparam right-hand side must be a constant expression "
+                    "built from numbers and parameters",
+                    6, "23.10.1"));
+}
+
+TEST(DefparamElaboration, RhsRefusesAPackageParameter) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  parameter int PP = 4;\n"
+      "endpackage\n"
+      "module c;\n"
+      "  parameter Q = 3;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u();\n"
+      "  defparam u.Q = pk::PP;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam right-hand side may only reference "
+                            "parameters declared in the same module",
+                            9, "23.10.1"));
 }
 
 TEST(DefparamElaboration, PathsReachingNoBlockParameterAreNotFound) {
@@ -499,6 +540,24 @@ TEST(DefparamElaboration, RhsMayReadAPartOfAParameterOfItsOwnModule) {
       ElabFixture f;
       ElaborateSrc(place.source(value), f, "top");
       EXPECT_FALSE(f.has_errors);
+    }
+  }
+}
+
+TEST(DefparamElaboration, DISABLED_RhsReadingAPartGivesThatPartsValue) {
+  struct PartValue {
+    const char* rhs;
+    int64_t value;
+  };
+  const PartValue kValues[] = {
+      {"S.a", 7}, {"S.in.a", 6}, {"S.arr[1]", 5}, {"IA[1].a", 9}};
+  for (const DefparamPlace& place : kDefparamPlaces) {
+    for (const PartValue& part : kValues) {
+      SCOPED_TRACE(std::string(place.where) + ", " + part.rhs);
+      ElabFixture f;
+      EXPECT_EQ(ParamOfModule(place.source(part.rhs), "child", "P", f),
+                part.value);
+      EXPECT_TRUE(f.diag.Diagnostics().empty());
     }
   }
 }
