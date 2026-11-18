@@ -135,18 +135,9 @@ TEST(GenerateElaboration, BlockNameRulesStayWithinOneScope) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(GenerateElaboration, SelfInstantiationEndsWhereTheConditionFails) {
+void ExpectSelfInstantiationDepth(const std::string& src, int expected) {
   ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      "module r #(parameter N = 3) ();\n"
-      "  if (N > 0) begin : sub\n"
-      "    r #(.N(N - 1)) u ();\n"
-      "  end\n"
-      "endmodule\n"
-      "module top;\n"
-      "  r #(.N(2)) u ();\n"
-      "endmodule\n",
-      f, "", true);
+  auto* design = ElaborateWithPreprocessor(src, f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -160,7 +151,51 @@ TEST(GenerateElaboration, SelfInstantiationEndsWhereTheConditionFails) {
     ASSERT_NE(mod, nullptr);
     ++depth;
   }
-  EXPECT_EQ(depth, 3);
+  EXPECT_EQ(depth, expected);
+}
+
+TEST(GenerateElaboration, SelfInstantiationEndsWhereTheConditionFails) {
+  ExpectSelfInstantiationDepth(
+      "module r #(parameter N = 3) ();\n"
+      "  if (N > 0) begin : sub\n"
+      "    r #(.N(N - 1)) u ();\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  r #(.N(2)) u ();\n"
+      "endmodule\n",
+      3);
+}
+
+TEST(GenerateElaboration, SelfInstantiationEndsWhereTheCaseSelectsNoInstance) {
+  ExpectSelfInstantiationDepth(
+      "module r #(parameter N = 0) ();\n"
+      "  case (N)\n"
+      "    0: begin : leaf\n"
+      "      logic done;\n"
+      "    end\n"
+      "    default: begin : deeper\n"
+      "      r #(.N(N - 1)) u ();\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n"
+      "module top;\n"
+      "  r #(.N(3)) u ();\n"
+      "endmodule\n",
+      4);
+}
+
+TEST(GenerateElaboration, SelfInstantiationEndsWhereTheLoopHasNoIterations) {
+  ExpectSelfInstantiationDepth(
+      "module r #(parameter N = 0) ();\n"
+      "  for (genvar k = 0; k < (N > 0 ? 1 : 0); k++) begin : sub\n"
+      "    r #(.N(N - 1)) u ();\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  r #(.N(3)) u ();\n"
+      "endmodule\n",
+      4);
 }
 
 std::string BindInGenerateBlock(const char* cond) {

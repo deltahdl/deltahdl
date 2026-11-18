@@ -168,6 +168,23 @@ TEST(LoopGenerateHierarchicalNameSim, NestedInstanceDeclarationsAreRead) {
             "n 7 1 2\n");
 }
 
+TEST(LoopGenerateHierarchicalNameSim,
+     DISABLED_AnEnclosingBlockReachesANestedInstanceByARelativeName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  if (1) begin : g\n"
+                       "    for (genvar k = 0; k < 2; k++) begin : n\n"
+                       "      localparam int Q = k + 20;\n"
+                       "      logic [7:0] v = k + 30;\n"
+                       "    end\n"
+                       "    initial #1 $display(\"r %0d %0d %0d %0d\", n[0].Q, "
+                       "n[1].Q, n[0].v, n[1].v);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "r 20 21 30 31\n");
+}
+
 TEST(LoopGenerateHierarchicalNameSim, ImplicitIndexLocalparamIsRead) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

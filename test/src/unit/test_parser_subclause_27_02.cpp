@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 
@@ -219,6 +220,130 @@ TEST(GenerateBlockContent, GenerateBlockAcceptsNestedGenerateConstruct) {
               "    end\n"
               "  end\n"
               "endmodule\n"));
+}
+
+TEST(GenerateBlockContent, TypedPortDeclarationRejectedAsASingleItemBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) input logic [3:0] a;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 2,
+      "27.2"));
+}
+
+TEST(GenerateBlockContent, EachForbiddenItemRejectedInABlockInsideARegion) {
+  auto r = Parse(
+      "module m;\n"
+      "  generate\n"
+      "    if (1) begin\n"
+      "      input a;\n"
+      "      specify endspecify\n"
+      "      specparam t = 1.0;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 4,
+      "27.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block", 5, "27.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block",
+                            6, "27.2"));
+}
+
+TEST(GenerateBlockContent, PortDeclarationRejectedInInterfaceAndProgramBlocks) {
+  auto r = Parse(
+      "interface i;\n"
+      "  if (1) begin\n"
+      "    input a;\n"
+      "  end\n"
+      "endinterface\n"
+      "program p;\n"
+      "  if (1) begin\n"
+      "    output b;\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 3,
+      "27.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port declaration not allowed inside a generate block", 8,
+      "27.2"));
+}
+
+TEST(GenerateBlockContent, PortDeclarationAllowedInInterfaceAndProgramBodies) {
+  EXPECT_TRUE(
+      ParseOk("interface i(a);\n"
+              "  input a;\n"
+              "endinterface\n"
+              "program p(b);\n"
+              "  output b;\n"
+              "endprogram\n"));
+}
+
+TEST(GenerateBlockContent, SpecifyBlockRejectedAsASingleItemBody) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) specify endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "specify block not allowed inside a generate block", 2, "27.2"));
+}
+
+TEST(GenerateBlockContent, SpecparamRejectedInCaseAndNestedGenerateBlocks) {
+  auto r = Parse(
+      "module m;\n"
+      "  case (1)\n"
+      "    1: begin specparam t = 1.0; end\n"
+      "    default: ;\n"
+      "  endcase\n"
+      "  if (1) begin\n"
+      "    if (1) begin\n"
+      "      specparam u = 2.0;\n"
+      "    end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block",
+                            3, "27.2"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "specparam declaration not allowed inside a "
+                            "generate block",
+                            8, "27.2"));
+}
+
+TEST(GenerateBlockContent, GenerateBlockParameterIsLocalInInterfaceAndProgram) {
+  auto r = Parse(
+      "interface i;\n"
+      "  parameter int B = 1;\n"
+      "  if (1) begin : g\n"
+      "    parameter int P = 3;\n"
+      "  end\n"
+      "endinterface\n"
+      "program p;\n"
+      "  parameter int B = 1;\n"
+      "  if (1) begin : g\n"
+      "    parameter int P = 3;\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->interfaces.size(), 1u);
+  ASSERT_EQ(r.cu->programs.size(), 1u);
+  for (const auto& items :
+       {r.cu->interfaces[0]->items, r.cu->programs[0]->items}) {
+    ASSERT_EQ(items.size(), 2u);
+    ASSERT_EQ(items[0]->kind, ModuleItemKind::kParamDecl);
+    EXPECT_FALSE(items[0]->is_localparam);
+    ASSERT_EQ(items[1]->kind, ModuleItemKind::kGenerateIf);
+    ASSERT_EQ(items[1]->gen_body.size(), 1u);
+    ASSERT_EQ(items[1]->gen_body[0]->kind, ModuleItemKind::kParamDecl);
+    EXPECT_TRUE(items[1]->gen_body[0]->is_localparam);
+  }
 }
 
 }  // namespace
