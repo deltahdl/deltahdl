@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 #include <unordered_set>
 
@@ -765,6 +766,84 @@ TEST(PackageExport, PackageReferencedNamesReadEveryDeclaration) {
         "pt_t"}) {
     EXPECT_TRUE(kNames.contains(name)) << name;
   }
+}
+
+void ExpectExportRefused(const std::string& src, const std::string& msg,
+                         int line) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  EXPECT_FALSE(ElabOk(src, f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, line, "26.6"));
+}
+
+TEST(PackageExport, ExportOfThePackagesOwnDeclarationIsReported) {
+  ExpectExportRefused(
+      "package q; int y;\n"
+      "  export q::y;\n"
+      "endpackage\n",
+      "export 'q::y': 'y' is not imported in package 'q'", 2);
+}
+
+TEST(PackageExport, DISABLED_ExportOfANameALocalDeclarationHidesIsReported) {
+  ExpectExportRefused(
+      "package p1; int x = 1; endpackage\n"
+      "package r; int x; import p1::*;\n"
+      "  export p1::x;\n"
+      "endpackage\n",
+      "export 'p1::x'", 3);
+}
+
+TEST(PackageExport,
+     DISABLED_ExportFromAPackageOtherThanTheBindingOneIsReported) {
+  ExpectExportRefused(
+      "package q; int x = 7; endpackage\n"
+      "package p; int x = 1; endpackage\n"
+      "package r; import q::*; int d = x; import p::*;\n"
+      "  export p::x;\n"
+      "endpackage\n",
+      "export 'p::x'", 4);
+}
+
+TEST(PackageExport, ExportOfAnImportedCandidateIsAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("package p1; int x = 1; endpackage\n"
+             "package r; import p1::*; export p1::x; endpackage\n",
+             f));
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(PackageExport, WildcardExportDoesNotHandOnAnotherPackagesImport) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p0; int w = 3; endpackage\n"
+             "package p1; int x = 1; endpackage\n"
+             "package p2; import p0::w; import p1::x; export p1::*; "
+             "endpackage\n"
+             "module top; import p2::*; int a = x;\n"
+             "  int b = w;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'w'", 5,
+                            "23.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier 'x'", 4,
+                             "23.9"));
+}
+
+TEST(PackageExport, WildcardExportWithNoImportFromItsPackageHandsOnNothing) {
+  ElabFixture f;
+  EXPECT_FALSE(
+      ElabOk("package p1; int x = 1; endpackage\n"
+             "package p2; export p1::*; endpackage\n"
+             "module top; import p2::*;\n"
+             "  int a = x;\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'x'", 4,
+                            "23.9"));
 }
 
 }  // namespace

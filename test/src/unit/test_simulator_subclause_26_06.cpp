@@ -4,6 +4,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -390,6 +391,93 @@ TEST(PackageExportSim, StarExportHandsOnOnlyReferencedCandidates) {
                        "endmodule\n",
                        f),
             "f=5 y=70\n");
+}
+
+TEST(PackageExportSim, TwoExportsOfOneDeclarationThroughDifferentPackages) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1; int x = 6; endpackage\n"
+      "package p4; import p1::*; export p1::*; int y = x; endpackage\n"
+      "package p5; import p4::*; import p1::*; export p1::x; export p4::x; "
+      "endpackage\n"
+      "module t; import p5::*; int r; initial r = x; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
+}
+
+TEST(PackageExportSim, AWildcardExportBeforeItsExplicitImportHandsItOn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1; int x = 6; int y = 9; endpackage\n"
+      "package p2; export p1::*; import p1::x; endpackage\n"
+      "module t; import p2::*; int r; initial r = x; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 6u);
+}
+
+TEST(PackageExportSim, StarExportHandsOnAnImportFromEachPackage) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1; int x = 6; endpackage\n"
+      "package p7; int y = 9; endpackage\n"
+      "package p8; export *::*; import p7::y; import p1::x; endpackage\n"
+      "module t; import p8::*; int a, b; initial begin a = x; b = y; end "
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 9u);
+}
+
+TEST(PackageExportSim, ALocalDeclarationAfterAWildcardExportIsHandedOn) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1; int x = 6; endpackage\n"
+      "package p2; import p1::*; export p1::*; int x = 4; endpackage\n"
+      "module t; import p2::*; int r; initial r = x; endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 4u);
+}
+
+TEST(PackageExportSim, AReExportOfAPathToADirectlyImportedName) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p1; int x = 6, y = 9; endpackage\n"
+      "package p2; import p1::x; export p1::*; endpackage\n"
+      "package p3; import p1::*; import p2::*; export p2::*; int q = x; "
+      "endpackage\n"
+      "module t; import p3::*; int a, b; initial begin a = x; b = q; end "
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 6u);
+  EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 6u);
+  SimFixture g;
+  ElaborateSrc(
+      "package p1; int x = 6, y = 9; endpackage\n"
+      "package p2; import p1::x; export p1::*; endpackage\n"
+      "package p3; import p1::*; import p2::*; export p2::*; int q = x; "
+      "endpackage\n"
+      "module t; import p3::*;\n"
+      "  int b = y;\n"
+      "endmodule\n",
+      g);
+  EXPECT_TRUE(ReportedError(g.diag.Diagnostics(),
+                            "reference to unresolved identifier 'y'", 5,
+                            "23.9"));
 }
 
 }  // namespace

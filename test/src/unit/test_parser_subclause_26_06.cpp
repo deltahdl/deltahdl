@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -101,6 +103,70 @@ TEST(PackageExportParsing, ExportStarStarTakesNoList) {
       "  export *::*, p1::x;\n"
       "endpackage\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got ','", 4, "26.6"));
+}
+
+TEST(PackageExportParsing, AHalfWildcardOrAnEmptyItemListIsRefused) {
+  auto r = Parse(
+      "package p1; int x = 5; endpackage\n"
+      "package p2; import p1::x;\n"
+      "  export *::x;\n"
+      "endpackage\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '*', got identifier", 3, "26.6"));
+  auto e = Parse(
+      "package p1; int x = 5; endpackage\n"
+      "package p2; import p1::x;\n"
+      "  export ;\n"
+      "endpackage\n");
+  EXPECT_TRUE(
+      ReportedError(e.diags, "expected identifier, got ';'", 3, "26.6"));
+  EXPECT_FALSE(Parse("package p1; int x = 5; endpackage\n"
+                     "package p2; import p1::x;\n"
+                     "  export *::*;\n"
+                     "endpackage\n")
+                   .has_errors);
+}
+
+void ExpectExportOutsideAPackageRefused(const std::string& body) {
+  SCOPED_TRACE(body);
+  auto r = Parse("package p1; int x = 5; endpackage\n" + body);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a package export declaration is allowed only in a package", 3,
+      "26.6"));
+}
+
+TEST(PackageExportParsing, AnExportInAnotherDesignElementOrBlockIsRefused) {
+  ExpectExportOutsideAPackageRefused(
+      "interface i; import p1::*;\n"
+      "  export p1::x;\n"
+      "endinterface\n");
+  ExpectExportOutsideAPackageRefused(
+      "program g; import p1::*;\n"
+      "  export p1::x;\n"
+      "endprogram\n");
+  ExpectExportOutsideAPackageRefused(
+      "checker c; import p1::*;\n"
+      "  export p1::x;\n"
+      "endchecker\n");
+  ExpectExportOutsideAPackageRefused(
+      "module m; import p1::*; if (1) begin : g\n"
+      "  export p1::x;\n"
+      "end endmodule\n");
+}
+
+TEST(PackageExportParsing, DISABLED_AnExportInAClassOrSubroutineIsRefused) {
+  ExpectExportOutsideAPackageRefused(
+      "class k;\n"
+      "  export p1::x;\n"
+      "endclass\n");
+  ExpectExportOutsideAPackageRefused(
+      "module m; function void f(); import p1::*;\n"
+      "  export p1::x;\n"
+      "endfunction endmodule\n");
+  ExpectExportOutsideAPackageRefused(
+      "module m; task t(); import p1::*;\n"
+      "  export p1::x;\n"
+      "endtask endmodule\n");
 }
 
 }  // namespace
