@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 #include "helpers_rtlir_lookup.h"
@@ -415,6 +417,98 @@ TEST(PackageImport, PackageLocalparamOfPackageEnumTypeFoldsToLiteral) {
   ASSERT_NE(imported, nullptr);
   EXPECT_TRUE(imported->is_resolved);
   EXPECT_EQ(imported->resolved_value, 1);
+}
+
+constexpr const char* kTwoPackagesOfC =
+    "package q; int c = 7; endpackage\n"
+    "package p; int c = 1; endpackage\n";
+
+void ExpectClaimedThenImported(const std::string& body, int line) {
+  SCOPED_TRACE(body);
+  ElabFixture f;
+  EXPECT_FALSE(ElabOk(kTwoPackagesOfC + body, f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "explicit import of 'p::c' is illegal because",
+                            line, "26.5"));
+}
+
+TEST(WildcardClaimedExplicitImport, IsReportedInEachDesignElementAndBody) {
+  ExpectClaimedThenImported(
+      "module m; import q::*;\n"
+      "if (1) begin : g int d; initial d = c; end\n"
+      "import p::c;\n"
+      "endmodule\n",
+      5);
+  ExpectClaimedThenImported(
+      "interface i; import q::*; int d; initial d = c;\n"
+      "import p::c;\n"
+      "endinterface\n"
+      "module top; i u(); endmodule\n",
+      4);
+  ExpectClaimedThenImported(
+      "program g; import q::*; int d; initial d = c;\n"
+      "import p::c;\n"
+      "endprogram\n"
+      "module top; g u(); endmodule\n",
+      4);
+  ExpectClaimedThenImported(
+      "module m; function automatic int f(); import q::*; int d = c;\n"
+      "import p::c;\n"
+      "return d; endfunction endmodule\n",
+      4);
+  ExpectClaimedThenImported(
+      "module m; task automatic t(); import q::*; int d = c;\n"
+      "import p::c;\n"
+      "endtask endmodule\n",
+      4);
+  ExpectClaimedThenImported(
+      "module m; if (1) begin : g import q::*; int d = c;\n"
+      "import p::c;\n"
+      "end endmodule\n",
+      4);
+}
+
+TEST(WildcardClaimedExplicitImport,
+     DISABLED_IsReportedInAPackageTheUnitAndABlock) {
+  ExpectClaimedThenImported(
+      "package r; import q::*; int d = c;\n"
+      "import p::c;\n"
+      "endpackage\n",
+      4);
+  ExpectClaimedThenImported(
+      "import q::*; int d = c;\n"
+      "import p::c;\n"
+      "module top; endmodule\n",
+      4);
+  ExpectClaimedThenImported(
+      "module m; initial begin import q::*; automatic int d = c;\n"
+      "import p::c;\n"
+      "end endmodule\n",
+      4);
+}
+
+TEST(WildcardClaimedExplicitImport, AnImportOfTheClaimedDeclarationIsAccepted) {
+  ElabFixture f;
+  EXPECT_TRUE(ElabOk(std::string(kTwoPackagesOfC) +
+                         "module m; import q::*; int d; initial d = c;\n"
+                         "import q::c;\n"
+                         "endmodule\n",
+                     f));
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(QualifiedPackageReference, ABareNameWithNoDeclarationOrImportIsReported) {
+  ElabFixture f;
+  EXPECT_FALSE(ElabOk(std::string(kTwoPackagesOfC) + "module m; int d, e;\n"
+                                                     "initial e = p::c;\n"
+                                                     "initial d = c;\n"
+                                                     "endmodule\n",
+                      f));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'c'", 5,
+                            "23.9"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "reference to unresolved identifier", 4, "23.9"));
 }
 
 }  // namespace

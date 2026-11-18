@@ -223,4 +223,53 @@ TEST(PackageImportSim, PackageParameterFromImportedPackageParameterReads) {
   LowerRunAndCheck(f, design, {{"a", 21u}, {"b", 21u}, {"c", 21u}, {"d", 4u}});
 }
 
+TEST(PackageImportSim,
+     AnExplicitImportFromOnePackageLeavesTheQualifiedNameOfAnother) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package q; parameter int c = 7; endpackage\n"
+      "package p; parameter int c = 1; endpackage\n"
+      "module t;\n"
+      "  import q::c;\n"
+      "  int bare, qualified;\n"
+      "  initial begin bare = c; qualified = p::c; end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("bare")->value.ToUint64(), 7u);
+  EXPECT_EQ(f.ctx.FindVariable("qualified")->value.ToUint64(), 1u);
+}
+
+TEST(PackageImportSim, AQualifiedLiteralReadsWithoutAnImport) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p; typedef enum {FALSE, TRUE} BOOL; endpackage\n"
+      "module t;\n"
+      "  int y;\n"
+      "  initial y = p::TRUE;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 1u);
+}
+
+TEST(PackageImportSim, ExplicitImportOfTheWildcardClaimedDeclarationReadsIt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package q; int c = 7; endpackage\n"
+      "package p; int c = 1; endpackage\n"
+      "module t;\n"
+      "  import q::*;\n"
+      "  int d;\n"
+      "  initial #1 d = c;\n"
+      "  import q::c;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 7u);
+}
+
 }  // namespace
