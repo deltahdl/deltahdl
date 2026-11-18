@@ -3,9 +3,11 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
 #include "simulator/variable.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -515,6 +517,166 @@ TEST(GenerateSimulation, ModuleInterfaceInstanceIsConnectedInsideABlock) {
                        "endmodule\n",
                        f),
             "oi 72\n");
+}
+
+TEST(ConditionalGenerateElsePairing, ANullElseHandsTheNextElseToTheOuterIf) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t #(parameter P = 0, Q = 0) ();\n"
+                       "  if (P == 1)\n"
+                       "    if (Q == 0) begin : u\n"
+                       "      initial #(P * 10 + Q) $display(\"%m then\");\n"
+                       "    end\n"
+                       "    else ;\n"
+                       "  else begin : u\n"
+                       "    initial #(P * 10 + Q) $display(\"%m else\");\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module w;\n"
+                       "  t #(.P(1), .Q(3)) a();\n"
+                       "  t #(.P(0)) b();\n"
+                       "  t #(.P(1), .Q(0)) c();\n"
+                       "endmodule\n",
+                       f),
+            "w.b.u else\nw.c.u then\n");
+}
+
+TEST(ConditionalGenerateElsePairing, ANamedBeginEndHandsTheElseToTheOuterIf) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t #(parameter P = 0, Q = 0) ();\n"
+                       "  if (P == 1) begin : o\n"
+                       "    if (Q == 0) begin : u\n"
+                       "      initial #(P * 10 + Q) $display(\"%m then\");\n"
+                       "    end\n"
+                       "  end\n"
+                       "  else begin : u\n"
+                       "    initial #(P * 10 + Q) $display(\"%m else\");\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module w;\n"
+                       "  t #(.P(1), .Q(0)) a();\n"
+                       "  t #(.P(1), .Q(1)) b();\n"
+                       "  t #(.P(0)) c();\n"
+                       "endmodule\n",
+                       f),
+            "w.c.u else\nw.a.o.u then\n");
+}
+
+TEST(ConditionalGenerateElsePairing,
+     AnUnnamedBeginEndHandsTheElseToTheOuterIf) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t #(parameter P = 0, Q = 0) ();\n"
+                 "  if (P == 1) begin\n"
+                 "    if (Q == 0) begin : u\n"
+                 "      int v = 1;\n"
+                 "      initial #(P * 10 + Q) $display(\"then %0d\", v);\n"
+                 "    end\n"
+                 "  end\n"
+                 "  else begin : u\n"
+                 "    int v = 2;\n"
+                 "    initial #(P * 10 + Q) $display(\"else %0d\", u.v);\n"
+                 "  end\n"
+                 "endmodule\n"
+                 "module w;\n"
+                 "  t #(.P(1), .Q(0)) a();\n"
+                 "  t #(.P(1), .Q(1)) b();\n"
+                 "  t #(.P(0)) c();\n"
+                 "endmodule\n",
+                 f),
+      "else 2\nthen 1\n");
+}
+
+TEST(ConditionalGenerateHierarchicalNameSim,
+     DISABLED_ARelativeNameInAnEnclosingBlockReachesANestedBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  if (1) begin : o\n"
+                       "    if (1) begin : n\n"
+                       "      int x = 5;\n"
+                       "    end\n"
+                       "    initial #1 $display(\"%0d %0d\", n.x, o.n.x);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 5\n");
+}
+
+class ConditionalGenerateGateVpi : public VpiDesignRun {};
+
+TEST_F(ConditionalGenerateGateVpi,
+       DISABLED_AGateInASelectedBlockIsReachedByItsPath) {
+  Run("module test #(parameter p = 1, q = 0) ();\n"
+      "  wire a, b, c;\n"
+      "  if (p == 1)\n"
+      "    if (q == 0) begin : u1 and g1(a, b, c); end\n"
+      "    else if (q == 2) begin : u1 or g1(a, b, c); end\n"
+      "    else ;\n"
+      "  else if (p == 2)\n"
+      "    case (q)\n"
+      "      0, 1, 2: begin : u1 xor g1(a, b, c); end\n"
+      "      default: begin : u1 xnor g1(a, b, c); end\n"
+      "    endcase\n"
+      "endmodule\n");
+  vpiHandle gate = By("test.u1.g1");
+  ASSERT_NE(gate, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, gate), vpiGate);
+  EXPECT_EQ(vpi_get(vpiPrimType, gate), vpiAndPrim);
+  EXPECT_EQ(std::string(vpi_get_str(vpiFullName, gate)), "test.u1.g1");
+}
+
+std::string RunRealOperands(const std::string& element) {
+  std::string src = element;
+  src +=
+      " e;\n"
+      "  localparam real R = 2.5;\n"
+      "  if (R > 2.0) begin : a initial #1 $display(\"a\"); end\n"
+      "  if (2.0 == 2.0 && !(R < 1.0)) begin : b initial #2 $display(\"b\"); "
+      "end\n"
+      "  if ($itor(3) > 2.5 ? 1 : 0) begin : c initial #3 $display(\"c\"); "
+      "end\n"
+      "  case (R < 1.0 || R != 2.5) 1'b0: begin : d initial #4 "
+      "$display(\"d\"); end endcase\n"
+      "  case (1'b1) R >= 2.5: begin : g initial #5 $display(\"g\"); end "
+      "endcase\n"
+      "  for (genvar i = 0; i < R; i = i + 1.0) begin : h\n"
+      "    initial #(6 + i) $display(\"h%0d\", i);\n"
+      "  end\n"
+      "  for (genvar k = 2.6 / 2; k < 2; k++) begin : m\n"
+      "    initial #10 $display(\"m%0d\", k);\n"
+      "  end\n"
+      "  localparam int P = 4;\n"
+      "  if (P * 0.5 > 1) begin : n initial #11 $display(\"n\"); end\n"
+      "  if (1) begin : o\n"
+      "    if (shortreal'(1.5) + R > 3.9) begin : q initial #12 "
+      "$display(\"q\"); end\n"
+      "  end\n"
+      "end";
+  src += element;
+  src += "\nmodule top;\n  e u();\nendmodule\n";
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(ConditionalGenerateRealOperandSim,
+     DISABLED_RealOperandsSelectInEachElement) {
+  for (const std::string& element : {"module", "interface", "program"}) {
+    SCOPED_TRACE(element);
+    EXPECT_EQ(RunRealOperands(element),
+              "a\nb\nc\nd\ng\nh0\nh1\nh2\nm1\nn\nq\n");
+  }
+}
+
+TEST(ConditionalGenerateRealOperandSim,
+     DISABLED_ARealComparisonSizesADimension) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  localparam real P = 3.0;\n"
+                       "  logic [(P > 2.4) * 7 : 0] v;\n"
+                       "  logic [3:0] w [(P < 2.4) * 2 : 0];\n"
+                       "  initial $display(\"%0d %0d\", $bits(v), $size(w));\n"
+                       "endmodule\n",
+                       f),
+            "8 1\n");
 }
 
 }  // namespace
