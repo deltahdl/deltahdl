@@ -258,4 +258,81 @@ TEST(ProgramPortConnectionSim, ArrayInputPortFollowsTheDesignBeforeObserved) {
       "n=3\n$finish at time 45\n");
 }
 
+TEST(ProgramPortConnectionSim, AVariableAcrossAnOutputPortChangesAfterActive) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p(output logic [7:0] q);\n"
+                       "  initial #5 q = 8'd9;\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic [7:0] v;\n"
+                       "  p pi(.q(v));\n"
+                       "  initial #5 $display(\"active sees %0d\", v);\n"
+                       "  always @(v) $display(\"woken sees %0d at %0t\", v, "
+                       "$time);\n"
+                       "endmodule\n",
+                       f),
+            "active sees x\nwoken sees 9 at 5\n");
+}
+
+TEST(ProgramPortConnectionSim, ANetAcrossAnOutputPortChangesAfterActive) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("program p(output wire pw);\n"
+                 "  logic d = 0;\n"
+                 "  assign pw = d;\n"
+                 "  initial #5 d = 1;\n"
+                 "endprogram\n"
+                 "module top;\n"
+                 "  wire w;\n"
+                 "  p pi(w);\n"
+                 "  initial #5 $display(\"active sees %b\", w);\n"
+                 "  always @(w) $display(\"woken %b at %0t\", w, $time);\n"
+                 "endmodule\n",
+                 f),
+      "woken 0 at 0\nactive sees 0\nwoken 1 at 5\n");
+}
+
+TEST(ProgramPortConnectionSim,
+     TheDataFlowThroughAProgramAssignReachesTheDesign) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  logic r;\n"
+                       "  wire dw1, dw2;\n"
+                       "  initial begin\n"
+                       "    r = 0;\n"
+                       "    #10 r = 1;\n"
+                       "  end\n"
+                       "  assign dw1 = r;\n"
+                       "  p p_i(dw2, dw1);\n"
+                       "  always @(dw2) $display(\"dw2 is %b at %0t\", dw2, "
+                       "$time);\n"
+                       "endmodule\n"
+                       "program p(output pw2, input pw1);\n"
+                       "  assign pw2 = pw1;\n"
+                       "endprogram\n",
+                       f),
+            "dw2 is 0 at 0\ndw2 is 1 at 10\n");
+}
+
+TEST(ProgramPortConnectionSim, ANetWithADesignAndAProgramDriverResolvesBoth) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p(output wire pw);\n"
+                       "  logic d = 0;\n"
+                       "  assign pw = d;\n"
+                       "  initial begin #5 d = 1; #10; end\n"
+                       "endprogram\n"
+                       "module top;\n"
+                       "  logic en = 1;\n"
+                       "  wire w;\n"
+                       "  assign w = en ? 1'b0 : 1'bz;\n"
+                       "  p pi(w);\n"
+                       "  initial #5 $display(\"active sees %b\", w);\n"
+                       "  initial #10 en = 0;\n"
+                       "  always @(w) if ($time > 0) $display(\"w=%b at %0t\", "
+                       "w, $time);\n"
+                       "endmodule\n",
+                       f),
+            "active sees 0\nw=x at 5\nw=1 at 10\n");
+}
+
 }  // namespace
