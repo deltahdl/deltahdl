@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -516,6 +518,113 @@ TEST(InterfaceItemsParsing, ModuleDeclInsideInterface) {
   ASSERT_EQ(r.cu->interfaces.size(), 1u);
   EXPECT_TRUE(HasItemOfKind(r.cu->interfaces[0]->items,
                             ModuleItemKind::kNestedModuleDecl));
+}
+
+TEST(InterfaceParsing,
+     DISABLED_ABodyPortDeclarationWithoutANonAnsiHeaderIsReported) {
+  auto r = Parse(
+      "interface i(input logic a);\n"
+      "  output logic b;\n"
+      "endinterface\n"
+      "interface j;\n"
+      "  input c;\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "interface 'i' declares a port in its body "
+                            "without a non-ANSI header",
+                            2, "25.3"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "interface 'j' declares a port in its body "
+                            "without a non-ANSI header",
+                            5, "25.3"));
+}
+
+TEST(InterfaceParsing, ABodyPortDeclarationAfterANonAnsiHeaderIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("interface i(a);\n"
+              "  input a;\n"
+              "endinterface\n"));
+}
+
+TEST(InterfaceParsing, AWildcardHeaderWritesNoParameterPortList) {
+  auto r = Parse(
+      "interface i #(parameter int W = 1) (.*);\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a ( .* ) header writes no parameter port list", 1, "A.1.2"));
+}
+
+TEST(InterfaceParsing, AStaticLifetimeAndALifetimeBeforeBothListsAreAccepted) {
+  auto r = Parse(
+      "interface static i; endinterface\n"
+      "interface automatic j #(parameter W = 1) (input logic a);\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->interfaces.size(), 2u);
+}
+
+TEST(InterfaceParsing, ATimeunitsDeclarationLeadsANonAnsiOrWildcardBody) {
+  auto r = Parse(
+      "interface i(a);\n"
+      "  timeunit 1ns;\n"
+      "  input a;\n"
+      "endinterface\n"
+      "interface j(.*);\n"
+      "  timeunit 1ns;\n"
+      "endinterface\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_EQ(r.cu->interfaces.size(), 2u);
+}
+
+TEST(InterfaceParsing,
+     DISABLED_AnInterfaceClosedByAnotherEndKeywordIsReported) {
+  for (const char* end : {"endmodule", "endprogram", "endchecker", "endpackage",
+                          "endprimitive", "endconfig", "endclass"}) {
+    auto r = Parse(std::string("interface i;\n") + end + "\n");
+    EXPECT_TRUE(ReportedError(r.diags,
+                              std::string("interface 'i' is closed by '") +
+                                  end + "' instead of 'endinterface'",
+                              2, "25.3"))
+        << end;
+  }
+}
+
+TEST(InterfaceParsing,
+     DISABLED_AnInterfaceNestedInAModuleClosedByAnotherEndKeywordIsReported) {
+  for (const char* end : {"endmodule", "endprogram"}) {
+    auto r = Parse(std::string("module o;\n  interface i;\n  ") + end +
+                   "\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags,
+                              std::string("interface 'i' is closed by '") +
+                                  end + "' instead of 'endinterface'",
+                              3, "25.3"))
+        << end;
+  }
+}
+
+TEST(
+    InterfaceParsing,
+    DISABLED_AnInterfaceNestedInAnInterfaceClosedByAnotherEndKeywordIsReported) {
+  auto r = Parse(
+      "interface o;\n"
+      "  interface i;\n"
+      "  endprogram\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "interface 'i' is closed by 'endprogram' instead of 'endinterface'", 3,
+      "25.3"));
+}
+
+TEST(InterfaceParsing, DISABLED_AnEndinterfaceWithNoInterfaceOpenIsReported) {
+  auto r = Parse(
+      "interface i;\n"
+      "endinterface\n"
+      "endinterface\n");
+  EXPECT_TRUE(ReportedError(r.diags, "'endinterface' with no interface open", 3,
+                            "25.3"));
 }
 
 }  // namespace

@@ -442,4 +442,149 @@ TEST(InterfaceDefinitions, ExternInterfacePrototypeIsNoDefinition) {
   EXPECT_EQ(ifc->variables[0].name, "data");
 }
 
+TEST(InterfaceDefinitions,
+     DISABLED_ModuleDeclInsideAnUninstantiatedInterfaceIsError) {
+  ElabFixture f;
+  Elaborate(
+      "interface ifc;\n"
+      "  module bad;\n"
+      "  endmodule\n"
+      "endinterface\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'bad' cannot be declared inside interface "
+                            "'ifc'",
+                            2, "25.3"));
+}
+
+TEST(InterfaceDefinitions,
+     DISABLED_ModuleInstantiationInsideAnUninstantiatedInterfaceIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module sub;\n"
+      "endmodule\n"
+      "interface ifc;\n"
+      "  sub u0();\n"
+      "  if (1) begin : g sub u1(); end\n"
+      "endinterface\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "top");
+  for (int line : {4, 5}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "module 'sub' cannot be instantiated inside "
+                              "interface 'ifc'",
+                              line, "25.3"));
+  }
+}
+
+TEST(InterfaceDefinitions,
+     ModuleDeclInsideAnInstantiatedNestedInterfaceIsError) {
+  ElabFixture f;
+  Elaborate(
+      "interface outer;\n"
+      "  interface inner;\n"
+      "    module bad;\n"
+      "    endmodule\n"
+      "  endinterface\n"
+      "  inner n();\n"
+      "endinterface\n"
+      "module top;\n"
+      "  outer o();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'bad' cannot be declared inside interface "
+                            "'inner'",
+                            3, "25.3"));
+}
+
+TEST(InterfaceDefinitions,
+     DISABLED_ModuleDeclInsideAnUninstantiatedNestedInterfaceIsError) {
+  ElabFixture f;
+  Elaborate(
+      "interface outer;\n"
+      "  interface inner;\n"
+      "    module bad;\n"
+      "    endmodule\n"
+      "  endinterface\n"
+      "endinterface\n"
+      "module top;\n"
+      "  outer o();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'bad' cannot be declared inside interface "
+                            "'inner'",
+                            3, "25.3"));
+}
+
+TEST(InterfaceDefinitions,
+     ModuleInstantiationInAnInterfacesGenerateBlockIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module sub;\n"
+      "endmodule\n"
+      "interface ifc;\n"
+      "  if (1) begin : g sub u1(); end\n"
+      "  for (genvar k = 0; k < 2; k++) begin : l sub u2(); end\n"
+      "endinterface\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "endmodule\n",
+      f, "top");
+  for (int line : {4, 5}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "module 'sub' cannot be instantiated inside "
+                              "interface 'ifc'",
+                              line, "25.3"));
+  }
+}
+
+TEST(InterfacePortHierRef, ModportThroughArrayedInstanceIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; modport mp(input a); endinterface\n"
+      "module holder; ifc i(); endmodule\n"
+      "module user(ifc.mp p); endmodule\n"
+      "module top; holder h[2]();\n"
+      "  user u1(h[0].i.mp);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the actual of interface port 'p' resolves "
+                            "through the arrayed instance 'h'",
+                            5, "25.3"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "interface port 'p' must be connected to an "
+                             "interface instance or interface port",
+                             5, "23.3.3.4"));
+}
+
+TEST(InterfacePortHierRef, DISABLED_ModportThroughGenerateBlockIsRefused) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc; logic a; modport mp(input a); endinterface\n"
+      "module user(ifc.mp p); endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g ifc i(); end\n"
+      "  for (genvar k = 0; k < 2; k++) begin : l ifc i(); end\n"
+      "  user u1(g.i.mp);\n"
+      "  user u2(l[1].i.mp);\n"
+      "endmodule\n",
+      f, "top");
+  for (int line : {6, 7}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "the actual of interface port 'p' resolves "
+                              "through a generate block",
+                              line, "25.3"));
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "interface port 'p' must be connected to an "
+                               "interface instance or interface port",
+                               line, "23.3.3.4"));
+  }
+}
+
 }  // namespace
