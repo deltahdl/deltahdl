@@ -232,4 +232,54 @@ TEST(ModportlessPortSim, APortSelectingNoModportWritesEveryMember) {
       "in 1 1 1\na=1 z=1 w=1\n");
 }
 
+std::string ModportPickedAtTheConnection(const std::string& mem_header,
+                                         const std::string& cpu_header,
+                                         const std::string& connections) {
+  return RunWithoutErrors(
+      "interface simple_bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "  logic [7:0] data;\n"
+      "  modport target(input req, clk, output gnt, ref data);\n"
+      "  modport initiator(input gnt, clk, output req, ref data);\n"
+      "endinterface\n"
+      "module memMod(" +
+      mem_header +
+      " a);\n"
+      "  logic avail = 1;\n"
+      "  always @(posedge a.clk) a.gnt <= a.req & avail;\n"
+      "endmodule\n"
+      "module cpuMod(" +
+      cpu_header +
+      " b);\n"
+      "  initial begin\n"
+      "    b.req = 1; b.data = 7;\n"
+      "    @(posedge b.clk); #1 $display(\"gnt=%0d data=%0d\", b.gnt, "
+      "b.data);\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf(clk);\n"
+      "  initial repeat (4) #10 clk++;\n" +
+      connections +
+      "  initial #15 $display(\"top gnt=%0d data=%0d\", sb_intf.gnt, "
+      "sb_intf.data);\n"
+      "endmodule\n");
+}
+
+TEST(ModportConnectionSim, APositionalConnectionPicksTheModportOfAPlainPort) {
+  EXPECT_EQ(ModportPickedAtTheConnection("simple_bus", "simple_bus",
+                                         "  memMod mem(sb_intf.target);\n"
+                                         "  cpuMod cpu(sb_intf.initiator);\n"),
+            "gnt=1 data=7\ntop gnt=1 data=7\n");
+}
+
+TEST(ModportConnectionSim, ANamedConnectionPicksTheModportOfAGenericPort) {
+  EXPECT_EQ(
+      ModportPickedAtTheConnection("interface", "interface",
+                                   "  memMod mem(.a(sb_intf.target));\n"
+                                   "  cpuMod cpu(.b(sb_intf.initiator));\n"),
+      "gnt=1 data=7\ntop gnt=1 data=7\n");
+}
+
 }  // namespace
