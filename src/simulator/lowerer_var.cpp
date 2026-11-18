@@ -20,7 +20,6 @@
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/pattern_type_key.h"
-#include "simulator/process.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -381,20 +380,11 @@ static void RecordVcdDeclaration(std::string_view name,
 void Lowerer::LowerBlockScopedVarInit(std::string_view name,
                                       const RtlirVariable& var, Variable* v,
                                       uint32_t width) {
-  if (var.gen_block_prefixes.empty()) {
-    LowerVarInit(name, var, v, width);
-    return;
-  }
-  Process* enclosing = ctx_.CurrentProcess();
-  Process scope;
-  scope.stand_in = true;
-  scope.inst_prefix = inst_prefix_;
-  InstallGenBlockConsts(var.gen_block_consts, &scope);
-  scope.gen_prefixes.assign(var.gen_block_prefixes.begin(),
-                            var.gen_block_prefixes.end());
-  ctx_.SetCurrentProcess(&scope);
+  const std::vector<std::string> kBlockPrefixes(var.gen_block_prefixes.begin(),
+                                                var.gen_block_prefixes.end());
+  ctx_.SetLoweringGenPrefixes(&kBlockPrefixes);
   LowerVarInit(name, var, v, width);
-  ctx_.SetCurrentProcess(enclosing);
+  ctx_.SetLoweringGenPrefixes(nullptr);
 }
 
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {

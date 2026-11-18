@@ -176,9 +176,12 @@ Variable* FindUnderInstanceOrNamedScopes(
 
 Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
                                           std::string_view name) {
-  if (!current_process_) return nullptr;
+  const std::vector<std::string>* prefixes =
+      current_process_ != nullptr ? &current_process_->gen_prefixes
+                                  : lowering_gen_prefixes_;
+  if (prefixes == nullptr) return nullptr;
   for (const std::string& key :
-       GenerateBlockKeys(inst_prefix, current_process_->gen_prefixes, name)) {
+       GenerateBlockKeys(inst_prefix, *prefixes, name)) {
     auto found = variables_.find(key);
     if (found != variables_.end()) return found->second;
   }
