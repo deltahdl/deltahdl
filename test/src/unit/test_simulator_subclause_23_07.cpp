@@ -328,4 +328,69 @@ TEST(DottedNameResolution, NestedReadBeforeAnInstanceReadsTheImportedStruct) {
   EXPECT_FALSE(f.has_errors);
 }
 
+TEST(DottedNameResolution, AnInstanceDeclaredAfterItsUseIsAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child;\n  int sig = 4;\nendmodule\n"
+                       "module t;\n  int r;\n"
+                       "  initial #1 begin\n    r = c1.sig;\n"
+                       "    $display(\"%0d\", r);\n  end\n"
+                       "  child c1();\nendmodule\n",
+                       f),
+            "4\n");
+}
+
+TEST(DottedNameResolution, AnotherTopModulesNameIsAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("module other;\n  int sig = 8;\nendmodule\n"
+                              "module top;\n"
+                              "  initial #1 $display(\"%0d\", other.sig);\n"
+                              "endmodule\n",
+                              f),
+            "8\n");
+}
+
+TEST(DottedNameResolution, DISABLED_APackageSubroutinesStructMemberSelect) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n  typedef struct { int a; } st;\n"
+                       "  function int g();\n    st s;\n    s.a = 6;\n"
+                       "    return s.a;\n  endfunction\nendpackage\n"
+                       "module t;\n  initial $display(\"%0d\", p::g());\n"
+                       "endmodule\n",
+                       f),
+            "6\n");
+}
+
+TEST(DottedNameResolution, AProgramsStructMemberSelect) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program t;\n  typedef struct { int a; } st;\n"
+                       "  st s;\n  initial begin\n    s.a = 7;\n"
+                       "    $display(\"%0d\", s.a);\n  end\nendprogram\n",
+                       f),
+            "7\n");
+}
+
+TEST(DottedNameResolution, AnExplicitlyImportedFunctionHeadsItsStaticLocal) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n  function void f();\n"
+                       "    static int x;\n    x = 5;\n  endfunction\n"
+                       "endpackage\n"
+                       "module t;\n  import p::f;\n"
+                       "  initial begin\n    f();\n"
+                       "    $display(\"%0d\", f.x);\n  end\nendmodule\n",
+                       f),
+            "5\n");
+}
+
+TEST(DottedNameResolution, AGenerateBlockShadowsAWildcardImportedStruct) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package p;\n  struct { int x; } s1;\nendpackage\n"
+                       "module t;\n  import p::*;\n"
+                       "  if (1) begin : s1\n    int x;\n"
+                       "    initial begin\n      s1.x = 1;\n"
+                       "      #1 $display(\"%0d %0d\", x, p::s1.x);\n"
+                       "    end\n  end\nendmodule\n",
+                       f),
+            "1 0\n");
+}
+
 }  // namespace

@@ -32,4 +32,25 @@ TEST(ScopeResolutionPrefixSim, PackagePrefixDoesNotResolveToLocalVariable) {
             5u);
 }
 
+TEST(ScopeResolutionPrefixSim,
+     DISABLED_AUnitClassComesBeforeALikeNamedPackage) {
+  EXPECT_EQ(RunAndGet("package C;\n  int v = 1;\nendpackage\n"
+                      "class C;\n  static int v = 2;\nendclass\n"
+                      "module t;\n  int result;\n  initial result = C::v;\n"
+                      "endmodule\n",
+                      "result"),
+            2u);
+}
+
+TEST(ScopeResolutionPrefixSim,
+     DISABLED_AnImportedClassComesBeforeALikeNamedPackage) {
+  EXPECT_EQ(RunAndGet("package K;\n  int v = 1;\nendpackage\n"
+                      "package p;\n  class K;\n    static int v = 2;\n"
+                      "  endclass\nendpackage\n"
+                      "module t;\n  import p::*;\n  int result;\n"
+                      "  initial result = K::v;\nendmodule\n",
+                      "result"),
+            2u);
+}
+
 }  // namespace

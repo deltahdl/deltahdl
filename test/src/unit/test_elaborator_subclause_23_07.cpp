@@ -1,5 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -602,6 +609,265 @@ TEST(DottedNameElaboration, AMemberOfAnUndeclaredStructMemberIsReportedOnce) {
                             "structure 's_t' has no member named 'nope'", 4,
                             "23.7"));
   EXPECT_EQ(f.diag.ErrorCount(), 1U);
+}
+
+uint32_t LineOf(const std::string& src, std::string_view text) {
+  std::string_view before(src.data(), src.find(text));
+  return static_cast<uint32_t>(std::count(before.begin(), before.end(), '\n') +
+                               1);
+}
+
+std::string ParameterSelectDesign(const std::string& context,
+                                  const std::string& expr) {
+  std::string body = context;
+  body.replace(body.find('@'), 1, expr);
+  return "module t;\n"
+         "  typedef struct { int k; } n_t;\n"
+         "  typedef struct { int a; n_t n; } s_t;\n"
+         "  typedef struct packed { logic [3:0] hi; logic [3:0] lo; } ps_t;\n"
+         "  typedef union packed { logic [7:0] w; logic [7:0] v; } pu_t;\n"
+         "  typedef union { int i; int j; } uu_t;\n"
+         "  parameter s_t P = '{a: 1, n: '{k: 2}};\n"
+         "  parameter ps_t PS = 8'h12;\n"
+         "  parameter pu_t PU = 8'h3;\n"
+         "  parameter uu_t UU = '{i: 4};\n"
+         "  parameter s_t A [2] = '{'{a: 1, n: '{k: 2}}, '{a: 3, n: '{k: "
+         "4}}};\n" +
+         body + "endmodule\n";
+}
+
+constexpr const char* kParameterSelectContexts[] = {
+    "  parameter int Q = @;\n", "  localparam int Q = @;\n",
+    "  logic [@:0] q;\n", "  if (@) begin : g\n  end\n",
+    "  int n;\n  initial n = @;\n"};
+
+void ExpectReportedInEveryContext(const std::string& expr,
+                                  const std::string& message,
+                                  const char* subclause) {
+  for (const char* context : kParameterSelectContexts) {
+    SCOPED_TRACE(context);
+    ElabFixture f;
+    std::string src = ParameterSelectDesign(context, expr);
+    ElaborateSrc(src, f, "t");
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, LineOf(src, expr),
+                              subclause));
+  }
+}
+
+TEST(ParameterMemberSelects, DISABLED_AnUnpackedStructuresMissingMember) {
+  ExpectReportedInEveryContext(
+      "P.zz", "structure 's_t' has no member named 'zz'", "23.7");
+}
+
+TEST(ParameterMemberSelects, DISABLED_ANestedStructuresMissingMember) {
+  ExpectReportedInEveryContext(
+      "P.n.zz", "structure 'n_t' has no member named 'zz'", "23.7");
+}
+
+TEST(ParameterMemberSelects, DISABLED_APackedStructuresMissingMember) {
+  ExpectReportedInEveryContext(
+      "PS.zz", "structure 'ps_t' has no member named 'zz'", "23.7");
+}
+
+TEST(ParameterMemberSelects, DISABLED_APackedUnionsMissingMember) {
+  ExpectReportedInEveryContext("PU.zz", "union 'pu_t' has no member named 'zz'",
+                               "23.7");
+}
+
+TEST(ParameterMemberSelects, DISABLED_AnUnpackedUnionsMissingMember) {
+  ExpectReportedInEveryContext("UU.zz", "union 'uu_t' has no member named 'zz'",
+                               "23.7");
+}
+
+TEST(ParameterMemberSelects, DISABLED_AnArrayElementsMissingMember) {
+  ExpectReportedInEveryContext(
+      "A[0].zz", "structure 's_t' has no member named 'zz'", "23.7");
+}
+
+TEST(ParameterMemberSelects, DISABLED_AMemberSelectOfTheArrayItself) {
+  ExpectReportedInEveryContext(
+      "A.a", "'a' is not a built-in method of the fixed-size array 'A'",
+      "7.12");
+}
+
+TEST(ParameterMemberSelects, DeclaredMembersAreAcceptedInEveryContext) {
+  for (const char* expr :
+       {"P.a", "P.n.k", "PS.lo", "PU.w", "UU.i", "A[0].a", "A[1].n.k"}) {
+    for (const char* context : kParameterSelectContexts) {
+      SCOPED_TRACE(std::string(expr) + " in " + context);
+      ElabFixture f;
+      ElaborateSrc(ParameterSelectDesign(context, expr), f, "t");
+      EXPECT_FALSE(f.has_errors);
+    }
+  }
+}
+
+constexpr const char* kStructParameter =
+    "  typedef struct { int a; } s_t;\n"
+    "  parameter s_t P = '{a: 1};\n";
+
+std::string ParameterInAPlace(const std::string& place,
+                              const std::string& member) {
+  std::string decl = kStructParameter;
+  if (place == "interface") {
+    return "interface ifc;\n" + decl + "  localparam int Q = P." + member +
+           ";\nendinterface\nmodule t;\n  ifc i();\nendmodule\n";
+  }
+  if (place == "program") {
+    return "program prg;\n" + decl + "  localparam int Q = P." + member +
+           ";\nendprogram\nmodule t;\n  prg p();\nendmodule\n";
+  }
+  if (place == "generate block") {
+    return "module t;\n  if (1) begin : g\n" + decl +
+           "  localparam int Q = P." + member + ";\n  end\nendmodule\n";
+  }
+  if (place == "package") {
+    return "package pk;\n" + decl +
+           "endpackage\nmodule t;\n  localparam int Q = pk::P." + member +
+           ";\nendmodule\n";
+  }
+  if (place == "unit scoped") {
+    return decl + "module t;\n  localparam int Q = $unit::P." + member +
+           ";\nendmodule\n";
+  }
+  if (place == "unit bare") {
+    return decl + "module t;\n  localparam int Q = P." + member +
+           ";\nendmodule\n";
+  }
+  return "module t;\n  class C;\n" + decl +
+         "  endclass\n  localparam int Q = C::P." + member + ";\nendmodule\n";
+}
+
+void ExpectMissingMemberReportedIn(const std::string& place) {
+  ElabFixture f;
+  std::string src = ParameterInAPlace(place, "zz");
+  ElaborateSrc(src, f, "t");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 's_t' has no member named 'zz'",
+                            LineOf(src, "zz"), "23.7"));
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_AnInterfacesParameter) {
+  ExpectMissingMemberReportedIn("interface");
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_AProgramsParameter) {
+  ExpectMissingMemberReportedIn("program");
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_AGenerateBlocksParameter) {
+  ExpectMissingMemberReportedIn("generate block");
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_APackagesParameter) {
+  ExpectMissingMemberReportedIn("package");
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_AUnitParameterThroughUnitScope) {
+  ExpectMissingMemberReportedIn("unit scoped");
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_AUnitParameterByItsBareName) {
+  ExpectMissingMemberReportedIn("unit bare");
+}
+
+TEST(ParameterMemberSelectPlaces, DISABLED_AClasssParameter) {
+  ExpectMissingMemberReportedIn("class");
+}
+
+TEST(ParameterMemberSelectPlaces, ADeclaredMemberIsAcceptedInEveryPlace) {
+  for (const char* place : {"interface", "program", "generate block", "package",
+                            "unit scoped", "unit bare", "class"}) {
+    SCOPED_TRACE(place);
+    ElabFixture f;
+    ElaborateSrc(ParameterInAPlace(place, "a"), f, "t");
+    EXPECT_FALSE(f.has_errors);
+  }
+}
+
+TEST(DottedNameMemberSelects, DISABLED_APackageSubroutineStructsMissingMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n  typedef struct { int a; } st;\n"
+      "  function int g();\n    st s;\n    return s.zz;\n  endfunction\n"
+      "endpackage\nmodule t;\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "structure 'st' has no member named 'zz'", 5,
+                            "23.7"));
+}
+
+TEST(DottedNameMemberSelects, DISABLED_AnInterfacePortsMissingMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc;\n  logic a;\nendinterface\n"
+      "module m(ifc p);\n  logic r;\n  initial r = p.nosuch;\nendmodule\n"
+      "module t;\n  ifc i();\n  m u(i);\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface 'ifc' has no member named 'nosuch'", 6,
+                            "23.7"));
+}
+
+TEST(DottedNameMemberSelects, AnInterfacePortsDeclaredMemberIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc;\n  logic a;\nendinterface\n"
+      "module m(ifc p);\n  logic r;\n  initial r = p.a;\nendmodule\n"
+      "module t;\n  ifc i();\n  m u(i);\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DottedNameMemberSelects, DISABLED_ACovergroupObjectsMissingMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n  logic clk;\n  covergroup cg @(posedge clk);\n"
+      "    coverpoint clk;\n  endgroup\n  cg c = new;\n  int r;\n"
+      "  initial r = c.nosuch;\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "covergroup 'cg' has no member named 'nosuch'", 8,
+                            "23.7"));
+}
+
+TEST(DottedNameMemberSelects, ACovergroupObjectsMethodIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n  logic clk;\n  covergroup cg @(posedge clk);\n"
+      "    coverpoint clk;\n  endgroup\n  cg c = new;\n  real r;\n"
+      "  initial r = c.get_coverage();\nendmodule\n",
+      f, "t");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DottedNameMemberSelects, DISABLED_AScopeDeclaredAfterAnImportedName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n  struct { int x; } s2;\nendpackage\n"
+      "module t;\n  import p::*;\n  initial s2.x = 1;\n  int s2;\n"
+      "endmodule\n",
+      f, "t");
+  const std::vector<Diagnostic>& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags,
+                            "declaration of 's2' follows a reference resolved "
+                            "through a wildcard package import",
+                            7, "26.3"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(DottedNameMemberSelects, DISABLED_AnImportedFunctionsMissingMember) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n  function void f();\n    static int x;\n  endfunction\n"
+      "endpackage\nmodule t;\n  import p::f;\n  int r;\n"
+      "  initial r = f.nosuch;\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "hierarchical reference 'p::f.nosuch' is unresolved: "
+                    "'nosuch' is not declared in function 'f'",
+                    9, "23.7"));
 }
 
 }  // namespace
