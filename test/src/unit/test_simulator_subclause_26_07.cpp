@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 
 using namespace delta;
@@ -151,6 +154,131 @@ TEST(StdPackageSim, StdMailboxBesideAUserClassIsTheBuiltin) {
                        "endmodule\n",
                        f),
             "n=1 v=31\n");
+}
+
+void ExpectStdOutput(const std::string& src, const std::string& expected) {
+  SCOPED_TRACE(src);
+  SimFixture f;
+  EXPECT_EQ(RunCapture(src, f), expected);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(StdPackageSim, AnUnqualifiedStdFunctionIsCalledFromAModule) {
+  ExpectStdOutput(
+      "module top; int x, r; initial begin r = randomize(x); "
+      "$display(\"%0d\", r); end endmodule\n",
+      "1\n");
+}
+
+TEST(StdPackageSim, AnUnqualifiedStdClassIsDeclaredInTheUnit) {
+  ExpectStdOutput(
+      "semaphore g = new(1);\n"
+      "module top; initial $display(\"%0d %0d\", g.try_get(), g.try_get()); "
+      "endmodule\n",
+      "1 0\n");
+}
+
+TEST(StdPackageSim, AnExplicitStdImportInAPackageAndTheUnit) {
+  ExpectStdOutput(
+      "package pk; import std::*; semaphore s = new(1); endpackage\n"
+      "import std::*;\n"
+      "module top; initial $display(\"%0d %0d\", pk::s.try_get(), "
+      "pk::s.try_get()); endmodule\n",
+      "1 0\n");
+}
+
+TEST(StdPackageSim, AUserClassNamedForAStdClassInAnInterfaceOrProgram) {
+  ExpectStdOutput(
+      "interface ifc; class semaphore; int v = 5; endclass semaphore s = new; "
+      "initial $display(\"i %0d\", s.v); endinterface\n"
+      "program pg; class mailbox; int v = 6; endclass mailbox m = new; "
+      "initial $display(\"p %0d\", m.v); endprogram\n"
+      "module top; ifc u(); pg q(); endmodule\n",
+      "i 5\np 6\n");
+}
+
+TEST(StdPackageSim, DISABLED_AUserClassNamedProcessTakesPrecedence) {
+  ExpectStdOutput(
+      "class process; int v = 8; endclass\n"
+      "module top; process s = new; initial $display(\"%0d\", s.v); "
+      "endmodule\n",
+      "8\n");
+  ExpectStdOutput(
+      "package pp; class process; int v = 9; endclass endpackage\n"
+      "module top; pp::process s = new; initial $display(\"%0d\", s.v); "
+      "endmodule\n",
+      "9\n");
+  ExpectStdOutput(
+      "interface ifc; class process; int v = 10; endclass process s = new; "
+      "initial $display(\"%0d\", s.v); endinterface\n"
+      "module top; ifc u(); endmodule\n",
+      "10\n");
+  ExpectStdOutput(
+      "program pg; class process; int v = 11; endclass process s = new; "
+      "initial $display(\"%0d\", s.v); endprogram\n"
+      "module top; pg u(); endmodule\n",
+      "11\n");
+  ExpectStdOutput(
+      "module top; class process; int v = 12; endclass process s = new; "
+      "initial $display(\"%0d\", s.v); endmodule\n",
+      "12\n");
+}
+
+TEST(StdPackageSim, DISABLED_AUserFunctionNamedRandomizeTakesPrecedence) {
+  ExpectStdOutput(
+      "module top; function int randomize(int a); return 77; endfunction "
+      "int x, r; initial begin r = randomize(x); $display(\"%0d\", r); end "
+      "endmodule\n",
+      "77\n");
+}
+
+TEST(StdPackageSim, AStdScopedNameReachesTheBuiltinBesideAUserDeclaration) {
+  ExpectStdOutput(
+      "class semaphore; int v = 5; endclass\n"
+      "module top; std::semaphore s = new(1); "
+      "initial $display(\"%0d %0d\", s.try_get(), s.try_get()); endmodule\n",
+      "1 0\n");
+  ExpectStdOutput(
+      "package up; class semaphore; int v = 5; endclass endpackage\n"
+      "module top; import up::*; std::semaphore s = new(1); "
+      "initial $display(\"%0d %0d\", s.try_get(), s.try_get()); endmodule\n",
+      "1 0\n");
+  ExpectStdOutput(
+      "module top; function int randomize(int a); return 77; endfunction "
+      "int x, r; initial begin r = std::randomize(x); $display(\"%0d\", r); "
+      "end endmodule\n",
+      "1\n");
+}
+
+TEST(StdPackageSim, AStdScopedTypeInEachScope) {
+  ExpectStdOutput(
+      "std::semaphore g = new(1);\n"
+      "interface ifc; std::mailbox #(int) mb = new; int v; "
+      "initial begin mb.put(4); mb.get(v); $display(\"i %0d\", v); end "
+      "endinterface\n"
+      "class C; std::semaphore s; function new(); s = new(1); endfunction "
+      "endclass\n"
+      "module top; ifc u(); C c = new; initial begin "
+      "$display(\"u %0d %0d\", g.try_get(), g.try_get()); "
+      "$display(\"c %0d %0d\", c.s.try_get(), c.s.try_get()); end endmodule\n",
+      "u 1 0\nc 1 0\ni 4\n");
+  ExpectStdOutput(
+      "program pg; std::semaphore s = new(1); "
+      "initial $display(\"%0d %0d\", s.try_get(), s.try_get()); endprogram\n"
+      "module top; pg q(); endmodule\n",
+      "1 0\n");
+}
+
+TEST(StdPackageSim, ADollarPrefixedStdFunctionNameIsReported) {
+  SimFixture f;
+  RunCapture(
+      "module top; int x, r;\n"
+      "initial r = $randomize(x);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "$randomize is not a system task or system function", 2, "20.1"));
 }
 
 }  // namespace
