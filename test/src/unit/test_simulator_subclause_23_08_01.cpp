@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -304,6 +307,133 @@ TEST(TaskAndFunctionNameResolutionSimulation,
                  f),
       "42 1 101 2 101 2\n");
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(SubroutineNameSearchRun, TheUnitsFunctionBeatsAParentInstances) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "function int f();\n  return 2;\nendfunction\n"
+                "module child;\n  initial $display(\"%0d\", f());\nendmodule\n"
+                "module t;\n  function int f();\n    return 7;\n"
+                "  endfunction\n  child c();\nendmodule\n",
+                f),
+            "2\n");
+}
+
+TEST(SubroutineNameSearchRun, AClassMethodReachesTheUnitsFunction) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("function int f();\n  return 2;\nendfunction\n"
+                        "module t;\n  class C;\n"
+                        "    function int m();\n      return f();\n"
+                        "    endfunction\n  endclass\n  C c;\n"
+                        "  initial begin\n    c = new;\n"
+                        "    $display(\"%0d\", c.m());\n  end\nendmodule\n",
+                        f),
+      "2\n");
+}
+
+TEST(SubroutineNameSearchRun, DISABLED_ABareEnableRunsAnEnclosingModulesTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module child;\n  initial t;\nendmodule\n"
+                "module top;\n  int x;\n  task t;\n    x = 3;\n  endtask\n"
+                "  child c();\n  initial #1 $display(\"%0d\", x);\n"
+                "endmodule\n",
+                f),
+            "3\n");
+}
+
+TEST(SubroutineNameSearchRun, ABareCallReachesAFunctionTwoLevelsUp) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module leaf;\n  initial $display(\"%0d\", sq(3));\nendmodule\n"
+                "module mid;\n  leaf l();\nendmodule\n"
+                "module top;\n"
+                "  function int sq(int a);\n    return a * 4;\n"
+                "  endfunction\n  mid m();\nendmodule\n",
+                f),
+            "12\n");
+}
+
+TEST(SubroutineNameSearchRun, DISABLED_AnEnclosingFunctionReadsItsOwnInstance) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module child;\n  initial #1 $display(\"%0d\", rd());\n"
+                        "endmodule\n"
+                        "module top;\n  int g = 7;\n"
+                        "  function int rd();\n    return g;\n  endfunction\n"
+                        "  child c();\nendmodule\n",
+                        f),
+      "7\n");
+}
+
+TEST(SubroutineNameSearchRun, DISABLED_EachChildCallsItsOwnEnclosingFunction) {
+  SimFixture f;
+  std::string out = RunCaptureAllTops(
+      "module child;\n  initial #1 $display(\"%0d\", rd());\nendmodule\n"
+      "module p1;\n  int g = 7;\n"
+      "  function int rd();\n    return g;\n  endfunction\n"
+      "  child c();\nendmodule\n"
+      "module p2;\n  int g = 12;\n"
+      "  function int rd();\n    return g;\n  endfunction\n"
+      "  child c();\nendmodule\n"
+      "module top;\n  p1 a();\n  p2 b();\nendmodule\n",
+      f);
+  EXPECT_NE(out.find("7\n"), std::string::npos);
+  EXPECT_NE(out.find("12\n"), std::string::npos);
+}
+
+TEST(SubroutineNameSearchRun, DISABLED_AnInterfaceReachesItsModulesTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "interface ifc;\n  initial t;\nendinterface\n"
+                "module top;\n  int x;\n  task t;\n    x = 3;\n  endtask\n"
+                "  ifc i();\n  initial #1 $display(\"%0d\", x);\nendmodule\n",
+                f),
+            "3\n");
+}
+
+TEST(SubroutineNameSearchRun, DISABLED_AProgramReachesItsModulesTask) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "program prg;\n  initial t;\nendprogram\n"
+                "module top;\n  int x;\n  task t;\n    x = 3;\n  endtask\n"
+                "  prg p();\n  initial #1 $display(\"%0d\", x);\nendmodule\n",
+                f),
+            "3\n");
+}
+
+TEST(SubroutineNameSearchRun, ABareDisableEndsAnEnclosingModulesBlock) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module child;\n  initial #1 disable blk;\nendmodule\n"
+                "module top;\n  child c();\n"
+                "  initial begin : blk\n    #5 $display(\"not ended\");\n"
+                "  end\n  initial #10 $display(\"done\");\nendmodule\n",
+                f),
+            "done\n");
+}
+
+TEST(SubroutineNameSearchRun, ABareGenerateBlockNameReachesTheEnclosingOne) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module child;\n  initial #1 $display(\"%0d\", g.v);\n"
+                "endmodule\n"
+                "module top;\n  if (1) begin : g\n    int v = 4;\n  end\n"
+                "  child c();\nendmodule\n",
+                f),
+            "4\n");
+}
+
+TEST(SubroutineNameSearchRun, ASiblingInstancesTaskIsNotFound) {
+  SimFixture f;
+  RunCaptureAllTops(
+      "module sib;\n  task t;\n  endtask\nendmodule\n"
+      "module top;\n  sib s();\n  initial t;\nendmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 't'",
+                            7, "23.9"));
 }
 
 }  // namespace

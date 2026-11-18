@@ -374,4 +374,25 @@ TEST(SeparateCompilationUnits, ProceduralAssignmentToItsOwnUnitsNet) {
                             "10.4"));
 }
 
+TEST(SeparateCompilationUnits,
+     DISABLED_AnotherUnitsFunctionInAnExpressionIsUndeclared) {
+  ElabFixture f;
+  ElaborateUnits({"function int g();\n  return 2;\nendfunction\n"
+                  "module a; endmodule\n",
+                  "module top;\n  int x;\n  initial x = g();\nendmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'g'",
+                            3, "23.9"));
+}
+
+TEST(SeparateCompilationUnits,
+     AnInstanceFromAnotherUnitDoesNotReachTheParentsUnit) {
+  ElabFixture f;
+  ElaborateUnits({"task tk;\nendtask\nmodule top;\n  child c();\nendmodule\n",
+                  "module child;\n  initial tk;\nendmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'tk'",
+                            2, "23.9"));
+}
+
 }  // namespace
