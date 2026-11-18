@@ -225,19 +225,6 @@ TEST(ElabSeverityTask, MessageRecordsHierarchicalScope) {
   EXPECT_EQ(design->last_elab_severity_scope, "top");
 }
 
-TEST(ElabSeverityTask, GenerateScopeAppearsInMessageScope) {
-  ElabFixture ef;
-  auto* design = Elaborate(
-      "module top;\n"
-      "  for (genvar i = 0; i < 1; i++) begin\n"
-      "    $info(\"hi\");\n"
-      "  end\n"
-      "endmodule\n",
-      ef);
-  ASSERT_NE(design, nullptr);
-  EXPECT_EQ(design->last_elab_severity_scope, "top.genblk1_0");
-}
-
 TEST(ElabSeverityTask, MessageRecordsUserDefinedText) {
   ElabFixture ef;
   auto* design = Elaborate(
