@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -234,6 +236,173 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsTimingCheckTerminal) {
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",
                             3, "25.6"));
+}
+
+constexpr const char* kBusWithVector =
+    "interface Bus;\n"
+    "  logic a, b;\n"
+    "  logic [3:0] v;\n"
+    "  modport mp(input a, v, output b);\n"
+    "endinterface\n";
+
+void ExpectSourceRejected(ElabFixture& f, const char* name, int line) {
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string("interface signal '") + name +
+                                "' is restricted by its modport to an output "
+                                "and cannot be a module path source",
+                            line, "25.6"));
+}
+
+void ExpectDestinationRejected(ElabFixture& f, const char* name, int line) {
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string("interface signal '") + name +
+                                "' is restricted by its modport to an input "
+                                "and cannot be a module path destination",
+                            line, "25.6"));
+}
+
+TEST(SpecifyInterfaceTerminal,
+     DISABLED_AModportPickedAtTheConnectionRestrictsAPathSource) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kBusWithVector) +
+                   "module m(Bus p, output o);\n"
+                   "  specify\n"
+                   "    (p.a => o) = 5;\n"
+                   "    (p.b => o) = 5;\n"
+                   "  endspecify\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  Bus b();\n"
+                   "  wire o;\n"
+                   "  m u(.p(b.mp), .o(o));\n"
+                   "endmodule\n",
+               f, "top");
+  ExpectSourceRejected(f, "p.b", 9);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface signal 'p.a'", 8, "25.6"));
+}
+
+TEST(SpecifyInterfaceTerminal,
+     DISABLED_AGenericModportHeaderGivesTheModportDirections) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kBusWithVector) +
+                   "module m(interface.mp p, input i, output o);\n"
+                   "  specify\n"
+                   "    (p.a => o) = 5;\n"
+                   "    (i => p.b) = 5;\n"
+                   "    (p.b => o) = 5;\n"
+                   "    (i => p.a) = 5;\n"
+                   "  endspecify\n"
+                   "endmodule\n"
+                   "module top;\n"
+                   "  Bus b();\n"
+                   "  wire i, o;\n"
+                   "  m u(b.mp, i, o);\n"
+                   "endmodule\n",
+               f, "top");
+  ExpectSourceRejected(f, "p.b", 10);
+  ExpectDestinationRejected(f, "p.a", 11);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface signal", 8, "25.6"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface signal", 9, "25.6"));
+}
+
+TEST(SpecifyInterfaceTerminal, AModportOutputAmongFullPathSourcesIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kBusWithVector) +
+                   "module m(Bus.mp p, input i, output o);\n"
+                   "  specify\n"
+                   "    (i, p.a *> o) = 5;\n"
+                   "    (i, p.b *> o) = 5;\n"
+                   "  endspecify\n"
+                   "endmodule\n",
+               f);
+  ExpectSourceRejected(f, "p.b", 9);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface signal", 8, "25.6"));
+}
+
+TEST(SpecifyInterfaceTerminal, ABitSelectTakesItsSignalsModportDirection) {
+  ElabFixture f;
+  ElaborateSrc(std::string(kBusWithVector) +
+                   "module m(Bus.mp p, input i, output o);\n"
+                   "  specify\n"
+                   "    (p.v[1] => o) = 5;\n"
+                   "    (i => p.v[1]) = 5;\n"
+                   "  endspecify\n"
+                   "endmodule\n",
+               f);
+  ExpectDestinationRejected(f, "p.v", 9);
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "interface signal", 8, "25.6"));
+}
+
+TEST(SpecifyInterfaceTerminal, AModportOutputIsATimingCheckTerminal) {
+  EXPECT_TRUE(ElabOk(std::string(kBusWithVector) +
+                     "module m(Bus.mp p, input clk);\n"
+                     "  specify\n"
+                     "    $setup(p.b, posedge clk, 10);\n"
+                     "    $hold(posedge clk, p.b, 10);\n"
+                     "  endspecify\n"
+                     "endmodule\n"));
+}
+
+TEST(SpecifyRefTerminalRejected, RefPortAmongFullPathSourcesIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input i, ref logic r, output o);\n"
+      "  specify\n"
+      "    (i *> o) = 5;\n"
+      "    (i, r *> o) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref port 'r' cannot be used as a terminal in a specify block", 4,
+      "25.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "ref port", 3, "25.6"));
+}
+
+TEST(SpecifyRefTerminalRejected, RefPortAsTimingCheckReferenceIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input d, input clk, ref logic r);\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, 10);\n"
+      "    $setup(d, posedge r, 10);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref port 'r' cannot be used as a terminal in a specify block", 4,
+      "25.6"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "ref port", 3, "25.6"));
+}
+
+TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsPathDestination) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface Bus;\n"
+      "  logic a, b;\n"
+      "  modport mp(ref a, output b);\n"
+      "endinterface\n"
+      "module m(input i, Bus.mp p);\n"
+      "  specify\n"
+      "    (i => p.b) = 5;\n"
+      "    (i => p.a) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "ref modport member 'p.a' cannot be used as a terminal in a specify "
+      "block",
+      8, "25.6"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "ref modport member", 7, "25.6"));
 }
 
 }  // namespace
