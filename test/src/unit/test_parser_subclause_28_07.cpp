@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -150,6 +151,49 @@ TEST(MosSwitchParsing, TerminalOrderOutputDataControl) {
   EXPECT_EQ(g->gate_terminals[0]->text, "y");
   EXPECT_EQ(g->gate_terminals[1]->text, "a");
   EXPECT_EQ(g->gate_terminals[2]->text, "en");
+}
+
+TEST(MosSwitchParsing, EachSwitchRejectsFourDelays) {
+  for (const std::string& sw : {"nmos", "pmos", "rnmos", "rpmos"}) {
+    std::string src = "module m;\n  ";
+    src += sw;
+    src += " #(1, 2, 3, 4) n1(o, i, g);\nendmodule\n";
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"))
+        << sw;
+  }
+}
+
+TEST(MosSwitchParsing, EachSwitchTakesZeroToThreeDelays) {
+  for (const std::string& sw : {"nmos", "pmos", "rnmos", "rpmos"}) {
+    for (const std::string& delay : {"", "#5", "#(1, 2)", "#(1, 2, 3)"}) {
+      std::string src = "module m;\n  ";
+      src += sw;
+      src += " ";
+      src += delay;
+      src += " n1(o, i, g);\nendmodule\n";
+      EXPECT_FALSE(Parse(src).has_errors) << sw << " " << delay;
+    }
+  }
+}
+
+TEST(MosSwitchParsing, ASwitchInAGenerateBlockParsesToItsKind) {
+  auto r = Parse(
+      "module m;\n"
+      "  for (genvar k = 0; k < 2; k++) begin : g\n"
+      "    nmos a(o, i, c);\n"
+      "  end\n"
+      "  if (1) begin : b\n"
+      "    pmos p(o, i, c);\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : c\n"
+      "      rnmos r(o, i, c);\n"
+      "    end\n"
+      "    default: rpmos q(o, i, c);\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
