@@ -157,4 +157,58 @@ TEST(InterfacePorts, TwoInstancesShareExternalWire) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
+TEST(InterfacePorts, ABodyNetIsNotConnectableExternally) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i1(input a, output b, inout c);\n"
+      "  wire d;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  wire aw, dw;\n"
+      "  i1 u(.a(aw), .d(dw));\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), "port 'd' not found", 6, "23.3.2.2"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
+}
+
+TEST(InterfacePorts, AnImplicitNamedConnectionToABodyMemberIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  logic clk = 0, req = 0;\n"
+      "  simple_bus sb(.clk, .req);\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "port 'req' not found", 6,
+                            "23.3.2.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "port 'clk' not found", 6,
+                             "23.3.2.2"));
+}
+
+TEST(InterfacePorts, ABodyMemberConnectionInsideAnInterfaceIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface simple_bus(input logic clk);\n"
+      "  logic req, gnt;\n"
+      "endinterface\n"
+      "interface outer;\n"
+      "  logic c;\n"
+      "  simple_bus sb(.clk(c), .req(c));\n"
+      "endinterface\n"
+      "module top;\n"
+      "  outer o();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "port 'req' not found", 6,
+                            "23.3.2.2"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "port 'clk' not found", 6,
+                             "23.3.2.2"));
+}
+
 }  // namespace
