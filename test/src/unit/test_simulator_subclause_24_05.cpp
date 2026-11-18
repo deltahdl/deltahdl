@@ -45,7 +45,7 @@ TEST(BlockingTasksCycleEventMode,
 }
 
 TEST(BlockingTasksCycleEventMode,
-     ModuleTaskNonBlockingCalledFromProgramCommitsInReNba) {
+     ModuleTaskNonBlockingCalledFromProgramReadsTheDesignNbaValue) {
   SimFixture f;
   auto* b = RunAndFindVar(
       "module top;\n"
