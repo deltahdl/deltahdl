@@ -177,8 +177,8 @@ TEST(MultipleTaskExports, SingleModuleExportOfFunctionElaborates) {
              "                 export compute);\n"
              "endinterface\n"
              "module memMod(interface a);\n"
-             "  function int a.compute(input int x);\n"
-             "    return x;\n"
+             "  function int a.compute(input int a);\n"
+             "    return a;\n"
              "  endfunction\n"
              "endmodule\n"
              "module top;\n"
@@ -232,6 +232,27 @@ TEST(MultipleTaskExports,
              "  logic clk = 0;\n"
              "  simple_bus sb_intf(clk);\n"
              "  cpuMod cpu(sb_intf.initiator);\n"
+             "endmodule\n"));
+}
+
+TEST(MultipleTaskExports,
+     TwoModuleTypesExportingOneExternForkjoinTaskElaborate) {
+  EXPECT_TRUE(
+      ElabOk("interface simple_bus (input logic clk);\n"
+             "  extern forkjoin task countTargets();\n"
+             "  modport target(input clk, export countTargets);\n"
+             "endinterface\n"
+             "module memMod(interface a);\n"
+             "  task a.countTargets(); endtask\n"
+             "endmodule\n"
+             "module romMod(interface a);\n"
+             "  task a.countTargets(); endtask\n"
+             "endmodule\n"
+             "module top;\n"
+             "  logic clk = 0;\n"
+             "  simple_bus sb_intf(clk);\n"
+             "  memMod mem(sb_intf.target);\n"
+             "  romMod rom(sb_intf.target);\n"
              "endmodule\n"));
 }
 
