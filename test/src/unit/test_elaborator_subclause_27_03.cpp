@@ -146,4 +146,57 @@ TEST(GenerateConstructSyntax, ConstantCaseItemExpressionsElaborate) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'b'), 0);
 }
 
+TEST(GenerateConstructSyntax, NonConstantSchemesOutsideAModuleAreReported) {
+  auto r = RunGenerateElaboration(
+      "interface ifc;\n"
+      "  logic v;\n"
+      "  if (v) begin : g logic a; end\n"
+      "endinterface\n"
+      "program pr;\n"
+      "  logic v;\n"
+      "  case (v) 1'b1: begin : g logic a; end default: ; endcase\n"
+      "endprogram\n"
+      "checker ck;\n"
+      "  logic v;\n"
+      "  for (genvar k = 0; k < v; k++) begin : g end\n"
+      "endchecker\n"
+      "module top; ifc i(); pr p(); ck c(); endmodule\n");
+  const auto& diags = r.f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, "generate-if condition is not constant", 3, "27.5"));
+  EXPECT_TRUE(ReportedError(diags, "generate-case selector is not constant", 7,
+                            "27.5"));
+  EXPECT_TRUE(ReportedError(
+      diags, "generate-for termination expression is not constant", 11,
+      "27.4"));
+}
+
+TEST(GenerateConstructSyntax, ANestedConditionOnABlockVariableIsNotConstant) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (1) begin : v\n"
+      "    logic z;\n"
+      "    if (z) begin : w end\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.f.diag.Diagnostics(),
+                            "generate-if condition is not constant", 4,
+                            "27.5"));
+}
+
+TEST(GenerateConstructSyntax, DISABLED_ANameInsideAnUnselectedBlockIsReported) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (1) begin : u1 int v; end\n"
+      "  else begin : u2 int w; end\n"
+      "  if (0) begin : u3 int x; end\n"
+      "  initial $display(\"%0d %0d\", u2.w, u3.x);\n"
+      "endmodule\n");
+  const auto& diags = r.f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "hierarchical name 'u2' resolves to no declaration", 5, "23.8"));
+  EXPECT_TRUE(ReportedError(
+      diags, "hierarchical name 'u3' resolves to no declaration", 5, "23.8"));
+}
+
 }  // namespace
