@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_simulator.h"
 #include "simulator/lowerer.h"
 #include "simulator/scheduler.h"
@@ -348,6 +350,223 @@ TEST(ProgramControlTasksSim, ExitLeavesAnotherProgramsDelayedInitialRunning) {
   ASSERT_NE(v, nullptr);
   EXPECT_EQ(v->value.ToUint64(), 33u);
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 5u);
+}
+
+constexpr const char* kSurvivor =
+    "program q;\n"
+    "  initial begin #12 $display(\"q at %0t\", $time); $finish; end\n"
+    "endprogram\n";
+
+constexpr const char* kSurvivorOut = "q at 12\n$finish at time 12\n";
+
+std::string RunBesideSurvivor(const std::string& src) {
+  SimFixture f;
+  return RunCapture(src + kSurvivor, f);
+}
+
+TEST(ProgramControlTasksSim, AProgramsStopSuspendsTheRunAtTheCall) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  initial begin\n"
+                       "    #4 $display(\"before\");\n"
+                       "    $stop;\n"
+                       "    $display(\"after stop\");\n"
+                       "  end\n"
+                       "endprogram\n"
+                       "module top; p pi(); initial #20 $display(\"m\"); "
+                       "endmodule\n",
+                       f),
+            "before\n$stop at time 4\n");
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
+}
+
+TEST(ProgramControlTasksSim, AProgramsFinishEndsTheRunWhileAModuleRunsOn) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("program p;\n"
+                       "  initial begin #6 $finish; $display(\"after\"); end\n"
+                       "endprogram\n"
+                       "module top; p pi(); initial #60 $display(\"m\"); "
+                       "endmodule\n",
+                       f),
+            "$finish at time 6\n");
+  EXPECT_EQ(f.ctx.CurrentTime().ticks, 6u);
+}
+
+TEST(ProgramControlTasksSim, ExitFromAForkChildEndsItsSiblingAndPeerInitial) {
+  EXPECT_EQ(
+      RunBesideSurvivor("module top; p pi(); q qi(); endmodule\n"
+                        "program p;\n"
+                        "  initial begin\n"
+                        "    fork\n"
+                        "      begin #2 $display(\"child exits\"); $exit; "
+                        "$display(\"child after\"); end\n"
+                        "      begin #5 $display(\"sibling\"); end\n"
+                        "    join\n"
+                        "    $display(\"parent after join\");\n"
+                        "  end\n"
+                        "  initial #9 $display(\"peer initial\");\n"
+                        "endprogram\n"),
+      std::string("child exits\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitMidwayThroughAProgramTaskEndsTheTaskAndPeer) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top; p pi(); q qi(); endmodule\n"
+                "program p;\n"
+                "  task automatic run();\n"
+                "    #3 $display(\"task exits\");\n"
+                "    $exit;\n"
+                "    $display(\"after in task\");\n"
+                "  endtask\n"
+                "  initial begin run(); $display(\"after in initial\"); end\n"
+                "  initial #7 $display(\"peer\");\n"
+                "endprogram\n"),
+            std::string("task exits\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitInAClassMethodEndsTheMethodTheInitialAndPeer) {
+  EXPECT_EQ(RunBesideSurvivor("module top; p pi(); q qi(); endmodule\n"
+                              "class C;\n"
+                              "  task run();\n"
+                              "    #3 $display(\"method exits\");\n"
+                              "    $exit;\n"
+                              "    $display(\"after in method\");\n"
+                              "  endtask\n"
+                              "endclass\n"
+                              "program p;\n"
+                              "  initial begin\n"
+                              "    automatic C c = new;\n"
+                              "    c.run();\n"
+                              "    $display(\"after in initial\");\n"
+                              "  end\n"
+                              "  initial #7 $display(\"peer\");\n"
+                              "endprogram\n"),
+            std::string("method exits\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim,
+     DISABLED_ExitInAVoidFunctionEndsTheFunctionCallerAndPeer) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top; p pi(); q qi(); endmodule\n"
+                "program p;\n"
+                "  function automatic void f();\n"
+                "    $display(\"function exits\");\n"
+                "    $exit;\n"
+                "    $display(\"after exit in f\");\n"
+                "  endfunction\n"
+                "  initial begin #1 f(); $display(\"caller after f\"); end\n"
+                "  initial #5 $display(\"peer\");\n"
+                "endprogram\n"),
+            std::string("function exits\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitInAForeverLoopEndsTheLoopAndPeer) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top; p pi(); q qi(); endmodule\n"
+                "program p;\n"
+                "  int n = 0;\n"
+                "  initial forever begin\n"
+                "    #3 n++;\n"
+                "    if (n == 3) begin $display(\"exit at %0t\", $time); "
+                "$exit; end\n"
+                "    $display(\"n %0d\", n);\n"
+                "  end\n"
+                "  initial #10 $display(\"peer\");\n"
+                "endprogram\n"),
+            std::string("n 1\nn 2\nexit at 9\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitInAModuleTaskAProgramCallsEndsThatProgram) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top;\n"
+                "  task automatic mt();\n"
+                "    $display(\"module task exits at %0t\", $time);\n"
+                "    $exit;\n"
+                "    $display(\"after exit in module task\");\n"
+                "  endtask\n"
+                "  p pi();\n"
+                "  q qi();\n"
+                "endmodule\n"
+                "program p;\n"
+                "  initial begin #2 top.mt(); $display(\"after mt\"); end\n"
+                "  initial #6 $display(\"peer\");\n"
+                "endprogram\n"),
+            std::string("module task exits at 2\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitEndsAJoinNoneChildOfAnotherInitial) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top; p pi(); q qi(); endmodule\n"
+                "program p;\n"
+                "  initial begin\n"
+                "    fork #5 $display(\"join_none child\"); join_none\n"
+                "    #8 $display(\"forker\");\n"
+                "  end\n"
+                "  initial begin #2 $display(\"exit at %0t\", $time); $exit; "
+                "end\n"
+                "endprogram\n"),
+            std::string("exit at 2\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitLeavesAnotherInstanceOfTheSameProgramRunning) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top; p #(2) p1(); p #(6) p2(); q qi(); endmodule\n"
+                "program p #(parameter int D = 2);\n"
+                "  initial begin\n"
+                "    #D $display(\"p%0d at %0t\", D, $time);\n"
+                "    if (D == 2) $exit;\n"
+                "    #1 $display(\"p%0d after\", D);\n"
+                "  end\n"
+                "endprogram\n"),
+            std::string("p2 at 2\np6 at 6\np6 after\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitLeavesModuleProcessesRunning) {
+  EXPECT_EQ(RunBesideSurvivor(
+                "module top;\n"
+                "  p pi();\n"
+                "  q qi();\n"
+                "  initial #7 $display(\"module at %0t\", $time);\n"
+                "endmodule\n"
+                "program p;\n"
+                "  initial begin #2 $display(\"exit at %0t\", $time); $exit; "
+                "end\n"
+                "endprogram\n"),
+            std::string("exit at 2\nmodule at 7\n") + kSurvivorOut);
+}
+
+TEST(ProgramControlTasksSim, ExitInAProgramsFinalProcedureIsIgnored) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureThroughFinals(ElaborateSrc,
+                                    "program p;\n"
+                                    "  int v = 0;\n"
+                                    "  initial begin #1 v = 5; $finish; end\n"
+                                    "  final begin\n"
+                                    "    $exit;\n"
+                                    "    $display(\"final after exit %0d\", "
+                                    "v);\n"
+                                    "  end\n"
+                                    "endprogram\n"
+                                    "module top; p pi(); endmodule\n",
+                                    f),
+            "$finish at time 1\nfinal after exit 5\n");
+}
+
+TEST(ProgramControlTasksSim, ExitInAnInterfacesInitialIsIgnored) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("interface ifc;\n"
+                       "  logic [7:0] w;\n"
+                       "  initial begin\n"
+                       "    w = 1;\n"
+                       "    $exit;\n"
+                       "    w = 2;\n"
+                       "    #3 $display(\"ifc %0d at %0t\", w, $time);\n"
+                       "  end\n"
+                       "endinterface\n"
+                       "module top; ifc i(); endmodule\n",
+                       f),
+            "ifc 2 at 3\n");
+  EXPECT_FALSE(f.ctx.StopRequested());
 }
 
 }  // namespace
