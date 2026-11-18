@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -582,6 +584,338 @@ TEST(ModportImportPrototype, OtherCallsAreNoImportCalls) {
                             "interface 'sb'",
                             9, "25.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+void ElabTop(ElabFixture& f, const std::string& src) {
+  ElaborateSrc(src, f, "top");
+}
+
+TEST(ModportImportPrototype, AnImportPrototypeOfAnotherArgumentTypeIsRefused) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  function int f(int a); return a; endfunction\n"
+          "  function int g(int a); return a; endfunction\n"
+          "  modport mp(import function int f(string a),\n"
+          "             import function int g(int a));\n"
+          "endinterface\n"
+          "module m(ifc.mp p);\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the prototype of 'f' modport 'mp' imports does "
+                            "not match its declaration in interface 'ifc'",
+                            4, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "the prototype of 'g'", 5, "25.7"));
+}
+
+TEST(ModportImportPrototype,
+     DISABLED_AnImportPrototypeOfAMatchingTypeIsAccepted) {
+  ElabFixture f;
+  ElabTop(f,
+          "typedef int myint;\n"
+          "interface ifc;\n"
+          "  function int f(myint a); return a + 1; endfunction\n"
+          "  modport mp(import function int f(int a));\n"
+          "endinterface\n"
+          "module m(ifc.mp p);\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i); endmodule\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ModportExportPrototype,
+     DISABLED_AnExportDefinitionOfAMatchingTypeIsAccepted) {
+  ElabFixture f;
+  ElabTop(f,
+          "typedef int myint;\n"
+          "interface ifc;\n"
+          "  modport mp(export function int f(int a));\n"
+          "endinterface\n"
+          "module m(ifc.mp p);\n"
+          "  function int p.f(myint a); return a + 2; endfunction\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i.mp); endmodule\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(ExternPrototype, DISABLED_AHierarchicalBodyRenamingAFormalIsRefused) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  extern function int f(int a);\n"
+          "  extern function int g(int a);\n"
+          "endinterface\n"
+          "module m(interface p);\n"
+          "  function int p.f(int b); return b + 2; endfunction\n"
+          "  function int p.g(int a); return a + 2; endfunction\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "out-of-block declaration for 'ifc.f' argument "
+                            "'b' does not have the prototype's name 'a'",
+                            6, "25.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "'ifc.g'", 7, "25.7"));
+}
+
+TEST(ModportExportPrototype,
+     DISABLED_AnExportDefinitionRenamingAFormalIsRefused) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  modport mp(export function int compute(input int a),\n"
+          "             export function int keep(input int a));\n"
+          "endinterface\n"
+          "module memMod(ifc.mp a);\n"
+          "  function int a.compute(input int a_arg); return a_arg; "
+          "endfunction\n"
+          "  function int a.keep(input int a); return a; endfunction\n"
+          "endmodule\n"
+          "module top; ifc i(); memMod u(i.mp); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "definition of exported subroutine 'compute' in "
+                            "module 'memMod' does not match the prototype "
+                            "declared in the modport",
+                            6, "25.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "definition of exported subroutine 'keep'", 7,
+                             "25.7"));
+}
+
+TEST(ModportImportPrototype, ACallOmittingAnArgumentTheImportGivesNoDefault) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  task t(int a = 5); endtask\n"
+          "  task u(int a = 5); endtask\n"
+          "  modport mp(import task t(int a), import task u(int a = 5));\n"
+          "endinterface\n"
+          "module m(ifc.mp p);\n"
+          "  initial p.t();\n"
+          "  initial p.u();\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i.mp); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 't' through modport 'mp' omits "
+                            "argument 'a', which the modport's prototype gives "
+                            "no default",
+                            7, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "the call of 'u'", 8, "25.7"));
+}
+
+TEST(ModportImportPrototype,
+     ACallOmittingAnArgumentTheImportOfAnExportGivesNoDefault) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  modport ex(export task t(int a));\n"
+          "  modport im(import task t(int a));\n"
+          "endinterface\n"
+          "module d(ifc.ex p);\n"
+          "  task p.t(int a = 5); endtask\n"
+          "endmodule\n"
+          "module c(ifc.im p);\n"
+          "  initial p.t();\n"
+          "  initial p.t(2);\n"
+          "endmodule\n"
+          "module top; ifc i(); d u(i.ex); c v(i.im); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 't' through modport 'im' omits "
+                            "argument 'a', which the modport's prototype gives "
+                            "no default",
+                            9, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "the call of 't'", 10, "25.7"));
+}
+
+TEST(ExternPrototype,
+     DISABLED_ACallOmittingAnArgumentTheExternPrototypeGivesNoDefault) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  extern task t(int a);\n"
+          "endinterface\n"
+          "module d(interface p);\n"
+          "  task p.t(int a = 5); endtask\n"
+          "endmodule\n"
+          "module top;\n"
+          "  ifc i();\n"
+          "  d u(i);\n"
+          "  initial i.t();\n"
+          "  initial i.t(2);\n"
+          "endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 't' omits argument 'a', which the "
+                            "extern prototype in interface 'ifc' gives no "
+                            "default",
+                            10, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "the call of 't'", 11, "25.7"));
+}
+
+TEST(ModportImportPrototype, AFunctionAnotherModuleDefinesNeedsAFullPrototype) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  modport ex(export f, export g);\n"
+          "  modport im(import f, import function int g(int a));\n"
+          "endinterface\n"
+          "module d(ifc.ex p);\n"
+          "  function int p.f(int a); return a + 1; endfunction\n"
+          "  function int p.g(int a); return a + 1; endfunction\n"
+          "endmodule\n"
+          "module c(ifc.im p);\n"
+          "endmodule\n"
+          "module top; ifc i(); d u(i.ex); c v(i.im); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "modport 'im' imports 'f', which interface 'ifc' "
+                            "does not define, by its name alone; importing a "
+                            "subroutine another module defines needs a full "
+                            "prototype",
+                            3, "25.7"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "imports 'g'", 3, "25.7"));
+}
+
+TEST(ModportImportPrototype, ATaskImportedByNameTakesOnlyPositionalCalls) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  task t(int a, int b = 3); endtask\n"
+          "  modport mp(import t);\n"
+          "endinterface\n"
+          "module m(ifc.mp p);\n"
+          "  initial p.t(1, 2);\n"
+          "  initial p.t(.a(1), .b(2));\n"
+          "  initial p.t(1);\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i.mp); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 't' through modport 'mp' binds an "
+                            "argument by name, which needs a full prototype of "
+                            "'t' in the modport",
+                            7, "25.7"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 't' through modport 'mp' relies on a "
+                            "default argument value, which needs a full "
+                            "prototype of 't' in the modport",
+                            8, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "the call of 't'", 6, "25.7"));
+}
+
+TEST(ModportImportPrototype,
+     DISABLED_ACallByNameThroughAPrototypeWithNamelessFormalsIsRefusedOnce) {
+  ElabFixture f;
+  ElabTop(f,
+          "interface ifc;\n"
+          "  task t(int a); endtask\n"
+          "  modport mp(import task t(int));\n"
+          "endinterface\n"
+          "module m(ifc.mp p);\n"
+          "  initial p.t(1);\n"
+          "  initial p.t(.a(1));\n"
+          "endmodule\n"
+          "module top; ifc i(); m u(i.mp); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the call of 't' through modport 'mp' binds an "
+                            "argument by name, but the modport's prototype of "
+                            "'t' gives its formals no name",
+                            7, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "omits argument", 7, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "the call of 't'", 6, "25.7"));
+}
+
+constexpr const char* kExportsFunction =
+    "interface ifc;\n"
+    "  modport target(export function int f(int a));\n"
+    "endinterface\n";
+
+TEST(ModportExportDefinition, AnExportedFunctionLeftUndefinedIsRefused) {
+  ElabFixture f;
+  ElabTop(f, std::string(kExportsFunction) +
+                 "module memMod(interface a);\n"
+                 "endmodule\n"
+                 "module defMod(interface a);\n"
+                 "  function int a.f(int a); return a; endfunction\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  ifc i(), j();\n"
+                 "  memMod u(i.target);\n"
+                 "  defMod v(j.target);\n"
+                 "endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'memMod' is connected to modport 'target' "
+                            "of interface instance 'i', which exports "
+                            "subroutine 'f', but the module does not define it",
+                            2, "25.7"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), "module 'defMod'", 2, "25.7"));
+}
+
+TEST(ModportExportDefinition,
+     AModportTypedHeaderLeavingAnExportUndefinedIsRefused) {
+  ElabFixture f;
+  ElabTop(f, std::string(kExportsFunction) +
+                 "module memMod(ifc.target a);\n"
+                 "endmodule\n"
+                 "module top; ifc i(); memMod u(i.target); endmodule\n");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'memMod' is connected to modport 'target' "
+                            "of interface instance 'i', which exports "
+                            "subroutine 'f', but the module does not define it",
+                            2, "25.7"));
+}
+
+TEST(
+    ModportExportDefinition,
+    DISABLED_AModportTypedHeaderLeavingAnExportUndefinedIsRefusedWithAPlainConnection) {
+  for (const char* item :
+       {"export function int f(int a)", "export task f()", "export f"}) {
+    ElabFixture f;
+    ElabTop(f, std::string("interface ifc;\n"
+                           "  modport target(") +
+                   item +
+                   ");\n"
+                   "endinterface\n"
+                   "module memMod(ifc.target a);\n"
+                   "endmodule\n"
+                   "module top; ifc i(); memMod u(i); endmodule\n");
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "module 'memMod' is connected to modport "
+                              "'target' of interface instance 'i', which "
+                              "exports subroutine 'f', but the module does not "
+                              "define it",
+                              2, "25.7"))
+        << item;
+  }
+}
+
+TEST(HierarchicalSubroutineDefinition, AnUnannouncedDefinitionIsRefused) {
+  for (const char* header : {"interface p", "ifc p", "ifc.mp p"}) {
+    for (const char* body : {"function int p.f(int a); return a; endfunction",
+                             "task p.f(); endtask"}) {
+      ElabFixture f;
+      ElabTop(f, std::string("interface ifc;\n"
+                             "  logic x;\n"
+                             "  modport mp(input x);\n"
+                             "endinterface\n"
+                             "module m(") +
+                     header + ");\n  " + body +
+                     "\nendmodule\n"
+                     "module top; ifc i(); m u(i); endmodule\n");
+      EXPECT_TRUE(ReportedError(
+          f.diag.Diagnostics(),
+          "subroutine 'f' defined in module 'm' for interface port 'p' by a "
+          "hierarchical name is neither declared 'extern' in interface 'ifc' "
+          "nor exported by any of its modports",
+          6, "25.7"))
+          << header << " / " << body;
+    }
+  }
 }
 
 }  // namespace

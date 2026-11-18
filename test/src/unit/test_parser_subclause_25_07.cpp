@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -196,6 +197,24 @@ TEST(InterfaceItemsParsing, ExternFunctionPrototypeReturnType) {
   ASSERT_NE(func, nullptr);
   EXPECT_TRUE(func->is_extern);
   EXPECT_EQ(func->return_type.kind, DataTypeKind::kInt);
+}
+
+TEST(ModportPrototypeParsing, ANamelessFormalTakesNoDimensionOrDefault) {
+  auto r = Parse(
+      "interface ifc;\n"
+      "  modport a(import task t(int = 1));\n"
+      "  modport b(export task t(int = 1));\n"
+      "  modport c(import function void f(logic [7:0] [4]));\n"
+      "  modport d(export function void f(logic [7:0] [4]));\n"
+      "  modport e(import task t(int x = 1), export task u(int));\n"
+      "endinterface\n");
+  const char* msg =
+      "a formal written without a name takes no unpacked dimension and no "
+      "default value";
+  for (uint32_t line : {2U, 3U, 4U, 5U}) {
+    EXPECT_TRUE(ReportedError(r.diags, msg, line, "A.2.7")) << line;
+  }
+  EXPECT_FALSE(ReportedError(r.diags, msg, 6, "A.2.7"));
 }
 
 }  // namespace
