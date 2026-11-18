@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -261,6 +263,27 @@ TEST(CmosSwitches, RcmosTerminalOrderIsOutDataNctrlPctrl) {
   EXPECT_EQ(g->gate_terminals[1]->text, "data");
   EXPECT_EQ(g->gate_terminals[2]->text, "nctrl");
   EXPECT_EQ(g->gate_terminals[3]->text, "pctrl");
+}
+
+TEST(CmosSwitches, SeveralRcmosInstancesInOneDeclaration) {
+  auto r = Parse(
+      "module m;\n"
+      "  rcmos r1(o1, d1, n1, p1), r2(o2, d2, n2, p2), r3(o3, d3, n3, p3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto gates = FindAllGates(r.cu->modules[0]->items);
+  ASSERT_EQ(gates.size(), 3u);
+  const char* const kNames[] = {"r1", "r2", "r3"};
+  const char* const kOuts[] = {"o1", "o2", "o3"};
+  const char* const kPctrls[] = {"p1", "p2", "p3"};
+  for (std::size_t i = 0; i < gates.size(); ++i) {
+    EXPECT_EQ(gates[i]->gate_kind, GateKind::kRcmos) << i;
+    EXPECT_EQ(gates[i]->gate_inst_name, kNames[i]) << i;
+    ASSERT_EQ(gates[i]->gate_terminals.size(), 4u) << i;
+    EXPECT_EQ(gates[i]->gate_terminals[0]->text, kOuts[i]) << i;
+    EXPECT_EQ(gates[i]->gate_terminals[3]->text, kPctrls[i]) << i;
+  }
 }
 
 }  // namespace
