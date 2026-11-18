@@ -344,6 +344,20 @@ TEST(SeparateCompilationUnits, AnotherUnitsParameterIsUnresolved) {
                             "23.9"));
 }
 
+TEST(SeparateCompilationUnits,
+     DISABLED_AnotherUnitsParameterInADimensionIsUnresolved) {
+  ElabFixture f;
+  ElaborateUnits({"localparam int W = 8;\n"
+                  "module a; endmodule\n",
+                  "module top;\n"
+                  "  logic [W-1:0] v;\n"
+                  "endmodule\n"},
+                 f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'W'", 2,
+                            "23.9"));
+}
+
 TEST(SeparateCompilationUnits, AUnitsNetDeclarationAssignmentIsReported) {
   ElabFixture f;
   ElaborateUnits({"module top;\n"

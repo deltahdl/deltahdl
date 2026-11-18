@@ -709,4 +709,135 @@ TEST(ScopeRulesSimulation, LikeNamedPropertiesOfTwoClassesKeepTheirOwn) {
             "1 2\n");
 }
 
+TEST(InstanceScopeSimulation, ABareCallInAChildRunsTheParentsFunction) {
+  SimFixture f;
+  auto* y = RunAndFindVar(
+      "module child;\n  int y;\n  initial y = f(1);\nendmodule\n"
+      "module parent;\n  function int f(int v); return v + 1; endfunction\n"
+      "  child c();\nendmodule\n",
+      f, "c.y");
+  ASSERT_NE(y, nullptr);
+  EXPECT_EQ(y->value.ToUint64(), 2u);
+}
+
+std::string ArrayShadowDesign(const std::string& decl, const std::string& init,
+                              const std::string& fill,
+                              const std::string& show) {
+  return "module top;\n  " + decl + " = " + init +
+         ";\n  initial begin\n    begin : b\n      " + decl + ";\n      " +
+         fill + "\n      $display(\"in %0d\", " + show +
+         ");\n    end\n    $display(\"%0d\", " + show +
+         ");\n  end\n"
+         "endmodule\n";
+}
+
+TEST(BlockArrayShadowing, DISABLED_ABlocksArrayLeavesTheModulesArrayAlone) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module top;\n  int arr[3] = '{1, 2, 3};\n  initial begin\n"
+                "    begin : b\n      int arr[3];\n"
+                "      foreach (arr[i]) arr[i] = 9;\n"
+                "      $display(\"in %0d %0d %0d\", arr[0], arr[1], arr[2]);\n"
+                "    end\n"
+                "    $display(\"%0d %0d %0d\", arr[0], arr[1], arr[2]);\n"
+                "  end\nendmodule\n",
+                f),
+            "in 9 9 9\n1 2 3\n");
+}
+
+TEST(BlockArrayShadowing,
+     DISABLED_TwoDimensionalAndStringArraysOfABlockLeaveTheModulesAlone) {
+  {
+    SimFixture f;
+    EXPECT_EQ(RunCaptureAllTops(
+                  ArrayShadowDesign(
+                      "int arr[2][3]", "'{'{1, 2, 3}, '{4, 5, 6}}",
+                      "foreach (arr[i, j]) arr[i][j] = 9;", "arr[1][2]"),
+                  f),
+              "in 9\n6\n");
+  }
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                ArrayShadowDesign("string arr[3]", "'{\"a\", \"b\", \"c\"}",
+                                  "foreach (arr[i]) arr[i] = \"z\";",
+                                  "arr[1].len() + (arr[1] == \"b\")"),
+                f),
+            "in 1\n2\n");
+}
+
+TEST(BlockArrayShadowing,
+     DISABLED_AStaticTasksBlockKeepsItsOwnArrayFromCallToCall) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module top;\n  int arr[3] = '{1, 2, 3};\n  task t;\n"
+                        "    begin : b\n      int arr[3];\n"
+                        "      arr[0] = arr[0] + 5;\n"
+                        "      $display(\"%0d\", arr[0]);\n    end\n  endtask\n"
+                        "  initial begin\n    t();\n    t();\n"
+                        "    $display(\"%0d\", arr[0]);\n  end\nendmodule\n",
+                        f),
+      "5\n10\n1\n");
+}
+
+TEST(BlockArrayShadowing,
+     DISABLED_ScopesThatDoNotEncloseOneAnotherKeepTheirArraysApart) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module top;\n  function void f();\n    int arr[3];\n"
+                "    arr[0] = 7;\n  endfunction\n  initial begin\n"
+                "    begin : b1\n      int arr[3];\n      arr[0] = 1;\n"
+                "      f();\n      $display(\"b1 %0d\", arr[0]);\n    end\n"
+                "    begin : b2\n      int arr[3];\n"
+                "      $display(\"b2 %0d\", arr[0]);\n    end\n  end\n"
+                "endmodule\n",
+                f),
+            "b1 1\nb2 0\n");
+}
+
+TEST(BlockArrayShadowing, ABlocksArrayNothingEnclosingSharesWorks) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module top;\n  initial begin\n    begin : b\n"
+                "      int arr[3];\n      foreach (arr[i]) arr[i] = 9;\n"
+                "      $display(\"%0d %0d %0d\", arr[0], arr[1], arr[2]);\n"
+                "    end\n  end\nendmodule\n",
+                f),
+            "9 9 9\n");
+}
+
+std::string InstanceNamedLikeADefinition(const char* kind, const char* end) {
+  return std::string("module bar;\n  int x = 2;\nendmodule\n") + kind +
+         " foo;\n  int x = 5;\n" + end +
+         "\nmodule top;\n  bar foo();\n"
+         "  initial #1 $display(\"%0d\", foo.x);\nendmodule\n";
+}
+
+TEST(PathHeadPrecedence, AnInstanceIsChosenOverALikeNamedModule) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(InstanceNamedLikeADefinition("module", "endmodule"), f),
+      "2\n");
+}
+
+TEST(PathHeadPrecedence, AnInstanceIsChosenOverALikeNamedInterface) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                InstanceNamedLikeADefinition("interface", "endinterface"), f),
+            "2\n");
+}
+
+TEST(PathHeadPrecedence, DISABLED_AnInstanceIsChosenOverALikeNamedProgram) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                InstanceNamedLikeADefinition("program", "endprogram"), f),
+            "2\n");
+}
+
+TEST(PathHeadPrecedence, AnInstanceIsChosenOverALikeNamedChecker) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                InstanceNamedLikeADefinition("checker", "endchecker"), f),
+            "2\n");
+}
+
 }  // namespace
