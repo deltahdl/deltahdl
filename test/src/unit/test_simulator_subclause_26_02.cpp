@@ -340,4 +340,166 @@ TEST(PackageDeclarationSim, ScopedReadOfAPackageInitializerAtTimeZero) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(PackageDeclarationSim,
+     DISABLED_TheSectionsComplexPackageAddsAndMultiplies) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package ComplexPkg;\n"
+                 "  typedef struct {\n"
+                 "    shortreal i, r;\n"
+                 "  } Complex;\n"
+                 "  function Complex add(Complex a, b);\n"
+                 "    add.r = a.r + b.r;\n"
+                 "    add.i = a.i + b.i;\n"
+                 "  endfunction\n"
+                 "  function Complex mul(Complex a, b);\n"
+                 "    mul.r = (a.r * b.r) - (a.i * b.i);\n"
+                 "    mul.i = (a.r * b.i) + (a.i * b.r);\n"
+                 "  endfunction\n"
+                 "endpackage : ComplexPkg\n"
+                 "module top;\n"
+                 "  ComplexPkg::Complex a = '{1.0, 2.0}, b = '{3.0, 4.0};\n"
+                 "  ComplexPkg::Complex s, m;\n"
+                 "  initial begin\n"
+                 "    s = ComplexPkg::add(a, b);\n"
+                 "    m = ComplexPkg::mul(a, b);\n"
+                 "    $display(\"%0.1f %0.1f %0.1f %0.1f\", s.i, s.r, m.i, "
+                 "m.r);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "4.0 6.0 10.0 5.0\n");
+}
+
+TEST(PackageDeclarationSim, ACheckersClockedProcessesRunInItsInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureThroughFinals(
+                ElaborateSrc,
+                "package p;\n"
+                "  checker ck(logic clk, logic v);\n"
+                "    int n = 0;\n"
+                "    initial @(posedge clk) assert (v) $display(\"init ok\");\n"
+                "      else $display(\"init bad\");\n"
+                "    always_ff @(posedge clk) n <= n + 1;\n"
+                "    final $display(\"final n=%0d\", n);\n"
+                "  endchecker\n"
+                "endpackage\n"
+                "module top;\n"
+                "  logic clk = 0, v = 1;\n"
+                "  initial repeat (6) #5 clk = ~clk;\n"
+                "  p::ck c(clk, v);\n"
+                "endmodule\n",
+                f),
+            "init ok\nfinal n=3\n");
+}
+
+TEST(PackageDeclarationSim, ACheckersCombinationalProcessesRunInItsInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureThroughFinals(ElaborateSrc,
+                                    "package p;\n"
+                                    "  checker ck(logic a);\n"
+                                    "    logic b, l;\n"
+                                    "    always_comb b = !a;\n"
+                                    "    always_latch if (a) l = !a;\n"
+                                    "    final $display(\"b=%b l=%b\", b, l);\n"
+                                    "  endchecker\n"
+                                    "endpackage\n"
+                                    "module top;\n"
+                                    "  logic a = 1;\n"
+                                    "  p::ck c(a);\n"
+                                    "endmodule\n",
+                                    f),
+            "b=0 l=0\n");
+}
+
+std::string RunPackageNet(const std::string& package_items,
+                          const std::string& modules) {
+  SimFixture f;
+  return RunCapture("package p;\n" + package_items + "endpackage\n" + modules,
+                    f);
+}
+
+constexpr const char* kByteNet = "  wire [7:0] w;\n";
+
+TEST(PackageDeclarationSim, DISABLED_AWildcardImportedNetIsDriven) {
+  EXPECT_EQ(RunPackageNet(kByteNet,
+                          "module top;\n"
+                          "  import p::*;\n"
+                          "  assign w = 8'hA5;\n"
+                          "  initial #1 $display(\"%h %0d\", w, $bits(w));\n"
+                          "endmodule\n"),
+            "a5 8\n");
+}
+
+TEST(PackageDeclarationSim, DISABLED_AScopedNetIsDriven) {
+  EXPECT_EQ(RunPackageNet(kByteNet,
+                          "module top;\n"
+                          "  assign p::w = 8'hA5;\n"
+                          "  initial #1 $display(\"%h\", p::w);\n"
+                          "endmodule\n"),
+            "a5\n");
+}
+
+TEST(PackageDeclarationSim, DISABLED_AnExplicitlyImportedNetIsDriven) {
+  EXPECT_EQ(RunPackageNet(kByteNet,
+                          "module top;\n"
+                          "  import p::w;\n"
+                          "  assign w = 8'hA5;\n"
+                          "  initial #1 $display(\"%h\", w);\n"
+                          "endmodule\n"),
+            "a5\n");
+}
+
+TEST(PackageDeclarationSim, AWandNetResolvesTheDriversOfTwoInstances) {
+  EXPECT_EQ(RunPackageNet("  wand w;\n",
+                          "module d #(parameter bit V = 0);\n"
+                          "  assign p::w = V;\n"
+                          "endmodule\n"
+                          "module top;\n"
+                          "  d #(1) d1();\n"
+                          "  d #(0) d0();\n"
+                          "  initial #1 $display(\"%b\", p::w);\n"
+                          "endmodule\n"),
+            "0\n");
+}
+
+TEST(PackageDeclarationSim, DISABLED_AnUndrivenTri1NetPullsUp) {
+  EXPECT_EQ(RunPackageNet("  tri1 w;\n",
+                          "module top;\n"
+                          "  initial #1 $display(\"%b\", p::w);\n"
+                          "endmodule\n"),
+            "1\n");
+}
+
+TEST(PackageDeclarationSim, DISABLED_ALocalNetHidesTheWildcardImportedOne) {
+  EXPECT_EQ(RunPackageNet("  wire w;\n",
+                          "module top;\n"
+                          "  import p::*;\n"
+                          "  wire w;\n"
+                          "  assign w = 1;\n"
+                          "  initial #1 $display(\"%b %b\", w, p::w);\n"
+                          "endmodule\n"),
+            "1 z\n");
+}
+
+TEST(PackageDeclarationSim, DISABLED_ANettypeNetResolvesByItsFunction) {
+  EXPECT_EQ(
+      RunPackageNet("  function automatic logic [3:0] rs(input logic [3:0] "
+                    "d[]);\n"
+                    "    rs = 0;\n"
+                    "    foreach (d[i]) rs |= d[i];\n"
+                    "  endfunction\n"
+                    "  nettype logic [3:0] n4 with rs;\n"
+                    "  n4 w;\n",
+                    "module d #(parameter logic [3:0] V = 0);\n"
+                    "  assign p::w = V;\n"
+                    "endmodule\n"
+                    "module top;\n"
+                    "  d #(4'b0011) a();\n"
+                    "  d #(4'b1000) b();\n"
+                    "  initial #1 $display(\"%b\", p::w);\n"
+                    "endmodule\n"),
+      "1011\n");
+}
+
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -348,6 +350,85 @@ TEST(PackageDeclaration, ClockingBlockOfThePackageItselfStaysReported) {
       "endpackage\n");
   EXPECT_TRUE(ReportedError(
       r.diags, "a package body cannot hold a clocking block", 3, "14.7"));
+}
+
+TEST(PackageDeclaration, AnEndLabelNamingAnotherPackageIsRefused) {
+  auto r = Parse(
+      "package p;\n"
+      "endpackage : q\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "end label 'q' does not match 'p'", 2, "9.3.4"));
+}
+
+TEST(PackageDeclaration, AHeaderWithoutItsSemicolonIsRefused) {
+  auto r = Parse("package p endpackage\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endpackage'", 1, "26.2"));
+}
+
+TEST(PackageDeclaration, PackageNotAllowedInsidePackage) {
+  auto r = Parse(
+      "package outer;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endpackage\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
+}
+
+TEST(PackageDeclaration, PackageNotAllowedInsideClass) {
+  auto r = Parse(
+      "class C;\n"
+      "  package inner;\n"
+      "  endpackage\n"
+      "endclass\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got 'package'", 2, "8.5"));
+}
+
+TEST(PackageDeclaration, PackageNotAllowedInsideGenerateBlock) {
+  auto r = Parse(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "    package inner;\n"
+      "    endpackage\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "unexpected token in module body", 3, "23.2.4"));
+}
+
+TEST(PackageDeclaration, PackageNotAllowedInsideFunctionOrTask) {
+  for (const char* sub : {"function void f();", "task t();"}) {
+    SCOPED_TRACE(sub);
+    const bool kIsTask = std::string(sub) == "task t();";
+    auto r = Parse(std::string("module m;\n  ") + sub +
+                   "\n    package inner;\n    endpackage\n  " +
+                   (kIsTask ? "endtask" : "endfunction") + "\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  }
+}
+
+TEST(PackageDeclaration, AnotherElementsEndKeywordDoesNotClosePackage) {
+  for (const char* end :
+       {"endmodule", "endinterface", "endprogram", "endchecker"}) {
+    SCOPED_TRACE(end);
+    auto r = Parse(std::string("package p;\n  int x;\n") + end + "\n");
+    EXPECT_TRUE(
+        ReportedError(r.diags, "unexpected token in module body", 3, "23.2.4"));
+  }
+}
+
+TEST(PackageDeclaration, AnEndpackageWithNoPackageOpenIsRefused) {
+  auto alone = Parse("endpackage\n");
+  EXPECT_TRUE(ReportedError(alone.diags, "expected top-level declaration", 1,
+                            "3.12.1"));
+  auto in_module = Parse(
+      "module m;\n"
+      "  endpackage\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(in_module.diags, "unexpected token in module body",
+                            2, "23.2.4"));
 }
 
 }  // namespace
