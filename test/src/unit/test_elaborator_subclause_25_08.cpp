@@ -158,4 +158,23 @@ TEST(ParameterizedInterface, UnknownParameterOverrideNameRejected) {
                             "23.10.2.2"));
 }
 
+TEST(ParameterizedInterface, MorePositionalOverridesThanParametersRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc #(W = 8);\n"
+      "  logic [W-1:0] data;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  ifc #(3, 4) bad();\n"
+      "  ifc #(3) ok();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too many positional parameter overrides", 5,
+                            "23.10.2.1"));
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                             "too many positional parameter overrides", 6,
+                             "23.10.2.1"));
+}
+
 }  // namespace
