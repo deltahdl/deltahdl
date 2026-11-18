@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -125,16 +128,37 @@ TEST(UpwardNameReferenceElaboration,
              "endmodule\n"));
 }
 
-TEST(UpwardNameReferenceElaboration, ScopeNameFoundInInstantiationParentScope) {
+TEST(UpwardNameReferenceElaboration,
+     DISABLED_ScopeNameFoundInInstantiationParentScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module leaf;\n"
+      "  integer r;\n"
+      "  initial r = sib.v;\n"
+      "endmodule\n"
+      "module parent;\n"
+      "  integer v;\n"
+      "  leaf sib();\n"
+      "  leaf ref_src();\n"
+      "endmodule\n",
+      f, "parent");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "hierarchical reference 'sib.v' is unresolved", 3,
+                            "23.8"));
+}
+
+TEST(UpwardNameReferenceElaboration, AScopeNameInTheParentReachesItsItem) {
   EXPECT_TRUE(
       ElabOk("module leaf;\n"
+             "  integer v;\n"
+             "endmodule\n"
+             "module probe;\n"
              "  integer r;\n"
              "  initial r = sib.v;\n"
              "endmodule\n"
              "module parent;\n"
-             "  integer v;\n"
              "  leaf sib();\n"
-             "  leaf ref_src();\n"
+             "  probe ref_src();\n"
              "endmodule\n"));
 }
 
@@ -332,6 +356,37 @@ TEST(UnresolvedFirstNameScopes, InACompilationUnitSubroutine) {
       "hierarchical name 'nosuch' in a compilation-unit task or function is "
       "read from $root, where no top-level instance 'nosuch' stands",
       2, "3.12.1"));
+}
+
+TEST(RootedNameResolution, DISABLED_NamesThatMatchNothingAreReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  int y = 1, r;\n"
+      "  initial begin\n"
+      "    r = $root.nosuch;\n"
+      "    r = $root.nosuch.v;\n"
+      "    r = $root.t.nosuch;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "t");
+  const std::vector<Diagnostic>& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "hierarchical reference '$root.nosuch' is unresolved", 4, "23.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "hierarchical reference '$root.nosuch.v' is unresolved", 5,
+      "23.6"));
+  EXPECT_TRUE(ReportedError(
+      diags, "hierarchical reference '$root.t.nosuch' is unresolved", 6,
+      "23.6"));
+}
+
+TEST(RootedNameResolution, ANameToADeclaredVariableIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int y = 1, r;\n"
+             "  initial r = $root.t.y;\n"
+             "endmodule\n"));
 }
 
 }  // namespace

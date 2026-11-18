@@ -592,4 +592,119 @@ TEST(OwnNameInAModuleAssertion,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(FirstComponentSearchRun, AFunctionNameReadsItsStaticLocal) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module t;\n  function int f();\n    static int cnt = 0;\n    "
+                "cnt = cnt + 1;\n    return cnt;\n  endfunction\n  initial "
+                "begin\n    void'(f());\n    void'(f());\n    void'(f());\n    "
+                "$display(\"%0d\", f.cnt);\n  end\nendmodule\n",
+                f),
+            "3\n");
+}
+
+TEST(FirstComponentSearchRun,
+     DISABLED_AFunctionNameReadsTheCallsAutomaticLocal) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module t;\n  function automatic int f();\n    int "
+                        "k;\n    k = 3;\n    return f.k;\n  endfunction\n  "
+                        "initial $display(\"%0d\", f());\nendmodule\n",
+                        f),
+      "3\n");
+}
+
+TEST(FirstComponentSearchRun, ATaskNameWritesAndReadsItsOwnVariable) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module t;\n  task tk;\n    static int s;\n    tk.s = 3;\n    "
+                "$display(\"%0d\", s);\n    s = 4;\n    $display(\"%0d\", "
+                "tk.s);\n  endtask\n  initial tk;\nendmodule\n",
+                f),
+            "3\n4\n");
+}
+
+TEST(FirstComponentSearchRun, AnInstanceOfTheDesignElementIsTheScopeName) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module leaf;\n  int w = 6;\nendmodule\nmodule t;\n  leaf "
+                "u();\n  initial #1 $display(\"%0d\", u.w);\nendmodule\n",
+                f),
+            "6\n");
+}
+
+TEST(FirstComponentSearchRun, ANamedBlockIsReadFromAFunctionAndATask) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          "module t;\n  initial begin : blk\n    static int v = 8;\n  end\n  "
+          "function int rd();\n    return blk.v;\n  endfunction\n  task tr;\n  "
+          "  $display(\"%0d\", blk.v);\n  endtask\n  initial begin\n    #1 "
+          "$display(\"%0d\", rd());\n    tr;\n  end\nendmodule\n",
+          f),
+      "8\n8\n");
+}
+
+TEST(FirstComponentSearchRun, AnInterfaceInstanceAtTheCurrentLevel) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "interface ifc;\n  int v = 5;\nendinterface\nmodule t;\n  ifc "
+                "ii();\n  initial #1 $display(\"%0d\", ii.v);\nendmodule\n",
+                f),
+            "5\n");
+}
+
+TEST(FirstComponentSearchRun, ACurrentLevelScopeWinsOverAHigherOne) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          "module leaf;\n  int v = 2;\nendmodule\nmodule c;\n  leaf u();\n  "
+          "initial #1 $display(\"%0d\", u.v);\nendmodule\nmodule t;\n  if (1) "
+          "begin : u\n    int v = 7;\n  end\n  c c1();\nendmodule\n",
+          f),
+      "2\n");
+}
+
+TEST(FirstComponentSearchRun, AParentsNamedBlockIsReachedFromAChild) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module c;\n  initial #1 $display(\"%0d\", "
+                "blk.v);\nendmodule\nmodule t;\n  initial begin : blk\n    "
+                "static int v = 3;\n  end\n  c c1();\nendmodule\n",
+                f),
+            "3\n");
+}
+
+TEST(FirstComponentSearchRun, AParentsGenerateBlockIsReachedFromAChild) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module c;\n  initial #1 $display(\"%0d\", "
+                        "g.v);\nendmodule\nmodule t;\n  if (1) begin : g\n    "
+                        "int v = 4;\n  end\n  c c1();\nendmodule\n",
+                        f),
+      "4\n");
+}
+
+TEST(FirstComponentSearchRun, AParentsInterfaceInstanceIsReachedFromAChild) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "interface ifc;\n  int v = 5;\nendinterface\nmodule c;\n  "
+                "initial #1 $display(\"%0d\", ii.v);\nendmodule\nmodule t;\n  "
+                "ifc ii();\n  c c1();\nendmodule\n",
+                f),
+            "5\n");
+}
+
+TEST(FirstComponentSearchRun, TheSearchGoesOnWhenTheParentLacksTheItem) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module leaf;\nendmodule\nmodule leaf2;\n  int v = "
+                        "9;\nendmodule\nmodule c;\n  initial #1 "
+                        "$display(\"%0d\", sib.v);\nendmodule\nmodule mid;\n  "
+                        "leaf sib();\n  c c1();\nendmodule\nmodule t;\n  leaf2 "
+                        "sib();\n  mid m();\nendmodule\n",
+                        f),
+      "9\n");
+}
+
 }  // namespace

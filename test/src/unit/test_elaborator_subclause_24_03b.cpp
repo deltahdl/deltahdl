@@ -127,4 +127,22 @@ TEST(AnonymousProgramHierRef, TaskCallIntoAnotherProgramIsError) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 4, "24.3"));
 }
 
+TEST(ProgramSignalReference, DISABLED_AnUpwardNameFromAChildModuleIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program prg;\n"
+      "  int v = 6;\n"
+      "endprogram\n"
+      "module c;\n"
+      "  initial $display(\"%0d\", pp.v);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  prg pp();\n"
+      "  c c1();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 5, "24.3"));
+}
+
 }  // namespace
