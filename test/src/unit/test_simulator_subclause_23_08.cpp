@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_reported_error.h"
 #include "simulator/lowerer.h"
 #include "simulator/variable.h"
 
@@ -285,6 +286,310 @@ TEST(UpwardNameReferenceSimulation, DottedNameHeadedByAnEnclosingNamedBlock) {
                        "endmodule\n",
                        f),
             "4\n5\n7 7 7\n");
+}
+
+std::string ParentNamedObject(const std::string& decls,
+                              const std::string& stmts,
+                              const std::string& read) {
+  return "module c;\n" + decls + "  initial begin\n" + stmts +
+         "    #1 $display(\"%0d\", " + read +
+         ");\n  end\nendmodule\n"
+         "module m;\n  int x = 9;\n  c c1();\nendmodule\n";
+}
+
+TEST(UpwardSearchStopsAtAnObject, AStructureLackingTheMemberIsReported) {
+  SimFixture f;
+  RunCaptureAllTops(ParentNamedObject("  struct {int y;} m;\n", "", "m.x"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the structure of 'm' has no member named 'x'", 4,
+                            "23.7"));
+}
+
+TEST(UpwardSearchStopsAtAnObject,
+     DISABLED_AnInitializedStructureMemberIsReadNotTheModules) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          ParentNamedObject("  struct {int x;} m = '{5};\n", "", "m.x"), f),
+      "5\n");
+}
+
+TEST(UpwardSearchStopsAtAnObject,
+     AnAssignedStructureMemberIsReadNotTheModules) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(ParentNamedObject("  struct {int x;} m;\n",
+                                                "    m.x = 6;\n", "m.x"),
+                              f),
+            "6\n");
+}
+
+TEST(UpwardSearchStopsAtAnObject, AUnionLackingTheMemberIsReported) {
+  SimFixture f;
+  RunCaptureAllTops(ParentNamedObject("  union {int y;} m;\n", "", "m.x"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "the union of 'm' has no member named 'x'", 4,
+                            "23.7"));
+}
+
+TEST(UpwardSearchStopsAtAnObject, AUnionMemberIsReadNotTheModules) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(ParentNamedObject("  union {int x;} m;\n",
+                                                "    m.x = 6;\n", "m.x"),
+                              f),
+            "6\n");
+}
+
+TEST(UpwardSearchStopsAtAnObject, AClassLackingThePropertyIsReported) {
+  SimFixture f;
+  RunCaptureAllTops(
+      ParentNamedObject("  class K;\n    int y;\n  endclass\n  K m;\n",
+                        "    m = new;\n", "m.x"),
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'K' has no member named 'x'", 8, "8.5"));
+}
+
+TEST(UpwardSearchStopsAtAnObject, DISABLED_AClassPropertyIsReadNotTheModules) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                ParentNamedObject("  class K;\n    int x = 7;\n  endclass\n"
+                                  "  K m;\n",
+                                  "    m = new;\n", "m.x"),
+                f),
+            "7\n");
+}
+
+TEST(UpwardSearchStopsAtAnObject,
+     DISABLED_ACovergroupLackingTheMemberIsReported) {
+  SimFixture f;
+  RunCaptureAllTops(
+      ParentNamedObject("  int v;\n  covergroup cg;\n    cp: coverpoint v;\n"
+                        "  endgroup\n  cg m = new;\n",
+                        "", "m.x"),
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "covergroup 'cg' has no member named 'x'", 8,
+                            "23.7"));
+}
+
+TEST(UpwardSearchStopsAtAnObject, ACovergroupMemberIsReadNotTheModules) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                ParentNamedObject("  int v;\n  covergroup cg;\n"
+                                  "    x: coverpoint v {bins one = {1};}\n"
+                                  "  endgroup\n  cg m = new;\n",
+                                  "    v = 1;\n    m.sample();\n",
+                                  "$rtoi(m.x.get_inst_coverage())"),
+                f),
+            "100\n");
+}
+
+TEST(UpwardItemReferenceRun, ATaskThroughTheDefinitionNameRunsInEachInstance) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module c;\n  initial #1 b.t;\nendmodule\n"
+                "module b;\n  int i;\n  task t;\n    i = i + 1;\n  endtask\n"
+                "  c c1();\nendmodule\n"
+                "module top;\n  b x(), y();\n"
+                "  initial #2 $display(\"%0d %0d\", x.i, y.i);\nendmodule\n",
+                f),
+            "1 1\n");
+}
+
+TEST(UpwardItemReferenceRun, ANamedBlockVariableOfTheEnclosingModuleIsRead) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                "module c;\n  initial #1 $display(\"%0d\", b.blk.v);\n"
+                "endmodule\n"
+                "module b;\n  initial begin : blk\n    static int v = 5;\n"
+                "  end\n  c c1();\nendmodule\n",
+                f),
+            "5\n");
+}
+
+TEST(UpwardItemReferenceRun, EachCopyOfTheEnclosingModuleTakesItsOwnWrite) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          "module a;\n  integer i;\n  b a_b1();\nendmodule\n"
+          "module b;\n  integer i;\n  c b_c1(), b_c2();\nendmodule\n"
+          "module c;\n  integer i;\n"
+          "  initial begin\n    i = 1;\n    b.i = 1;\n  end\n"
+          "endmodule\n"
+          "module d;\n  integer i;\n  b d_b1();\nendmodule\n"
+          "module top;\n  a a();\n  d d();\n"
+          "  initial #1 $display(\"%0d %0d %0d %0d\", a.a_b1.i, d.d_b1.i, "
+          "a.i, a.a_b1.b_c2.i);\nendmodule\n",
+          f),
+      "1 1 x 1\n");
+}
+
+TEST(UpwardItemReferenceRun, AContinuousAssignmentReadsAnUpwardNet) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("module c;\n  wire w;\n  assign w = b.m;\n"
+                              "  initial #1 $display(\"%b\", w);\nendmodule\n"
+                              "module b;\n  wire m = 1;\n  c c1();\n"
+                              "endmodule\n",
+                              f),
+            "1\n");
+}
+
+TEST(UpwardItemReferenceRun, AContinuousAssignmentDrivesAnUpwardNet) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops("module c;\n  assign b.m = 1;\nendmodule\n"
+                              "module b;\n  wire m;\n  c c1();\n"
+                              "  initial #1 $display(\"%b\", m);\nendmodule\n",
+                              f),
+            "1\n");
+}
+
+TEST(UpwardItemReferenceRun, ALowerModulesFunctionReadsAnUpwardVariable) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops("module c;\n"
+                        "  function int rd();\n    return b.v;\n  endfunction\n"
+                        "  initial #1 $display(\"%0d\", rd());\nendmodule\n"
+                        "module b;\n  int v = 9;\n  c c1();\nendmodule\n",
+                        f),
+      "9\n");
+}
+
+std::string OwnNameAssertion(const std::string& keyword,
+                             const std::string& name, const std::string& items,
+                             const std::string& rest) {
+  return keyword + " " + name + ";\n  logic clk = 0, a = 1;\n  int n = 0;\n" +
+         items +
+         "  initial begin\n    #1 clk = 1;\n    #1 clk = 0;\n"
+         "    #1 clk = 1;\n    #1 $display(\"%0d\", n);\n  end\nend" +
+         keyword + "\n" + rest;
+}
+
+std::string FirstLine(const std::string& out) {
+  return out.substr(0, out.find('\n') + 1);
+}
+
+TEST(OwnNameInAModuleAssertion, ARootedNameIsAccepted) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                OwnNameAssertion(
+                    "module", "m",
+                    "  assert property (@(posedge clk) $root.m.a) n++;\n", ""),
+                f),
+            "2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, AProceduralAssertionAcceptsTheOwnName) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                OwnNameAssertion(
+                    "module", "m",
+                    "  always @(posedge clk) assert property (m.a) n++;\n", ""),
+                f),
+            "2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_TheOwnNameOfATopLevelModule) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          OwnNameAssertion("module", "m",
+                           "  assert property (@(posedge clk) m.a) n++;\n", ""),
+          f),
+      "2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_TheOwnNameOfAnInstantiatedModule) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          OwnNameAssertion("module", "sub",
+                           "  assert property (@(posedge clk) sub.a) n++;\n",
+                           "module top;\n  sub s0();\nendmodule\n"),
+          f),
+      "2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_TheEnclosingInstanceName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          OwnNameAssertion("module", "sub",
+                           "  assert property (@(posedge clk) s0.a) n++;\n",
+                           "module top;\n  sub s0();\nendmodule\n"),
+          f),
+      "2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_InASequenceAndAPropertyDeclaration) {
+  SimFixture f;
+  EXPECT_EQ(FirstLine(RunCaptureAllTops(
+                OwnNameAssertion("module", "m",
+                                 "  sequence s;\n    @(posedge clk) m.a;\n"
+                                 "  endsequence\n"
+                                 "  property p;\n    @(posedge clk) m.a;\n"
+                                 "  endproperty\n"
+                                 "  cover property (s) n++;\n"
+                                 "  cover property (p) n++;\n",
+                                 ""),
+                f)),
+            "4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_InAnInterface) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          OwnNameAssertion("interface", "ii",
+                           "  assert property (@(posedge clk) ii.a) n++;\n"
+                           "  assert property (@(posedge clk) u.a) n++;\n",
+                           "module top;\n  ii u();\nendmodule\n"),
+          f),
+      "4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_InAProgram) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureAllTops(
+          OwnNameAssertion("program", "pp",
+                           "  assert property (@(posedge clk) pp.a) n++;\n"
+                           "  assert property (@(posedge clk) u.a) n++;\n",
+                           "module top;\n  pp u();\nendmodule\n"),
+          f),
+      "4\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion, DISABLED_InAChecker) {
+  SimFixture f;
+  RunCaptureAllTops(
+      "checker ck(logic clk);\n  logic a = 1;\n"
+      "  assert property (@(posedge clk) ck.a);\n"
+      "  assert property (@(posedge clk) u.a);\nendchecker\n"
+      "module top;\n  logic clk = 0;\n  ck u(clk);\nendmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OwnNameInAModuleAssertion,
+     DISABLED_InDisableIffAClockingEventAndASequenceArgument) {
+  SimFixture f;
+  EXPECT_EQ(RunCaptureAllTops(
+                OwnNameAssertion("module", "m",
+                                 "  sequence s(x);\n    x;\n  endsequence\n"
+                                 "  assert property (@(posedge m.clk) "
+                                 "disable iff (!m.a) s(m.a)) n++;\n",
+                                 ""),
+                f),
+            "2\n");
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 }  // namespace

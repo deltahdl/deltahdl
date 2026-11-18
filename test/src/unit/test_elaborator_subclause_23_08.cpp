@@ -255,4 +255,83 @@ TEST(UpwardNameReferenceElaboration,
   EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 12));
 }
 
+TEST(UnresolvedFirstNameScopes, InATaskOfAModule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n  int r;\n  task tk;\n    r = nosuch.v;\n  "
+      "endtask\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'nosuch' resolves to no declaration", 4, "23.8"));
+}
+
+TEST(UnresolvedFirstNameScopes, DISABLED_InAMethodOfAClassInAModule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n  class C;\n    function int f();\n      return nosuch.v;\n  "
+      "  endfunction\n  endclass\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'nosuch' resolves to no declaration", 4, "23.8"));
+}
+
+TEST(UnresolvedFirstNameScopes, InAProgram) {
+  ElabFixture f;
+  ElaborateSrc("program t;\n  int r;\n  initial r = nosuch.v;\nendprogram\n", f,
+               "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'nosuch' resolves to no declaration", 3, "23.8"));
+}
+
+TEST(UnresolvedFirstNameScopes, InAnInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n  int r;\n  initial r = nosuch.v;\nendinterface\nmodule "
+      "t;\n  i u();\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'nosuch' resolves to no declaration", 3, "23.8"));
+}
+
+TEST(UnresolvedFirstNameScopes, DISABLED_InsideANamedGenerateBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n  if (1) begin : g\n    int r;\n    initial r = nosuch.v;\n  "
+      "end\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'nosuch' resolves to no declaration", 4, "23.8"));
+}
+
+TEST(UnresolvedFirstNameScopes, InAPackageSubroutine) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n  function int f();\n    return nosuch.v;\n  "
+      "endfunction\nendpackage\nmodule t;\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "package item contains a hierarchical reference 'nosuch' that does not "
+      "target the package itself or an imported package",
+      3, "26.2"));
+}
+
+TEST(UnresolvedFirstNameScopes, InACompilationUnitSubroutine) {
+  ElabFixture f;
+  ElaborateSrc(
+      "function int f();\n  return nosuch.v;\nendfunction\nmodule "
+      "t;\nendmodule\n",
+      f, "t");
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "hierarchical name 'nosuch' in a compilation-unit task or function is "
+      "read from $root, where no top-level instance 'nosuch' stands",
+      2, "3.12.1"));
+}
+
 }  // namespace
