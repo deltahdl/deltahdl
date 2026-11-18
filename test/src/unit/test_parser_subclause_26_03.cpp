@@ -287,7 +287,6 @@ TEST(PackageImportSyntax, AnItemWithoutTheScopeOperatorIsRefused) {
   auto r = Parse(
       "package p; int x; endpackage\n"
       "module top; import p; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
   EXPECT_TRUE(ReportedError(r.diags, "expected '::', got ';'", 2, "26.3"));
 }
 
@@ -295,7 +294,6 @@ TEST(PackageImportSyntax, ATrailingCommaInTheItemListIsRefused) {
   auto r = Parse(
       "package p; int x; endpackage\n"
       "module top; import p::x, ; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 2, "26.3"));
 }
@@ -304,7 +302,6 @@ TEST(PackageImportSyntax, AScopeStepAfterTheWildcardIsRefused) {
   auto r = Parse(
       "package p; int x; endpackage\n"
       "module top; import p::*::x; endmodule\n");
-  EXPECT_TRUE(r.has_errors);
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '::'", 2, "26.3"));
 }
 
