@@ -163,4 +163,71 @@ TEST(InterfaceNamedBundleSim, TheInterfacesOwnPortIsReachedThroughThePort) {
   EXPECT_EQ(out, "clk=1\nn=3 m=3\n$finish at time 28\n");
 }
 
+TEST(InterfaceNamedBundleSim,
+     AContinuousAssignmentThroughThePortDrivesTheInstancesVariable) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface simple_bus; logic [7:0] addr; logic req; endinterface\n"
+      "module memMod(simple_bus a, input logic clk);\n"
+      "  assign a.addr = a.req ? 8'h5A : 8'h21;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf();\n"
+      "  memMod mem(sb_intf, clk);\n"
+      "  initial begin\n"
+      "    sb_intf.req = 0;\n"
+      "    #1 $display(\"%h\", sb_intf.addr);\n"
+      "    sb_intf.req = 1;\n"
+      "    #1 $display(\"%h\", sb_intf.addr);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "21\n5a\n");
+}
+
+TEST(InterfaceNamedBundleSim,
+     ANetDrivenThroughThePortAndByTheParentResolvesBothDrivers) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface simple_bus; wire w; wire [3:0] v; endinterface\n"
+      "module memMod(simple_bus a, input logic clk);\n"
+      "  assign a.w = 1'b1;\n"
+      "  assign a.v = 4'b1100;\n"
+      "  initial #1 $display(\"mod %b %b\", a.w, a.v);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf();\n"
+      "  memMod mem(sb_intf, clk);\n"
+      "  assign sb_intf.w = 1'b0;\n"
+      "  assign sb_intf.v = 4'b1010;\n"
+      "  initial #2 $display(\"top %b %b\", sb_intf.w, sb_intf.v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "mod x 1xx0\ntop x 1xx0\n");
+}
+
+TEST(InterfaceNamedBundleSim,
+     AHighImpedanceDriverThroughThePortYieldsToTheParents) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "interface simple_bus; wire [3:0] v; endinterface\n"
+      "module memMod(simple_bus a, input logic clk);\n"
+      "  assign a.v = 4'bzz11;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic clk = 0;\n"
+      "  simple_bus sb_intf();\n"
+      "  memMod mem(sb_intf, clk);\n"
+      "  assign sb_intf.v = 4'b10zz;\n"
+      "  initial #1 $display(\"%b\", sb_intf.v);\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "1011\n");
+}
+
 }  // namespace
