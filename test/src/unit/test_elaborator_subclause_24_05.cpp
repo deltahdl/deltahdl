@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -447,6 +449,119 @@ TEST(ProgramSubroutineCall, ModuleCallingTopLevelProgramFunctionIsOneError) {
                             "module is not permitted",
                             6, "24.5"));
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+void ExpectProgramCallReported(const std::string& src, int line) {
+  ElabFixture f;
+  ElaborateSrc(src, f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "calling a program subroutine from within a design "
+                            "module is not permitted",
+                            line, "24.5"));
+}
+
+TEST(ProgramSubroutineCall,
+     DISABLED_AProgramSubroutineCallInAGenerateBlockIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  task t; endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  p pi();\n"
+      "  for (genvar i = 0; i < 1; i++) begin : g\n"
+      "    initial pi.t();\n"
+      "  end\n"
+      "endmodule\n",
+      7);
+}
+
+TEST(ProgramSubroutineCall,
+     DISABLED_AProgramSubroutineCallInAnIfGenerateIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  task t; endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  p pi();\n"
+      "  if (1) begin : g\n"
+      "    initial pi.t();\n"
+      "  end\n"
+      "endmodule\n",
+      7);
+}
+
+TEST(ProgramSubroutineCall,
+     DISABLED_AProgramSubroutineCallInACaseGenerateIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  task t; endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  p pi();\n"
+      "  case (1)\n"
+      "    1: begin : g\n"
+      "      initial pi.t();\n"
+      "    end\n"
+      "  endcase\n"
+      "endmodule\n",
+      8);
+}
+
+TEST(ProgramSubroutineCall, AProgramSubroutineCallInAnAlwaysCombIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  function int f(int x); return x; endfunction\n"
+      "endprogram\n"
+      "module top;\n"
+      "  int a, b;\n"
+      "  p pi();\n"
+      "  always_comb b = pi.f(a);\n"
+      "endmodule\n",
+      7);
+}
+
+TEST(ProgramSubroutineCall, AProgramSubroutineCallInAFinalProcedureIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  task t; endtask\n"
+      "endprogram\n"
+      "module top;\n"
+      "  p pi();\n"
+      "  final pi.t();\n"
+      "endmodule\n",
+      6);
+}
+
+TEST(ProgramSubroutineCall,
+     AProgramSubroutineCallThroughAFullHierarchicalPathIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  task t; endtask\n"
+      "endprogram\n"
+      "module other;\n"
+      "  initial top.pi.t();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  p pi();\n"
+      "  other o();\n"
+      "endmodule\n",
+      5);
+}
+
+TEST(ProgramSubroutineCall,
+     AProgramSubroutineCallIntoASubmodulesProgramInstanceIsReported) {
+  ExpectProgramCallReported(
+      "program p;\n"
+      "  task t; endtask\n"
+      "endprogram\n"
+      "module sub;\n"
+      "  p pi();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  sub s();\n"
+      "  initial s.pi.t();\n"
+      "endmodule\n",
+      9);
 }
 
 }  // namespace

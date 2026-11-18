@@ -164,4 +164,84 @@ TEST(BlockingTasksCycleEventMode,
             "helper d=4 at 4\nuser v=12 at 4\n");
 }
 
+TEST(BlockingTasksCycleEventMode,
+     ANestedProgramRunsItsSiblingsTaskAndReadsItsFunction) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int x;\n"
+                       "  program p1;\n"
+                       "    task p1task(input int v);\n"
+                       "      x = v;\n"
+                       "      $display(\"p1task x=%0d at %0t\", x, $time);\n"
+                       "    endtask\n"
+                       "    function int g(int v); return v + 1; endfunction\n"
+                       "  endprogram\n"
+                       "  program p2;\n"
+                       "    initial begin\n"
+                       "      #2 p1.p1task(9);\n"
+                       "      $display(\"p2 g=%0d\", p1.g(3));\n"
+                       "    end\n"
+                       "  endprogram\n"
+                       "endmodule\n",
+                       f),
+            "p1task x=9 at 2\np2 g=4\n");
+}
+
+TEST(BlockingTasksCycleEventMode,
+     AProgramReadsAFunctionOfAnotherProgramByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  helper h();\n"
+                 "  user u();\n"
+                 "endmodule\n"
+                 "program helper;\n"
+                 "  function int twice(int x); return 2 * x; endfunction\n"
+                 "endprogram\n"
+                 "program user;\n"
+                 "  initial #1 $display(\"user f=%0d at %0t\", "
+                 "top.h.twice(21), $time);\n"
+                 "endprogram\n",
+                 f),
+      "user f=42 at 1\n");
+}
+
+TEST(BlockingTasksCycleEventMode,
+     AProgramRunsTheEnclosingModulesTaskBySimpleNameInItsThread) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  int a = 1, b = 2;\n"
+                       "  task T;\n"
+                       "    a = b;\n"
+                       "    #3 $display(\"T a=%0d at %0t\", a, $time);\n"
+                       "  endtask\n"
+                       "  initial #10 b = 5;\n"
+                       "  program p;\n"
+                       "    initial begin\n"
+                       "      #10 T;\n"
+                       "      $display(\"prog done at %0t\", $time);\n"
+                       "    end\n"
+                       "  endprogram\n"
+                       "endmodule\n",
+                       f),
+            "T a=5 at 13\nprog done at 13\n");
+}
+
+TEST(BlockingTasksCycleEventMode,
+     AProgramReadsTheTopModulesFunctionByHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "  int k = 5;\n"
+                 "  function int scale(int x); return x * k; endfunction\n"
+                 "  p pi();\n"
+                 "endmodule\n"
+                 "program p;\n"
+                 "  initial #1 $display(\"prog f=%0d at %0t\", "
+                 "top.scale(7), $time);\n"
+                 "endprogram\n",
+                 f),
+      "prog f=35 at 1\n");
+}
+
 }  // namespace
