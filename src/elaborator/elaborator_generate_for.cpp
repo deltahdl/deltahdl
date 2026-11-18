@@ -276,7 +276,7 @@ void Elaborator::ElaborateGenerateFor(ModuleItem* item, RtlirModule* mod,
     gen_loop_consts_[const_depth].second = loop_scope[genvar_name];
     EnterLoopBlockInstance(mod, gen_block_path_, genvar_name,
                            loop_scope[genvar_name]);
-    ElaborateGenerateItems(item->gen_body, mod, loop_scope);
+    ElaborateGenerateBlockBody(item->gen_body, mod, loop_scope);
 
     if (!AdvanceGenerateForGenvar(diag_, item, genvar_name, loop_scope)) {
       close_loop();

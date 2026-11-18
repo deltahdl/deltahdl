@@ -123,6 +123,14 @@ static void StampGenBlockScope(std::vector<Scoped>& items, size_t first,
   }
 }
 
+template <typename T>
+void StampGenBlockPrefixes(std::vector<T>& items, size_t first,
+                           const GenBlockPrefixes& prefixes) {
+  for (size_t i = first; i < items.size(); ++i) {
+    items[i].gen_block_prefixes = prefixes;
+  }
+}
+
 void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
                                             RtlirModule* mod) {
   size_t first_proc = mod->processes.size();
@@ -132,6 +140,7 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
   size_t first_assertion = mod->assertions.size();
   size_t first_assertion_item = mod->assertion_item_decls.size();
   size_t first_alias = mod->aliases.size();
+  size_t first_var = mod->variables.size();
   ElaborateItem(item, mod);
   ValidateGeneratedItem(item, *mod);
   bool is_subroutine = item->kind == ModuleItemKind::kFunctionDecl ||
@@ -159,9 +168,8 @@ void Elaborator::ElaborateGenerateBlockItem(ModuleItem* item,
                         gen_prefix_scopes_);
   StampGenBlockInstance(mod->children, first_child, gen_loop_consts_,
                         gen_prefix_scopes_);
-  for (size_t i = first_alias; i < mod->aliases.size(); ++i) {
-    mod->aliases[i].gen_block_prefixes = gen_prefix_scopes_;
-  }
+  StampGenBlockPrefixes(mod->aliases, first_alias, gen_prefix_scopes_);
+  StampGenBlockPrefixes(mod->variables, first_var, gen_prefix_scopes_);
 }
 
 struct EnclosingTypedefs {
@@ -232,7 +240,9 @@ class ShadowedEntries {
   }
   ShadowedEntries(const ShadowedEntries&) = delete;
   ShadowedEntries& operator=(const ShadowedEntries&) = delete;
-  ~ShadowedEntries() {
+  ~ShadowedEntries() = default;
+
+  void Restore() {
     for (std::string_view name : names_) table_.erase(name);
     table_.merge(taken_);
   }
@@ -242,6 +252,11 @@ class ShadowedEntries {
   const std::vector<std::string_view>& names_;
   Table taken_;
 };
+
+template <typename... Shadows>
+void RestoreShadowedEntries(Shadows&... shadows) {
+  (shadows.Restore(), ...);
+}
 
 static std::vector<std::string_view> DeclaredDataNames(
     const std::vector<ModuleItem*>& items) {
@@ -338,6 +353,8 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
   mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;
+  RestoreShadowedEntries(var_types, class_var_types, class_vars, scalar_vars,
+                         real_vars, real_params, select_shapes);
 }
 
 void Elaborator::ResetPendingElaboration() {

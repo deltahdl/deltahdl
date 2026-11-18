@@ -338,6 +338,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
                               RtlirModule* mod, const ScopeMap& scope);
+  void ElaborateGenerateBlockBody(const std::vector<ModuleItem*>& items,
+                                  RtlirModule* mod, const ScopeMap& scope);
 
   void AssignGenerateBlockNames(const ModuleDecl* decl);
 

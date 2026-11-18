@@ -167,6 +167,12 @@ std::vector<RtlirEnumMember> BuildEnumMembers(const DataType& enumeration,
     ctx.enum_member_names.insert(member.name);
     RtlirVariable var;
     var.name = member.name;
+    if (!ctx.gen_prefix.empty()) {
+      std::string full = std::string(ctx.gen_prefix) + std::string(member.name);
+      var.name = {ctx.arena.AllocString(full.c_str(), full.size()),
+                  full.size()};
+    }
+    var.gen_block_prefix = ctx.gen_prefix;
     var.is_enum_constant = true;
     var.width = width;
     var.is_4state = false;
@@ -197,7 +203,7 @@ std::string_view EnumTypeKey(std::string_view decl_name,
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
                      ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
   auto members = BuildEnumMembers(type, width, ctx);
-  for (RtlirEnumMember m : members) {
+  for (RtlirEnumMember& m : members) {
     BindDeclaredConstant(scope, m.name, m.value);
     m.gen_block_prefix = ctx.gen_prefix;
     ctx.mod->enum_constants.push_back(m);

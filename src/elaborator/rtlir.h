@@ -171,6 +171,7 @@ struct RtlirVariable {
 
   SourceLoc loc;
   std::string_view gen_block_prefix;
+  GenBlockPrefixes gen_block_prefixes;
 };
 
 struct RtlirContAssign {

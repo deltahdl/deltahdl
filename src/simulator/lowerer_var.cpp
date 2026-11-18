@@ -20,6 +20,7 @@
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/pattern_type_key.h"
+#include "simulator/process.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -377,6 +378,25 @@ static void RecordVcdDeclaration(std::string_view name,
   if (var.is_enum_constant) ctx.Vcd().MarkVcdEnumConstant(name);
 }
 
+void Lowerer::LowerBlockScopedVarInit(std::string_view name,
+                                      const RtlirVariable& var, Variable* v,
+                                      uint32_t width) {
+  if (var.gen_block_prefixes.empty()) {
+    LowerVarInit(name, var, v, width);
+    return;
+  }
+  Process* enclosing = ctx_.CurrentProcess();
+  Process scope;
+  scope.stand_in = true;
+  scope.inst_prefix = inst_prefix_;
+  InstallGenBlockConsts(var.gen_block_consts, &scope);
+  scope.gen_prefixes.assign(var.gen_block_prefixes.begin(),
+                            var.gen_block_prefixes.end());
+  ctx_.SetCurrentProcess(&scope);
+  LowerVarInit(name, var, v, width);
+  ctx_.SetCurrentProcess(enclosing);
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = StorageWidth(var);
   auto* v = ctx_.CreateVariable(name, width);
@@ -407,7 +427,7 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   GenBlockConstFrame loop_consts(var.gen_block_consts, ctx_, arena_);
   if (var.init_expr) {
     ctx_.SetLoweringGenBlockPrefix(var.gen_block_prefix);
-    LowerVarInit(name, var, v, width);
+    LowerBlockScopedVarInit(name, var, v, width);
     ctx_.SetLoweringGenBlockPrefix({});
   }
   if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);

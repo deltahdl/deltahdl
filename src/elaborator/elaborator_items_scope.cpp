@@ -34,8 +34,10 @@ ScopeMap Elaborator::BuildParamScope(
     scope[*key] = val;
   }
   for (const auto& entry : mod->enum_types) {
-    for (const auto& member : entry.second)
+    for (const auto& member : entry.second) {
+      if (!ParamVisibleFromScopes(member.gen_block_prefix, scopes)) continue;
       BindDeclaredConstant(scope, member.name, member.value);
+    }
   }
   for (const auto& [name, value] : mod->constant_formals)
     BindDeclaredConstant(scope, name, value);

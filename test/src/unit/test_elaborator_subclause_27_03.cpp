@@ -199,4 +199,107 @@ TEST(GenerateConstructSyntax, DISABLED_ANameInsideAnUnselectedBlockIsReported) {
       diags, "hierarchical name 'u3' resolves to no declaration", 5, "23.8"));
 }
 
+TEST(GenerateBlockEnumConstants, ASiblingBlockParameterCannotNameThem) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (1) begin : g1\n"
+      "    typedef enum {A, B} e_t;\n"
+      "  end\n"
+      "  if (1) begin : g2\n"
+      "    localparam int P = B;\n"
+      "  end\n"
+      "  if (0) begin : h1 end\n"
+      "  else begin : h2\n"
+      "    typedef enum {C, D} f_t;\n"
+      "  end\n"
+      "  if (1) begin : h3\n"
+      "    localparam int Q = D;\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin : k1 typedef enum {E, F} k_t; end\n"
+      "    default: ;\n"
+      "  endcase\n"
+      "  if (1) begin : k2\n"
+      "    localparam int R = F;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 2; i++) begin : l\n"
+      "    typedef enum {G = i, H} l_t;\n"
+      "  end\n"
+      "  if (1) begin : k3\n"
+      "    localparam int S = H;\n"
+      "  end\n"
+      "endmodule\n");
+  const auto& diags = r.f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "localparam 'P' initializer is not a constant expression", 6,
+      "6.20.4"));
+  EXPECT_TRUE(ReportedError(
+      diags, "localparam 'Q' initializer is not a constant expression", 13,
+      "6.20.4"));
+  EXPECT_TRUE(ReportedError(
+      diags, "localparam 'R' initializer is not a constant expression", 20,
+      "6.20.4"));
+  EXPECT_TRUE(ReportedError(
+      diags, "localparam 'S' initializer is not a constant expression", 26,
+      "6.20.4"));
+}
+
+TEST(GenerateBlockEnumConstants, ParametersOutsideTheBlockCannotNameThem) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    if (1) begin : n\n"
+      "      typedef enum {A, B} e_t;\n"
+      "    end\n"
+      "    localparam int P = B;\n"
+      "  end\n"
+      "  localparam int Q = A;\n"
+      "endmodule\n");
+  const auto& diags = r.f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "localparam 'P' initializer is not a constant expression", 6,
+      "6.20.4"));
+  EXPECT_TRUE(ReportedError(
+      diags, "localparam 'Q' initializer is not a constant expression", 8,
+      "6.20.4"));
+}
+
+TEST(GenerateBlockEnumConstants, EachBlockAndIterationDeclaresItsOwn) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (1) begin : g1\n"
+      "    typedef enum {A, B} e_t;\n"
+      "    localparam int P = B;\n"
+      "  end\n"
+      "  if (1) begin : g2\n"
+      "    typedef enum {B, A} e_t;\n"
+      "    localparam int P = B;\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 3; i++) begin : l\n"
+      "    typedef enum {X = i, Y} h_t;\n"
+      "    localparam int P = Y;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.f.has_errors);
+  EXPECT_TRUE(r.f.diag.Diagnostics().empty());
+}
+
+TEST(GenerateBlockEnumConstants, AHierarchicalNameIsNotAConstant) {
+  auto r = RunGenerateElaboration(
+      "module top;\n"
+      "  if (1) begin : g1\n"
+      "    typedef enum {A, B} e_t;\n"
+      "  end\n"
+      "  localparam int Q = g1.B;\n"
+      "  localparam int R = 1;\n"
+      "endmodule\n");
+  const auto& diags = r.f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(
+      diags, "parameter 'Q' value contains a hierarchical reference", 5,
+      "6.20.2"));
+  EXPECT_FALSE(ReportedError(
+      diags, "parameter 'R' value contains a hierarchical reference", 6,
+      "6.20.2"));
+}
+
 }  // namespace

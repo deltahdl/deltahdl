@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -28,6 +29,14 @@ bool IsDirectlyNestedBlock(const std::vector<ModuleItem*>& body,
          IsConditionalGenerateConstruct(body[0]->kind);
 }
 
+void Elaborator::ElaborateGenerateBlockBody(
+    const std::vector<ModuleItem*>& items, RtlirModule* mod,
+    const ScopeMap& scope) {
+  auto enclosing_enum_member_names = enum_member_names_;
+  ElaborateGenerateItems(items, mod, scope);
+  enum_member_names_ = std::move(enclosing_enum_member_names);
+}
+
 void Elaborator::ElaborateConditionalGenerateBlock(
     const ConditionalGenerateBlock& block, RtlirModule* mod,
     const ScopeMap& scope) {
@@ -45,7 +54,7 @@ void Elaborator::ElaborateConditionalGenerateBlock(
        block.name,
        {}});
   mod->gen_block_instances.push_back(gen_block_path_);
-  ElaborateGenerateItems(block.body, mod, scope);
+  ElaborateGenerateBlockBody(block.body, mod, scope);
   gen_block_path_.pop_back();
   gen_prefix_scopes_.pop_back();
   gen_prefix_ = saved_prefix;

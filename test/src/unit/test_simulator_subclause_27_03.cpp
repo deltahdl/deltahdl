@@ -273,4 +273,58 @@ TEST(ConditionalGenerateSelectionSim, NestedAlternativesPickOneGateOrNone) {
       "01zz10\n11zz01\n");
 }
 
+TEST(GenerateBlockEnumConstantsSim, EachBlockAndIterationFoldsItsOwnValues) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  if (1) begin : g1\n"
+                       "    typedef enum {A, B} e_t;\n"
+                       "    localparam int P = B;\n"
+                       "  end\n"
+                       "  if (1) begin : g2\n"
+                       "    typedef enum {B, A} e_t;\n"
+                       "    localparam int P = B;\n"
+                       "  end\n"
+                       "  for (genvar i = 0; i < 3; i++) begin : l\n"
+                       "    typedef enum {X = i, Y} h_t;\n"
+                       "    localparam int P = Y;\n"
+                       "  end\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d\", g1.P,"
+                       " g2.P, l[0].P, l[2].P, g1.B, g2.A);\n"
+                       "endmodule\n",
+                       f),
+            "1 0 1 3 1 1\n");
+}
+
+TEST(GenerateBlockEnumConstantsSim, AHierarchicalNameReadsTheBlocksValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module m;\n"
+                       "  if (1) begin : g1\n"
+                       "    localparam int Z = 4;\n"
+                       "    typedef enum {A = 5, B} e_t;\n"
+                       "  end\n"
+                       "  typedef enum {C = 7, D} f_t;\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", g1.Z, g1.A,"
+                       " g1.B, D);\n"
+                       "endmodule\n",
+                       f),
+            "4 5 6 8\n");
+}
+
+TEST(GenerateBlockEnumConstantsSim, ABlockVariableInitializerReadsBlockNames) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module m;\n"
+                 "  if (1) begin : g1\n"
+                 "    int a = 3;\n"
+                 "    int b = a;\n"
+                 "    typedef enum {A = 5, B} e_t;\n"
+                 "    e_t v = B;\n"
+                 "    int w = B;\n"
+                 "    initial $display(\"%0d %0d %0d %0d\", b, v, w, B);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "3 6 6 6\n");
+}
+
 }  // namespace

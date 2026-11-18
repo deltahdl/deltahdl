@@ -90,6 +90,8 @@ class Lowerer {
   void LowerModuleProcesses(const RtlirModule* mod);
   const std::vector<EventExpr>& ClockOf(const RtlirProcess& proc);
   void LowerVar(std::string_view name, const RtlirVariable& var);
+  void LowerBlockScopedVarInit(std::string_view name, const RtlirVariable& var,
+                               Variable* v, uint32_t width);
   void LowerVarInit(std::string_view name, const RtlirVariable& var,
                     Variable* v, uint32_t width);
   Logic4Vec CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
