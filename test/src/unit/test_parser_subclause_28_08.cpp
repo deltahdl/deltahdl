@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <iterator>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -291,6 +295,48 @@ TEST(PassSwitches, AllSixKindsParseToDistinctGateKinds) {
             nullptr);
   EXPECT_NE(FindGateByKind(r.cu->modules[0]->items, GateKind::kRtranif1),
             nullptr);
+}
+
+TEST(PassEnableSwitches, EachKindKeepsOneOrTwoDelays) {
+  const GateKind kKinds[] = {GateKind::kTranif0, GateKind::kTranif1,
+                             GateKind::kRtranif0, GateKind::kRtranif1};
+  const char* const kNames[] = {"tranif0", "tranif1", "rtranif0", "rtranif1"};
+  for (std::size_t i = 0; i < std::size(kKinds); ++i) {
+    std::string one = "module m;\n  ";
+    one += kNames[i];
+    one += " #6 t1(a, b, c);\nendmodule\n";
+    auto r1 = Parse(one);
+    ASSERT_FALSE(r1.has_errors) << kNames[i];
+    auto* g1 = FindGateByKind(r1.cu->modules[0]->items, kKinds[i]);
+    ASSERT_NE(g1, nullptr) << kNames[i];
+    ASSERT_NE(g1->gate_delay, nullptr) << kNames[i];
+    EXPECT_EQ(g1->gate_delay->int_val, 6u) << kNames[i];
+    EXPECT_EQ(g1->gate_delay_fall, nullptr) << kNames[i];
+    std::string two = "module m;\n  ";
+    two += kNames[i];
+    two += " #(3, 8) t1(a, b, c);\nendmodule\n";
+    auto r2 = Parse(two);
+    ASSERT_FALSE(r2.has_errors) << kNames[i];
+    auto* g2 = FindGateByKind(r2.cu->modules[0]->items, kKinds[i]);
+    ASSERT_NE(g2, nullptr) << kNames[i];
+    ASSERT_NE(g2->gate_delay, nullptr) << kNames[i];
+    ASSERT_NE(g2->gate_delay_fall, nullptr) << kNames[i];
+    EXPECT_EQ(g2->gate_delay->int_val, 3u) << kNames[i];
+    EXPECT_EQ(g2->gate_delay_fall->int_val, 8u) << kNames[i];
+    EXPECT_EQ(g2->gate_delay_decay, nullptr) << kNames[i];
+  }
+}
+
+TEST(PassEnableSwitches, EachKindRejectsThreeDelays) {
+  for (const std::string& sw : {"tranif0", "tranif1", "rtranif0", "rtranif1"}) {
+    std::string src = "module m;\n  ";
+    src += sw;
+    src += " #(2, 4, 6) t1(a, b, c);\nendmodule\n";
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(
+        r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"))
+        << sw;
+  }
 }
 
 }  // namespace

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <iterator>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -231,6 +233,266 @@ TEST(BidirSwitchRun, ASignalCrossesASwitchChainToABitSelectTerminal) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "z1 1\n");
+}
+
+std::string CrossedStrengthsShown(const std::string& sw,
+                                  const std::string& sources,
+                                  const std::string& first,
+                                  const std::string& second) {
+  std::string ctl;
+  if (sw == "tranif0") ctl = ", c0";
+  if (sw == "tranif1") ctl = ", c1";
+  std::string src = "module top;\n";
+  src += sources;
+  src += "  logic c0 = 0, c1 = 1;\n  ";
+  src += sw;
+  src += " t1 (";
+  src += first;
+  src += ctl;
+  src += ");\n  ";
+  src += sw;
+  src += " t2 (";
+  src += second;
+  src += ctl;
+  src +=
+      ");\n"
+      "  initial #1 $display(\"%v %v\", far1, far2);\n"
+      "endmodule\n";
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(BidirSwitchRun, ASupplySourceCrossesAsStrongEitherWay) {
+  for (const std::string& sw : {"tran", "tranif0", "tranif1"}) {
+    EXPECT_EQ(CrossedStrengthsShown(sw,
+                                    "  supply0 gnd;\n"
+                                    "  supply1 vdd;\n"
+                                    "  wire far1, far2;\n",
+                                    "gnd, far1", "far2, vdd"),
+              "St0 St1\n")
+        << sw;
+  }
+}
+
+TEST(BidirSwitchRun, AWeakSourceCrossesUnchanged) {
+  for (const std::string& sw : {"tran", "tranif0", "tranif1"}) {
+    EXPECT_EQ(CrossedStrengthsShown(sw,
+                                    "  wire a, q, far1, far2;\n"
+                                    "  assign (weak0, weak1) a = 1'b0;\n"
+                                    "  assign (weak0, weak1) q = 1'b1;\n",
+                                    "a, far1", "far2, q"),
+              "We0 We1\n")
+        << sw;
+  }
+}
+
+TEST(BidirSwitchRun, EnabledSwitchesConductFromTheSecondTerminal) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire a0, b0, a1, b1;\n"
+      "  logic c0 = 0, c1 = 1;\n"
+      "  assign b0 = 1'b1;\n"
+      "  assign b1 = 1'b0;\n"
+      "  tranif0 t0 (a0, b0, c0);\n"
+      "  rtranif1 t1 (a1, b1, c1);\n"
+      "  initial begin\n"
+      "    #1 $display(\"%v %v\", a0, a1);\n"
+      "    c0 = 1; c1 = 0;\n"
+      "    #1 $display(\"%v %v\", a0, a1);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "St1 Pu0\n"
+            "HiZ HiZ\n");
+}
+
+TEST(BidirSwitchRun, RtranConductsBothWaysAtReducedStrength) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire a, b;\n"
+      "  logic da = 1'bz, db = 1'bz;\n"
+      "  assign a = da;\n"
+      "  assign b = db;\n"
+      "  rtran r1 (a, b);\n"
+      "  initial begin\n"
+      "    da = 1;\n"
+      "    #1 $display(\"%v %v\", a, b);\n"
+      "    da = 1'bz; db = 0;\n"
+      "    #1 $display(\"%v %v\", a, b);\n"
+      "    db = 1'bz;\n"
+      "    #1 $display(\"%v %v\", a, b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "St1 Pu1\n"
+            "Pu0 St0\n"
+            "HiZ HiZ\n");
+}
+
+TEST(BidirSwitchRun, Tranif0JoinsNetsOfAUserDefinedNetType) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  nettype logic res_t;\n"
+      "  res_t a, b;\n"
+      "  logic c = 0;\n"
+      "  assign a = 1'b1;\n"
+      "  tranif0 t (a, b, c);\n"
+      "  initial begin\n"
+      "    #1 $display(\"b=%b\", b);\n"
+      "    c = 1;\n"
+      "    #1 $display(\"b=%b\", b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "b=1\n"
+            "b=z\n");
+}
+
+TEST(BidirSwitchRun, AnUnknownControlLeavesUserDefinedNetsApart) {
+  for (const std::string& sw : {"tranif0", "tranif1"}) {
+    const char* on = sw == "tranif0" ? "1'b0" : "1'b1";
+    std::string src =
+        "module top;\n"
+        "  nettype logic res_t;\n"
+        "  res_t a, b;\n"
+        "  logic c = ";
+    src += on;
+    src += ";\n  assign a = 1'b1;\n  ";
+    src += sw;
+    src +=
+        " t (a, b, c);\n"
+        "  initial begin\n"
+        "    #1 $write(\"%b \", b);\n"
+        "    c = 1'bx;\n"
+        "    #1 $write(\"%b \", b);\n"
+        "    c = 1'bz;\n"
+        "    #1 $display(\"%b\", b);\n"
+        "  end\n"
+        "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(src, f), "1 z z\n") << sw;
+  }
+}
+
+TEST(BidirSwitchRun, AFourStateNetControlSwitchesTheSwitch) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire a, b, en;\n"
+      "  logic drive = 1;\n"
+      "  assign en = drive;\n"
+      "  assign a = 1'b1;\n"
+      "  rtranif0 r (a, b, en);\n"
+      "  initial begin\n"
+      "    #1 $write(\"%b \", b);\n"
+      "    drive = 0;\n"
+      "    #1 $display(\"%b\", b);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "z 1\n");
+}
+
+TEST(BidirSwitchRun, DataCrossesADelayedSwitchWithoutDelay) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire a, b;\n"
+      "  logic c = 0, d = 0;\n"
+      "  assign a = d;\n"
+      "  tranif1 #(3, 5) t (a, b, c);\n"
+      "  always @(b) $display(\"%0t b=%b\", $time, b);\n"
+      "  initial begin\n"
+      "    c = 1;\n"
+      "    #10 d = 1;\n"
+      "    #10 d = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "3 b=0\n"
+            "10 b=1\n"
+            "20 b=0\n");
+}
+
+TEST(BidirSwitchRun, OneDelayTimesTurningOnAndOff) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire a, b;\n"
+      "  logic c = 0;\n"
+      "  assign a = 1'b1;\n"
+      "  tranif1 #4 t (a, b, c);\n"
+      "  always @(b) $display(\"%0t b=%b\", $time, b);\n"
+      "  initial begin\n"
+      "    #10 c = 1;\n"
+      "    #10 c = 0;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "14 b=1\n"
+            "24 b=z\n");
+}
+
+TEST(BidirSwitchRun, AnUnknownControlTakesTheSmallerDelay) {
+  const char* const kDelays[] = {"#(3, 5)", "#(5, 3)"};
+  const char* const kExpected[] = {"13 b=x\n23 b=1\n33 b=x\n45 b=z\n",
+                                   "13 b=x\n25 b=1\n33 b=x\n43 b=z\n"};
+  for (std::size_t i = 0; i < std::size(kDelays); ++i) {
+    std::string src =
+        "module top;\n"
+        "  wire a, b;\n"
+        "  logic c = 0;\n"
+        "  assign a = 1'b1;\n"
+        "  tranif1 ";
+    src += kDelays[i];
+    src +=
+        " t (a, b, c);\n"
+        "  always @(b) $display(\"%0t b=%b\", $time, b);\n"
+        "  initial begin\n"
+        "    #10 c = 1'bx;\n"
+        "    #10 c = 1;\n"
+        "    #10 c = 1'bx;\n"
+        "    #10 c = 0;\n"
+        "  end\n"
+        "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(RunCapture(src, f), kExpected[i]) << kDelays[i];
+  }
+}
+
+TEST(BidirSwitchRun, EverySwitchKindRunsInAGenerateBlock) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module top;\n"
+      "  wire [5:0] a, b;\n"
+      "  logic c0 = 0, c1 = 1;\n"
+      "  assign a = 6'b101101;\n"
+      "  for (genvar k = 0; k < 1; k++) begin : g\n"
+      "    tran t0 (a[0], b[0]);\n"
+      "    rtran t1 (a[1], b[1]);\n"
+      "  end\n"
+      "  if (1) begin : h\n"
+      "    tranif0 t2 (a[2], b[2], c0);\n"
+      "    tranif1 t3 (a[3], b[3], c1);\n"
+      "  end\n"
+      "  case (1)\n"
+      "    1: begin\n"
+      "      rtranif0 t4 (a[4], b[4], c0);\n"
+      "      rtranif1 t5 (a[5], b[5], c1);\n"
+      "    end\n"
+      "  endcase\n"
+      "  initial #1 $display(\"%b\", b);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "101101\n");
 }
 
 }  // namespace

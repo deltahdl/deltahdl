@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <iterator>
 #include <vector>
 
 #include "common/types.h"
@@ -254,6 +256,33 @@ TEST(SwitchProcessing, BidirectionalPropagationIgnoresControlDelaySpec) {
                 PassSwitchDelaySpec{true, true, 100, 200}});
   ResolveSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kVal1);
+}
+
+TEST(BidirSwitchStrength, UserDefinedNetEnabledSwitchesDoNotReduceStrength) {
+  for (SwitchKind kind : {SwitchKind::kTranif0, SwitchKind::kTranif1}) {
+    auto np = MakeNetPair(1);
+    np.a.resolved_strength = {Strength::kSupply, Strength::kSupply,
+                              Strength::kSupply, Strength::kSupply};
+    const Logic4Word kOn =
+        kind == SwitchKind::kTranif0 ? Logic4Word{0, 0} : Logic4Word{1, 0};
+    std::vector<SwitchInst> sw;
+    sw.push_back({&np.a, &np.b, kind, kOn, true});
+    ResolveSwitchNetwork(sw, np.arena);
+    EXPECT_EQ(np.b.resolved_strength.s1_hi, Strength::kSupply);
+    EXPECT_EQ(np.b.resolved_strength.s1_lo, Strength::kSupply);
+  }
+}
+
+TEST(SwitchProcessing, UserDefinedNetTranif0OnlyAZeroControlConducts) {
+  const Logic4Word kControls[] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+  const uint8_t kExpected[] = {kVal1, kValZ, kValZ, kValZ};
+  for (std::size_t i = 0; i < std::size(kControls); ++i) {
+    auto np = MakeNetPair(1);
+    std::vector<SwitchInst> sw;
+    sw.push_back({&np.a, &np.b, SwitchKind::kTranif0, kControls[i], true});
+    ResolveSwitchNetwork(sw, np.arena);
+    EXPECT_EQ(ValOf(*np.vb), kExpected[i]) << i;
+  }
 }
 
 }  // namespace
