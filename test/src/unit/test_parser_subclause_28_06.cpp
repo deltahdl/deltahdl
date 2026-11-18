@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -132,6 +133,30 @@ TEST(TristateGateParsing, Bufif0ThreeValueDelay) {
   EXPECT_EQ(item->gate_delay_fall->int_val, 10u);
   ASSERT_NE(item->gate_delay_decay, nullptr);
   EXPECT_EQ(item->gate_delay_decay->int_val, 15u);
+}
+
+TEST(TristateGateParsing, EachGateRejectsFourDelays) {
+  for (const std::string& gate : {"bufif0", "bufif1", "notif0", "notif1"}) {
+    std::string src = "module m;\n  ";
+    src += gate;
+    src += " #(1, 2, 3, 4) b1(o, d, c);\nendmodule\n";
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"))
+        << gate;
+  }
+}
+
+TEST(TristateGateParsing, EachGateTakesZeroToThreeDelays) {
+  for (const std::string& gate : {"bufif0", "bufif1", "notif0", "notif1"}) {
+    for (const std::string& delay : {"", "#5", "#(1, 2)", "#(1, 2, 3)"}) {
+      std::string src = "module m;\n  ";
+      src += gate;
+      src += " ";
+      src += delay;
+      src += " b1(o, d, c);\nendmodule\n";
+      EXPECT_FALSE(Parse(src).has_errors) << gate << " " << delay;
+    }
+  }
 }
 
 }  // namespace
