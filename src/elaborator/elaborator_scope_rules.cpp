@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cstddef>
+#include <deque>
 #include <format>
 #include <functional>
 #include <memory>
@@ -305,15 +306,15 @@ void ReportUnresolvedRefs(const std::vector<const Expr*>& refs, Pred declared,
 }
 
 template <typename Pred>
-void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
+void ReportProcUnresolved(const std::vector<ModuleItem*>& items, Pred declared,
                           DiagEngine& diag) {
   std::unordered_set<std::string_view> locals;
-  for (const auto* item : decl->items) {
+  for (const auto* item : items) {
     if (IsProceduralItemKind(item->kind))
       CollectProcReadableNames(item->body, locals);
   }
   std::vector<const Expr*> refs;
-  for (const auto* item : decl->items) {
+  for (const auto* item : items) {
     if (!IsProceduralItemKind(item->kind)) continue;
     CollectProcRhsIdents(item->body, locals, refs);
     for (const EventExpr& ev : item->sensitivity) {
@@ -321,22 +322,109 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
       CollectBareIdents(ev.iff_condition, refs);
     }
   }
-  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
+  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(items));
 }
 
 template <typename Pred>
-void ReportDeclReadsUnresolved(const ModuleDecl* decl, Pred declared,
-                               DiagEngine& diag) {
+void ReportDeclReadsUnresolved(const std::vector<ModuleItem*>& items,
+                               Pred declared, DiagEngine& diag) {
   std::vector<const Expr*> refs;
-  for (const auto* item : decl->items) {
+  for (const auto* item : items) {
     bool is_data_decl = item->kind == ModuleItemKind::kVarDecl ||
                         item->kind == ModuleItemKind::kNetDecl;
     if (!is_data_decl) continue;
     CollectBareIdents(item->init_expr, refs);
     CollectBareIdents(item->data_type.type_ref_expr, refs);
   }
-  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
+  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(items));
 }
+
+template <typename Pred>
+void ReportContAssignUnresolved(const std::vector<ModuleItem*>& items,
+                                Pred declared, DiagEngine& diag) {
+  std::vector<const Expr*> refs;
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kContAssign) continue;
+    CollectBareIdents(item->assign_rhs, refs);
+  }
+  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(items));
+}
+
+class GenerateBlockReads {
+ public:
+  GenerateBlockReads(std::function<bool(std::string_view)> enclosing,
+                     const CompilationUnit* unit,
+                     ProvidedNameCache& provided_cache, DiagEngine& diag)
+      : enclosing_(std::move(enclosing)),
+        unit_(unit),
+        provided_cache_(provided_cache),
+        diag_(diag) {}
+
+  void CheckConstructs(const std::vector<ModuleItem*>& items) {
+    for (const ModuleItem* item : items) CheckConstruct(item);
+  }
+
+ private:
+  struct BlockScope {
+    ScopeNameSet names;
+    const std::vector<ModuleItem*>* items;
+  };
+
+  void CheckConstruct(const ModuleItem* item) {
+    switch (item->kind) {
+      case ModuleItemKind::kGenerateIf:
+        CheckIfArms(item);
+        return;
+      case ModuleItemKind::kGenerateCase:
+        for (const auto& ci : item->gen_case_items)
+          CheckBlock(ci.body, nullptr);
+        return;
+      case ModuleItemKind::kGenerateFor:
+        CheckBlock(item->gen_body, item->gen_init);
+        return;
+      default:
+        return;
+    }
+  }
+
+  void CheckIfArms(const ModuleItem* item) {
+    CheckBlock(item->gen_body, nullptr);
+    const ModuleItem* other = item->gen_else;
+    if (other == nullptr) return;
+    if (other->gen_cond != nullptr) {
+      CheckIfArms(other);
+      return;
+    }
+    CheckBlock(other->gen_body, nullptr);
+  }
+
+  void CheckBlock(const std::vector<ModuleItem*>& body, const Stmt* init) {
+    BlockScope& scope = scopes_.emplace_back();
+    scope.items = &body;
+    for (const ModuleItem* item : body) scope.names.AddItemOwnNames(item);
+    if (init != nullptr) scope.names.Insert(init->lhs->text);
+    auto visible = [this](std::string_view n) { return Visible(n); };
+    ReportContAssignUnresolved(body, visible, diag_);
+    ReportProcUnresolved(body, visible, diag_);
+    ReportDeclReadsUnresolved(body, visible, diag_);
+    CheckConstructs(body);
+    scopes_.pop_back();
+  }
+
+  bool Visible(std::string_view name) const {
+    if (enclosing_(name)) return true;
+    return std::ranges::any_of(scopes_, [&](const BlockScope& scope) {
+      return scope.names.Contains(name) ||
+             ImportsProvideName(unit_, provided_cache_, *scope.items, name);
+    });
+  }
+
+  std::function<bool(std::string_view)> enclosing_;
+  const CompilationUnit* unit_;
+  ProvidedNameCache& provided_cache_;
+  DiagEngine& diag_;
+  std::deque<BlockScope> scopes_;
+};
 
 void CollectItemConstantPositions(const ModuleItem* item,
                                   std::vector<const Expr*>& out) {
@@ -510,18 +598,6 @@ static bool AnyPackageProvidesName(const CompilationUnit* unit,
   return false;
 }
 
-template <typename Declared>
-static void ReportContAssignUnresolved(const ModuleDecl* decl,
-                                       const Declared& declared,
-                                       DiagEngine& diag) {
-  std::vector<const Expr*> refs;
-  for (const auto* item : decl->items) {
-    if (item->kind != ModuleItemKind::kContAssign) continue;
-    CollectBareIdents(item->assign_rhs, refs);
-  }
-  ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
-}
-
 static std::unordered_set<std::string_view> UnpackedArrayNames(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         infos) {
@@ -541,17 +617,15 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       ExplicitlyImportedNames(mod);
   std::vector<std::string_view> wildcard_packages =
       WildcardImportedPackages(mod);
-  std::unordered_set<std::string_view> generate_names;
-  CollectModuleGenerateNames(decl->items, generate_names);
-  auto declared = [this, decl, &explicit_imported, &wildcard_packages,
-                   &generate_names](std::string_view n) {
+  auto declared = [this, decl, &explicit_imported,
+                   &wildcard_packages](std::string_view n) {
     bool unit_later =
         (UnitDataDeclaredOnlyAfter(unit_, n, decl->range.start) &&
          var_types_.count(n) == 0 && !IsNameInModuleScope(n)) ||
         (UnitConstantDeclaredOnlyAfter(unit_, n, decl->range.start) &&
          !ModuleDeclaresName(decl, n) && !IsNameInEnclosingScope(n));
     return (!unit_later && IsDeclaredNameForRhs(n)) ||
-           explicit_imported.count(n) != 0 || generate_names.count(n) != 0 ||
+           explicit_imported.count(n) != 0 ||
            AnyPackageProvidesName(unit_, pkg_provided_names_, wildcard_packages,
                                   n);
   };
@@ -569,9 +643,11 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
         return VisibleCovergroup(n, mod, unit_) != nullptr;
       },
       diag_);
-  ReportContAssignUnresolved(decl, declared, diag_);
-  ReportProcUnresolved(decl, declared, diag_);
-  ReportDeclReadsUnresolved(decl, declared, diag_);
+  ReportContAssignUnresolved(decl->items, declared, diag_);
+  ReportProcUnresolved(decl->items, declared, diag_);
+  ReportDeclReadsUnresolved(decl->items, declared, diag_);
+  GenerateBlockReads(declared, unit_, pkg_provided_names_, diag_)
+      .CheckConstructs(decl->items);
   ReportGenvarConstantMisuse(decl, diag_);
   ReportAssertionUnresolved(decl, declared, diag_);
   ReportNonConstantBoundActuals(

@@ -252,52 +252,6 @@ std::vector<std::string_view> WildcardImportedPackages(const RtlirModule* mod) {
   return pkgs;
 }
 
-static void CollectGenerateBodyNames(
-    const std::vector<ModuleItem*>& items,
-    std::unordered_set<std::string_view>& names);
-
-static void CollectOneGenerateNames(
-    const ModuleItem* item, std::unordered_set<std::string_view>& names) {
-  const Stmt* init = item->gen_init;
-  if (init != nullptr && init->lhs != nullptr &&
-      init->lhs->kind == ExprKind::kIdentifier) {
-    names.insert(init->lhs->text);
-  }
-  if (init != nullptr && !init->var_name.empty()) names.insert(init->var_name);
-  CollectGenerateBodyNames(item->gen_body, names);
-  if (item->gen_else != nullptr) {
-    CollectGenerateBodyNames(item->gen_else->gen_body, names);
-  }
-  for (const auto& ci : item->gen_case_items) {
-    CollectGenerateBodyNames(ci.body, names);
-  }
-}
-
-static void CollectGenerateBodyNames(
-    const std::vector<ModuleItem*>& items,
-    std::unordered_set<std::string_view>& names) {
-  for (const auto* item : items) {
-    if (!item->name.empty()) names.insert(item->name);
-    if (item->kind == ModuleItemKind::kGenerateFor ||
-        item->kind == ModuleItemKind::kGenerateIf ||
-        item->kind == ModuleItemKind::kGenerateCase) {
-      CollectOneGenerateNames(item, names);
-    }
-  }
-}
-
-void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
-                                std::unordered_set<std::string_view>& names) {
-  for (const auto* item : items) {
-    if (item->is_genvar && !item->name.empty()) names.insert(item->name);
-    if (item->kind == ModuleItemKind::kGenerateFor ||
-        item->kind == ModuleItemKind::kGenerateIf ||
-        item->kind == ModuleItemKind::kGenerateCase) {
-      CollectOneGenerateNames(item, names);
-    }
-  }
-}
-
 static void CollectMatchesBindings(
     const Expr* e, std::unordered_set<std::string_view>& names) {
   if (e == nullptr) return;

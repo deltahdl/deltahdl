@@ -39,11 +39,11 @@ class ScopeNameSet {
   void AddItem(const ModuleItem* item);
   void AddStmt(const Stmt* s);
   void Insert(std::string_view name);
+  void AddItemOwnNames(const ModuleItem* item);
 
   bool Contains(std::string_view name) const;
 
  private:
-  void AddItemOwnNames(const ModuleItem* item);
   void AddEnumerations(const DataType& type);
   void AddImplicitNets(const Expr* e);
 

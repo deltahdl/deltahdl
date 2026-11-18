@@ -55,9 +55,6 @@ bool ImportsProvideName(const CompilationUnit* unit,
 
 std::vector<std::string_view> WildcardImportedPackages(const RtlirModule* mod);
 
-void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
-                                std::unordered_set<std::string_view>& names);
-
 void CollectProcLocalNames(const Stmt* s,
                            std::unordered_set<std::string_view>& names);
 
