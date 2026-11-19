@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
+#include <string_view>
 
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -111,6 +114,116 @@ TEST(SystemTimingCheckParsing, TwoTimingChecksRecordSeparateLines) {
             LineHolding(kSrc, "$hold"));
   EXPECT_NE(spec->specify_items[0]->timing_check.loc.line,
             spec->specify_items[1]->timing_check.loc.line);
+}
+
+constexpr std::string_view kWellFormedTimingChecks[] = {
+    "$setup(d, posedge clk, 2);",
+    "$hold(posedge clk, d, 2);",
+    "$setuphold(posedge clk, d, 1, 2);",
+    "$recovery(posedge rst, clk, 2);",
+    "$removal(posedge rst, clk, 2);",
+    "$recrem(posedge rst, clk, 1, 2);",
+    "$skew(posedge clk, d, 2);",
+    "$timeskew(posedge clk, d, 2);",
+    "$fullskew(posedge clk, negedge d, 1, 2);",
+    "$period(posedge clk, 10);",
+    "$width(posedge clk, 5);",
+    "$nochange(posedge clk, d, 0, 0);",
+    "$setup(d &&& en, edge [01, 10] clk, 2);",
+    "$width(negedge clk &&& (en == 1'b1), 5);"};
+
+size_t ErrorCount(const ParseResult& r) {
+  size_t count = 0;
+  for (const Diagnostic& d : r.diags) {
+    if (d.severity == DiagSeverity::kError) ++count;
+  }
+  return count;
+}
+
+void ExpectOneProceduralRejection(std::string_view before,
+                                  std::string_view after) {
+  for (std::string_view check : kWellFormedTimingChecks) {
+    std::string src(before);
+    src += check;
+    src += after;
+    auto r = Parse(src);
+    EXPECT_EQ(ErrorCount(r), 1u) << src;
+    EXPECT_TRUE(ReportedError(
+        r.diags, "timing check cannot appear in procedural code", 2, "31.2"))
+        << src;
+  }
+}
+
+constexpr std::string_view kModuleHead =
+    "module m(input clk, input d, input rst, input en);\n  ";
+
+TEST(SystemTimingCheckParsing, DISABLED_InInitialProcedureDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "initial ",
+                               "\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InFinalProcedureDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "final ",
+                               "\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InAlwaysProcedureDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "always ",
+                               "\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InAlwaysCombProcedureDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "always_comb ",
+                               "\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InAlwaysFfProcedureDrawsOneError) {
+  ExpectOneProceduralRejection(
+      std::string(kModuleHead) + "always_ff @(posedge clk) ", "\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InAlwaysLatchProcedureDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "always_latch ",
+                               "\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InNestedStatementsDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "initial begin #1 ",
+                               " end\nendmodule\n");
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "initial if (en) ",
+                               "\nendmodule\n");
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "initial fork ",
+                               " join\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InTaskAndFunctionDrawsOneError) {
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "task t; ",
+                               " endtask\nendmodule\n");
+  ExpectOneProceduralRejection(std::string(kModuleHead) + "function void f; ",
+                               " endfunction\nendmodule\n");
+}
+
+TEST(SystemTimingCheckParsing, DISABLED_InOtherDesignElementsDrawsOneError) {
+  ExpectOneProceduralRejection(
+      "interface i(input clk, input d, input rst, input en);\n  initial ",
+      "\nendinterface\n");
+  ExpectOneProceduralRejection(
+      "program p(input clk, input d, input rst, input en);\n  initial ",
+      "\nendprogram\n");
+  ExpectOneProceduralRejection("class c;\n  task t; ", " endtask\nendclass\n");
+  ExpectOneProceduralRejection("package k;\n  function void f; ",
+                               " endfunction\nendpackage\n");
+}
+
+TEST(SystemTimingCheckParsing, EveryWellFormedCheckInSpecifyBlockIsAccepted) {
+  for (std::string_view check : kWellFormedTimingChecks) {
+    std::string src(kModuleHead);
+    src += "specify\n    ";
+    src += check;
+    src += "\n  endspecify\nendmodule\n";
+    auto r = Parse(src);
+    EXPECT_EQ(ErrorCount(r), 0u) << src;
+  }
 }
 
 }  // namespace

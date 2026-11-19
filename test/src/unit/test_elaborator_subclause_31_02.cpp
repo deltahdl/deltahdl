@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -181,6 +183,93 @@ TEST(TimingCheckTerminals, InterfacePortMemberAccepted) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(TimingCheckLimitConstness, ModuleLevelSpecparamLimitElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input d, clk);\n"
+      "  specparam tSetup = 5, tHold = 2;\n"
+      "  specify\n"
+      "    $setuphold(posedge clk, d, tSetup, tHold);\n"
+      "    $width(posedge clk, tSetup);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(TimingCheckLimitConstness, NetLimitRejected) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input d, clk);\n"
+      "  wire [7:0] w;\n"
+      "  specify\n"
+      "    $setup(d, posedge clk, w);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "timing check limit operand 'w' is not a specparam",
+                            4, "31.2"));
+}
+
+void ExpectLimitOperandRejected(const char* check, const char* name) {
+  ElabFixture f;
+  std::string src =
+      "module m(input d, clk);\n"
+      "  wire [7:0] w;\n"
+      "  logic [7:0] v;\n"
+      "  specify\n"
+      "    specparam tA = 2;\n"
+      "    ";
+  src += check;
+  src +=
+      "\n"
+      "  endspecify\n"
+      "endmodule\n";
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr) << src;
+  std::string msg = "timing check limit operand '";
+  msg += name;
+  msg += "' is not a specparam";
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 6, "31.2")) << src;
+}
+
+TEST(TimingCheckLimitConstness, NetOrVariableSecondLimitRejected) {
+  ExpectLimitOperandRejected("$setuphold(posedge clk, d, tA, w);", "w");
+  ExpectLimitOperandRejected("$setuphold(posedge clk, d, tA, v);", "v");
+  ExpectLimitOperandRejected("$recrem(posedge clk, d, tA, w);", "w");
+  ExpectLimitOperandRejected("$recrem(posedge clk, d, tA, v);", "v");
+  ExpectLimitOperandRejected("$fullskew(posedge clk, negedge d, tA, w);", "w");
+  ExpectLimitOperandRejected("$fullskew(posedge clk, negedge d, tA, v);", "v");
+}
+
+TEST(TimingCheckLimitConstness, NetOrVariableWidthOrPeriodLimitRejected) {
+  ExpectLimitOperandRejected("$width(posedge clk, w);", "w");
+  ExpectLimitOperandRejected("$width(posedge clk, v);", "v");
+  ExpectLimitOperandRejected("$period(posedge clk, w);", "w");
+  ExpectLimitOperandRejected("$period(posedge clk, v);", "v");
+}
+
+TEST(TimingCheckLimitConstness, SpecparamSecondLimitsElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input d, clk);\n"
+      "  specify\n"
+      "    specparam tA = 2, tB = 3;\n"
+      "    $setuphold(posedge clk, d, tA, tB);\n"
+      "    $recrem(posedge clk, d, tA, tB);\n"
+      "    $fullskew(posedge clk, negedge d, tA, tB);\n"
+      "    $width(posedge clk, tA);\n"
+      "    $period(posedge clk, tB);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
