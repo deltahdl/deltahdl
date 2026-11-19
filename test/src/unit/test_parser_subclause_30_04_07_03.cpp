@@ -2,6 +2,7 @@
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_specify.h"
 
 using namespace delta;
@@ -65,6 +66,63 @@ TEST(NegativePolarityParsing, PositiveOperatorIsNotNegative) {
   auto* si = GetSolePathItem(r);
   ASSERT_NE(si, nullptr);
   EXPECT_NE(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+TEST(NegativePolarityParsing, FullPathMinusAdjacentToStarGt) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a -*> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+TEST(NegativePolarityParsing, MinusAppliesToEveryPairOfAList) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b -*> c, d) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  VerifyFullPathPorts(si, {"a", "b"}, {"c", "d"});
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+TEST(NegativePolarityParsing, IfnonePathKeepsMinus) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    ifnone (a -=> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+}
+
+TEST(NegativePolarityParsing, ErrorTwoPolarityOperators) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a + - *> b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
+      "30.4.2"));
 }
 
 }  // namespace

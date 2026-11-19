@@ -67,4 +67,34 @@ TEST(UnknownPolarityParsing, FullPathWithOperatorIsNotUnknown) {
   EXPECT_NE(si->path.polarity, SpecifyPolarity::kNone);
 }
 
+TEST(UnknownPolarityParsing, StateDependentPathWithoutOperator) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    if (c) (a => b) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kParallel);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
+}
+
+TEST(UnknownPolarityParsing, DestinationListWithoutOperator) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a *> c, d) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  VerifyFullPathPorts(si, {"a"}, {"c", "d"});
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
+}
+
 }  // namespace
