@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "elaborator/elaborator.h"
@@ -224,9 +225,97 @@ TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
   EXPECT_EQ(p->error_limit[0], 12u);
 }
 
+TEST(PulseControlResolution, PathSpecificRejectOnlyMirrorsError) {
+  SimFixture f;
+  SpecifyManager mgr;
+  BuildResolvedSpecify(
+      "    (clk => q) = 12;\n"
+      "    specparam PATHPULSE$clk$q = (4);",
+      f, mgr);
+  const PathDelay* p = FindPath(mgr, "clk", "q");
+  ASSERT_NE(p, nullptr);
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_EQ(p->reject_limit[i], 4u);
+    EXPECT_EQ(p->error_limit[i], 4u);
+  }
+}
+
+SpecifyManager* RunAndInstall(const std::string& src, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  if (design == nullptr) return nullptr;
+  LowerAndRun(design, f);
+  return f.ctx.GetSpecifyManager();
+}
+
+void ExpectLimits(const SpecifyManager& mgr, std::string_view src,
+                  std::string_view dst, uint64_t reject, uint64_t error) {
+  const PathDelay* p = FindPath(mgr, src, dst);
+  ASSERT_NE(p, nullptr) << src << " => " << dst;
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_EQ(p->reject_limit[i], reject) << src << " => " << dst;
+    EXPECT_EQ(p->error_limit[i], error) << src << " => " << dst;
+  }
+}
+
+std::string TwoOutputCell(const std::string& specify_body) {
+  return "module t(input clk, input pre, output q, output r);\n"
+         "  assign q = clk & pre;\n"
+         "  assign r = clk;\n"
+         "  specify\n" +
+         specify_body +
+         "  endspecify\n"
+         "endmodule\n";
+}
+
+TEST(PulseControlResolution, MultiPathNonFirstInputTakesFirstTerminalsLimits) {
+  SimFixture f;
+  SpecifyManager* mgr =
+      RunAndInstall(TwoOutputCell("    (clk, pre *> q) = 4;\n"
+                                  "    specparam PATHPULSE$clk$q = (1, 2);\n"
+                                  "    specparam PATHPULSE$pre$q = (3);\n"),
+                    f);
+  ASSERT_NE(mgr, nullptr);
+  ExpectLimits(*mgr, "clk", "q", 1, 2);
+  ExpectLimits(*mgr, "pre", "q", 1, 2);
+}
+
+TEST(PulseControlResolution, MultiPathNonFirstOutputTakesFirstTerminalsLimits) {
+  SimFixture f;
+  SpecifyManager* mgr =
+      RunAndInstall(TwoOutputCell("    (clk *> q, r) = 6;\n"
+                                  "    specparam PATHPULSE$clk$q = (1, 2);\n"
+                                  "    specparam PATHPULSE$clk$r = (3, 5);\n"),
+                    f);
+  ASSERT_NE(mgr, nullptr);
+  ExpectLimits(*mgr, "clk", "q", 1, 2);
+  ExpectLimits(*mgr, "clk", "r", 1, 2);
+}
+
+TEST(PulseControlResolution, MultiPathNonFirstInputAloneIsIgnored) {
+  SimFixture f;
+  SpecifyManager* mgr =
+      RunAndInstall(TwoOutputCell("    (clk, pre *> q) = 4;\n"
+                                  "    specparam PATHPULSE$pre$q = (1, 2);\n"),
+                    f);
+  ASSERT_NE(mgr, nullptr);
+  ExpectLimits(*mgr, "clk", "q", 4, 4);
+  ExpectLimits(*mgr, "pre", "q", 4, 4);
+}
+
+TEST(PulseControlResolution, MultiPathNonFirstOutputAloneIsIgnored) {
+  SimFixture f;
+  SpecifyManager* mgr =
+      RunAndInstall(TwoOutputCell("    (clk *> q, r) = 6;\n"
+                                  "    specparam PATHPULSE$clk$r = (1, 2);\n"),
+                    f);
+  ASSERT_NE(mgr, nullptr);
+  ExpectLimits(*mgr, "clk", "q", 6, 6);
+  ExpectLimits(*mgr, "clk", "r", 6, 6);
+}
+
 TEST(PulseControlResolution, StandardExampleNonspecificLimitReachesPath) {
   SimFixture f;
-  auto* design = ElaborateSrc(
+  SpecifyManager* installed = RunAndInstall(
       "module t(input clk, input data, input clr, input pre, output q);\n"
       "  specify\n"
       "    (clk => q) = 12;\n"
@@ -240,9 +329,6 @@ TEST(PulseControlResolution, StandardExampleNonspecificLimitReachesPath) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  ASSERT_NE(design, nullptr);
-  LowerAndRun(design, f);
-  SpecifyManager* installed = f.ctx.GetSpecifyManager();
   ASSERT_NE(installed, nullptr);
   const PathDelay* unnamed = FindPath(*installed, "data", "q");
   ASSERT_NE(unnamed, nullptr);
@@ -250,8 +336,9 @@ TEST(PulseControlResolution, StandardExampleNonspecificLimitReachesPath) {
   EXPECT_EQ(unnamed->error_limit[0], 3u);
 }
 
-std::string BufferPulseDesign(const std::string& specify_body) {
-  return "module mybuf(input a, output y);\n"
+std::string BufferPulseDesign(const std::string& specify_body,
+                              const std::string& module_items = "") {
+  return "module mybuf(input a, output y);\n" + module_items +
          "  assign y = a;\n"
          "  specify\n" +
          specify_body +
@@ -274,6 +361,31 @@ TEST(PulseControlRun, NonspecificLimitReachesEveryPath) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferPulseDesign("    (a => y) = 7;\n"
                                          "    specparam PATHPULSE$ = (3);\n"),
+                       f),
+            "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
+}
+
+TEST(PulseControlRun, PathSpecificRejectOnlyLimitIsTheErrorLimitToo) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(BufferPulseDesign("    (a => y) = 7;\n"
+                                   "    specparam PATHPULSE$a$y = (3);\n"),
+                 f),
+      "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
+}
+
+TEST(PulseControlRun, DISABLED_ModuleLevelNonspecificLimitReachesEveryPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BufferPulseDesign("    (a => y) = 7;\n",
+                                         "  specparam PATHPULSE$ = (3);\n"),
+                       f),
+            "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
+}
+
+TEST(PulseControlRun, DISABLED_ModuleLevelPathSpecificLimitReachesItsPath) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(BufferPulseDesign("    (a => y) = 7;\n",
+                                         "  specparam PATHPULSE$a$y = (3);\n"),
                        f),
             "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
 }

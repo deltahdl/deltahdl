@@ -154,6 +154,80 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
   EXPECT_EQ(ErrorCount(r.diags), 2U);
 }
 
+TEST(PulseControlSpecparamParsing, OutputTerminalCannotBePartSelect) {
+  auto r = Parse(
+      "module m(input [1:0] a, output [1:0] b);\n"
+      "  specify\n"
+      "    specparam PATHPULSE$a$b[1:0] = (1, 3);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a PATHPULSE$ specparam names each terminal whole, "
+                            "without selecting a bit or a part of it",
+                            3, "30.7.1"));
+  EXPECT_EQ(ErrorCount(r.diags), 1U);
+}
+
+TEST(PulseControlSpecparamParsing, DISABLED_ModuleLevelTerminalCannotBeSelect) {
+  auto r = Parse(
+      "module m(input [1:0] a, output [1:0] b);\n"
+      "  specparam PATHPULSE$a[0]$b = (1, 3);\n"
+      "  specparam PATHPULSE$a$b[1:0] = (2);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a PATHPULSE$ specparam names each terminal whole, "
+                            "without selecting a bit or a part of it",
+                            2, "30.7.1"));
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a PATHPULSE$ specparam names each terminal whole, "
+                            "without selecting a bit or a part of it",
+                            3, "30.7.1"));
+  EXPECT_EQ(ErrorCount(r.diags), 2U);
+}
+
+TEST(PulseControlSpecparamParsing, ModuleLevelWholeTerminalsAreAccepted) {
+  auto r = Parse(
+      "module m(input [1:0] a, output [1:0] b);\n"
+      "  specparam PATHPULSE$a$b = (1, 3);\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(PulseControlSpecparamParsing, ThreeLimitsAreReported) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    specparam PATHPULSE$ = (1, 3, 5);\n"
+      "    specparam PATHPULSE$a$y = (1, 3, 5);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 3, "30.7.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 4, "30.7.1"));
+}
+
+TEST(PulseControlSpecparamParsing, ModuleLevelThreeLimitsAreReported) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specparam PATHPULSE$ = (1, 3, 5);\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "30.7.1"));
+}
+
+TEST(PulseControlSpecparamParsing, EmptyLimitListIsReported) {
+  auto r = Parse(
+      "module m(input a, output y);\n"
+      "  specify\n"
+      "    specparam PATHPULSE$ = ();\n"
+      "    specparam PATHPULSE$a$y = ();\n"
+      "  endspecify\n"
+      "  specparam PATHPULSE$ = ();\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "30.7.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "30.7.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 6, "30.7.1"));
+}
+
 TEST(PulseControlSpecparamParsing,
      StandardExampleUnparenthesizedLimitIsReported) {
   auto r = Parse(
