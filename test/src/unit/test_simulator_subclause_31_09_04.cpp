@@ -6,12 +6,14 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
 #include "parser/parser.h"
+#include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
 
@@ -640,6 +642,83 @@ TEST(DelayedSignalCopies, DelayedSignalNamedByOneOfTwoChecksIsShared) {
                        "endmodule\n",
                        f),
             "1 1\n");
+}
+
+std::string DelayedSignalTrace(const std::string& check,
+                               TimingCheckInvocationOptions o) {
+  SimFixture f;
+  f.ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(o);
+  return PreprocessAndCapture(
+      "`timescale 1ns/1ns\n"
+      "module top(output reg clk = 0, output reg [1:0] d = 0);\n"
+      "  reg n = 0; wire dclk; wire [1:0] dd;\n"
+      "  specify\n"
+      "    " +
+          check +
+          "\n"
+          "  endspecify\n"
+          "  always @(dclk) $display(\"dclk %b %0t\", dclk, $time);\n"
+          "  always @(dd) $display(\"dd %b %0t\", dd, $time);\n"
+          "  initial begin\n"
+          "    #100 clk = 1; #15 d = 2'b11; #20 $display(\"n %b\", n);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+constexpr TimingCheckInvocationOptions kAllOff = {true, true};
+constexpr TimingCheckInvocationOptions kWithoutTheOption = {false, false};
+constexpr const char* kUndelayedCopies = "dclk 1 100\ndd 11 115\nn 0\n";
+
+TEST(DelayedSignalCopiesRun, AllOffNegativeSetupholdIsSilentAndCopies) {
+  EXPECT_EQ(
+      DelayedSignalTrace(
+          "$setuphold(posedge clk, d, -10, 20, n, , , dclk, dd);", kAllOff),
+      kUndelayedCopies);
+}
+
+TEST(DelayedSignalCopiesRun, AllOffNegativeRemovalIsSilentAndCopies) {
+  EXPECT_EQ(DelayedSignalTrace(
+                "$recrem(posedge clk, d, 20, -10, n, , , dclk, dd);", kAllOff),
+            kUndelayedCopies);
+}
+
+TEST(DelayedSignalCopiesRun, AllOffNegativeRecoveryIsSilentAndCopies) {
+  EXPECT_EQ(DelayedSignalTrace(
+                "$recrem(posedge clk, d, -10, 20, n, , , dclk, dd);", kAllOff),
+            kUndelayedCopies);
+}
+
+TEST(DelayedSignalCopiesRun, ReferenceCopyAloneFollowsWithoutTheOption) {
+  EXPECT_EQ(
+      DelayedSignalTrace("$setuphold(posedge clk, d, -10, 20, n, , , dclk);",
+                         kWithoutTheOption),
+      "dclk 1 100\nn 1\n");
+}
+
+TEST(DelayedSignalCopiesRun, DataCopyAloneFollowsWithoutTheOption) {
+  EXPECT_EQ(
+      DelayedSignalTrace("$setuphold(posedge clk, d, 20, -10, n, , , , dd);",
+                         kWithoutTheOption),
+      "dd 11 115\nn 0\n");
+}
+
+TEST(DelayedSignalCopiesRun, BitSelectCopiesFollowWithoutTheOption) {
+  EXPECT_EQ(DelayedSignalTrace(
+                "$setuphold(posedge clk, d[0], 20, -10, n, , , dclk, dd[1]);",
+                kWithoutTheOption),
+            "dclk 1 100\ndd 1z 115\nn 0\n");
+}
+
+TEST(DelayedSignalCopiesRun, RecremCopiesFollowWithoutTheOption) {
+  EXPECT_EQ(
+      DelayedSignalTrace("$recrem(posedge clk, d, 20, -10, n, , , dclk, dd);",
+                         kWithoutTheOption),
+      "dclk 1 100\ndd 11 115\nn 1\n");
+  EXPECT_EQ(
+      DelayedSignalTrace("$recrem(posedge clk, d, -10, 20, n, , , dclk, dd);",
+                         kWithoutTheOption),
+      kUndelayedCopies);
 }
 
 }  // namespace

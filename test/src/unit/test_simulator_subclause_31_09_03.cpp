@@ -1,7 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_preprocess_and_get.h"
 #include "parser/ast_specify.h"
+#include "simulator/sim_context.h"
 #include "simulator/specify.h"
 #include "simulator/specify_timing_check.h"
 
@@ -122,6 +127,49 @@ TEST(NegativeTimingCheckNotifierToggle, RecremDoesNotToggleOnRawInputOnly) {
     notifier = ToggleNotifierOnViolation(notifier);
   }
   EXPECT_TRUE(notifier.IsZero());
+}
+
+std::string NotifierRun(const std::string& checks,
+                        const std::string& stimulus) {
+  SimFixture f;
+  f.ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions({true, false});
+  return PreprocessAndCapture(
+      "`timescale 1ns/1ns\n"
+      "module top(output reg clk = 0, output reg d = 0, output reg e = 0);\n"
+      "  reg n = 0;\n"
+      "  specify\n"
+      "    " +
+          checks +
+          "\n"
+          "  endspecify\n"
+          "  always @(n) $display(\"toggle %0t\", $time);\n"
+          "  initial begin\n"
+          "    " +
+          stimulus +
+          "\n"
+          "    #50 $display(\"n %b\", n);\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(NegativeTimingCheckNotifierRun, InputsOutsideTheShiftedWindowLeaveIt) {
+  EXPECT_EQ(NotifierRun("$setuphold(posedge clk, d, -10, 20, n);",
+                        "#100 clk = 1; #5 d = 1;"),
+            "n 0\n");
+}
+
+TEST(NegativeTimingCheckNotifierRun, InputsInsideTheShiftedWindowToggleIt) {
+  EXPECT_EQ(NotifierRun("$setuphold(posedge clk, d, -10, 20, n);",
+                        "#100 clk = 1; #15 d = 1;"),
+            "toggle 115\nn 1\n");
+}
+
+TEST(NegativeTimingCheckNotifierRun, RecremTogglesAtTheDelayedReference) {
+  EXPECT_EQ(NotifierRun("$recrem(posedge clk, d, 20, -10); "
+                        "$recrem(posedge clk, e, 8, -4, n);",
+                        "#100 clk = 1; #5 e = 1;"),
+            "toggle 111\nn 1\n");
 }
 
 }  // namespace
