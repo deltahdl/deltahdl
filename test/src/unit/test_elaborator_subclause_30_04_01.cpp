@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -210,6 +212,128 @@ TEST(SpecifyTerminalElaboration, NonAnsiInputRedeclaredAsAVariable) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "module path source 'a' must be a net", 7,
                             "30.4.1"));
+}
+
+constexpr const char* kOutputSource =
+    "module path source 'o' must be connected to an input or inout port";
+
+bool TerminalReported(const std::string& ports, const std::string& path,
+                      const std::string& message) {
+  ElabFixture f;
+  ElaborateSrc("module m(" + ports +
+                   ");\n"
+                   "  specify\n"
+                   "    " +
+                   path +
+                   "\n"
+                   "  endspecify\n"
+                   "endmodule\n",
+               f);
+  return ReportedError(f.diag.Diagnostics(), message, 3, "30.4.1");
+}
+
+bool TerminalsAccepted(const std::string& ports, const std::string& path) {
+  ElabFixture f;
+  auto* design = ElaborateSrc("module m(" + ports +
+                                  ");\n"
+                                  "  specify\n"
+                                  "    " +
+                                  path +
+                                  "\n"
+                                  "  endspecify\n"
+                                  "endmodule\n",
+                              f);
+  return design != nullptr && !f.has_errors;
+}
+
+TEST(SpecifyTerminalElaboration, OutputInAFullPathSourceListErrors) {
+  EXPECT_TRUE(TerminalReported("input i, output o, output y",
+                               "(i, o *> y) = 5;", kOutputSource));
+}
+
+TEST(SpecifyTerminalElaboration, InputsInAFullPathSourceListElaborate) {
+  EXPECT_TRUE(
+      TerminalsAccepted("input i, input j, output y", "(i, j *> y) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, InputInAFullPathDestinationListErrors) {
+  EXPECT_TRUE(TerminalReported("input i, input i2, output y",
+                               "(i *> y, i2) = 5;",
+                               "module path destination 'i2' must be "
+                               "connected to an output or inout port"));
+}
+
+TEST(SpecifyTerminalElaboration, OutputsInAFullPathDestinationListElaborate) {
+  EXPECT_TRUE(
+      TerminalsAccepted("input i, output y, output z", "(i *> y, z) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, OutputAsEdgeSensitivePathSourceErrors) {
+  EXPECT_TRUE(TerminalReported("input i, output o, output y",
+                               "(posedge o => (y : i)) = 5;", kOutputSource));
+}
+
+TEST(SpecifyTerminalElaboration, InputAsEdgeSensitivePathDestinationErrors) {
+  EXPECT_TRUE(TerminalReported("input i, input c, output y",
+                               "(posedge c => (i : c)) = 5;",
+                               "module path destination 'i' must be "
+                               "connected to an output or inout port"));
+}
+
+TEST(SpecifyTerminalElaboration, EdgeSensitivePathOnPortsElaborates) {
+  EXPECT_TRUE(TerminalsAccepted("input i, input c, output y",
+                                "(posedge c => (y : i)) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, OutputAsStateDependentPathSourceErrors) {
+  EXPECT_TRUE(TerminalReported("input i, output o, output y",
+                               "if (i) (o => y) = 5;", kOutputSource));
+}
+
+TEST(SpecifyTerminalElaboration, InputAsStateDependentPathDestinationErrors) {
+  EXPECT_TRUE(TerminalReported("input i, input c, output y",
+                               "if (i) (i => c) = 5;",
+                               "module path destination 'c' must be "
+                               "connected to an output or inout port"));
+}
+
+TEST(SpecifyTerminalElaboration, StateDependentPathOnPortsElaborates) {
+  EXPECT_TRUE(
+      TerminalsAccepted("input i, input c, output y", "if (i) (c => y) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, SelectsOfVectorPortsElaborate) {
+  EXPECT_TRUE(TerminalsAccepted("input [3:0] a, output [3:0] y",
+                                "(a[0] => y[1]) = 5; (a[3:2] *> y[1:0]) = 4;"));
+}
+
+TEST(SpecifyTerminalElaboration, SelectOfAnOutputAsSourceErrors) {
+  EXPECT_TRUE(TerminalReported(
+      "input [3:0] a, output [3:0] y", "(y[0] => a[1]) = 5;",
+      "module path source 'y' must be connected to an input or inout port"));
+}
+
+TEST(SpecifyTerminalElaboration, SelectOfAVariableInputAsSourceErrors) {
+  EXPECT_TRUE(TerminalReported("input var logic [1:0] i, output o",
+                               "(i[0] => o) = 5;",
+                               "module path source 'i' must be a net"));
+}
+
+TEST(SpecifyTerminalElaboration, AnsiInputWithADataTypeIsANetSource) {
+  EXPECT_TRUE(TerminalsAccepted("input logic i, output o", "(i => o) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, ResolvedNetTypesAreTerminals) {
+  EXPECT_TRUE(
+      TerminalsAccepted("input tri1 i, output wand o", "(i => o) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, LogicOutputVariableAsDestinationElaborates) {
+  EXPECT_TRUE(TerminalsAccepted("input i, output logic o", "(i => o) = 5;"));
+}
+
+TEST(SpecifyTerminalElaboration, IntOutputVariableAsDestinationElaborates) {
+  EXPECT_TRUE(TerminalsAccepted("input i, output int o", "(i *> o) = 5;"));
 }
 
 }  // namespace
