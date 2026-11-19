@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -246,6 +247,22 @@ TEST(TimingCheckArgumentParsing, NotifierExpressionIsRejected) {
   EXPECT_TRUE(ReportedError(
       r.diags, "a timing check's notifier is a variable identifier", 3,
       "A.7.5.2"));
+}
+
+TEST(TimingCheckArgumentParsing, HierarchicalNotifierNamesAreRejected) {
+  for (const char* notifier : {"s0.n", "i.n"}) {
+    auto r = Parse(std::string("module m;\n"
+                               "specify\n"
+                               "  $setup(d, posedge clk, 10, ") +
+                   notifier +
+                   ");\n"
+                   "endspecify\n"
+                   "endmodule\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags, "a timing check's notifier is a variable identifier", 3,
+        "A.7.5.2"))
+        << notifier;
+  }
 }
 
 TEST(TimingCheckArgumentParsing, DelayedReferenceAndDataEscapedIdentifiers) {
