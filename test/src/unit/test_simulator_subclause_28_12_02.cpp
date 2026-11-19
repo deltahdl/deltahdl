@@ -448,4 +448,79 @@ TEST(StrengthResolution, SourceStrongHWithWeakZeroIs36X) {
   EXPECT_EQ(out, "y=x 36X w=1 651\n");
 }
 
+TEST(AmbiguousStrengthSources, ALogicGateWithAnUnknownResultDrivesHLOrX) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, x;\n"
+      "  wire g1, g2, g3, g4, g5;\n"
+      "  and (highz1, strong0) n1(g1, a, x);\n"
+      "  and (strong1, strong0) n2(g2, a, x);\n"
+      "  and (strong1, highz0) n3(g3, a, x);\n"
+      "  or (pull1, highz0) n4(g4, x, 1'b0);\n"
+      "  xor (weak1, weak0) n5(g5, x, 1'b1);\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    x = 1'bx;\n"
+      "    #1 $display(\"%v %v %v %v %v\", g1, g2, g3, g4, g5);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "StL StX StH PuH WeX\n");
+}
+
+TEST(AmbiguousStrengthSources, TwoRangesOfOneValueSpanFromTheLowerToTheUpper) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg x, one, zero;\n"
+      "  wire w1, w2, w3, w4;\n"
+      "  bufif1 b1(w1, one, x);\n"
+      "  bufif1 (pull0, pull1) b2(w1, one, x);\n"
+      "  bufif1 b3(w2, one, x);\n"
+      "  assign (pull0, pull1) w2 = 1;\n"
+      "  bufif0 b4(w3, zero, x);\n"
+      "  assign (weak0, weak1) w3 = 0;\n"
+      "  bufif0 (weak0, weak1) b5(w4, zero, x);\n"
+      "  bufif0 (pull0, pull1) b6(w4, zero, x);\n"
+      "  initial begin\n"
+      "    x = 1'bx;\n"
+      "    one = 1;\n"
+      "    zero = 0;\n"
+      "    #1 $display(\"%v %v %v %v\", w1, w2, w3, w4);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "StH 651 630 PuL\n");
+}
+
+TEST(AmbiguousStrengthSources,
+     ASupplyThroughAPmosMakesTheSwitchNetworkStrongX) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, b, g, d;\n"
+      "  wire sx, px, pd;\n"
+      "  supply0 sup;\n"
+      "  pmos p1(sx, a, b);\n"
+      "  pullup (sx);\n"
+      "  pmos p2(sx, sup, g);\n"
+      "  and (strong1, weak0) n1(sx, d, d);\n"
+      "  pmos p3(px, a, b);\n"
+      "  pullup (px);\n"
+      "  pulldown (pd);\n"
+      "  pmos p4(px, pd, g);\n"
+      "  and (strong1, weak0) n2(px, d, d);\n"
+      "  initial begin\n"
+      "    a = 1;\n"
+      "    b = 1'bx;\n"
+      "    g = 1'bx;\n"
+      "    d = 0;\n"
+      "    #1 $display(\"%v %v\", sx, px);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "StX 56X\n");
+}
+
 }  // namespace

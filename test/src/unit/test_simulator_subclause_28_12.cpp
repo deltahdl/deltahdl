@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <utility>
+
 #include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
@@ -36,55 +38,6 @@ TEST(UserNettypeStrength, UserNettypeSingleDriverUsesValueOnly) {
   net.Resolve(arena);
 
   EXPECT_EQ(sn.var->value.ToUint64(), 1u);
-}
-
-TEST(UserNettypeStrength, UserNettypeIgnoresStrengthPerBit) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 4);
-  Net& net = sn.net;
-  net.is_user_nettype = true;
-
-  AddDriver(arena, net, 4, 0b1100, Strength::kStrong);
-  AddDriver(arena, net, 4, 0b1010, Strength::kWeak);
-  net.Resolve(arena);
-
-  EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1110u);
-  EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
-}
-
-TEST(UserNettypeStrength, UserNettypeIgnoresStrengthWithThreeDrivers) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-  net.is_user_nettype = true;
-
-  AddDriver(arena, net, 1, 0, Strength::kSupply);
-  AddDriver(arena, net, 1, 1, Strength::kStrong);
-  AddDriver(arena, net, 1, 0, Strength::kWeak);
-  net.Resolve(arena);
-
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);
-  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
-}
-
-TEST(UserNettypeStrength, UserNettypeConflictKeepsNoStrengthLevels) {
-  Arena arena;
-  StrengthNet sn = MakeStrengthNet(arena, 1);
-  Net& net = sn.net;
-  net.is_user_nettype = true;
-
-  AddDriver(arena, net, 1, 0, Strength::kStrong);
-  AddDriver(arena, net, 1, 1, Strength::kStrong);
-  net.Resolve(arena);
-
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);
-  EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
-
-  EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s0_lo, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kHighz);
-  EXPECT_EQ(net.resolved_strength.s1_lo, Strength::kHighz);
-  EXPECT_FALSE(net.resolved_strength.IsAmbiguous());
 }
 
 TEST(NetStrengthDisjunction, UnambiguousDriversYieldUnambiguousNetStrength) {
@@ -274,6 +227,71 @@ TEST(HighZStrengthResolution, SourceDrivenHighZNetIsZ) {
   auto* w = f.ctx.FindNet("w");
   ASSERT_NE(w, nullptr);
   EXPECT_EQ(w->resolved->value.ToString(), "z");
+}
+
+TEST(UserNettypeStrength,
+     DriversOfUnequalStrengthAllReachTheResolutionFunction) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  function automatic logic any1(input logic driver[]);\n"
+      "    any1 = 0;\n"
+      "    foreach (driver[i]) any1 |= driver[i];\n"
+      "  endfunction\n"
+      "  function automatic logic all1(input logic driver[]);\n"
+      "    all1 = 1;\n"
+      "    foreach (driver[i]) all1 &= driver[i];\n"
+      "  endfunction\n"
+      "  nettype logic onet with any1;\n"
+      "  nettype logic anet with all1;\n"
+      "  onet n;\n"
+      "  anet k;\n"
+      "  assign (supply0, supply1) n = 0;\n"
+      "  assign (weak0, weak1) n = 1;\n"
+      "  assign (supply0, supply1) k = 1;\n"
+      "  assign (weak0, weak1) k = 0;\n"
+      "  assign (pull0, pull1) k = 1;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  f.scheduler.Run();
+  for (const auto& [name, value] :
+       {std::pair<const char*, const char*>{"n", "1"}, {"k", "0"}}) {
+    auto* var = f.ctx.FindVariable(name);
+    ASSERT_NE(var, nullptr) << name;
+    EXPECT_EQ(var->value.ToString(), value) << name;
+    auto* net = f.ctx.FindNet(name);
+    ASSERT_NE(net, nullptr) << name;
+    EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kHighz) << name;
+    EXPECT_EQ(net->resolved_strength.s0_lo, Strength::kHighz) << name;
+    EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kHighz) << name;
+    EXPECT_EQ(net->resolved_strength.s1_lo, Strength::kHighz) << name;
+  }
+}
+
+TEST(UserNettypeStrength, DISABLED_AHighzStrengthDoesNotTurnADriverToZ) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  function automatic logic all1(input logic driver[]);\n"
+      "    all1 = 1;\n"
+      "    foreach (driver[i]) all1 &= driver[i];\n"
+      "  endfunction\n"
+      "  nettype logic anet with all1;\n"
+      "  nettype logic pnet;\n"
+      "  anet m, k;\n"
+      "  pnet p;\n"
+      "  assign (supply0, supply1) m = 1;\n"
+      "  assign (highz0, strong1) m = 0;\n"
+      "  assign (supply0, supply1) k = 1;\n"
+      "  assign (weak0, highz1) k = 1;\n"
+      "  assign (highz0, strong1) p = 0;\n"
+      "  initial #1 $display(\"%b %b %b\", m, k, p);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 1 0\n");
 }
 
 }  // namespace

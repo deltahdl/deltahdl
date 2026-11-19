@@ -554,4 +554,81 @@ TEST(WiredLogicPipeline, AmbiguousDriverCombinesOverAllLevels) {
             "wa=0 650 wo=x 65X\n");
 }
 
+TEST(WiredLogicPipeline, AStrongerDriverDominatesEveryWiredNet) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  wand wa;\n"
+      "  wor wo;\n"
+      "  triand ta;\n"
+      "  trior ro;\n"
+      "  assign (strong0, strong1) wa = 1'b1;\n"
+      "  assign (weak0, weak1) wa = 1'b0;\n"
+      "  assign (strong0, strong1) wo = 1'b0;\n"
+      "  assign (weak0, weak1) wo = 1'b1;\n"
+      "  assign (strong0, strong1) ta = 1'b1;\n"
+      "  assign (weak0, weak1) ta = 1'b0;\n"
+      "  assign (strong0, strong1) ro = 1'b0;\n"
+      "  assign (weak0, weak1) ro = 1'b1;\n"
+      "  initial #1 $display(\"%b %v %b %v %b %v %b %v\", wa, wa, wo, wo, ta, "
+      "ta, ro, ro);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 St1 0 St0 1 St1 0 St0\n");
+}
+
+TEST(WiredLogicPipeline, EqualDriversKeepTheirSharedStrengthOnEveryWiredNet) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  wor o1, wp;\n"
+      "  triand tp;\n"
+      "  trior rp;\n"
+      "  wand ap;\n"
+      "  assign (pull0, pull1) o1 = 1'b1;\n"
+      "  assign (pull0, pull1) o1 = 1'b1;\n"
+      "  assign (pull0, pull1) wp = 1'b0;\n"
+      "  assign (pull0, pull1) wp = 1'b1;\n"
+      "  assign (weak0, weak1) tp = 1'b0;\n"
+      "  assign (weak0, weak1) tp = 1'b1;\n"
+      "  assign (weak0, weak1) rp = 1'b0;\n"
+      "  assign (weak0, weak1) rp = 1'b1;\n"
+      "  assign (pull0, pull1) ap = 1'b0;\n"
+      "  assign (pull0, pull1) ap = 1'b1;\n"
+      "  initial #1 $display(\"%v %v %v %v %v\", o1, wp, tp, rp, ap);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "Pu1 Pu1 We0 We1 Pu0\n");
+}
+
+TEST(WiredLogicPipeline, AmbiguousThreeStateDriversPairEveryLevel) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg x, one, zero;\n"
+      "  wand wa;\n"
+      "  wor wo;\n"
+      "  triand ta;\n"
+      "  trior ro;\n"
+      "  bufif0 b1(wa, zero, x);\n"
+      "  assign (pull0, pull1) wa = 0;\n"
+      "  assign (pull0, pull1) wa = 1;\n"
+      "  bufif0 b2(wo, zero, x);\n"
+      "  assign (pull0, pull1) wo = 0;\n"
+      "  assign (pull0, pull1) wo = 1;\n"
+      "  bufif1 (pull0, pull1) b3(ta, zero, x);\n"
+      "  bufif1 (pull0, pull1) b4(ta, one, x);\n"
+      "  bufif1 (pull0, pull1) b5(ro, zero, x);\n"
+      "  bufif1 (pull0, pull1) b6(ro, one, x);\n"
+      "  initial begin\n"
+      "    x = 1'bx;\n"
+      "    one = 1;\n"
+      "    zero = 0;\n"
+      "    #1 $display(\"%v %v %v %v\", wa, wo, ta, ro);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "650 65X PuX PuX\n");
+}
+
 }  // namespace

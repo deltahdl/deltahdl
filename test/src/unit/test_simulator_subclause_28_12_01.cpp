@@ -212,4 +212,30 @@ TEST(StrengthResolutionPipeline, InterfaceNetDriversCombineByStrength) {
   EXPECT_EQ(out, "y=0 Pu0\n");
 }
 
+TEST(UnequalStrengthCombination, ASupplyDriverOverridesATriregsStoredCharge) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg c, s;\n"
+      "  trireg (large) tr;\n"
+      "  trireg (small) ts;\n"
+      "  assign tr = c ? 1'bz : 1'b1;\n"
+      "  assign ts = c ? 1'bz : 1'b0;\n"
+      "  assign (supply0, supply1) tr = s;\n"
+      "  assign (weak0, weak1) ts = s;\n"
+      "  initial begin\n"
+      "    c = 0;\n"
+      "    s = 1'bz;\n"
+      "    #1 c = 1;\n"
+      "    #1 $display(\"%v %v\", tr, ts);\n"
+      "    s = 1;\n"
+      "    #1 $display(\"%v %v\", tr, ts);\n"
+      "    s = 0;\n"
+      "    #1 $display(\"%v %v\", tr, ts);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "La1 Sm0\nSu1 We1\nSu0 We0\n");
+}
+
 }  // namespace

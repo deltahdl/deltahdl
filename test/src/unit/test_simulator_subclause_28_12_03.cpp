@@ -569,4 +569,33 @@ TEST(NetStrengthAmbigUnambig, ModelAndCombinerAgreeWithNoOppositeSurvivor) {
        StrengthLevel::kHighz});
 }
 
+TEST(AmbiguousWithUnambiguous, AThreeStateRangeBesideAKnownDriverFromSource) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg x, one, zero;\n"
+      "  wire w1, w2, w3, w4, w5, w6;\n"
+      "  bufif1 (pull0, pull1) b1(w1, one, x);\n"
+      "  assign w1 = 1;\n"
+      "  bufif1 (pull0, pull1) b2(w2, one, x);\n"
+      "  assign w2 = 0;\n"
+      "  bufif0 (weak0, weak1) b3(w3, zero, x);\n"
+      "  assign (pull0, pull1) w3 = 1;\n"
+      "  bufif1 b4(w4, one, x);\n"
+      "  assign (pull0, pull1) w4 = 0;\n"
+      "  bufif1 b5(w5, one, x);\n"
+      "  assign (weak0, weak1) w5 = 0;\n"
+      "  bufif0 b6(w6, zero, x);\n"
+      "  assign (pull0, pull1) w6 = 0;\n"
+      "  initial begin\n"
+      "    x = 1'bx;\n"
+      "    one = 1;\n"
+      "    zero = 0;\n"
+      "    #1 $display(\"%v %v %v %v %v %v\", w1, w2, w3, w4, w5, w6);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "St1 St0 Pu1 56X 36X 650\n");
+}
+
 }  // namespace
