@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -353,6 +354,27 @@ TEST(TriregChargeStorage, ABitHoldingChargeAloneDecaysAlone) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "1x\n");
+}
+
+TEST(TriregChargeStorage,
+     ADrivenTriregRisesAfterTheFirstDelayAndFallsAfterTheSecond) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  reg v;\n"
+      "  trireg #(7,11,500) t;\n"
+      "  assign t = v;\n"
+      "  initial begin\n"
+      "    $monitor(\"%0t %v\", $time, t);\n"
+      "    v = 0;\n"
+      "    #50 v = 1; #50 v = 0; #50 v = 1'bx; #50 v = 1; #50 v = 1'bx;\n"
+      "    #50 v = 0; #50 $finish;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out,
+            "0 MeX\n11 St0\n57 St1\n111 St0\n157 StX\n207 St1\n257 StX\n"
+            "311 St0\n$finish at time 350\n");
 }
 
 }  // namespace

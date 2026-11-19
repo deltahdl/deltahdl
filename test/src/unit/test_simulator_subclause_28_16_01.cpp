@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common/types.h"
+#include "elaborator/const_eval.h"
 #include "fixture_simulator.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
@@ -129,6 +130,60 @@ bool TriregDecayedBy(const char* finish_stmt) {
 TEST(MinTypMaxDelaySim, TriregChargeDecayTimeTripleDecaysAtTheTypicalMember) {
   EXPECT_FALSE(TriregDecayedBy("    #30 $finish;\n"));
   EXPECT_TRUE(TriregDecayedBy("    #50 $finish;\n"));
+}
+
+TEST(MinTypMaxDelaySim, UdpInstanceDelayTripleSelectsByMode) {
+  const std::string kSrc =
+      "primitive p(output y, input a);\n"
+      "  table 0 : 0; 1 : 1; endtable\n"
+      "endprimitive\n"
+      "module m;\n"
+      "  reg a;\n"
+      "  wire y;\n"
+      "  p #(3:5:7, 4:6:8) u(y, a);\n"
+      "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+      "endmodule\n";
+  EXPECT_EQ(SettleTicksUnderMode(kSrc, DelayMode::kMin), 103u);
+  EXPECT_EQ(SettleTicksUnderMode(kSrc, DelayMode::kTyp), 105u);
+  EXPECT_EQ(SettleTicksUnderMode(kSrc, DelayMode::kMax), 107u);
+}
+
+TEST(MinTypMaxDelaySim, NetDelayTripleTimesASeparateContinuousAssignment) {
+  const std::string kSrc =
+      "module m;\n"
+      "  reg a;\n"
+      "  wire #(3:5:7, 11) y;\n"
+      "  assign y = a;\n"
+      "  initial begin a = 1'b0; #100 a = 1'b1; end\n"
+      "endmodule\n";
+  EXPECT_EQ(SettleTicksUnderMode(kSrc, DelayMode::kMin), 103u);
+  EXPECT_EQ(SettleTicksUnderMode(kSrc, DelayMode::kTyp), 105u);
+  EXPECT_EQ(SettleTicksUnderMode(kSrc, DelayMode::kMax), 107u);
+}
+
+std::string TriregDecaySamplesUnderMode(DelayMode mode) {
+  DelayModeGuard guard(mode);
+  SimFixture f;
+  f.ctx.SetDelayMode(mode);
+  return RunCapture(
+      "module m;\n"
+      "  reg en;\n"
+      "  trireg #(0, 0, 20:40:60) cap;\n"
+      "  assign cap = en ? 1'b1 : 1'bz;\n"
+      "  initial begin\n"
+      "    en = 1; #100 en = 0;\n"
+      "    #19 $write(\"%b\", cap); #2 $write(\"%b\", cap);\n"
+      "    #18 $write(\"%b\", cap); #2 $write(\"%b\", cap);\n"
+      "    #18 $write(\"%b\", cap); #2 $display(\"%b\", cap);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+}
+
+TEST(MinTypMaxDelaySim, TriregChargeDecayTripleSelectsEveryMemberByMode) {
+  EXPECT_EQ(TriregDecaySamplesUnderMode(DelayMode::kMin), "1xxxxx\n");
+  EXPECT_EQ(TriregDecaySamplesUnderMode(DelayMode::kTyp), "111xxx\n");
+  EXPECT_EQ(TriregDecaySamplesUnderMode(DelayMode::kMax), "11111x\n");
 }
 
 }  // namespace
