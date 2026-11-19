@@ -227,4 +227,117 @@ TEST(DrivenTimingCheckEvaluation,
             "1\n2\n");
 }
 
+constexpr const char* kNochangeViolation = "$nochange violation: data signal";
+
+bool RanNochange(const char* args, const char* initial_ctl,
+                 const std::string& stimulus, SimFixture& f) {
+  std::string src =
+      "module top(\n"
+      "    output logic ctl,\n"
+      "    output logic d);\n"
+      "  specify\n"
+      "    $nochange(";
+  src += args;
+  src +=
+      ");\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    ctl = ";
+  src += initial_ctl;
+  src +=
+      ";\n"
+      "    d = 1'b0;\n";
+  return RanWithStimulus(src, stimulus, f);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     NochangeZeroOffsetLeadingEdgeAndDataInOneTimeStepReportNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("posedge ctl, d, 0, 0", "1'b0",
+                          "    #10 ctl = 1'b1;\n"
+                          "    d = 1'b1;\n"
+                          "    #20 ctl = 1'b0;\n",
+                          f));
+  EXPECT_EQ(FindDiag(f, kNochangeViolation), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     NochangeZeroOffsetDataBeforeLeadingEdgeInOneTimeStepReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("posedge ctl, d, 0, 0", "1'b0",
+                          "    #10 d = 1'b1;\n"
+                          "    ctl = 1'b1;\n"
+                          "    #20 ctl = 1'b0;\n",
+                          f));
+  EXPECT_EQ(FindDiag(f, kNochangeViolation), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     NochangeNegativeEndOffsetDataInTheCutTailReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("posedge ctl, d, 0, -5", "1'b0",
+                          "    #10 ctl = 1'b1;\n"
+                          "    #17 d = 1'b1;\n"
+                          "    #3 ctl = 1'b0;\n",
+                          f));
+  EXPECT_EQ(FindDiag(f, kNochangeViolation), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     NochangeNegativeEndOffsetDataBeforeTheCutIsReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("posedge ctl, d, 0, -5", "1'b0",
+                          "    #10 ctl = 1'b1;\n"
+                          "    #13 d = 1'b1;\n"
+                          "    #7 ctl = 1'b0;\n",
+                          f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), kNochangeViolation, 5, "31.4.6"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     NochangeNegativeStartOffsetDataInTheCutHeadReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("posedge ctl, d, -5, 0", "1'b0",
+                          "    #10 ctl = 1'b1;\n"
+                          "    #3 d = 1'b1;\n"
+                          "    #17 ctl = 1'b0;\n",
+                          f));
+  EXPECT_EQ(FindDiag(f, kNochangeViolation), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     NochangeNegativeStartOffsetDataAfterTheCutIsReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("posedge ctl, d, -5, 0", "1'b0",
+                          "    #10 ctl = 1'b1;\n"
+                          "    #7 d = 1'b1;\n"
+                          "    #13 ctl = 1'b0;\n",
+                          f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), kNochangeViolation, 5, "31.4.6"));
+}
+
+TEST(DrivenTimingCheckEvaluation, NochangeNegedgeDataWhileLowIsReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("negedge ctl, d, 0, 0", "1'b1",
+                          "    #10 ctl = 1'b0;\n"
+                          "    #5 d = 1'b1;\n"
+                          "    #10 ctl = 1'b1;\n",
+                          f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), kNochangeViolation, 5, "31.4.6"));
+}
+
+TEST(DrivenTimingCheckEvaluation, NochangeNegedgeDataWhileHighReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanNochange("negedge ctl, d, 0, 0", "1'b1",
+                          "    #10 ctl = 1'b0;\n"
+                          "    #10 ctl = 1'b1;\n"
+                          "    #5 d = 1'b1;\n"
+                          "    #10 ctl = 1'b0;\n",
+                          f));
+  EXPECT_EQ(FindDiag(f, kNochangeViolation), nullptr);
+}
+
 }  // namespace
