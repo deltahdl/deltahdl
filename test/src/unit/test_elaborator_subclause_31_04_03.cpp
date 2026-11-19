@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -117,6 +119,28 @@ TEST(SystemTimingCheckElaboration, FullskewNegativeBinaryExprLimitRejected) {
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "$fullskew timing check limit must be a non-negative", 3, "31.4.3"));
+}
+
+TEST(SystemTimingCheckElaboration, FullskewNetOrVariableLimitRejected) {
+  for (const char* limits : {"w, 4", "v, 4", "4, w", "4, v"}) {
+    ElabFixture f;
+    std::string src =
+        "module m(input clk, input d);\n"
+        "  wire [7:0] w;\n"
+        "  logic [7:0] v;\n"
+        "  specify\n"
+        "    $fullskew(posedge clk, d, ";
+    src += limits;
+    src +=
+        ");\n"
+        "  endspecify\n"
+        "endmodule\n";
+    ElaborateSrc(src, f);
+    std::string msg = "timing check limit operand '";
+    msg += std::string(limits).find('w') != std::string::npos ? "w" : "v";
+    msg += "' is not a specparam";
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 5, "31.2")) << limits;
+  }
 }
 
 }  // namespace
