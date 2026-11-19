@@ -298,4 +298,64 @@ TEST(StrengthReductionNonresistive, AStrengthChangeOfTheDataInputIsPassedOn) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
 }
 
+TEST(StrengthReductionNonresistive,
+     AnAmbiguousSupplyRangeLeavesEverySwitchStrong) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg x, on, off;\n"
+      "  wire sx, sh, sl;\n"
+      "  wire n1, p1, c1, t1, n2, p2, c2, t2, n3, t3;\n"
+      "  assign (supply0, supply1) sx = 1'bx;\n"
+      "  bufif1 (supply0, supply1) b1(sh, 1'b1, x);\n"
+      "  bufif1 (supply0, supply1) b2(sl, 1'b0, x);\n"
+      "  nmos (n1, sx, on);\n"
+      "  pmos (p1, sx, off);\n"
+      "  cmos (c1, sx, on, off);\n"
+      "  tran (sx, t1);\n"
+      "  nmos (n2, sh, on);\n"
+      "  pmos (p2, sh, off);\n"
+      "  cmos (c2, sl, off, off);\n"
+      "  tranif1 (t2, sh, on);\n"
+      "  nmos (n3, sl, on);\n"
+      "  tranif0 (t3, sl, off);\n"
+      "  initial begin\n"
+      "    x = 1'bx;\n"
+      "    on = 1;\n"
+      "    off = 0;\n"
+      "    #1 $display(\"%v %v %v %v | %v %v %v %v | %v %v\", n1, p1, c1, t1, "
+      "n2, p2, c2, t2, n3, t3);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "StX StX StX StX | StH StH StL StH | StL StL\n");
+}
+
+TEST(StrengthReductionNonresistive, AMixedRangeLosesOnlyItsSupplyLevel) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg x, on, off;\n"
+      "  wire m, wx, n1, p1, c1, t1, c2, t2;\n"
+      "  bufif1 (supply0, supply1) b1(m, 1'b1, x);\n"
+      "  assign (pull0, pull1) m = 1'b0;\n"
+      "  assign (weak0, weak1) wx = 1'bx;\n"
+      "  nmos (n1, m, on);\n"
+      "  pmos (p1, m, off);\n"
+      "  cmos (c1, m, on, off);\n"
+      "  tranif1 (m, t1, on);\n"
+      "  cmos (c2, wx, off, off);\n"
+      "  tran (wx, t2);\n"
+      "  initial begin\n"
+      "    x = 1'bx;\n"
+      "    on = 1;\n"
+      "    off = 0;\n"
+      "    #1 $display(\"%v | %v %v %v %v | %v %v\", m, n1, p1, c1, t1, c2, "
+      "t2);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "57X | 56X 56X 56X 56X | WeX WeX\n");
+}
+
 }  // namespace
