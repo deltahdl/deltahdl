@@ -483,4 +483,117 @@ TEST(NegativeTimingCheckSwitches,
                             "31.3.6"));
 }
 
+TEST(NegativeTimingCheckSwitches, SetupholdWithBothLimitsNegativeIsReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$setuphold(posedge r, posedge d, -10, -5);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to -15 in units of simulation precision", 4,
+                            "31.3.3"));
+}
+
+TEST(NegativeTimingCheckSwitches, RecremWithBothLimitsNegativeIsReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$recrem(posedge r, posedge d, -10, -5);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to -15 in units of simulation precision", 4,
+                            "31.3.6"));
+}
+
+std::string WindowDesign(const std::string& check, int data_at) {
+  return "`timescale 1ns/1ns\n"
+         "module top(output reg r = 0, output reg d = 0);\n"
+         "  reg n = 0; integer cnt = 0;\n"
+         "  specify\n"
+         "    " +
+         check +
+         "\n"
+         "  endspecify\n"
+         "  always @(n) cnt = cnt + 1;\n"
+         "  initial begin\n"
+         "    fork #100 r = 1; #" +
+         std::to_string(data_at) +
+         " d = 1; join\n"
+         "    #50 $display(\"%0d\", cnt);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string TogglesForDataAt(const std::string& check,
+                             const std::vector<int>& offsets) {
+  std::string out;
+  for (int offset : offsets) {
+    SimFixture f;
+    out += RunUnder(WindowDesign(check, 100 + offset), {true, false}, f);
+  }
+  return out;
+}
+
+TEST(NegativeTimingCheckSwitches, NegativeRemovalShiftsTheWindowAfterTheEdge) {
+  EXPECT_EQ(
+      TogglesForDataAt("$recrem(posedge r, posedge d, 10, -5, n);", {3, 7, 12}),
+      "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches,
+     NegativeRecoveryShiftsTheWindowBeforeTheEdge) {
+  EXPECT_EQ(TogglesForDataAt("$recrem(posedge r, posedge d, -5, 10, n);",
+                             {-12, -7, -3}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches, NegativeSetupFromASpecparamShiftsTheWindow) {
+  EXPECT_EQ(TogglesForDataAt("specparam tS = -10;\n"
+                             "    $setuphold(posedge r, d, tS, 20, n);",
+                             {9, 11, 25}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches,
+     NegativeSetupFromAConstantExpressionShiftsTheWindow) {
+  EXPECT_EQ(TogglesForDataAt("$setuphold(posedge r, d, -(4 + 6), 20, n);",
+                             {9, 11, 25}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches,
+     NegativeSetupFromATypicalValueShiftsTheWindow) {
+  EXPECT_EQ(TogglesForDataAt("$setuphold(posedge r, d, -12:-10:-8, 20, n);",
+                             {9, 11, 25}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches,
+     NegativeRemovalFromASpecparamShiftsTheWindow) {
+  EXPECT_EQ(TogglesForDataAt("specparam tRem = -5;\n"
+                             "    $recrem(posedge r, posedge d, 10, tRem, n);",
+                             {4, 6, 12}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches,
+     NegativeRemovalFromAConstantExpressionShiftsTheWindow) {
+  EXPECT_EQ(TogglesForDataAt("$recrem(posedge r, posedge d, 10, -(2 + 3), n);",
+                             {4, 6, 12}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches,
+     NegativeRemovalFromATypicalValueShiftsTheWindow) {
+  EXPECT_EQ(TogglesForDataAt("$recrem(posedge r, posedge d, 10, -7:-5:-3, n);",
+                             {4, 6, 12}),
+            "0\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches, PositiveSetupholdLimitsBehaveAsUsual) {
+  EXPECT_EQ(TogglesForDataAt("$setuphold(posedge r, d, 10, 20, n);",
+                             {-15, -5, 5, 25}),
+            "0\n1\n1\n0\n");
+}
+
+TEST(NegativeTimingCheckSwitches, PositiveRecremLimitsBehaveAsUsual) {
+  EXPECT_EQ(TogglesForDataAt("$recrem(posedge r, posedge d, 10, 20, n);",
+                             {-25, -15, 5, 15}),
+            "0\n1\n1\n0\n");
+}
+
 }  // namespace
