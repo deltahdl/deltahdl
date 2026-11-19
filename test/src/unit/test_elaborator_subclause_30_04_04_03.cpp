@@ -208,4 +208,86 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             7, "30.4.4.3"));
 }
 
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     DISABLED_DuplicateUnconditionalEdgePathIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clk, output q);\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    (posedge clk => (q : d)) = 1;\n"
+      "    (posedge clk => (q : d)) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "must be made unique by edge, condition, or both",
+                            5, "30.4.4.3"));
+}
+
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     UnconditionalAndConditionalSameEdgeElaborate) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input c, output q);\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    (posedge clk => (q : d)) = 1;\n"
+      "    if (c) (posedge clk => (q : d)) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     DuplicateAcrossSpecifyBlocksIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clk, input c, output q);\n"
+      "  reg d;\n"
+      "  specify\n"
+      "    if (c) (posedge clk => (q : d)) = (10, 5);\n"
+      "  endspecify\n"
+      "  specify\n"
+      "    if (c) (posedge clk => (q : d)) = (15, 8);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "must be made unique by edge, condition, or both",
+                            7, "30.4.4.3"));
+}
+
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     InconsistentReferenceUniqueByEdgeAloneIsIllegal) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clk, input [3:0] d, output [3:0] q);\n"
+      "  specify\n"
+      "    (posedge clk *> (q : d)) = 1;\n"
+      "    (negedge clk *> (q[0] : d)) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "bit-select, or part-select)",
+                            4, "30.4.4.3"));
+}
+
+TEST(EdgeSensitiveStateDependentPathElaboration,
+     ConsistentReferenceUniqueByEdgeAloneElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module m(input clk, input [3:0] d, output [3:0] q);\n"
+      "  specify\n"
+      "    (posedge clk *> (q[0] : d)) = 1;\n"
+      "    (negedge clk *> (q[0] : d)) = 2;\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
