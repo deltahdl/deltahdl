@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "fixture_simulator.h"
 #include "simulator/udp_eval.h"
@@ -213,6 +215,24 @@ TEST(UdpInitialStatementRun, InitialValueIsOnTheNetAtTimeZero) {
                        "endmodule\n",
                        f),
             "t0 1\nt0+ 1\nt1 1\n");
+}
+
+TEST(UdpInitialStatementRun, InstanceDelaysDoNotPostponeTheInitialValue) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(std::string(kSrff) + "module top;\n"
+                                      "  reg s, r; wire q, q2;\n"
+                                      "  srff #10 u(q, s, r);\n"
+                                      "  srff #(4,6) u2(q2, s, r);\n"
+                                      "  initial begin\n"
+                                      "    $write(\"%b%b \", q, q2);\n"
+                                      "    #3 $write(\"%b%b \", q, q2);\n"
+                                      "    #6 $display(\"%b%b\", q, q2);\n"
+                                      "  end\n"
+                                      "endmodule\n",
+                 f),
+      "11 11 11\n");
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace
