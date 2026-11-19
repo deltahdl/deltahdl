@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "driver/cli_options.h"
 #include "fixture_simulator.h"
@@ -158,6 +159,67 @@ TEST(PulseFilterStyleSim, OnEventInvocationOptionOverridesTheDeclaration) {
   ASSERT_TRUE(ParseCommandLine({"--pulse-style-onevent"}, opts));
   ApplyPulseControlOptions(opts, mgr);
   EXPECT_EQ(mgr.ResolvePulseStyle("out"), PulseStyle::kOnEvent);
+}
+
+std::string RunStyledPulse(const std::vector<std::string>& args,
+                           const std::string& style_line) {
+  SimFixture f;
+  CliOptions opts;
+  EXPECT_TRUE(ParseCommandLine(args, opts));
+  ApplyPulseControlOptions(opts, f.ctx.AcquireSpecifyManager());
+  return RunCapture(
+      "module mybuf(input a, output y);\n"
+      "  assign y = a;\n"
+      "  specify\n" +
+          style_line +
+          "    specparam PATHPULSE$ = (1, 5);\n"
+          "    (a => y) = (7, 9);\n"
+          "  endspecify\n"
+          "endmodule\n"
+          "module top;\n"
+          "  logic a;\n"
+          "  wire ty;\n"
+          "  mybuf u(.a(a), .y(ty));\n"
+          "  always @(ty) if ($time > 0)\n"
+          "    $display(\"t=%0t y=%b\", $time, ty);\n"
+          "  initial begin\n"
+          "    a = 1;\n"
+          "    #10 a = 0;\n"
+          "    #4 a = 1;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+constexpr std::string_view kOnEventWave = "t=7 y=1\nt=19 y=x\nt=21 y=1\n";
+constexpr std::string_view kOnDetectWave = "t=7 y=1\nt=14 y=x\nt=21 y=1\n";
+
+TEST(PulseStyleRun, WithoutDeclarationOrOptionTheFilteredPulseIsOnEvent) {
+  EXPECT_EQ(RunStyledPulse({}, ""), kOnEventWave);
+}
+
+TEST(PulseStyleRun, OnEventDeclarationKeepsTheScheduledLeadingEdge) {
+  EXPECT_EQ(RunStyledPulse({}, "    pulsestyle_onevent y;\n"), kOnEventWave);
+}
+
+TEST(PulseStyleRun, OnDetectOptionWithoutDeclarationMovesTheLeadingEdge) {
+  EXPECT_EQ(RunStyledPulse({"--pulse-style-ondetect"}, ""), kOnDetectWave);
+}
+
+TEST(PulseStyleRun, OnEventOptionWithoutDeclarationKeepsTheLeadingEdge) {
+  EXPECT_EQ(RunStyledPulse({"--pulse-style-onevent"}, ""), kOnEventWave);
+}
+
+TEST(PulseStyleRun, OnDetectOptionOverridesAnOnEventDeclaration) {
+  EXPECT_EQ(
+      RunStyledPulse({"--pulse-style-ondetect"}, "    pulsestyle_onevent y;\n"),
+      kOnDetectWave);
+}
+
+TEST(PulseStyleRun, OnEventOptionOverridesAnOnDetectDeclaration) {
+  EXPECT_EQ(
+      RunStyledPulse({"--pulse-style-onevent"}, "    pulsestyle_ondetect y;\n"),
+      kOnEventWave);
 }
 
 TEST(PulseFilterStyleSim, WithoutAStyleOptionTheDeclarationStands) {
