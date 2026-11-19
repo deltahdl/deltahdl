@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -151,6 +153,43 @@ TEST(TimingCheckCommandElaboration, WidthNegativeLimitNames31_4_4) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "$width timing check limit must be a non-negative",
                             3, "31.4.4"));
+}
+
+TEST(TimingCheckCommandElaboration, WidthNonConstantThresholdRejected) {
+  for (const char* name : {"w", "v", "notif"}) {
+    ElabFixture f;
+    std::string src =
+        "module m(input clr);\n"
+        "  wire [7:0] w;\n"
+        "  logic [7:0] v;\n"
+        "  reg notif;\n"
+        "  specify\n"
+        "    $width(negedge clr, 5, ";
+    src += name;
+    src +=
+        ");\n"
+        "  endspecify\n"
+        "endmodule\n";
+    ElaborateSrc(src, f);
+    std::string msg = "timing check limit operand '";
+    msg += name;
+    msg += "' is not a specparam";
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 6, "31.2")) << name;
+  }
+}
+
+TEST(TimingCheckCommandElaboration,
+     WidthNotifierAfterAZeroThresholdElaborates) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input clr);\n"
+      "  reg notif;\n"
+      "  specify\n"
+      "    $width(negedge clr, 5, 0, notif);\n"
+      "  endspecify\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

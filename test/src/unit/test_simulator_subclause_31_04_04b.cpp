@@ -40,6 +40,15 @@ constexpr const char* kNoThresholdDesignBeforeStimulus =
     "  initial begin\n"
     "    clk = 1'b0;\n";
 
+constexpr const char* kNegedgeDesignBeforeStimulus =
+    "module top(\n"
+    "    output logic clk);\n"
+    "  specify\n"
+    "    $width(negedge clk, 10);\n"
+    "  endspecify\n"
+    "  initial begin\n"
+    "    clk = 1'b1;\n";
+
 bool RanWithDesignAndStimulus(const char* design, const std::string& stimulus,
                               SimFixture& f) {
   auto* rtl = ElaborateSrc(std::string(design) + stimulus +
@@ -120,6 +129,57 @@ TEST(DrivenTimingCheckEvaluation, WidthWithoutAThresholdRegistersZero) {
   EXPECT_EQ(check->limit, 34u);
   EXPECT_EQ(check->threshold, 0u);
   EXPECT_EQ(check->limit2, 0u);
+}
+
+TEST(DrivenTimingCheckEvaluation, WidthPulseExactlyAtTheLimitReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithDesignAndStimulus(kThresholdDesignBeforeStimulus,
+                                       "    #40 clk = 1'b1;\n"
+                                       "    #21 clk = 1'b0;\n",
+                                       f));
+  EXPECT_EQ(FindDiag(f, "$width violation: signal"), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     WidthPulseExactlyAtTheThresholdReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithDesignAndStimulus(kThresholdDesignBeforeStimulus,
+                                       "    #40 clk = 1'b1;\n"
+                                       "    #8 clk = 1'b0;\n",
+                                       f));
+  EXPECT_EQ(FindDiag(f, "$width violation: signal"), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation, WidthNegedgeNarrowLowPulseIsReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithDesignAndStimulus(kNegedgeDesignBeforeStimulus,
+                                       "    #5 clk = 1'b0;\n"
+                                       "    #7 clk = 1'b1;\n",
+                                       f));
+  EXPECT_TRUE(ReportedWarning(
+      f.diag.Diagnostics(), "$width violation: signal",
+      LineHolding(kNegedgeDesignBeforeStimulus, "$width(negedge clk"),
+      "31.4.4"));
+}
+
+TEST(DrivenTimingCheckEvaluation, WidthNegedgeWideLowPulseReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithDesignAndStimulus(kNegedgeDesignBeforeStimulus,
+                                       "    #5 clk = 1'b0;\n"
+                                       "    #15 clk = 1'b1;\n"
+                                       "    #3 clk = 1'b0;\n",
+                                       f));
+  EXPECT_EQ(FindDiag(f, "$width violation: signal"), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation, WidthZeroWidthPulseReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanWithDesignAndStimulus(kNoThresholdDesignBeforeStimulus,
+                                       "    #40 clk = 1'b1;\n"
+                                       "    clk = 1'b0;\n"
+                                       "    #10 clk = 1'b0;\n",
+                                       f));
+  EXPECT_EQ(FindDiag(f, "$width violation: signal"), nullptr);
 }
 
 }  // namespace
