@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -92,6 +94,28 @@ TEST(SystemTimingCheckElaboration, SkewSpecparamArithmeticLimitElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SystemTimingCheckElaboration, SkewNetOrVariableLimitRejected) {
+  for (const char* name : {"w", "v"}) {
+    ElabFixture f;
+    std::string src =
+        "module m(input clk, input d);\n"
+        "  wire [7:0] w;\n"
+        "  logic [7:0] v;\n"
+        "  specify\n"
+        "    $skew(posedge clk, d, ";
+    src += name;
+    src +=
+        ");\n"
+        "  endspecify\n"
+        "endmodule\n";
+    ElaborateSrc(src, f);
+    std::string msg = "timing check limit operand '";
+    msg += name;
+    msg += "' is not a specparam";
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 5, "31.2")) << name;
+  }
 }
 
 }  // namespace

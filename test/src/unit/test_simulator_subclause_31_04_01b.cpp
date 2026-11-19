@@ -1,9 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 
+#include "common/diagnostic.h"
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_timing_check_one_time_step.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -93,6 +96,106 @@ TEST(DrivenTimingCheckEvaluation,
                               "    ref_sig = 1'b1;\n",
                               f));
   EXPECT_EQ(FindDiag(f, "$skew violation: data signal"), nullptr);
+}
+
+constexpr const char* kSkewViolation = "$skew violation: data signal";
+
+bool RanSkew(const char* limit, const std::string& stimulus, SimFixture& f) {
+  std::string src =
+      "module top(\n"
+      "    output logic r,\n"
+      "    output logic d);\n"
+      "  specify\n"
+      "    $skew(posedge r, posedge d, ";
+  src += limit;
+  src +=
+      ");\n"
+      "  endspecify\n"
+      "  initial begin\n"
+      "    r = 1'b0;\n"
+      "    d = 1'b0;\n";
+  src += stimulus;
+  src +=
+      "  end\n"
+      "endmodule\n";
+  auto* rtl = ElaborateSrc(src, f);
+  if (rtl == nullptr || f.has_errors) return false;
+  LowerAndRun(rtl, f);
+  return true;
+}
+
+size_t SkewReports(const SimFixture& f) {
+  size_t count = 0;
+  for (const Diagnostic& d : f.diag.Diagnostics()) {
+    if (d.message.find(kSkewViolation) != std::string::npos) ++count;
+  }
+  return count;
+}
+
+TEST(DrivenTimingCheckEvaluation, SkewDataExactlyAtTheLimitReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("10", "    #5 r = 1'b1;\n    #10 d = 1'b1;\n", f));
+  EXPECT_EQ(SkewReports(f), 0u);
+}
+
+TEST(DrivenTimingCheckEvaluation, SkewDataOneTickPastTheLimitIsReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("10", "    #5 r = 1'b1;\n    #11 d = 1'b1;\n", f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), kSkewViolation, 5, "31.4.1"));
+}
+
+TEST(DrivenTimingCheckEvaluation, ZeroLimitSkewDataOneTickLaterIsReported) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("0", "    #5 r = 1'b1;\n    #1 d = 1'b1;\n", f));
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), kSkewViolation, 5, "31.4.1"));
+}
+
+TEST(DrivenTimingCheckEvaluation, ZeroLimitSkewInOneTimeStepReportsNothing) {
+  EXPECT_TRUE(
+      SilentInEitherOrder("$skew(posedge r, posedge d, 0);", kSkewViolation));
+}
+
+TEST(DrivenTimingCheckEvaluation, SkewJudgesAnArbitrarilyLateDataEvent) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("10", "    #5 r = 1'b1;\n    #100000 d = 1'b1;\n", f));
+  EXPECT_EQ(SkewReports(f), 1u);
+  EXPECT_TRUE(
+      ReportedWarning(f.diag.Diagnostics(), kSkewViolation, 5, "31.4.1"));
+}
+
+TEST(DrivenTimingCheckEvaluation, SecondReferenceRestartsTheSkewWait) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("10",
+                      "    #5 r = 1'b1;\n"
+                      "    #7 r = 1'b0;\n"
+                      "    #8 r = 1'b1;\n"
+                      "    #5 d = 1'b1;\n",
+                      f));
+  EXPECT_EQ(SkewReports(f), 0u);
+}
+
+TEST(DrivenTimingCheckEvaluation, SkewDataWithoutAReferenceReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("10",
+                      "    #5 d = 1'b1;\n"
+                      "    #30 d = 1'b0;\n"
+                      "    #30 d = 1'b1;\n",
+                      f));
+  EXPECT_EQ(SkewReports(f), 0u);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     SkewReportsEveryLateDataEventAfterOneReference) {
+  SimFixture f;
+  ASSERT_TRUE(RanSkew("10",
+                      "    #5 r = 1'b1;\n"
+                      "    #20 d = 1'b1;\n"
+                      "    #5 d = 1'b0;\n"
+                      "    #5 d = 1'b1;\n",
+                      f));
+  EXPECT_EQ(SkewReports(f), 2u);
 }
 
 }  // namespace
