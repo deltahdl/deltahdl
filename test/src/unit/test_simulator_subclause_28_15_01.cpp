@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_net_declaration_places.h"
 #include "helpers_wide_undriven_net.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
@@ -239,6 +240,30 @@ TEST(Tri0Tri1NetStrengths, SignalThroughASwitchOverridesThePull) {
   EXPECT_EQ(t1->resolved->value.ToUint64() & 0x1, 0u);
   EXPECT_EQ(t1->resolved_strength.s0_hi, Strength::kStrong);
   EXPECT_EQ(t1->resolved_strength.s1_hi, Strength::kHighz);
+}
+
+TEST(Tri0Tri1NetStrengths, AnExplicitDataTypeKeepsThePullStrength) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  tri0 logic a;\n"
+      "  tri1 logic [3:0] b;\n"
+      "  tri0 logic [2:0] c;\n"
+      "  initial #1 $display(\"%v %v %v %v\", a, b[3], b[0], c[1]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "Pu0 Pu1 Pu1 Pu0\n");
+}
+
+TEST(Tri0Tri1NetStrengths, AnUndrivenNetIsPullInEveryPlaceItIsDeclared) {
+  for (auto place :
+       {NetDeclarationPlace::kCompilationUnit, NetDeclarationPlace::kInterface,
+        NetDeclarationPlace::kGenerate, NetDeclarationPlace::kProgram}) {
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "tri0 n;"), "Pu0\n")
+        << static_cast<int>(place);
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "tri1 n;"), "Pu1\n")
+        << static_cast<int>(place);
+  }
 }
 
 }  // namespace

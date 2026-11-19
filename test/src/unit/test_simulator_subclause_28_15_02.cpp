@@ -4,6 +4,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_net_declaration_places.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 
@@ -203,6 +204,74 @@ TEST(TriregChargeStrength, UndrivenTriregHoldsXAtItsChargeStrength) {
   EXPECT_EQ(t->resolved_strength.s1_hi, Strength::kMedium);
   EXPECT_EQ(u->resolved_strength.s0_hi, Strength::kLarge);
   EXPECT_EQ(u->resolved_strength.s1_hi, Strength::kLarge);
+}
+
+TEST(TriregChargeStrength, AnExplicitMediumDrivesTheHeldValueAtMedium) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg c = 0;\n"
+      "  trireg (medium) m;\n"
+      "  trireg (medium) logic [1:0] v;\n"
+      "  assign m = c ? 1'bz : 1'b1;\n"
+      "  assign v = c ? 2'bz : 2'b10;\n"
+      "  initial begin\n"
+      "    #1 c = 1;\n"
+      "    #1 $display(\"%v %v %v\", m, v[1], v[0]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "Me1 Me1 Me0\n");
+}
+
+TEST(TriregChargeStrength, AnExplicitDataTypeKeepsTheChargeStrength) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg c = 0;\n"
+      "  trireg (small) logic s;\n"
+      "  trireg (large) logic [1:0] l;\n"
+      "  trireg logic d;\n"
+      "  assign s = c ? 1'bz : 1'b0;\n"
+      "  assign l = c ? 2'bz : 2'b01;\n"
+      "  assign d = c ? 1'bz : 1'b1;\n"
+      "  initial begin\n"
+      "    #1 c = 1;\n"
+      "    #1 $display(\"%v %v %v %v\", s, l[1], l[0], d);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "Sm0 La0 La1 Me1\n");
+}
+
+TEST(TriregChargeStrength,
+     ADeclaredChargeStrengthHoldsInAnInterfaceGenerateOrProgram) {
+  for (auto place :
+       {NetDeclarationPlace::kInterface, NetDeclarationPlace::kGenerate,
+        NetDeclarationPlace::kProgram}) {
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "trireg (small) n;"), "SmX\n")
+        << static_cast<int>(place);
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "trireg (large) n;"), "LaX\n")
+        << static_cast<int>(place);
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "trireg n;"), "MeX\n")
+        << static_cast<int>(place);
+  }
+}
+
+TEST(TriregChargeStrength,
+     DISABLED_ADeclaredChargeStrengthHoldsInTheCompilationUnit) {
+  EXPECT_EQ(NetStrengthDeclaredIn(NetDeclarationPlace::kCompilationUnit,
+                                  "trireg (small) n;"),
+            "SmX\n");
+  EXPECT_EQ(NetStrengthDeclaredIn(NetDeclarationPlace::kCompilationUnit,
+                                  "trireg (large) n;"),
+            "LaX\n");
+}
+
+TEST(TriregChargeStrength, TheDefaultMediumHoldsInTheCompilationUnit) {
+  EXPECT_EQ(
+      NetStrengthDeclaredIn(NetDeclarationPlace::kCompilationUnit, "trireg n;"),
+      "MeX\n");
 }
 
 }  // namespace

@@ -4,6 +4,7 @@
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_net_declaration_places.h"
 #include "helpers_wide_undriven_net.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
@@ -150,6 +151,30 @@ TEST(SupplyNetStrengths, Supply1ContendedAtSupplyStrengthResolvesToX) {
   ExpectSupplyX(
       "  supply1 w;\n"
       "  buf (supply0, supply1) g (w, 1'b0);\n");
+}
+
+TEST(SupplyNetStrengths, AnExplicitDataTypeKeepsTheSupplyStrength) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  supply0 logic a;\n"
+      "  supply1 logic [1:0] b;\n"
+      "  supply0 logic [3:0] c;\n"
+      "  initial #1 $display(\"%v %v %v %v\", a, b[1], b[0], c[2]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "Su0 Su1 Su1 Su0\n");
+}
+
+TEST(SupplyNetStrengths, ASupplyNetIsSupplyInEveryPlaceItIsDeclared) {
+  for (auto place :
+       {NetDeclarationPlace::kCompilationUnit, NetDeclarationPlace::kInterface,
+        NetDeclarationPlace::kGenerate, NetDeclarationPlace::kProgram}) {
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "supply0 n;"), "Su0\n")
+        << static_cast<int>(place);
+    EXPECT_EQ(NetStrengthDeclaredIn(place, "supply1 n;"), "Su1\n")
+        << static_cast<int>(place);
+  }
 }
 
 }  // namespace
