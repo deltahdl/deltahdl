@@ -2,8 +2,11 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "driver/cli_options.h"
 #include "fixture_simulator.h"
+#include "helpers_command_line.h"
 
 using namespace delta;
 
@@ -114,6 +117,137 @@ TEST(NegativePulseAtOutput, TransitionsAfterARejectedStartupPulsePropagate) {
                        "endmodule\n",
                        f),
             "t=32 y=0\nt=55 y=1\n");
+}
+
+std::string RunNandPair(const std::vector<std::string>& args,
+                        const std::string& decls, int a_fall_after_b_rise) {
+  SimFixture f;
+  CliOptions opts;
+  EXPECT_TRUE(ParseCommandLine(args, opts));
+  ApplyPulseControlOptions(opts, f.ctx.AcquireSpecifyManager());
+  return RunCapture(
+      "module nand2(input A, input B, output Q);\n"
+      "  assign Q = ~(A & B);\n"
+      "  specify\n" +
+          decls +
+          "    (A => Q) = 10;\n"
+          "    (B => Q) = 14;\n"
+          "  endspecify\n"
+          "endmodule\n"
+          "module top;\n"
+          "  logic a, b;\n"
+          "  wire q;\n"
+          "  nand2 u(.A(a), .B(b), .Q(q));\n"
+          "  always @(q) if ($time > 50)\n"
+          "    $display(\"t=%0t q=%b\", $time, q);\n"
+          "  initial begin\n"
+          "    a = 1; b = 0;\n"
+          "    #100 b = 1;\n"
+          "    #" +
+          std::to_string(a_fall_after_b_rise) +
+          " a = 0;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+constexpr int kNearlySimultaneous = 2;
+constexpr int kSameScheduledTime = 4;
+
+TEST(NegativePulseAtOutput, TwoInputNandDefaultShowsNothing) {
+  EXPECT_EQ(RunNandPair({}, "", kNearlySimultaneous), "");
+}
+
+TEST(NegativePulseAtOutput, TwoInputNandShowcancelledOnEventShowsXBetween) {
+  EXPECT_EQ(RunNandPair({}, "    showcancelled Q;\n", kNearlySimultaneous),
+            "t=112 q=x\nt=114 q=1\n");
+}
+
+TEST(NegativePulseAtOutput, TwoInputNandShowcancelledOnDetectShowsXFromA) {
+  EXPECT_EQ(RunNandPair({},
+                        "    showcancelled Q;\n"
+                        "    pulsestyle_ondetect Q;\n",
+                        kNearlySimultaneous),
+            "t=102 q=x\nt=114 q=1\n");
+}
+
+TEST(NegativePulseAtOutput, SameTimeEdgesDefaultShowsNothing) {
+  EXPECT_EQ(RunNandPair({}, "", kSameScheduledTime), "");
+}
+
+TEST(NegativePulseAtOutput, SameTimeEdgesShowcancelledOnEventShowsNothing) {
+  EXPECT_EQ(RunNandPair({}, "    showcancelled Q;\n", kSameScheduledTime), "");
+}
+
+TEST(NegativePulseAtOutput,
+     DISABLED_SameTimeEdgesShowcancelledOnDetectShowsXUntilSchedule) {
+  EXPECT_EQ(RunNandPair({},
+                        "    showcancelled Q;\n"
+                        "    pulsestyle_ondetect Q;\n",
+                        kSameScheduledTime),
+            "t=104 q=x\nt=114 q=1\n");
+}
+
+TEST(NegativePulseAtOutput, SameTimeEdgesNoshowcancelledOnDetectShowsNothing) {
+  EXPECT_EQ(RunNandPair({},
+                        "    noshowcancelled Q;\n"
+                        "    pulsestyle_ondetect Q;\n",
+                        kSameScheduledTime),
+            "");
+}
+
+TEST(NegativePulseAtOutput, ShowcancelledOptionWithoutDeclarationShowsX) {
+  EXPECT_EQ(RunNandPair({"--showcancelled"}, "", kNearlySimultaneous),
+            "t=112 q=x\nt=114 q=1\n");
+}
+
+TEST(NegativePulseAtOutput, ShowcancelledOptionOverridesNoshowcancelled) {
+  EXPECT_EQ(RunNandPair({"--showcancelled"}, "    noshowcancelled Q;\n",
+                        kNearlySimultaneous),
+            "t=112 q=x\nt=114 q=1\n");
+}
+
+TEST(NegativePulseAtOutput, NoshowcancelledOptionOverridesShowcancelled) {
+  EXPECT_EQ(RunNandPair({"--noshowcancelled"},
+                        "    showcancelled Q;\n"
+                        "    pulsestyle_ondetect Q;\n",
+                        kNearlySimultaneous),
+            "");
+}
+
+TEST(NegativePulseAtOutput, InterleavedDeclarationsMatchTheListForm) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module mypair(input a, input b, output out, output out_b);\n"
+                 "  assign out = a;\n"
+                 "  assign out_b = b;\n"
+                 "  specify\n"
+                 "    showcancelled out;\n"
+                 "    pulsestyle_ondetect out;\n"
+                 "    (a => out) = (4, 6);\n"
+                 "    showcancelled out_b;\n"
+                 "    pulsestyle_ondetect out_b;\n"
+                 "    (b => out_b) = (4, 7);\n"
+                 "  endspecify\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  logic a, b;\n"
+                 "  wire t1, t2;\n"
+                 "  mypair u(.a(a), .b(b), .out(t1), .out_b(t2));\n"
+                 "  always @(t1) if ($time > 8)\n"
+                 "    $display(\"t=%0t out=%b\", $time, t1);\n"
+                 "  always @(t2) if ($time > 8)\n"
+                 "    $display(\"t=%0t out_b=%b\", $time, t2);\n"
+                 "  initial begin\n"
+                 "    a = 1; b = 1;\n"
+                 "    #10 a = 0;\n"
+                 "    #1 a = 1;\n"
+                 "    #19 b = 0;\n"
+                 "    #1 b = 1;\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "t=11 out=x\nt=16 out=1\nt=31 out_b=x\nt=37 out_b=1\n");
 }
 
 }  // namespace
