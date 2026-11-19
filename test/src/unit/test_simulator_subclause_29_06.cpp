@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -85,6 +88,27 @@ TEST(UdpEdgeSeq, RisingClockEdgeCapturesDataLetterSymbols) {
   EXPECT_EQ(state.EvaluateWithEdge({'0', '1'}, 0, '1'), '1');
   EXPECT_EQ(state.EvaluateWithEdge({'0', '0'}, 1, '1'), '1');
   EXPECT_EQ(state.EvaluateWithEdge({'1', '0'}, 0, '0'), '0');
+}
+
+TEST(UdpEdgeSeq, ClockToXHoldsAStateTheDataAgreesWithAndOtherwiseGivesX) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(std::string(kDEdgeFf) +
+                           "module m;\n"
+                           "  reg c, d;\n"
+                           "  wire q;\n"
+                           "  d_edge_ff u(q, c, d);\n"
+                           "  initial begin\n"
+                           "    c = 0; d = 1; #1 c = 1; #1 c = 0;\n"
+                           "    #1 c = 1'bx; #1 $write(\"%b\", q);\n"
+                           "    c = 0; d = 0; #1 c = 1; #1 c = 0;\n"
+                           "    #1 c = 1'bx; #1 $write(\"%b\", q);\n"
+                           "    c = 0; #1 d = 1; #1 c = 1'bx;\n"
+                           "    #1 $display(\"%b\", q);\n"
+                           "  end\n"
+                           "endmodule\n",
+                       f),
+            "10x\n");
+  EXPECT_FALSE(f.has_errors);
 }
 
 }  // namespace

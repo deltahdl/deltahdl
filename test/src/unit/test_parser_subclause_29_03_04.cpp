@@ -533,4 +533,32 @@ TEST(UdpStateTable, EdgeSymbolInCombinationalRowRejected) {
                             6, "29.3.4"));
 }
 
+bool AllXRowReported(const std::string& udp_header, const std::string& row) {
+  auto r = Parse(udp_header + "\n  table\n    " + row +
+                 "\n  endtable\nendprimitive\n");
+  return ReportedError(r.diags,
+                       "UDP table row with all-x inputs shall specify x output",
+                       3, "29.3.4");
+}
+
+TEST(UdpStateTable, UpperCaseAllXInputsWithZeroOutputRejected) {
+  EXPECT_TRUE(
+      AllXRowReported("primitive p(output y, input a, input b);", "X X : 0;"));
+}
+
+TEST(UdpStateTable, MixedCaseAllXInputsWithZeroOutputRejected) {
+  EXPECT_TRUE(
+      AllXRowReported("primitive p(output y, input a, input b);", "X x : 0;"));
+}
+
+TEST(UdpStateTable, SequentialAllXInputsWithHoldOutputRejected) {
+  EXPECT_TRUE(AllXRowReported("primitive s(output reg q, input a, input b);",
+                              "x x : 0 : -;"));
+}
+
+TEST(UdpStateTable, XBesideAQuestionMarkWithZeroOutputAccepted) {
+  EXPECT_FALSE(
+      AllXRowReported("primitive p(output y, input a, input b);", "x ? : 0;"));
+}
+
 }  // namespace

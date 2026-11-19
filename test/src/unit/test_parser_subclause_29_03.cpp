@@ -165,4 +165,28 @@ TEST(UdpTopLevelParsing, PrimitiveInsidePackageRejected) {
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
+void ExpectPrimitiveRejectedInGenerate(const std::string& opening,
+                                       const std::string& closing, int line) {
+  auto r = Parse("module m;\n" + opening +
+                 "    primitive inv(output out, input in);\n"
+                 "      table 0 : 1; 1 : 0; endtable\n"
+                 "    endprimitive\n" +
+                 closing + "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "unexpected token in module body", line,
+                            "23.2.4"));
+}
+
+TEST(UdpTopLevelParsing, PrimitiveInsideAGenerateRegionRejected) {
+  ExpectPrimitiveRejectedInGenerate("  generate\n", "  endgenerate\n", 3);
+}
+
+TEST(UdpTopLevelParsing, PrimitiveInsideAnIfGenerateBranchRejected) {
+  ExpectPrimitiveRejectedInGenerate("  if (1) begin : g\n", "  end\n", 3);
+}
+
+TEST(UdpTopLevelParsing, PrimitiveInsideAForGenerateLoopRejected) {
+  ExpectPrimitiveRejectedInGenerate(
+      "  genvar i;\n  for (i = 0; i < 2; i = i + 1) begin : g\n", "  end\n", 4);
+}
+
 }  // namespace

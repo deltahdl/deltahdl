@@ -497,4 +497,65 @@ TEST(UdpPortDeclaration, PortListedTwiceRejected) {
       "29.3.2"));
 }
 
+constexpr const char* kCombinationalRegMessage =
+    "combinational UDP shall not declare its output port reg";
+constexpr const char* kSequentialRegMessage =
+    "sequential UDP shall declare its output port reg";
+
+TEST(UdpPortDeclaration, CombinationalUdpWithNonAnsiOutputRegRejected) {
+  auto r = Parse(
+      "primitive c(y, a);\n"
+      "  output reg y;\n"
+      "  input a;\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kCombinationalRegMessage, 5, "29.3.2"));
+}
+
+TEST(UdpPortDeclaration, CombinationalUdpWithInitializedAnsiOutputRegRejected) {
+  auto r = Parse(
+      "primitive c(output reg y = 0, input a);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kCombinationalRegMessage, 3, "29.3.2"));
+}
+
+TEST(UdpPortDeclaration, SequentialUdpWithoutRegInAnsiHeaderRejected) {
+  auto r = Parse(
+      "primitive dff(output q, input d, clk);\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kSequentialRegMessage, 3, "29.3.2"));
+}
+
+TEST(UdpPortDeclaration, SequentialUdpWithoutRegInWildcardHeaderRejected) {
+  auto r = Parse(
+      "primitive dff(.*);\n"
+      "  output q;\n"
+      "  input d, clk;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kSequentialRegMessage, 5, "29.3.2"));
+}
+
+TEST(UdpPortDeclaration, SequentialUdpWithOutputRegInWildcardHeaderAccepted) {
+  auto r = Parse(
+      "primitive dff(.*);\n"
+      "  output reg q;\n"
+      "  input d, clk;\n"
+      "  table\n"
+      "    0 r : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace

@@ -287,4 +287,37 @@ TEST(UdpSymbolSemantics, UpperCaseSymbolsMatchAsTheLowerCaseOnesDo) {
   EXPECT_EQ(out, "1 1\n");
 }
 
+TEST(UdpSymbolSemantics, StarAndUpperCasePAndNMatchTheirXTransitions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("primitive star(output reg q, input c, d);\n"
+                       "  table\n"
+                       "    * 1 : ? : 1;\n"
+                       "    * 0 : ? : 0;\n"
+                       "    ? * : ? : -;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "primitive pn(output reg q, input c);\n"
+                       "  table\n"
+                       "    P : ? : 1;\n"
+                       "    N : ? : 0;\n"
+                       "  endtable\n"
+                       "endprimitive\n"
+                       "module m;\n"
+                       "  reg c, d;\n"
+                       "  wire q1, q2;\n"
+                       "  star s(q1, c, d);\n"
+                       "  pn u(q2, c);\n"
+                       "  initial begin\n"
+                       "    c = 0; d = 1; #1 c = 1'bx;\n"
+                       "    #1 $write(\"%b%b \", q1, q2);\n"
+                       "    d = 0; #1 c = 0; #1 $write(\"%b%b \", q1, q2);\n"
+                       "    c = 1'bx; #1 d = 1; #1 c = 1;\n"
+                       "    #1 $display(\"%b%b\", q1, q2);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "11 00 11\n");
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

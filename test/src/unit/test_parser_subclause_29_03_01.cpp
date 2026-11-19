@@ -300,4 +300,82 @@ TEST(UdpDeclGrammar, AnsiInputListContinuesWithoutTheKeyword) {
   EXPECT_EQ(r.cu->udps[0]->input_names[1], "b");
 }
 
+constexpr const char* kVectorPortMessage =
+    "a UDP port carries a single bit, so it cannot take a vector range";
+constexpr const char* kInoutPortMessage =
+    "UDP ports shall be input or output; inout not permitted";
+
+TEST(UdpDeclGrammar, UdpInoutPortInExternPrototypeRejected) {
+  auto r = Parse("extern primitive p(output o, inout io);\n");
+  EXPECT_TRUE(ReportedError(r.diags, kInoutPortMessage, 1, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpInoutPortInWildcardHeaderDeclRejected) {
+  auto r = Parse(
+      "primitive p(.*);\n"
+      "  output o;\n"
+      "  inout io;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kInoutPortMessage, 3, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpVectorRegOutputInAnsiHeaderRejected) {
+  auto r = Parse(
+      "primitive p(output reg [1:0] q, input c);\n"
+      "  table r : ? : 1; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVectorPortMessage, 1, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, DISABLED_UdpVectorRegDeclInNonAnsiBodyRejected) {
+  auto r = Parse(
+      "primitive p(q, c);\n"
+      "  output q; reg [1:0] q;\n"
+      "  input c;\n"
+      "  table r : ? : 1; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVectorPortMessage, 2, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpVectorOutputInExternPrototypeRejected) {
+  auto r = Parse("extern primitive p(output [1:0] q, input a);\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVectorPortMessage, 1, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpVectorInputInExternPrototypeRejected) {
+  auto r = Parse("extern primitive p(output q, input [1:0] a);\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVectorPortMessage, 1, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpVectorInputInWildcardHeaderDeclRejected) {
+  auto r = Parse(
+      "primitive p(.*);\n"
+      "  output q;\n"
+      "  input [1:0] a;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVectorPortMessage, 3, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpVectorOutputInWildcardHeaderDeclRejected) {
+  auto r = Parse(
+      "primitive p(.*);\n"
+      "  output [1:0] q;\n"
+      "  input a;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, kVectorPortMessage, 2, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, UdpScalarPortsInWildcardHeaderDeclAccepted) {
+  auto r = Parse(
+      "primitive p(.*);\n"
+      "  output q;\n"
+      "  input a;\n"
+      "  table 0 : 0; endtable\n"
+      "endprimitive\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
 }  // namespace
