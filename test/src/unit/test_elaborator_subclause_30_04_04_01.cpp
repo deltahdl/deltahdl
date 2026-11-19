@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -525,6 +527,199 @@ TEST(OperatorElaboration, FunctionCallOperandElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+std::string ConditionSource(const std::string& condition) {
+  return "module m(input [1:0] a, input b, inout [1:0] io, output [1:0] y,\n"
+         "         output reg r);\n"
+         "  parameter P = 1;\n"
+         "  localparam LP = 0;\n"
+         "  logic [3:0] g;\n"
+         "  wire [3:0] w;\n"
+         "  specify\n"
+         "    if (" +
+         condition +
+         ") (b => r) = 3;\n"
+         "  endspecify\n"
+         "endmodule\n";
+}
+
+void ExpectConditionAccepted(const std::string& condition) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(ConditionSource(condition), f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+void ExpectConditionReported(const std::string& condition,
+                             const std::string& message) {
+  ElabFixture f;
+  ElaborateSrc(ConditionSource(condition), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 8, "30.4.4.1"));
+}
+
+TEST(OperatorElaboration, LocalVariableBitSelectOperandElaborates) {
+  ExpectConditionAccepted("g[0]");
+}
+
+TEST(OperatorElaboration, LocalVariablePartSelectOperandElaborates) {
+  ExpectConditionAccepted("g[1:0]");
+}
+
+TEST(OperatorElaboration, LocalNetBitSelectOperandElaborates) {
+  ExpectConditionAccepted("w[3]");
+}
+
+TEST(OperatorElaboration, LocalNetPartSelectOperandElaborates) {
+  ExpectConditionAccepted("w[2:1]");
+}
+
+TEST(OperatorElaboration, LocalNetIndexedPartSelectOperandElaborates) {
+  ExpectConditionAccepted("w[1+:2]");
+}
+
+TEST(OperatorElaboration, ModuleParameterOperandElaborates) {
+  ExpectConditionAccepted("b && P");
+}
+
+TEST(OperatorElaboration, LocalParameterOperandElaborates) {
+  ExpectConditionAccepted("b || LP");
+}
+
+TEST(OperatorElaboration, InoutPortBitSelectOperandElaborates) {
+  ExpectConditionAccepted("io[1]");
+}
+
+TEST(OperatorElaboration, InoutPortPartSelectOperandElaborates) {
+  ExpectConditionAccepted("io[1:0]");
+}
+
+TEST(OperatorElaboration, BitwiseOrOperatorElaborates) {
+  ExpectConditionAccepted("a[0] | b");
+}
+
+TEST(OperatorElaboration, BitwiseXorOperatorElaborates) {
+  ExpectConditionAccepted("a[0] ^ b");
+}
+
+TEST(OperatorElaboration, ReductionXnorOperatorElaborates) {
+  ExpectConditionAccepted("^~a");
+}
+
+TEST(OperatorElaboration, ReductionXnorAltOperatorElaborates) {
+  ExpectConditionAccepted("~^a");
+}
+
+TEST(OperatorElaboration, ConditionWithManyOperandsAndOperatorsElaborates) {
+  ExpectConditionAccepted("~(a[0] & b) | (a[1] ^ b) && !b || {a, b} == {2{b}}");
+}
+
+TEST(OperatorElaboration, OutputPortPartSelectOperandIsRejected) {
+  ExpectConditionReported(
+      "y[1:0]",
+      "state-dependent path condition operand 'y' may not be an output port");
+}
+
+TEST(OperatorElaboration, OutputPortIndexedPartSelectOperandIsRejected) {
+  ExpectConditionReported(
+      "y[0+:1]",
+      "state-dependent path condition operand 'y' may not be an output port");
+}
+
+TEST(OperatorElaboration, OutputVariablePortOperandIsRejected) {
+  ExpectConditionReported(
+      "r",
+      "state-dependent path condition operand 'r' may not be an output port");
+}
+
+TEST(OperatorElaboration, CaseInequalityOperatorIsRejected) {
+  ExpectConditionReported("a !== b",
+                          "binary operator '!==' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, WildcardEqualityOperatorIsRejected) {
+  ExpectConditionReported("a ==? b",
+                          "binary operator '==?' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, WildcardInequalityOperatorIsRejected) {
+  ExpectConditionReported("a !=? b",
+                          "binary operator '!=?' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, ImplicationOperatorIsRejected) {
+  ExpectConditionReported("a[0] -> b",
+                          "binary operator '->' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, EquivalenceOperatorIsRejected) {
+  ExpectConditionReported("a[0] <-> b",
+                          "binary operator '<->' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, MultiplicationOperatorIsRejected) {
+  ExpectConditionReported("a * b",
+                          "binary operator '*' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, DivisionOperatorIsRejected) {
+  ExpectConditionReported("a / b",
+                          "binary operator '/' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, ModulusOperatorIsRejected) {
+  ExpectConditionReported("a % b",
+                          "binary operator '%' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, UnaryMinusOperatorIsRejected) {
+  ExpectConditionReported("-a",
+                          "unary operator '-' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, LogicalRightShiftOperatorIsRejected) {
+  ExpectConditionReported("a >> 1",
+                          "binary operator '>>' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, ArithmeticRightShiftOperatorIsRejected) {
+  ExpectConditionReported("a >>> 1",
+                          "binary operator '>>>' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, ArithmeticLeftShiftOperatorIsRejected) {
+  ExpectConditionReported("a <<< 1",
+                          "binary operator '<<<' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, LessOrEqualOperatorIsRejected) {
+  ExpectConditionReported("a <= b",
+                          "binary operator '<=' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, GreaterOrEqualOperatorIsRejected) {
+  ExpectConditionReported("a >= b",
+                          "binary operator '>=' is not permitted in a "
+                          "state-dependent path conditional expression");
+}
+
+TEST(OperatorElaboration, LessThanOperatorIsRejected) {
+  ExpectConditionReported("a < b",
+                          "binary operator '<' is not permitted in a "
+                          "state-dependent path conditional expression");
 }
 
 }  // namespace
