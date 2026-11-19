@@ -111,4 +111,73 @@ TEST(UdpEdgeSeq, ClockToXHoldsAStateTheDataAgreesWithAndOtherwiseGivesX) {
   EXPECT_FALSE(f.has_errors);
 }
 
+std::string RunEdgeSequence(const char* definition, const std::string& steps) {
+  SimFixture f;
+  std::string out = RunCapture(std::string(definition) +
+                                   "module m;\n"
+                                   "  reg c, d;\n"
+                                   "  wire q;\n"
+                                   "  ff u(q, c, d);\n"
+                                   "  task show; $write(\"%b\", q); endtask\n"
+                                   "  initial begin\n" +
+                                   steps +
+                                   "    $display;\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                               f);
+  EXPECT_FALSE(f.has_errors);
+  return out;
+}
+
+TEST(UdpEdgeSeqRun, UnlistedFallingEdgeOfARisingEdgeTableGivesX) {
+  EXPECT_EQ(RunEdgeSequence("primitive ff (q, clock, data);\n"
+                            "  output q; reg q;\n"
+                            "  input clock, data;\n"
+                            "  table\n"
+                            "    r 0 : ? : 0 ;\n"
+                            "    r 1 : ? : 1 ;\n"
+                            "    ? * : ? : - ;\n"
+                            "  endtable\n"
+                            "endprimitive\n",
+                            "    c = 0; d = 1; #1 c = 1; #1 show;\n"
+                            "    c = 0; #1 show;\n"
+                            "    d = 0; #1 c = 1; #1 show;\n"
+                            "    c = 0; #1 show;\n"),
+            "1x0x\n");
+}
+
+TEST(UdpEdgeSeqRun, UnlistedRisingEdgeOfAFallingEdgeTableGivesX) {
+  EXPECT_EQ(RunEdgeSequence("primitive ff (q, clock, data);\n"
+                            "  output q; reg q;\n"
+                            "  input clock, data;\n"
+                            "  table\n"
+                            "    f 0 : ? : 0 ;\n"
+                            "    f 1 : ? : 1 ;\n"
+                            "    ? * : ? : - ;\n"
+                            "  endtable\n"
+                            "endprimitive\n",
+                            "    c = 1; d = 1; #1 c = 0; #1 show;\n"
+                            "    c = 1; #1 show;\n"
+                            "    d = 0; #1 c = 0; #1 show;\n"
+                            "    c = 1; #1 show;\n"),
+            "1x0x\n");
+}
+
+TEST(UdpEdgeSeqRun, UnlistedDataChangeOnASteadyClockGivesX) {
+  EXPECT_EQ(RunEdgeSequence("primitive ff (q, clock, data);\n"
+                            "  output q; reg q;\n"
+                            "  input clock, data;\n"
+                            "  table\n"
+                            "    r 0 : ? : 0 ;\n"
+                            "    r 1 : ? : 1 ;\n"
+                            "    f ? : ? : - ;\n"
+                            "  endtable\n"
+                            "endprimitive\n",
+                            "    c = 0; d = 1; #1 c = 1; #1 show;\n"
+                            "    d = 0; #1 show;\n"
+                            "    c = 0; #1 c = 1; #1 show;\n"
+                            "    d = 1; #1 show;\n"),
+            "1x0x\n");
+}
+
 }  // namespace
