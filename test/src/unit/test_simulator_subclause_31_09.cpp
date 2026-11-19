@@ -418,4 +418,69 @@ TEST(NegativeTimingCheckSwitches, AnnotatedNochangeOffsetsAreMoved) {
   EXPECT_EQ(check.end_edge_offset, -7);
 }
 
+void RunNegativeLimitCheck(const char* check, SimFixture& f) {
+  std::string src =
+      "`timescale 1ns/1ns\n"
+      "module top(output reg r = 0, output reg d = 0);\n"
+      "  specify\n"
+      "    ";
+  src += check;
+  src +=
+      "\n"
+      "  endspecify\n"
+      "endmodule\n";
+  RunUnder(src, {true, false}, f);
+}
+
+TEST(NegativeTimingCheckSwitches,
+     SetupholdLimitsSummingBelowOneUnitAreReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$setuphold(posedge r, posedge d, -10, 5);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to -5 in units of simulation precision", 4,
+                            "31.3.3"));
+}
+
+TEST(NegativeTimingCheckSwitches,
+     SetupholdNegativeHoldSummingToOneUnitIsReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$setuphold(posedge r, posedge d, 5, -4);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to 1 in units of simulation precision", 4,
+                            "31.3.3"));
+}
+
+TEST(NegativeTimingCheckSwitches, RecremLimitsSummingToOneUnitAreReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$recrem(posedge r, posedge d, -4, 5);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to 1 in units of simulation precision", 4,
+                            "31.3.6"));
+}
+
+TEST(NegativeTimingCheckSwitches, RecremLimitsSummingToTwoUnitsAreAccepted) {
+  SimFixture f;
+  RunNegativeLimitCheck("$recrem(posedge r, posedge d, -4, 6);", f);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(FindDiag(f, "in units of simulation precision"), nullptr);
+}
+
+TEST(NegativeTimingCheckSwitches,
+     RecremNegativeRemovalSummingToOneUnitIsReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$recrem(posedge r, posedge d, 5, -4);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to 1 in units of simulation precision", 4,
+                            "31.3.6"));
+}
+
+TEST(NegativeTimingCheckSwitches,
+     RecremNegativeRemovalSummingBelowOneUnitIsReported) {
+  SimFixture f;
+  RunNegativeLimitCheck("$recrem(posedge r, posedge d, 5, -10);", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "sum to -5 in units of simulation precision", 4,
+                            "31.3.6"));
+}
+
 }  // namespace

@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_timing_check_one_time_step.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -98,6 +99,24 @@ TEST(DrivenTimingCheckEvaluation,
       f.diag.Diagnostics(), "$recrem violation: data signal",
       LineHolding(kSimultaneousDesignThroughTheCheck, "$recrem(posedge clr"),
       "31.3.6"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     DISABLED_RecremZeroRecoveryInOneTimeStepReportsNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$recrem(posedge r, posedge d, 0, 5);",
+                                  "$recrem violation: data signal"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     DISABLED_RecremZeroRemovalInOneTimeStepViolates) {
+  EXPECT_TRUE(ViolatesInEitherOrder("$recrem(posedge r, posedge d, 5, 0);",
+                                    "$recrem violation: data signal",
+                                    "31.3.6"));
+}
+
+TEST(DrivenTimingCheckEvaluation, RecremZeroLimitsInOneTimeStepReportNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$recrem(posedge r, posedge d, 0, 0);",
+                                  "$recrem violation: data signal"));
 }
 
 }  // namespace

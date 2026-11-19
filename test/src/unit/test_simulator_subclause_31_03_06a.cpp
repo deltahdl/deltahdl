@@ -69,4 +69,16 @@ TEST(RecremTimingCheckWindow, BothLimitsZeroNeverViolates) {
   EXPECT_FALSE(mgr.CheckRecremViolation("clk", 100, "rst", 101));
 }
 
+TEST(RecremTimingCheckWindow, DISABLED_ZeroRecoverySimultaneousDoesNotViolate) {
+  SpecifyManager mgr;
+  mgr.AddTimingCheck(MakeRecrem(0, 5));
+  EXPECT_FALSE(mgr.CheckRecremViolation("clk", 100, "rst", 100));
+}
+
+TEST(RecremTimingCheckWindow, DISABLED_ZeroRemovalSimultaneousViolates) {
+  SpecifyManager mgr;
+  mgr.AddTimingCheck(MakeRecrem(5, 0));
+  EXPECT_TRUE(mgr.CheckRecremViolation("clk", 100, "rst", 100));
+}
+
 }  // namespace

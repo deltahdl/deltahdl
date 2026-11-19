@@ -5,6 +5,7 @@
 #include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
 #include "helpers_reported_error.h"
+#include "helpers_timing_check_one_time_step.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
@@ -219,6 +220,27 @@ TEST(DesignTimingCheckEvaluation, LimitIsInTheDeclaringModulesUnit) {
                                  "endmodule\n",
                                  f),
             "1\n");
+}
+
+TEST(DesignTimingCheckEvaluation,
+     SetupInOneTimeStepReportsNothingInEitherOrder) {
+  EXPECT_TRUE(SilentInEitherOrder("$setup(posedge d, posedge r, 29);",
+                                  "$setup violation: data signal"));
+}
+
+TEST(DesignTimingCheckEvaluation, ZeroLimitSetupInOneTimeStepReportsNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$setup(posedge d, posedge r, 0);",
+                                  "$setup violation: data signal"));
+}
+
+TEST(DesignTimingCheckEvaluation, HoldInOneTimeStepViolatesInEitherOrder) {
+  EXPECT_TRUE(ViolatesInEitherOrder("$hold(posedge r, posedge d, 13);",
+                                    "$hold violation: data signal", "31.3.2"));
+}
+
+TEST(DesignTimingCheckEvaluation, ZeroLimitHoldInOneTimeStepReportsNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$hold(posedge r, posedge d, 0);",
+                                  "$hold violation: data signal"));
 }
 
 }  // namespace

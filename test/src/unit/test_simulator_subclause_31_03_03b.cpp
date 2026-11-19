@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_timing_check_one_time_step.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -60,6 +61,32 @@ TEST(DrivenTimingCheckEvaluation, SetupholdSatisfiedInARunReportsNothing) {
                       "    #35 clk = 1'b1;\n",
                       f));
   EXPECT_EQ(FindDiag(f, "$setuphold violation: data signal"), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     SetupholdPositiveLimitsInOneTimeStepViolateInEitherOrder) {
+  EXPECT_TRUE(ViolatesInEitherOrder("$setuphold(posedge r, posedge d, 21, 6);",
+                                    "$setuphold violation: data signal",
+                                    "31.3.3"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     DISABLED_SetupholdZeroHoldInOneTimeStepReportsNothingLikeSetupAndHold) {
+  EXPECT_TRUE(SilentInEitherOrder("$setuphold(posedge r, posedge d, 5, 0);",
+                                  "$setuphold violation: data signal"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     DISABLED_SetupholdZeroSetupInOneTimeStepViolatesLikeHold) {
+  EXPECT_TRUE(ViolatesInEitherOrder("$setuphold(posedge r, posedge d, 0, 5);",
+                                    "$setuphold violation: data signal",
+                                    "31.3.3"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     SetupholdZeroLimitsInOneTimeStepReportNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$setuphold(posedge r, posedge d, 0, 0);",
+                                  "$setuphold violation: data signal"));
 }
 
 }  // namespace

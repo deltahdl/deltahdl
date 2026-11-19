@@ -69,4 +69,16 @@ TEST(SetupholdTimingCheckWindow, BothLimitsZeroNeverViolates) {
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 101));
 }
 
+TEST(SetupholdTimingCheckWindow, DISABLED_ZeroHoldSimultaneousDoesNotViolate) {
+  SpecifyManager mgr;
+  mgr.AddTimingCheck(MakeSetuphold(5, 0));
+  EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 100));
+}
+
+TEST(SetupholdTimingCheckWindow, DISABLED_ZeroSetupSimultaneousViolates) {
+  SpecifyManager mgr;
+  mgr.AddTimingCheck(MakeSetuphold(0, 5));
+  EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 100));
+}
+
 }  // namespace

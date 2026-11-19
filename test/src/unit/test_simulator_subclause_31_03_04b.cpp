@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_timing_check_one_time_step.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -47,6 +48,20 @@ TEST(DrivenTimingCheckEvaluation, RemovalSatisfiedInARunReportsNothing) {
   ASSERT_TRUE(
       RanWithStimulus("    #240 clk = 1'b1;\n"
                       "    #25 rst = 1'b1;\n",
+                      f));
+  EXPECT_EQ(FindDiag(f, "$removal violation: data signal"), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation, RemovalInOneTimeStepReportsNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$removal(posedge r, posedge d, 18);",
+                                  "$removal violation: data signal"));
+}
+
+TEST(DrivenTimingCheckEvaluation, RemovalDataAfterReferenceReportsNothing) {
+  SimFixture f;
+  ASSERT_TRUE(
+      RanWithStimulus("    #300 rst = 1'b1;\n"
+                      "    #4 clk = 1'b1;\n",
                       f));
   EXPECT_EQ(FindDiag(f, "$removal violation: data signal"), nullptr);
 }

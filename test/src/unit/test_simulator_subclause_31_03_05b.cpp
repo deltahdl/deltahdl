@@ -4,6 +4,7 @@
 
 #include "fixture_simulator.h"
 #include "helpers_reported_error.h"
+#include "helpers_timing_check_one_time_step.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -49,6 +50,18 @@ TEST(DrivenTimingCheckEvaluation, RecoverySatisfiedInARunReportsNothing) {
                       "    #37 clk = 1'b1;\n",
                       f));
   EXPECT_EQ(FindDiag(f, "$recovery violation: data signal"), nullptr);
+}
+
+TEST(DrivenTimingCheckEvaluation, RecoveryInOneTimeStepViolatesInEitherOrder) {
+  EXPECT_TRUE(ViolatesInEitherOrder("$recovery(posedge r, posedge d, 22);",
+                                    "$recovery violation: data signal",
+                                    "31.3.5"));
+}
+
+TEST(DrivenTimingCheckEvaluation,
+     ZeroLimitRecoveryInOneTimeStepReportsNothing) {
+  EXPECT_TRUE(SilentInEitherOrder("$recovery(posedge r, posedge d, 0);",
+                                  "$recovery violation: data signal"));
 }
 
 }  // namespace

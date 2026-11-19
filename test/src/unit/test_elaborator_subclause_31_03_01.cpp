@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -64,6 +66,28 @@ TEST(SetupTimingCheckElaboration, NonNegativeSpecparamExpressionElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SetupTimingCheckElaboration, NegativeFoldingLimitExpressionsRejected) {
+  for (const char* limit : {"tSU - 10", "-(2 + 3)", "tSU * -1"}) {
+    ElabFixture f;
+    std::string src =
+        "module m(input d, clk);\n"
+        "  specify\n"
+        "    specparam tSU = 3;\n"
+        "    $setup(d, posedge clk, ";
+    src += limit;
+    src +=
+        ");\n"
+        "  endspecify\n"
+        "endmodule\n";
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "$setup timing check limit must be a "
+                              "non-negative constant expression",
+                              4, "31.3.1"))
+        << limit;
+  }
 }
 
 }  // namespace
