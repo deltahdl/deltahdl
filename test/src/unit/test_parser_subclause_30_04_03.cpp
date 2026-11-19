@@ -276,4 +276,75 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingExpression) {
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
+TEST(SpecifyPathParsing, FullEdgePathListsSourcesDestinationsAndData) {
+  auto r = Parse(
+      "module m(input a, b, d, output q, r);\n"
+      "  specify\n"
+      "    (posedge a, b *> (q, r : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kPosedge);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  ASSERT_EQ(si->path.src_ports.size(), 2u);
+  EXPECT_EQ(si->path.src_ports[1].name, "b");
+  ASSERT_EQ(si->path.dst_ports.size(), 2u);
+  EXPECT_EQ(si->path.dst_ports[1].name, "r");
+  EXPECT_NE(si->path.data_source, nullptr);
+}
+
+TEST(SpecifyPathParsing, FullEdgePathTakesBothPolarities) {
+  auto r = Parse(
+      "module m(input a, d, output q, r);\n"
+      "  specify\n"
+      "    (negedge a - *> (q, r -: d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.edge, SpecifyEdge::kNegedge);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
+  EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
+}
+
+TEST(SpecifyPathParsing, ParallelEdgePathTakesOneDestination) {
+  auto r = Parse(
+      "module m(input a, d, output q, r);\n"
+      "  specify\n"
+      "    (posedge a => (q, r : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "parallel path '=>' requires a single source and "
+                            "destination terminal",
+                            3, "30.4.5"));
+}
+
+TEST(SpecifyPathParsing, EdgePathTakesOneEdgeIdentifier) {
+  auto r = Parse(
+      "module m(input a, d, output q);\n"
+      "  specify\n"
+      "    (posedge negedge a => (q : d)) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got 'negedge'", 3, "30.4"));
+}
+
+TEST(SpecifyPathParsing, EdgePathRequiresADelayValue) {
+  auto r = Parse(
+      "module m(input a, d, output q);\n"
+      "  specify\n"
+      "    (posedge a => (q : d));\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 3, "30.5"));
+}
+
 }  // namespace

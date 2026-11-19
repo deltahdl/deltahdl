@@ -140,4 +140,80 @@ TEST(EdgeSensitivePathRun, ConditionalEdgePathsBesideAnOtherEdgePath) {
       "t=25 q=1\nt=32 q=0\nt=46 q=1\nt=52 q=0\n");
 }
 
+std::string BothEdgesRun(const std::string& path) {
+  SimFixture f;
+  return RunCapture(EdgePathDesign("", "clk & d", path, "0",
+                                   "    #10 clk = 1;\n"
+                                   "    #10 clk = 0;\n"),
+                    f);
+}
+
+TEST(EdgeSensitivePathRun, PathWithNoEdgeIdentifierIsActiveOnBothEdges) {
+  EXPECT_EQ(BothEdgesRun("    (clk => (y : d)) = (3, 5);\n"),
+            "t=13 y=1\nt=25 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, EdgeKeywordPathIsActiveOnBothEdges) {
+  EXPECT_EQ(BothEdgesRun("    (edge clk => (y : d)) = (3, 5);\n"),
+            "t=13 y=1\nt=25 y=0\n");
+}
+
+std::string DataPathRun(const std::string& source, const std::string& dest) {
+  return BothEdgesRun("    (posedge clk " + source + "=> (" + dest +
+                      ")) = (3, 5);\n"
+                      "    (negedge clk " +
+                      source + "=> (" + dest + ")) = (4, 6);\n");
+}
+
+TEST(EdgeSensitivePathRun, PositiveDestinationPolarityLeavesTimingUnchanged) {
+  EXPECT_EQ(DataPathRun("", "y +: d"), "t=13 y=1\nt=26 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, NegativeDestinationPolarityLeavesTimingUnchanged) {
+  EXPECT_EQ(DataPathRun("", "y -: d"), "t=13 y=1\nt=26 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, NoDestinationPolarityLeavesTimingUnchanged) {
+  EXPECT_EQ(DataPathRun("", "y : d"), "t=13 y=1\nt=26 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, NegativeSourcePolarityLeavesTimingUnchanged) {
+  EXPECT_EQ(DataPathRun("- ", "y : d"), "t=13 y=1\nt=26 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, ConstantDataSourceLeavesTimingUnchanged) {
+  EXPECT_EQ(DataPathRun("", "y : 1'b0"), "t=13 y=1\nt=26 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, DataSourceExpressionTheLogicIgnoresLeavesTiming) {
+  EXPECT_EQ(DataPathRun("", "y -: ~clk | d"), "t=13 y=1\nt=26 y=0\n");
+}
+
+std::string PartSelectSourceRun(const std::string& range,
+                                const std::string& body,
+                                const std::string& select) {
+  SimFixture f;
+  return RunCapture(EdgePathDesign(range, body,
+                                   "    (posedge clk" + select +
+                                       " => (y : d)) = (5, 5);\n"
+                                       "    (negedge clk" +
+                                       select + " => (y : d)) = (2, 2);\n",
+                                   "4'b0000",
+                                   "    #10 clk = 4'b0010;\n"
+                                   "    #10 clk = 4'b0110;\n"
+                                   "    #10 clk = 4'b0100;\n"
+                                   "    #10 clk = 4'b0000;\n"),
+                    f);
+}
+
+TEST(EdgeSensitivePathRun, PartSelectSourceEdgeIsDetectedOnItsLsb) {
+  EXPECT_EQ(PartSelectSourceRun("[3:0] ", "clk[1] & d", "[2:1]"),
+            "t=15 y=1\nt=32 y=0\n");
+}
+
+TEST(EdgeSensitivePathRun, AscendingPartSelectSourceEdgeIsOnItsRightmostBit) {
+  EXPECT_EQ(PartSelectSourceRun("[0:3] ", "clk[2] & d", "[1:2]"),
+            "t=15 y=1\nt=32 y=0\n");
+}
+
 }  // namespace
