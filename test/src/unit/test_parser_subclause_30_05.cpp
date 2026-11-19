@@ -129,4 +129,32 @@ TEST(SpecifyPathDelayParsing, ErrorEmptyDelayList) {
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
+TEST(SpecifyPathDelayParsing, BareListOfSixValues) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 1, 2, 3, 4, 5, 6;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.delays.size(), 6u);
+}
+
+TEST(SpecifyPathDelayParsing, BareListOfThreePlainValues) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => b) = 1, 2, 3;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  ASSERT_EQ(si->path.delays.size(), 3u);
+}
+
 }  // namespace

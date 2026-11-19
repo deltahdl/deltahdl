@@ -4,6 +4,7 @@
 #include <string>
 
 #include "common/types.h"
+#include "fixture_path_delay_run.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_path_decl.h"
 #include "helpers_preprocess_and_get.h"
@@ -314,6 +315,68 @@ TEST(SpecifyPathDelayFromSource, PathDelayCountsItsOwnModulesUnit) {
                                  "endmodule\n",
                                  f),
             "y=1 2010\n");
+}
+
+TEST(PathTransitionDelayRun, OneValueTimesEveryTransition) {
+  EXPECT_EQ(PathTransitionRun("11"),
+            "110 111 110 11z 111 11z 110 11x 111 11x 110 11x 11z 11x \n");
+}
+
+TEST(PathTransitionDelayRun, TwoValuesTimeZTransitionsByRiseAndFall) {
+  EXPECT_EQ(PathTransitionRun("(11, 12)"),
+            "120 111 120 11z 111 12z 120 11x 111 12x 120 11x 12z 11x \n");
+}
+
+TEST(PathTransitionDelayRun, ThreeValuesTimeTransitionsToZByTheThird) {
+  EXPECT_EQ(PathTransitionRun("(11, 12, 13)"),
+            "120 111 120 13z 111 13z 120 11x 111 12x 120 11x 13z 11x \n");
+}
+
+TEST(PathTransitionDelayRun, SixValuesTimeEachZTransitionByItsOwnValue) {
+  EXPECT_EQ(PathTransitionRun("(11, 12, 13, 14, 15, 16)"),
+            "160 111 120 13z 141 15z 160 11x 141 12x 160 11x 15z 14x \n");
+}
+
+TEST(PathTransitionDelayRun, TwelveValuesTimeEachXTransitionByItsOwnValue) {
+  EXPECT_EQ(
+      PathTransitionRun("(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22)"),
+      "200 111 120 13z 141 15z 160 17x 181 19x 200 17x 21z 22x \n");
+}
+
+TEST(PathDelayModeRun, TripleInEachListPositionFollowsTheDelayMode) {
+  EXPECT_EQ(BufferPathRun("", "", "(1:2:3, 4:5:6)", DelayMode::kMin),
+            "40 11 40 \n");
+  EXPECT_EQ(BufferPathRun("", "", "(1:2:3, 4:5:6)", DelayMode::kTyp),
+            "50 21 50 \n");
+  EXPECT_EQ(BufferPathRun("", "", "(1:2:3, 4:5:6)", DelayMode::kMax),
+            "60 31 60 \n");
+}
+
+TEST(PathDelayModeRun, SpecparamTripleFollowsTheDelayMode) {
+  std::string specparams = "    specparam lo = 1, mid = 2, hi = 3;\n";
+  EXPECT_EQ(BufferPathRun("", specparams, "lo:mid:hi", DelayMode::kMin),
+            "10 11 10 \n");
+  EXPECT_EQ(BufferPathRun("", specparams, "lo:mid:hi", DelayMode::kMax),
+            "30 31 30 \n");
+}
+
+TEST(PathDelayModeRun, SingleLiteralIsTheSameInEveryMode) {
+  for (DelayMode mode : {DelayMode::kMin, DelayMode::kTyp, DelayMode::kMax}) {
+    EXPECT_EQ(BufferPathRun("", "", "7", mode), "70 71 70 \n");
+  }
+}
+
+TEST(PathDelayModeRun, SingleSpecparamIsTheSameInEveryMode) {
+  for (DelayMode mode : {DelayMode::kMin, DelayMode::kTyp, DelayMode::kMax}) {
+    EXPECT_EQ(BufferPathRun("", "    specparam tb = 7;\n", "tb", mode),
+              "70 71 70 \n");
+  }
+}
+
+TEST(PathDelayModeRun, NegativeExpressionDelaysByZero) {
+  EXPECT_EQ(BufferPathRun("", "    specparam d = 2;\n", "(d - 5, 4)",
+                          DelayMode::kTyp),
+            "40 01 40 \n");
 }
 
 }  // namespace

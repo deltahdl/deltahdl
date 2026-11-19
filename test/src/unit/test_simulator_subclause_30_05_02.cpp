@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "fixture_path_delay_run.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_path_decl.h"
 #include "simulator/specify_path_delay.h"
@@ -91,6 +92,11 @@ TEST(SpecifyXTransitionSim, SpecparamDelaysDeriveXSlots) {
   EXPECT_EQ(pd.delays[9], 22u);
   EXPECT_EQ(pd.delays[10], 17u);
   EXPECT_EQ(pd.delays[11], 10u);
+}
+
+TEST(PathXTransitionRun, DerivedXDelaysTimeTheOutput) {
+  EXPECT_EQ(PathTransitionRun("(5, 12, 17, 10, 6, 22)"),
+            "220 51 120 17z 101 6z 220 5x 101 6x 220 5x 17z 10x \n");
 }
 
 }  // namespace
