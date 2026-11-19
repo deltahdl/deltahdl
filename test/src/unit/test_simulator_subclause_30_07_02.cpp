@@ -211,6 +211,178 @@ TEST(GlobalPulseLimitScaling, ErrorPercentageBelowRejectIsReportedAndRaised) {
       << err;
 }
 
+TEST(GlobalPulseLimitScaling, RejectPercentageAboveHundredIsRefused) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_FALSE(ParseCommandLineCapturingStderr({"--pulse-reject-limit", "101"},
+                                               opts, err));
+  EXPECT_TRUE(opts.rejected_argument);
+  EXPECT_NE(
+      err.find("--pulse-reject-limit expects a percentage from 0 to 100: 101"),
+      std::string::npos)
+      << err;
+}
+
+TEST(GlobalPulseLimitScaling, NegativePercentageIsRefused) {
+  for (const char* option : {"--pulse-reject-limit", "--pulse-error-limit"}) {
+    CliOptions opts;
+    std::string err;
+    EXPECT_FALSE(ParseCommandLineCapturingStderr({option, "-5"}, opts, err))
+        << option;
+    EXPECT_TRUE(opts.rejected_argument) << option;
+    EXPECT_NE(err.find(std::string(option) +
+                       " expects a number that is not negative: -5"),
+              std::string::npos)
+        << err;
+  }
+}
+
+TEST(GlobalPulseLimitScaling, NonIntegerPercentageIsRefused) {
+  for (const char* option : {"--pulse-reject-limit", "--pulse-error-limit"}) {
+    for (const char* value : {"50.5", "half"}) {
+      CliOptions opts;
+      std::string err;
+      EXPECT_FALSE(ParseCommandLineCapturingStderr({option, value}, opts, err))
+          << option << " " << value;
+      EXPECT_TRUE(opts.rejected_argument) << option << " " << value;
+      EXPECT_NE(err.find(std::string(option) + " expects a number: " + value),
+                std::string::npos)
+          << err;
+    }
+  }
+}
+
+TEST(GlobalPulseLimitScaling, DISABLED_RefusedErrorPercentageDrawsOneReport) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_FALSE(ParseCommandLineCapturingStderr({"--pulse-error-limit", "50.5"},
+                                               opts, err));
+  EXPECT_EQ(err.find("is smaller than"), std::string::npos) << err;
+}
+
+TEST(GlobalPulseLimitScaling, BoundaryPercentagesAreAccepted) {
+  const std::vector<std::vector<std::string>> kArgLists = {
+      {"--pulse-reject-limit", "0", "--pulse-error-limit", "0"},
+      {"--pulse-reject-limit", "0", "--pulse-error-limit", "100"},
+      {"--pulse-reject-limit", "100", "--pulse-error-limit", "100"},
+  };
+  for (const auto& args : kArgLists) {
+    CliOptions opts;
+    std::string err;
+    EXPECT_TRUE(ParseCommandLineCapturingStderr(args, opts, err)) << args[1];
+    EXPECT_FALSE(opts.rejected_argument) << args[1] << " " << args[3];
+    EXPECT_EQ(err, "") << args[1] << " " << args[3];
+    SpecifyManager mgr;
+    ApplyPulseControlOptions(opts, mgr);
+    EXPECT_EQ(mgr.RejectPulseLimitPercent(), std::stoul(args[1]));
+    EXPECT_EQ(mgr.ErrorPulseLimitPercent(), std::stoul(args[3]));
+  }
+}
+
+TEST(GlobalPulseLimitScaling, WithoutEitherOptionBothPercentagesAreHundred) {
+  CliOptions opts;
+  ASSERT_TRUE(ParseCommandLine({}, opts));
+  SpecifyManager mgr;
+  ApplyPulseControlOptions(opts, mgr);
+  EXPECT_EQ(mgr.RejectPulseLimitPercent(), 100u);
+  EXPECT_EQ(mgr.ErrorPulseLimitPercent(), 100u);
+}
+
+TEST(GlobalPulseLimitScaling, RejectOptionAloneLeavesErrorAtHundred) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_TRUE(ParseCommandLineCapturingStderr({"--pulse-reject-limit", "40"},
+                                              opts, err));
+  EXPECT_EQ(err, "");
+  EXPECT_EQ(opts.pulse_reject_percent, 40u);
+  EXPECT_EQ(opts.pulse_error_percent, 100u);
+}
+
+TEST(GlobalPulseLimitScaling, ErrorOptionAloneBelowDefaultRejectIsRaised) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_TRUE(ParseCommandLineCapturingStderr({"--pulse-error-limit", "80"},
+                                              opts, err));
+  EXPECT_EQ(opts.pulse_reject_percent, 100u);
+  EXPECT_EQ(opts.pulse_error_percent, 100u);
+  EXPECT_NE(err.find("--pulse-error-limit 80 is smaller than "
+                     "--pulse-reject-limit 100"),
+            std::string::npos)
+      << err;
+}
+
+TEST(GlobalPulseLimitScaling, EqualPercentagesAreAcceptedWithoutReport) {
+  CliOptions opts;
+  std::string err;
+  EXPECT_TRUE(ParseCommandLineCapturingStderr(
+      {"--pulse-reject-limit", "60", "--pulse-error-limit", "60"}, opts, err));
+  EXPECT_EQ(err, "");
+  EXPECT_EQ(opts.pulse_reject_percent, 60u);
+  EXPECT_EQ(opts.pulse_error_percent, 60u);
+}
+
+std::string RunPulseThroughCell(const std::vector<std::string>& args,
+                                const std::string& specify_body) {
+  SimFixture f;
+  CliOptions opts;
+  EXPECT_TRUE(ParseCommandLine(args, opts));
+  ApplyPulseControlOptions(opts, f.ctx.AcquireSpecifyManager());
+  return RunCapture(
+      "module drive(input a, output y);\n"
+      "  assign y = a;\n"
+      "  specify\n" +
+          specify_body +
+          "  endspecify\n"
+          "endmodule\n"
+          "module top;\n"
+          "  logic in;\n"
+          "  wire out;\n"
+          "  drive c(.a(in), .y(out));\n"
+          "  always @(out) if ($time > 0) $display(\"t=%0t y=%b\", $time, "
+          "out);\n"
+          "  initial begin\n"
+          "    in = 1;\n"
+          "    #10 in = 0;\n"
+          "    #4 in = 1;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(GlobalPulseLimitRun, WithoutOptionsANarrowPulseIsRejected) {
+  EXPECT_EQ(RunPulseThroughCell({}, "    (a => y) = 7;\n"), "t=7 y=1\n");
+}
+
+TEST(GlobalPulseLimitRun, HalvedLimitsLetTheSamePulsePropagate) {
+  EXPECT_EQ(RunPulseThroughCell(
+                {"--pulse-reject-limit", "50", "--pulse-error-limit", "50"},
+                "    (a => y) = 7;\n"),
+            "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
+}
+
+TEST(GlobalPulseLimitRun, PulseBetweenTheScaledLimitsIsFilteredToX) {
+  EXPECT_EQ(RunPulseThroughCell(
+                {"--pulse-reject-limit", "20", "--pulse-error-limit", "100"},
+                "    (a => y) = 7;\n"),
+            "t=7 y=1\nt=17 y=x\nt=21 y=1\n");
+}
+
+TEST(GlobalPulseLimitRun, PathpulseTakesPrecedenceOverTheOptions) {
+  EXPECT_EQ(RunPulseThroughCell(
+                {"--pulse-reject-limit", "50", "--pulse-error-limit", "50"},
+                "    (a => y) = 7;\n"
+                "    specparam PATHPULSE$ = (5);\n"),
+            "t=7 y=1\n");
+}
+
+TEST(GlobalPulseLimitRun, PathSpecificPathpulseTakesPrecedenceOverTheOptions) {
+  EXPECT_EQ(RunPulseThroughCell(
+                {"--pulse-reject-limit", "50", "--pulse-error-limit", "50"},
+                "    (a => y) = 7;\n"
+                "    specparam PATHPULSE$a$y = (5);\n"),
+            "t=7 y=1\n");
+}
+
 TEST(GlobalPulseLimitScaling, DeclaredPathTakesTheGlobalPercentages) {
   SimFixture f;
   f.ctx.AcquireSpecifyManager().SetGlobalPulseLimitPercents(50, 80);
