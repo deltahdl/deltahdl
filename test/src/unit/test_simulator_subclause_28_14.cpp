@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "common/types.h"
@@ -338,6 +339,122 @@ TEST(StrengthReductionResistive, ASwitchPassesAnAmbiguousStrengthAsARange) {
   EXPECT_EQ(y2->resolved->value.words[0].bval & 0x1, 0u);
   EXPECT_EQ(y2->resolved_strength.s1_hi, Strength::kPull);
   EXPECT_EQ(y2->resolved_strength.s1_lo, Strength::kWeak);
+}
+
+struct ResistiveSwitchForm {
+  const char* name;
+  const char* instance;
+};
+
+const ResistiveSwitchForm kResistiveForms[] = {
+    {"rnmos", "rnmos (y, d, on);"},
+    {"rpmos", "rpmos (y, d, off);"},
+    {"rcmos n-half", "rcmos (y, d, on, on);"},
+    {"rcmos p-half", "rcmos (y, d, off, off);"},
+    {"rtran", "rtran (d, y);"},
+    {"rtran reversed", "rtran (y, d);"},
+    {"rtranif1", "rtranif1 (d, y, on);"},
+    {"rtranif1 reversed", "rtranif1 (y, d, on);"},
+    {"rtranif0", "rtranif0 (d, y, off);"},
+    {"rtranif0 reversed", "rtranif0 (y, d, off);"},
+};
+
+struct ResistiveRow {
+  const char* source;
+  const char* reduced;
+};
+
+const ResistiveRow kResistiveRows[] = {
+    {"wire d; assign (supply0, supply1) d = v;", "Pu"},
+    {"wire d; assign (strong0, strong1) d = v;", "Pu"},
+    {"wire d; assign (pull0, pull1) d = v;", "We"},
+    {"trireg (large) d; assign d = c ? 1'bz : v;", "Me"},
+    {"wire d; assign (weak0, weak1) d = v;", "Me"},
+    {"trireg (medium) d; assign d = c ? 1'bz : v;", "Sm"},
+    {"trireg (small) d; assign d = c ? 1'bz : v;", "Sm"},
+};
+
+std::string ResistiveOutputShown(const std::string& source,
+                                 const std::string& instance) {
+  std::string src =
+      "module t;\n"
+      "  reg on = 1, off = 0, c = 0, v = 0;\n"
+      "  wire y;\n  ";
+  src += source;
+  src += "\n  ";
+  src += instance;
+  src +=
+      "\n"
+      "  initial begin\n"
+      "    #1 c = 1;\n"
+      "    #1 $display(\"%v\", y);\n"
+      "    c = 0;\n"
+      "    v = 1;\n"
+      "    #1 c = 1;\n"
+      "    #1 $display(\"%v\", y);\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  return RunCapture(src, f);
+}
+
+TEST(StrengthReductionResistive,
+     EveryResistiveSwitchReducesEveryRowOfBothValues) {
+  for (const auto& form : kResistiveForms) {
+    for (const auto& row : kResistiveRows) {
+      std::string expected = row.reduced;
+      expected += "0\n";
+      expected += row.reduced;
+      expected += "1\n";
+      EXPECT_EQ(ResistiveOutputShown(row.source, form.instance), expected)
+          << form.name << " with " << row.source;
+    }
+  }
+}
+
+TEST(StrengthReductionResistive, AHighImpedanceInputStaysHighImpedance) {
+  for (const auto& form : kResistiveForms) {
+    EXPECT_EQ(ResistiveOutputShown("wire d;", form.instance), "HiZ\nHiZ\n")
+        << form.name;
+  }
+}
+
+TEST(StrengthReductionResistive, AnUnknownIsReducedOnBothSides) {
+  for (const auto& form : kResistiveForms) {
+    EXPECT_EQ(ResistiveOutputShown(
+                  "wire d; assign (strong0, strong1) d = 1'bx;", form.instance),
+              "PuX\nPuX\n")
+        << form.name;
+  }
+}
+
+TEST(StrengthReductionResistive, AStrengthChangeAloneIsPassedOnReduced) {
+  for (const auto& form : kResistiveForms) {
+    EXPECT_EQ(ResistiveOutputShown("wire d; assign (weak0, weak1) d = 1'b1;\n"
+                                   "  assign (strong0, strong1) d = v ? 1'b1 : "
+                                   "1'bz;",
+                                   form.instance),
+              "Me1\nPu1\n")
+        << form.name;
+  }
+}
+
+TEST(StrengthReductionResistive, AnArrayOfInstancesReducesEachElementsBit) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg on = 1, off = 0;\n"
+      "  wire [1:0] dv, yn, yp, yc;\n"
+      "  pullup (dv[1]);\n"
+      "  assign dv[0] = 1'b0;\n"
+      "  rnmos rn[1:0] (yn, dv, on);\n"
+      "  rpmos rp[1:0] (yp, dv, off);\n"
+      "  rcmos rc[1:0] (yc, dv, off, off);\n"
+      "  initial #1 $display(\"%v %v %v %v %v %v\", yn[1], yn[0], yp[1], "
+      "yp[0], yc[1], yc[0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "We1 Pu0 We1 Pu0 We1 Pu0\n");
 }
 
 }  // namespace
