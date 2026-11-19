@@ -359,4 +359,46 @@ TEST(UdpInstanceSim, ASelectOutputIsADriverOfItsNet) {
             "11 x0\n");
 }
 
+std::string RunRiseFallDelays(const char* primitive, const char* instantiation,
+                              const char* a) {
+  SimFixture f;
+  std::string out = RunCapture(std::string(primitive) +
+                                   "module m;\n"
+                                   "  reg a, b;\n"
+                                   "  wire y;\n"
+                                   "  " +
+                                   instantiation +
+                                   "\n"
+                                   "  initial begin\n"
+                                   "    a = " +
+                                   a +
+                                   "; b = 0;\n"
+                                   "    #10 b = 1;\n"
+                                   "    #2 $write(\"%b\", y);\n"
+                                   "    #2 $write(\"%b \", y);\n"
+                                   "    #6 b = 0;\n"
+                                   "    #6 $write(\"%b\", y);\n"
+                                   "    #2 $write(\"%b \", y);\n"
+                                   "    #2 b = 1'bx;\n"
+                                   "    #2 $write(\"%b\", y);\n"
+                                   "    #2 $display(\"%b\", y);\n"
+                                   "  end\n"
+                                   "endmodule\n",
+                               f);
+  EXPECT_FALSE(f.has_errors);
+  return out;
+}
+
+TEST(UdpInstanceDelayRun, CombinationalRiseFallDelaysChargeEachTransition) {
+  EXPECT_EQ(
+      RunRiseFallDelays(kAndPrimitive, "udp_and #(3, 7) g(y, a, b);", "1"),
+      "01 10 0x\n");
+}
+
+TEST(UdpInstanceDelayRun, SequentialRiseFallDelaysChargeEachTransition) {
+  EXPECT_EQ(
+      RunRiseFallDelays(kLatchPrimitive, "udp_latch #(3, 7) g(y, a, b);", "0"),
+      "01 10 0x\n");
+}
+
 }  // namespace

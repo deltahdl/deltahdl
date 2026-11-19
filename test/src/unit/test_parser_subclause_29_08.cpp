@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
@@ -178,6 +179,64 @@ TEST(UdpInstantiation, UdpDeclaredLaterTakesAnUnnamedInstance) {
   ASSERT_EQ(insts.size(), 1u);
   EXPECT_TRUE(insts[0]->gate_inst_name.empty());
   ASSERT_EQ(insts[0]->gate_terminals.size(), 3u);
+}
+
+bool UdpInstanceReported(const std::string& instance, const char* message,
+                         int line, const char* subclause) {
+  auto r = Parse(std::string(udp_def) + "module top;\n  wire [1:0] y;\n" +
+                 "  reg [1:0] a, b;\n  " + instance + "\nendmodule\n");
+  return ReportedError(r.diags, message, line, subclause);
+}
+
+TEST(UdpInstantiation, DISABLED_RejectsAnEmptyDelay) {
+  EXPECT_TRUE(UdpInstanceReported(
+      "my_udp #() u1 (y, a, b);",
+      "a UDP instance's #( ) holds one or two delays, not none", 10, "A.5.4"));
+}
+
+TEST(UdpInstantiation, DISABLED_RejectsANamedDelayAssignment) {
+  EXPECT_TRUE(UdpInstanceReported(
+      "my_udp #(.d(1)) u1 (y, a, b);",
+      "a UDP instance takes its delays in order, not a named assignment", 10,
+      "29.8"));
+}
+
+TEST(UdpInstantiation, RejectsASecondInstanceRange) {
+  EXPECT_TRUE(UdpInstanceReported(
+      "my_udp u[1:0][1:0] (y, a, b);",
+      "an array of instances takes a single range after its instance "
+      "identifier, not a second one",
+      10, "28.3.5"));
+}
+
+TEST(UdpInstantiation, RejectsASizeAloneAsInstanceRange) {
+  EXPECT_TRUE(UdpInstanceReported(
+      "my_udp u[2] (y, a, b);",
+      "an array of instances is declared by a range of two constant "
+      "expressions, [lhi:rhi]; a size alone is no range",
+      10, "28.3.5"));
+}
+
+TEST(UdpInstantiation, DISABLED_RejectsAnInstanceInAClassBody) {
+  auto r = Parse(std::string(udp_def) +
+                 "class c;\n"
+                 "  my_udp u1 (y, a, b);\n"
+                 "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "primitive cannot be instantiated inside class 'c'",
+                            8, "A.1.9"));
+}
+
+TEST(UdpInstantiation, DISABLED_RejectsAnInstanceInATaskBody) {
+  EXPECT_TRUE(UdpInstanceReported(
+      "task t; my_udp u1 (y, a, b); endtask",
+      "primitive cannot be instantiated inside task 't'", 10, "A.2.7"));
+}
+
+TEST(UdpInstantiation, DISABLED_RejectsAnInstanceInAFunctionBody) {
+  EXPECT_TRUE(UdpInstanceReported(
+      "function void f; my_udp u1 (y, a, b); endfunction",
+      "primitive cannot be instantiated inside function 'f'", 10, "A.2.6"));
 }
 
 }  // namespace
