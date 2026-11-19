@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
+#include "fixture_simulator.h"
 #include "simulator/udp_eval.h"
 
 using namespace delta;
@@ -126,6 +128,71 @@ TEST(UdpCombinational, BInputSymbolMatchesZeroAndOneNotX) {
   EXPECT_EQ(state.Evaluate({'1', '0'}), '0');
   EXPECT_EQ(state.Evaluate({'x', '1'}), 'x');
   EXPECT_EQ(state.Evaluate({'x', '0'}), 'x');
+}
+
+std::string RunMultiplexerThrough(const char* definition,
+                                  const std::string& steps) {
+  SimFixture f;
+  std::string out =
+      RunCapture(std::string(definition) +
+                     "module m;\n"
+                     "  reg c, a, b;\n"
+                     "  wire y, gy;\n"
+                     "  multiplexer u(y, c, a, b);\n"
+                     "  if (1) begin : g\n"
+                     "    multiplexer v(gy, c, a, b);\n"
+                     "  end\n"
+                     "  task show; $write(\"%b%b \", y, gy); endtask\n"
+                     "  initial begin\n" +
+                     steps +
+                     "    $display;\n"
+                     "  end\n"
+                     "endmodule\n",
+                 f);
+  EXPECT_FALSE(f.has_errors);
+  return out;
+}
+
+constexpr const char* kXInputSteps =
+    "    c = 0; a = 0; b = 0; #1 show;\n"
+    "    a = 1; b = 1'bx; #1 show;\n"
+    "    a = 0; b = 0; #1 show;\n"
+    "    c = 1'bx; a = 1; b = 1; #1 show;\n"
+    "    c = 0; a = 0; b = 0; #1 show;\n"
+    "    c = 1; a = 1'bx; b = 1; #1 show;\n";
+
+constexpr const char* kXInputOutput = "00 11 00 11 00 11 \n";
+
+TEST(UdpCombinationalRun, XInputsSelectTheirRowsInTheFullMultiplexer) {
+  EXPECT_EQ(RunMultiplexerThrough(kMultiplexer, kXInputSteps), kXInputOutput);
+}
+
+TEST(UdpCombinationalRun, XInputsSelectTheirRowsInTheAbbreviatedMultiplexer) {
+  EXPECT_EQ(RunMultiplexerThrough(kMultiplexerAbbreviated, kXInputSteps),
+            kXInputOutput);
+}
+
+constexpr const char* kUnlistedSteps =
+    "    c = 0; a = 1; b = 0; #1 show;\n"
+    "    a = 1'bx; b = 1'bx; #1 show;\n"
+    "    a = 1; b = 0; #1 show;\n"
+    "    a = 0; #1 show;\n"
+    "    a = 1'bx; b = 1'bx; #1 show;\n"
+    "    a = 0; b = 0; #1 show;\n";
+
+constexpr const char* kUnlistedOutput = "11 xx 11 00 xx 00 \n";
+
+TEST(UdpCombinationalRun,
+     AnUnlistedCombinationDrivesXAndALaterListedOneLeavesIt) {
+  EXPECT_EQ(RunMultiplexerThrough(kMultiplexer, kUnlistedSteps),
+            kUnlistedOutput);
+}
+
+TEST(
+    UdpCombinationalRun,
+    AnUnlistedCombinationOfTheAbbreviatedTableDrivesXAndALaterListedOneLeavesIt) {
+  EXPECT_EQ(RunMultiplexerThrough(kMultiplexerAbbreviated, kUnlistedSteps),
+            kUnlistedOutput);
 }
 
 }  // namespace
