@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -193,6 +195,81 @@ TEST(SpecifyBlock, MissingEndspecifyNames30_3) {
       "    (a => b) = 1;");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endspecify', got EOF", 3, "30.3"));
+}
+
+constexpr const char* kPlacedSpecify =
+    "  specify\n"
+    "    (a => y) = 5;\n"
+    "  endspecify\n";
+
+TEST(SpecifyBlockDeclParsing, SpecifyInsideMacromoduleAccepted) {
+  auto r = Parse(std::string("macromodule m(input a, output y);\n") +
+                 kPlacedSpecify + "  assign y = a;\nendmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  ASSERT_EQ(r.cu->modules.size(), 1u);
+  EXPECT_NE(FindSpecifyBlock(r.cu->modules[0]->items), nullptr);
+}
+
+TEST(SpecifyBlockDeclParsing, SpecifyInsideNestedModuleAccepted) {
+  auto r = Parse(std::string("module outer;\n"
+                             "  module inner(input a, output y);\n") +
+                 kPlacedSpecify +
+                 "    assign y = a;\n"
+                 "  endmodule\n"
+                 "  inner u(.a(1'b0), .y());\n"
+                 "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+}
+
+bool SpecifyPlacementReported(const std::string& head, const char* tail,
+                              const char* message, int line,
+                              const char* subclause) {
+  auto r = Parse(head + kPlacedSpecify + tail);
+  return ReportedError(r.diags, message, line, subclause);
+}
+
+constexpr const char* kAnonymousProgramItems =
+    "an anonymous program may contain only task, function, class, interface "
+    "class, covergroup, and class constructor declarations";
+
+TEST(SpecifyBlockDeclParsing, ErrorSpecifyInsideAnonymousProgramInPackage) {
+  EXPECT_TRUE(SpecifyPlacementReported("package p;\n  program;\n",
+                                       "  endprogram\nendpackage\n",
+                                       kAnonymousProgramItems, 3, "A.1.11"));
+}
+
+TEST(SpecifyBlockDeclParsing, ErrorSpecifyInsideAnonymousProgramInUnit) {
+  EXPECT_TRUE(SpecifyPlacementReported("program;\n", "endprogram\n",
+                                       kAnonymousProgramItems, 2, "A.1.11"));
+}
+
+constexpr const char* kSpecifyOutsideModule =
+    "specify block must appear inside a module declaration";
+
+TEST(SpecifyBlockDeclParsing, DISABLED_ErrorSpecifyInsideClass) {
+  EXPECT_TRUE(SpecifyPlacementReported("class c;\n", "endclass\n",
+                                       kSpecifyOutsideModule, 2, "30.3"));
+}
+
+TEST(SpecifyBlockDeclParsing, DISABLED_ErrorSpecifyInsideFunction) {
+  EXPECT_TRUE(SpecifyPlacementReported(
+      "module m(input a, output y);\n  function void f;\n",
+      "  endfunction\nendmodule\n", kSpecifyOutsideModule, 3, "30.3"));
+}
+
+TEST(SpecifyBlockDeclParsing, DISABLED_ErrorSpecifyInsideTask) {
+  EXPECT_TRUE(SpecifyPlacementReported(
+      "module m(input a, output y);\n  task t;\n", "  endtask\nendmodule\n",
+      kSpecifyOutsideModule, 3, "30.3"));
+}
+
+TEST(SpecifyBlockDeclParsing, DISABLED_ErrorSpecifyInsideUdp) {
+  EXPECT_TRUE(SpecifyPlacementReported(
+      "primitive u(output y, input a);\n",
+      "  table\n    0 : 0 ;\n  endtable\nendprimitive\n", kSpecifyOutsideModule,
+      2, "30.3"));
 }
 
 }  // namespace

@@ -32,7 +32,7 @@ SpecifyManager* RunAndTakeManager(const std::string& src, SimFixture& f) {
 TEST(SpecifyManagerInstalledByRun, RunRegistersDeclaredModulePath) {
   SimFixture f;
   SpecifyManager* mgr = RunAndTakeManager(
-      "module t;\n"
+      "module t(input a, output y);\n"
       "  logic [7:0] x;\n"
       "  specify\n"
       "    (a => y) = 5;\n"
@@ -60,7 +60,7 @@ TEST(SpecifyManagerInstalledByRun, RunWithoutSpecifyBlockStillInstallsManager) {
 TEST(SpecifyManagerInstalledByRun, RegisteredPathStartsWithDefaultPulseLimits) {
   SimFixture f;
   SpecifyManager* mgr = RunAndTakeManager(
-      "module t;\n"
+      "module t(input a, output y);\n"
       "  specify\n"
       "    (a => y) = 7;\n"
       "  endspecify\n"
