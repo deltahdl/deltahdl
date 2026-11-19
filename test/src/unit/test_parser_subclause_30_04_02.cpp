@@ -328,4 +328,87 @@ TEST(SpecifyPathParsing, OutputTerminalMinusIndexed) {
   EXPECT_EQ(si->path.dst_ports[0].range_kind, SpecifyRangeKind::kMinusIndexed);
 }
 
+TEST(SpecifyPathParsing, FullPathGluedPositivePolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, b +*> c) = 5;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.path_kind, SpecifyPathKind::kFull);
+  EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
+}
+
+TEST(SpecifyPathParsing, ParenthesizedSingleDelayValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (b => q) = (12);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
+  auto* si = GetSolePathItem(r);
+  ASSERT_NE(si, nullptr);
+  EXPECT_EQ(si->path.delays.size(), 1u);
+}
+
+TEST(SpecifyPathParsing, SimplePathRequiresADelayValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => y);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 3, "30.5"));
+}
+
+TEST(SpecifyPathParsing, SimplePathDestinationTakesNoPolarity) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => -y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '-'", 3, "30.4"));
+}
+
+TEST(SpecifyPathParsing, SimplePathRequiresASource) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    ( => y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '=>'", 3, "30.4"));
+}
+
+TEST(SpecifyPathParsing, FullPathSourceListTakesNoTrailingComma) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a, *> y) = 1;\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got '*>'", 3, "30.4"));
+}
+
+TEST(SpecifyPathParsing, SimplePathEndsWithASemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  specify\n"
+      "    (a => y) = 1\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.4"));
+}
+
 }  // namespace

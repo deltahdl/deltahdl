@@ -169,4 +169,28 @@ TEST(SimpleModulePathRun, BitSelectTerminalsDeclareOnePathPerBit) {
             "t=12 y=01\nt=25 y=11\nt=32 y=10\n");
 }
 
+TEST(SimpleModulePathRun, FullPathDelaysTheOutputFromEachListedSource) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module mc(input c, input d, output q);\n"
+                       "  assign q = c ^ d;\n"
+                       "  specify\n"
+                       "    (c, d *> q) = 18;\n"
+                       "  endspecify\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic c, d;\n"
+                       "  wire q;\n"
+                       "  mc u(.c(c), .d(d), .q(q));\n"
+                       "  always @(q) if ($time > 0)\n"
+                       "    $write(\"%0d%b \", $time, q);\n"
+                       "  initial begin\n"
+                       "    c = 0; d = 0;\n"
+                       "    #100 c = 1;\n"
+                       "    #100 d = 1;\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "180 1181 2180 ");
+}
+
 }  // namespace
