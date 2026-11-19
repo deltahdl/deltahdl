@@ -106,4 +106,38 @@ TEST(ModulePathPulseFiltering, TransitionsAfterARejectedPulseStillPropagate) {
       "t=7 y=1\nt=37 y=0\nt=57 y=1\n");
 }
 
+std::string AsymmetricPulseRun(const std::string& stimulus) {
+  SimFixture f;
+  return RunCapture(
+      "module mybuf(input a, output y);\n"
+      "  assign y = a;\n"
+      "  specify\n"
+      "    (a => y) = (7, 9);\n"
+      "  endspecify\n"
+      "endmodule\n"
+      "module top;\n"
+      "  logic a; wire ty;\n"
+      "  mybuf u(.a(a), .y(ty));\n"
+      "  always @(ty) if ($time > 50) $write(\"%0d%b \", $time, ty);\n"
+      "  initial begin\n" +
+          stimulus +
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(ModulePathPulseFiltering, LowPulsePassesByItsRisingTrailingEdgeLimit) {
+  EXPECT_EQ(AsymmetricPulseRun("    a = 1;\n"
+                               "    #100 a = 0;\n"
+                               "    #10 a = 1;\n"),
+            "1090 1171 ");
+}
+
+TEST(ModulePathPulseFiltering, HighPulseIsRejectedByItsFallingTrailingEdge) {
+  EXPECT_EQ(AsymmetricPulseRun("    a = 0;\n"
+                               "    #100 a = 1;\n"
+                               "    #6 a = 0;\n"),
+            "");
+}
+
 }  // namespace
