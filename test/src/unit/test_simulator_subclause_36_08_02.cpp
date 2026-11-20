@@ -193,5 +193,29 @@ TEST_F(CompiletfApplicationRoutine, ReachesASystemFunctionCallTheSameWay) {
   EXPECT_EQ(g_first_arg_name_seen, "r");
 }
 
+TEST_F(CompiletfApplicationRoutine, RunsOnceForEachOfATasksCallSites) {
+  ResetCompiletfProbe();
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$utask");
+  task.compiletf = &RecordingCompiletf;
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    $utask;\n"
+      "    $utask;\n"
+      "    repeat (4) $utask;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  EXPECT_EQ(g_compiletf_calls, 3);
+}
+
 }  // namespace
 }  // namespace delta

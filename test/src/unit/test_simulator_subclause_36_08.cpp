@@ -138,5 +138,43 @@ TEST_F(SystfRoutinePeriods, ACallInAContinuousAssignmentIsEncountered) {
   EXPECT_EQ(Ran("compiletf"), 1);
 }
 
+PLI_INT32 PutsA5Calltf(PLI_BYTE8*) {
+  g_order.emplace_back("calltf");
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 0xA5;
+  vpi_put_value(vpi_handle(vpiSysTfCall, nullptr), &value, nullptr, vpiNoDelay);
+  return 0;
+}
+
+TEST_F(SystfRoutinePeriods, AContinuousAssignmentsCallRunsAndDrivesTheNet) {
+  g_order.clear();
+  s_vpi_systf_data data = {};
+  data.type = vpiSysFunc;
+  data.sysfunctype = vpiSizedFunc;
+  data.tfname = VpiText("$drive");
+  data.sizetf = &LoggingSizetf;
+  data.compiletf = &LoggingCompiletf;
+  data.calltf = &PutsA5Calltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  wire [7:0] w;\n"
+      "  int r;\n"
+      "  assign w = $drive();\n"
+      "  initial #1 r = w;\n"
+      "endmodule\n",
+      f, "r");
+
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 0xA5u);
+  EXPECT_GE(Ran("calltf"), 1);
+  ASSERT_GE(g_order.size(), 3u);
+  EXPECT_EQ(g_order[0], "sizetf");
+  EXPECT_EQ(g_order[1], "compiletf");
+}
+
 }  // namespace
 }  // namespace delta

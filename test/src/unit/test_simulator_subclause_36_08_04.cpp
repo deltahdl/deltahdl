@@ -252,5 +252,34 @@ TEST_F(SystfApplicationRoutineArguments,
   EXPECT_EQ(g_run_calltf_arg, nullptr);
 }
 
+TEST_F(SystfApplicationRoutineArguments,
+       ASystemTasksRoutinesReceiveItsOwnUserData) {
+  char task_user_data[] = "task-reader";
+  ResetRunProbes();
+  s_vpi_systf_data func = ProbeRegistration(g_registered_user_data);
+  ASSERT_NE(vpi_register_systf(&func), nullptr);
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$probe_task");
+  task.compiletf = &RunCompiletf;
+  task.calltf = &RunCalltf;
+  task.user_data = task_user_data;
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
+
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  initial $probe_task;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+
+  ASSERT_TRUE(g_run_compiletf_ran);
+  ASSERT_TRUE(g_run_calltf_ran);
+  EXPECT_EQ(g_run_compiletf_arg, task_user_data);
+  EXPECT_EQ(g_run_calltf_arg, task_user_data);
+}
+
 }  // namespace
 }  // namespace delta
