@@ -1,6 +1,9 @@
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <map>
 #include <string>
 
 #include "common/diagnostic.h"
@@ -203,6 +206,116 @@ TEST(DpiImportBinding, ARunWithNoImportBindsNothing) {
   BindDesignDpiImports(f.ctx);
   EXPECT_EQ(f.ctx.GetDpiRuntime(), nullptr);
   EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
+uint64_t ValueAfterRun(const std::string& src,
+                       const std::map<std::string, void*>& functions,
+                       const char* dir, const char* var) {
+  SimFixture f;
+  RunWithImportsBound(src, f, functions, std::string("subclause_35_04_") + dir);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* found = f.ctx.FindVariable(var);
+  return found == nullptr ? ~uint64_t{0} : found->value.ToUint64();
+}
+
+TEST(DpiImportBinding, AnImportWhoseSvNameIsNoCIdentifierReachesItsLinkage) {
+  EXPECT_EQ(ValueAfterRun("module t;\n"
+                          "  import \"DPI-C\" init_1 = function int \\init[1] "
+                          "(input int a);\n"
+                          "  int r;\n"
+                          "  initial r = \\init[1] (35);\n"
+                          "endmodule\n",
+                          {{"init_1", reinterpret_cast<void*>(&AddSeven)}},
+                          "escaped_sv_name", "r"),
+            42U);
+}
+
+constexpr const char* kNativeAndImportOfOneName =
+    "module t;\n"
+    "  function int foo; return 1; endfunction\n"
+    "  import \"DPI-C\" foo = function int bar(input int a);\n"
+    "  int r, s;\n"
+    "  initial begin r = foo(); s = bar(35); end\n"
+    "endmodule\n";
+
+TEST(DpiImportBinding, ANativeFunctionKeepsTheNameItsImportLinksUnder) {
+  EXPECT_EQ(ValueAfterRun(kNativeAndImportOfOneName,
+                          {{"foo", reinterpret_cast<void*>(&AddSeven)}},
+                          "native_name_r", "r"),
+            1U);
+}
+
+TEST(DpiImportBinding, AnImportLinkedUnderANativeFunctionsNameReachesC) {
+  EXPECT_EQ(ValueAfterRun(kNativeAndImportOfOneName,
+                          {{"foo", reinterpret_cast<void*>(&AddSeven)}},
+                          "native_name_s", "s"),
+            42U);
+}
+
+const char* exported_symbol = "";
+
+int CallsExportedSymbol(int a) {
+  auto exported =
+      reinterpret_cast<int (*)(int)>(dlsym(RTLD_DEFAULT, exported_symbol));
+  return exported == nullptr ? -1 : exported(a);
+}
+
+uint64_t ResultOfCallingTheFunctionExportAs(const char* symbol,
+                                            const char* dir) {
+  exported_symbol = symbol;
+  return ValueAfterRun(
+      "module t;\n"
+      "  export \"DPI-C\" gname_fn = function sv_local_fn;\n"
+      "  function int sv_local_fn(input int a); return a * 3; endfunction\n"
+      "  import \"DPI-C\" context function int calls_exported_symbol("
+      "input int a);\n"
+      "  int r;\n"
+      "  initial r = calls_exported_symbol(5);\n"
+      "endmodule\n",
+      {{"calls_exported_symbol",
+        reinterpret_cast<void*>(&CallsExportedSymbol)}},
+      dir, "r");
+}
+
+TEST(DpiExportLinkage, CReachesAFunctionExportByItsLinkageName) {
+  EXPECT_EQ(ResultOfCallingTheFunctionExportAs("gname_fn", "export_gname"),
+            15U);
+}
+
+TEST(DpiExportLinkage, CFindsNoFunctionExportUnderItsSvName) {
+  EXPECT_EQ(ResultOfCallingTheFunctionExportAs("sv_local_fn", "export_svname"),
+            0xFFFFFFFFU);
+}
+
+const char* exported_task_symbol = "";
+
+int CallsExportedTask(int a) {
+  auto exported =
+      reinterpret_cast<int (*)(int)>(dlsym(RTLD_DEFAULT, exported_task_symbol));
+  if (exported != nullptr) exported(a);
+  return 0;
+}
+
+uint64_t CountAfterCallingTheTaskExportAs(const char* symbol, const char* dir) {
+  exported_task_symbol = symbol;
+  return ValueAfterRun(
+      "module t;\n"
+      "  export \"DPI-C\" bump_task_c = task bump;\n"
+      "  int count;\n"
+      "  task bump(input int a); count = count + a; endtask\n"
+      "  import \"DPI-C\" context task calls_exported_task(input int a);\n"
+      "  initial calls_exported_task(4);\n"
+      "endmodule\n",
+      {{"calls_exported_task", reinterpret_cast<void*>(&CallsExportedTask)}},
+      dir, "count");
+}
+
+TEST(DpiExportLinkage, CReachesATaskExportByItsLinkageName) {
+  EXPECT_EQ(CountAfterCallingTheTaskExportAs("bump_task_c", "task_gname"), 4U);
+}
+
+TEST(DpiExportLinkage, CFindsNoTaskExportUnderItsSvName) {
+  EXPECT_EQ(CountAfterCallingTheTaskExportAs("bump", "task_svname"), 0U);
 }
 
 }  // namespace

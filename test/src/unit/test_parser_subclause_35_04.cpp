@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -130,6 +132,42 @@ TEST(DpiGlobalNameParsing, EscapedNameStartingWithDigitIsRejected) {
   EXPECT_TRUE(ReportedError(
       diag.Diagnostics(), "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
       2, "35.5.4"));
+}
+
+void ExpectCIdentifierReport(const std::string& src, int line) {
+  auto r = Parse(src);
+  EXPECT_TRUE(ReportedError(
+      r.diags, "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*", line,
+      "35.5.4"));
+}
+
+TEST(DpiGlobalNameParsing, AnExportsStrippedEscapedNameStartingWithADigit) {
+  ExpectCIdentifierReport(R"(
+    module m;
+      function void f(); endfunction
+      export "DPI-C" \1x  = function f;
+    endmodule
+  )",
+                          4);
+}
+
+TEST(DpiGlobalNameParsing, AnImportsStrippedEscapedNameHoldingAPlus) {
+  ExpectCIdentifierReport(R"(
+    module m;
+      import "DPI-C" \f+  = function void g();
+    endmodule
+  )",
+                          3);
+}
+
+TEST(DpiGlobalNameParsing, ATaskExportsStrippedEscapedNameStartingWithADigit) {
+  ExpectCIdentifierReport(R"(
+    module m;
+      task a; endtask
+      export "DPI-C" \9z  = task a;
+    endmodule
+  )",
+                          4);
 }
 
 }  // namespace
