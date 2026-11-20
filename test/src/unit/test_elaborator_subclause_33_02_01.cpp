@@ -392,4 +392,74 @@ TEST(LibraryCellNotation, DesignStatementNamingOnlyAConfigRejected) {
                     3, "33.4.1.1"));
 }
 
+constexpr const char* kCellPlainUseOfMidcfg =
+    "module top; mid m(); endmodule\n"
+    "config cfg;\n"
+    "  design top;\n"
+    "  default liblist libA;\n"
+    "  cell mid use lib1.midcfg;\n"
+    "endconfig\n"
+    "config midcfg;\n"
+    "  design lib1.mid;\n"
+    "  default liblist libB;\n"
+    "endconfig\n";
+
+constexpr const char* kCellConfigUseOfMidcfg =
+    "module top; mid m(); endmodule\n"
+    "config cfg;\n"
+    "  design top;\n"
+    "  default liblist libA;\n"
+    "  cell mid use lib1.midcfg:config;\n"
+    "endconfig\n"
+    "config midcfg;\n"
+    "  design lib1.mid;\n"
+    "  default liblist libB;\n"
+    "endconfig\n";
+
+TEST(LibraryCellNotation, CellClausePlainNameNamesModuleSharingConfigName) {
+  ConfigElab e;
+  e.Run(std::string(kLeafAndMidCells) +
+            "module midcfg; leaf lf(); endmodule\n" + kCellPlainUseOfMidcfg,
+        {.modules = {"libA", "libB", "lib1", "lib1", "libTop"}});
+  auto* top = OnlyTop(e.design);
+  ASSERT_NE(top, nullptr);
+  ASSERT_EQ(top->children.size(), 1u);
+  auto* bound = top->children[0].resolved;
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->name, "midcfg");
+  ASSERT_EQ(bound->children.size(), 1u);
+  auto* leaf = bound->children[0].resolved;
+  ASSERT_NE(leaf, nullptr);
+  EXPECT_EQ(leaf->library, "libA");
+}
+
+TEST(LibraryCellNotation, CellClausePlainNameNamesPrimitiveSharingConfigName) {
+  ConfigElab e;
+  e.Run(
+      std::string(kLeafAndMidCells) + kPrimitiveMidcfg + kCellPlainUseOfMidcfg,
+      {.modules = {"libA", "libB", "lib1", "libTop"}, .primitives = {"lib1"}});
+  EXPECT_TRUE(ReportedError(e.diag.Diagnostics(),
+                            "primitive 'midcfg' takes 2 terminal(s) but this "
+                            "instance connects 0",
+                            7, "29.8"));
+}
+
+TEST(LibraryCellNotation,
+     CellClauseConfigExtensionNamesConfigSharingModuleName) {
+  ConfigElab e;
+  e.Run(std::string(kLeafAndMidCells) +
+            "module midcfg; leaf lf(); endmodule\n" + kCellConfigUseOfMidcfg,
+        {.modules = {"libA", "libB", "lib1", "lib1", "libTop"}});
+  ExpectInstanceHandedToMidcfg(e.design);
+}
+
+TEST(LibraryCellNotation,
+     CellClauseConfigExtensionNamesConfigSharingPrimitiveName) {
+  ConfigElab e;
+  e.Run(
+      std::string(kLeafAndMidCells) + kPrimitiveMidcfg + kCellConfigUseOfMidcfg,
+      {.modules = {"libA", "libB", "lib1", "libTop"}, .primitives = {"lib1"}});
+  ExpectInstanceHandedToMidcfg(e.design);
+}
+
 }  // namespace

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string_view>
+
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -128,6 +131,55 @@ TEST(ConfigInstanceSourceMapping, UnlocatableNestedSubinstanceIsError) {
       "module top; mid u_mid(); endmodule\n",
       f, "top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'ghost'", 1,
+                            "23.3.2"));
+}
+
+const RtlirModule* TopNamed(const RtlirDesign* design, std::string_view name) {
+  for (const auto* top : design->top_modules) {
+    if (top->name == name) return top;
+  }
+  return nullptr;
+}
+
+const RtlirModule* SoleChildOf(const RtlirModule* mod) {
+  if (mod == nullptr || mod->children.size() != 1) return nullptr;
+  return mod->children.front().resolved;
+}
+
+TEST(ConfigInstanceSourceMapping, EveryTopsSubinstancesAreMapped) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module a_leaf; endmodule\n"
+      "module a; a_leaf u(); endmodule\n"
+      "module b_leaf; endmodule\n"
+      "module b_mid; b_leaf v(); endmodule\n"
+      "module b; b_mid u(); endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules.size(), 2u);
+  const auto* a_child = SoleChildOf(TopNamed(design, "a"));
+  ASSERT_NE(a_child, nullptr);
+  EXPECT_EQ(a_child->name, "a_leaf");
+  const auto* b_child = SoleChildOf(TopNamed(design, "b"));
+  ASSERT_NE(b_child, nullptr);
+  EXPECT_EQ(b_child->name, "b_mid");
+  const auto* b_leaf = SoleChildOf(b_child);
+  ASSERT_NE(b_leaf, nullptr);
+  EXPECT_EQ(b_leaf->name, "b_leaf");
+  EXPECT_TRUE(design->all_modules.contains("a_leaf"));
+  EXPECT_TRUE(design->all_modules.contains("b_leaf"));
+}
+
+TEST(ConfigInstanceSourceMapping,
+     UnlocatableSubinstanceUnderASecondTopIsError) {
+  ElabFixture f;
+  ElaborateWithPreprocessor(
+      "module a_leaf; endmodule\n"
+      "module a; a_leaf u(); endmodule\n"
+      "module b; ghost u(); endmodule\n",
+      f, "", true);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unknown module 'ghost'", 3,
                             "23.3.2"));
 }
 
