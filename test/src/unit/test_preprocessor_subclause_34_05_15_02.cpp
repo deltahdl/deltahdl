@@ -9,8 +9,13 @@
 #include "fixture_preprocessor.h"
 #include "helpers_protect_block_lines.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_des.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_digest_block.h"
+#include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_processing.h"
 
 using namespace delta;
@@ -154,6 +159,63 @@ TEST(ProtectDataBlockDescription, TheEncodedCharactersAreWhatIsReversed) {
       f.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied", 8,
       "34.3.2"));
+}
+
+std::string DesKeyOfTheRegionKey() {
+  std::string input(kRegionKey);
+  input.append(4, '\0');
+  return Sha1Digest(input).substr(0, kDesKeyBytes);
+}
+
+std::string EnvelopeOfARegionUnderDesCbc() {
+  std::string region = "`pragma protect begin\n`pragma protect data_method=\"";
+  region.append(kDesCbcMethod).append("\"\n");
+  region.append(kSealedDesign).append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, kRegionKey);
+  EXPECT_FALSE(Holds(envelope, kSealedDesign)) << envelope;
+  return envelope;
+}
+
+std::string DataBlockBytesOf(std::string_view envelope) {
+  std::string bytes;
+  EXPECT_TRUE(ProtectBlockBytesAfter(envelope, kAnnouncingDirective,
+                                     kBlockEnctype, &bytes))
+      << envelope;
+  return bytes;
+}
+
+std::string DataBlockContentUnderDesCbc(std::string_view envelope) {
+  std::string bytes = DataBlockBytesOf(envelope);
+  EXPECT_GT(bytes.size(), kDesBlockBytes) << envelope;
+  std::string content;
+  EXPECT_TRUE(DesCbcDecrypt(bytes.substr(kDesBlockBytes),
+                            DesKeyOfTheRegionKey(),
+                            bytes.substr(0, kDesBlockBytes), &content))
+      << envelope;
+  return content;
+}
+
+TEST(ProtectDataBlockDescription, UnderDesCbcTheBlockIsAnIvThenDesCbcText) {
+  std::string content =
+      DataBlockContentUnderDesCbc(EnvelopeOfARegionUnderDesCbc());
+  EXPECT_TRUE(Holds(content, kSealedDesign)) << content;
+}
+
+TEST(ProtectDataBlockDescription, ABlockSealedElsewhereUnderDesCbcOpens) {
+  std::string envelope = EnvelopeOfARegionUnderDesCbc();
+  std::string content = DataBlockContentUnderDesCbc(envelope);
+  ASSERT_TRUE(Holds(content, kSealedDesign)) << content;
+  const std::string kIv = "\xe4\x29\x6b\x10\xd7\x83\x5f\xa2";
+  std::string sealed = kIv;
+  sealed.append(DesCbcEncrypt(content, DesKeyOfTheRegionKey(), kIv));
+  ASSERT_EQ(sealed.size(), DataBlockBytesOf(envelope).size());
+  std::string rebuilt = WithProtectBlockBytes(envelope, kAnnouncingDirective,
+                                              sealed, kBlockEnctype);
+  ASSERT_NE(rebuilt, envelope);
+  PreprocFixture f;
+  std::string text = ReadBack(rebuilt, f);
+  EXPECT_FALSE(f.diag.HasErrors()) << rebuilt;
+  EXPECT_TRUE(Holds(text, kSealedDesign)) << text;
 }
 
 }  // namespace
