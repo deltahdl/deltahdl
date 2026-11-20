@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -380,6 +381,175 @@ TEST(ProtectEnvelopeEncryptionOrder, ANameAfterTheClosingWordIsForWhatFollows) {
   std::string written = Encrypted(source);
   EXPECT_EQ(TimesWritten(written, kBlockOpening), 1U) << written;
   EXPECT_TRUE(Holds(written, "module next_m; endmodule\n")) << written;
+}
+
+constexpr std::string_view kLicenseLine =
+    "`pragma protect runtime_license=(library=\"lic.so\", entry=\"acquire\", "
+    "feature=\"simulate\")\n";
+
+constexpr std::string_view kAuthorLine =
+    "`pragma protect author=\"Acme Corp\"\n";
+
+TEST(ProtectedEnvelopeOverview, EndClosesTheOnlyOpenBeginAndSealsItsText) {
+  std::string written =
+      Encrypted(ReachesTheKey() + RegionAround(kSealedDesign));
+  EXPECT_EQ(TimesWritten(written, kBeginProtected), 1U) << written;
+  EXPECT_EQ(TimesWritten(written, kEndProtected), 1U) << written;
+  EXPECT_FALSE(Holds(written, kSealedDesign)) << written;
+  EXPECT_EQ(OpenedBlockOf(written), std::string(kSealedDesign));
+}
+
+TEST(ProtectedEnvelopeOverview,
+     EndWithNothingOpenIsNotReportedAndSealsNothing) {
+  const std::string kLoose = "`pragma protect end\nmodule loose_m; endmodule\n";
+  EnvelopeRun run(kLoose);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 0U);
+  std::string written = Encrypted(ReachesTheKey() + kLoose);
+  EXPECT_FALSE(Holds(written, kBeginProtected)) << written;
+  EXPECT_TRUE(Holds(written, "module loose_m; endmodule\n")) << written;
+}
+
+TEST(ProtectedEnvelopeOverview, EndLeavesAnOpenDecryptionEnvelopeProtecting) {
+  EnvelopeRun run(
+      "`pragma protect begin_protected\n"
+      "`pragma protect end\n");
+  EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 0U);
+  EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 1U);
+  EXPECT_TRUE(run.Envelopes().InProtectedRegion());
+}
+
+TEST(ProtectedEnvelopeOverview,
+     DISABLED_BeginAndEndInOneDirectiveSealAsWhenSplit) {
+  std::string joined =
+      Encrypted(ReachesTheKey() + "`pragma protect begin, end\n");
+  std::string split = Encrypted(ReachesTheKey() +
+                                "`pragma protect begin\n`pragma protect end\n");
+  EXPECT_EQ(TimesWritten(joined, kBeginProtected), 1U) << joined;
+  EXPECT_EQ(TimesWritten(split, kBeginProtected), 1U) << split;
+  EXPECT_EQ(DataBlockOf(joined), DataBlockOf(split));
+  EXPECT_FALSE(DataBlockOf(joined).empty());
+}
+
+TEST(ProtectedEnvelopeOverview, EndProtectedLeavesAnOpenBeginOpen) {
+  EnvelopeRun open(
+      "`pragma protect begin\n"
+      "`pragma protect end_protected\n");
+  EXPECT_EQ(open.Envelopes().EncryptionEnvelopeDepth(), 1U);
+  EXPECT_EQ(open.Envelopes().DecryptionEnvelopeDepth(), 0U);
+  EXPECT_FALSE(open.Envelopes().InProtectedRegion());
+  EnvelopeRun closed(
+      "`pragma protect begin\n"
+      "`pragma protect end_protected\n"
+      "`pragma protect end\n");
+  EXPECT_EQ(closed.Envelopes().EncryptionEnvelopeDepth(), 0U);
+}
+
+TEST(ProtectedEnvelopeOverview, InnerEncryptionEnvelopeClosesBeforeTheOuter) {
+  EnvelopeRun inner_closed(
+      "`pragma protect begin_protected\n"
+      "`pragma protect begin\n"
+      "`pragma protect end\n");
+  EXPECT_FALSE(inner_closed.diag.HasErrors());
+  EXPECT_EQ(inner_closed.Envelopes().EncryptionEnvelopeDepth(), 0U);
+  EXPECT_EQ(inner_closed.Envelopes().DecryptionEnvelopeDepth(), 1U);
+  EXPECT_TRUE(inner_closed.Envelopes().InProtectedRegion());
+  EnvelopeRun both_closed(
+      "`pragma protect begin_protected\n"
+      "`pragma protect begin\n"
+      "`pragma protect end\n"
+      "`pragma protect end_protected\n");
+  EXPECT_EQ(both_closed.Envelopes().DecryptionEnvelopeDepth(), 0U);
+  EXPECT_FALSE(both_closed.Envelopes().InProtectedRegion());
+}
+
+TEST(ProtectedEnvelopeOverview,
+     BeginProtectedAndEndProtectedInOneDirectivePair) {
+  EnvelopeRun joined("`pragma protect begin_protected, end_protected\n");
+  EnvelopeRun split(
+      "`pragma protect begin_protected\n"
+      "`pragma protect end_protected\n");
+  EXPECT_FALSE(joined.diag.HasErrors());
+  EXPECT_EQ(joined.Envelopes().DecryptionEnvelopeDepth(), 0U);
+  EXPECT_EQ(split.Envelopes().DecryptionEnvelopeDepth(), 0U);
+  EXPECT_FALSE(joined.Envelopes().InProtectedRegion());
+}
+
+TEST(ProtectedEnvelopeOverview,
+     ExpressionBeforeBeginIsCarriedAheadOfTheEnvelope) {
+  std::string written = Encrypted(ReachesTheKey() + std::string(kAuthorLine) +
+                                  RegionAround(kSealedDesign));
+  ASSERT_TRUE(Holds(written, kAuthorLine)) << written;
+  EXPECT_LT(written.find(kAuthorLine), written.find(kBeginProtected));
+  EXPECT_EQ(OpenedBlockOf(written), std::string(kSealedDesign));
+}
+
+std::string OneDirectiveSequence() {
+  std::string src = ReachesTheKey();
+  src.append("`pragma protect author=\"Acme Corp\", begin, ");
+  src.append(kLicenseLine.substr(std::string_view("`pragma protect ").size()));
+  src.append(kSealedDesign).append("`pragma protect end\n");
+  return src;
+}
+
+std::string SplitSequence() {
+  std::string src = ReachesTheKey();
+  src.append(kAuthorLine).append("`pragma protect begin\n");
+  src.append(kLicenseLine).append(kSealedDesign);
+  src.append("`pragma protect end\n");
+  return src;
+}
+
+void ExpectAuthorDescribesAndLicenseIsSealed(const std::string& written) {
+  EXPECT_LT(written.find("author=\"Acme Corp\""),
+            written.find("begin_protected"))
+      << written;
+  EXPECT_FALSE(Holds(written, "runtime_license")) << written;
+  EXPECT_TRUE(Holds(OpenedBlockOf(written), "runtime_license=(")) << written;
+  EXPECT_TRUE(Holds(OpenedBlockOf(written), kSealedDesign)) << written;
+}
+
+TEST(ProtectedEnvelopeOverview, OneDirectiveSequenceSealsLeftToRight) {
+  ExpectAuthorDescribesAndLicenseIsSealed(Encrypted(OneDirectiveSequence()));
+}
+
+TEST(ProtectedEnvelopeOverview, SplitSequenceSealsAsTheOneDirectiveDoes) {
+  ExpectAuthorDescribesAndLicenseIsSealed(Encrypted(SplitSequence()));
+}
+
+TEST(ProtectedEnvelopeOverview, ExpressionAfterEndProtectedLeavesTheClosedOne) {
+  std::string envelope =
+      Encrypted(ReachesTheKey() + RegionAround(kSealedDesign));
+  ReadWithTheKeys read(envelope +
+                       "`pragma protect data_method=\"no-such-method\"\n");
+  EXPECT_FALSE(read.diags.HasErrors());
+  EXPECT_TRUE(read.Produced(kSealedDesign)) << read.produced;
+  EXPECT_EQ(read.StillOpen(), 0U);
+}
+
+std::string ReadingKeyNamedTwice(std::string_view first,
+                                 std::string_view second) {
+  std::string envelope =
+      Encrypted(ReachesTheKey() + RegionAround(kSealedDesign));
+  std::string named = "data_keyname=\"";
+  named.append(kKeyName).append("\"");
+  size_t at = envelope.find(named, envelope.find(kBeginProtected));
+  if (at == std::string::npos) return {};
+  std::string twice = "data_keyname=\"";
+  twice.append(first).append("\", data_keyname=\"").append(second);
+  twice.append("\"");
+  return envelope.replace(at, named.size(), twice);
+}
+
+TEST(ProtectedEnvelopeOverview, DISABLED_LaterOfTwoValuesStandsWhenReading) {
+  std::string later = ReadingKeyNamedTwice("no-such-key", kKeyName);
+  ASSERT_FALSE(later.empty());
+  ReadWithTheKeys right(later);
+  EXPECT_FALSE(right.diags.HasErrors());
+  EXPECT_TRUE(right.Produced(kSealedDesign)) << right.produced;
+  ReadWithTheKeys wrong(ReadingKeyNamedTwice(kKeyName, "no-such-key"));
+  EXPECT_TRUE(wrong.diags.HasErrors());
+  EXPECT_FALSE(wrong.Produced(kSealedDesign)) << wrong.produced;
 }
 
 }  // namespace

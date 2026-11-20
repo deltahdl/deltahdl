@@ -1,13 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_envelope.h"
+#include "preprocessor/protect_processing.h"
 
 namespace {
 
@@ -105,6 +108,35 @@ TEST(ProtectedEnvelopeRegionSimulation, OneDirectiveCarriesBothExpressions) {
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[0].envelope_keywords,
             std::vector<std::string>{"data_method"});
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[0].begin_loc.line, 3U);
+}
+
+constexpr std::string_view kNestingKey = "acme-nesting-exchange-key";
+
+std::string SealedEightTimes(std::string body) {
+  for (size_t level = 0;
+       level < ProtectEnvelopeState::kMinNestedDecryptionEnvelopes; ++level) {
+    std::string region = "`pragma protect begin\n";
+    region.append(body).append("`pragma protect end\n");
+    body = EncryptEnvelopes(region, kNestingKey);
+  }
+  return body;
+}
+
+TEST(ProtectedEnvelopeRegionSimulation, EightNestedSealedEnvelopesStillRun) {
+  std::string sealed = SealedEightTimes("  initial result = 88;\n");
+  ASSERT_EQ(sealed.find("result = 88"), std::string::npos);
+  SimFixture f;
+  PreprocConfig config;
+  config.protect_key = kNestingKey;
+  Preprocessor pp{f.mgr, f.diag, config};
+  uint64_t result =
+      RunPreprocessedSim(f,
+                         f.mgr.AddFile("<test>", "module t;\n  int result;\n" +
+                                                     sealed + "endmodule\n"),
+                         "result", pp);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(result, 88U);
+  EXPECT_EQ(pp.ProtectEnvelopes().DecryptionEnvelopeDepth(), 0U);
 }
 
 }  // namespace
