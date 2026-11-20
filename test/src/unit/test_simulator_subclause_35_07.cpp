@@ -99,9 +99,40 @@ Function ExportNamed(const char* name) {
   return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
 }
 
-int ViaExport(int a) {
-  auto sv_double = ExportNamed<int (*)(int)>("sv_double");
-  return sv_double == nullptr ? -1 : sv_double(a) + 1;
+int ExportPlusOne(const char* name, int a) {
+  auto exported = ExportNamed<int (*)(int)>(name);
+  return exported == nullptr ? -1 : exported(a) + 1;
+}
+
+int ViaExport(int a) { return ExportPlusOne("sv_double", a); }
+
+int ViaPackageExport(int a) { return ExportPlusOne("pk_f", a); }
+
+int ViaInterfaceExport(int a) { return ExportPlusOne("if_f", a); }
+
+int ViaGenerateExport(int a) { return ExportPlusOne("g_f", a); }
+
+int UnexportedHasNoSymbol() {
+  return dlsym(RTLD_DEFAULT, "sv_never_exported_f") == nullptr ? 1 : 0;
+}
+
+int WhereAmI() {
+  const char* name = svGetNameFromScope(svGetScope());
+  if (name == nullptr) return 0;
+  std::string_view path(name);
+  if (path == "top.u1") return 1;
+  if (path == "top.u2") return 2;
+  return 9;
+}
+
+int WhereFromBothInstances() {
+  auto sv_where = ExportNamed<int (*)()>("sv_where");
+  if (sv_where == nullptr) return -1;
+  svSetScope(svGetScopeFromName("top.u1"));
+  int first = sv_where();
+  svSetScope(svGetScopeFromName("top.u2"));
+  int second = sv_where();
+  return (first * 10) + second;
 }
 
 int ViaRenamedExport(int a) {
@@ -223,6 +254,144 @@ TEST(DpiExportCalledFromC, TheScopeSelectsTheInstancesExport) {
       "subclause_35_07_export_scope");
   EXPECT_EQ(VariableValue(f, "a"), 4U);
   EXPECT_EQ(VariableValue(f, "b"), 8U);
+}
+
+TEST(DpiExportedFunctionInADesign, AnOutputFormalIsStillWrittenBack) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "module t;\n"
+      "  int a;\n"
+      "  function int f(input int x, output int o);\n"
+      "    o = x * 3;\n"
+      "    return x;\n"
+      "  endfunction\n"
+      "  export \"DPI-C\" function f;\n"
+      "  initial void'(f(7, a));\n"
+      "endmodule\n",
+      f, "a");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 21u);
+}
+
+TEST(DpiExportedFunctionInADesign, APackageCallIsUnchangedByTheExport) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "package pk;\n"
+      "  function int f(input int x); return x + 100; endfunction\n"
+      "  export \"DPI-C\" function f;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int x;\n"
+      "  initial x = pk::f(5);\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 105u);
+}
+
+TEST(DpiExportedFunctionInADesign, AnInterfaceCallIsUnchangedByTheExport) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "interface i;\n"
+      "  function int f(input int x); return x + 200; endfunction\n"
+      "  export \"DPI-C\" function f;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  i u();\n"
+      "  int x;\n"
+      "  initial x = u.f(5);\n"
+      "endmodule\n",
+      f, "x");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 205u);
+}
+
+TEST(DpiExportCalledFromC, AFunctionWithoutAnExportHasNoSymbol) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module top;\n"
+      "  function int sv_never_exported_f(); return 5; endfunction\n"
+      "  import \"DPI-C\" context function int probe();\n"
+      "  int r;\n"
+      "  initial r = probe();\n"
+      "endmodule\n",
+      f, {{"probe", reinterpret_cast<void*>(&UnexportedHasNoSymbol)}},
+      "subclause_35_07_no_export");
+  EXPECT_EQ(VariableValue(f, "r"), 1U);
+}
+
+TEST(DpiExportCalledFromC, DISABLED_APackageExportIsCalledFromC) {
+  SimFixture f;
+  RunWithImportsBound(
+      "package pk;\n"
+      "  export \"DPI-C\" function pk_f;\n"
+      "  import \"DPI-C\" context function int call_pk(input int a);\n"
+      "  function int pk_f(input int a); return a + 100; endfunction\n"
+      "endpackage\n"
+      "module top;\n"
+      "  int r;\n"
+      "  initial r = pk::call_pk(5);\n"
+      "endmodule\n",
+      f, {{"call_pk", reinterpret_cast<void*>(&ViaPackageExport)}},
+      "subclause_35_07_package_export");
+  EXPECT_EQ(VariableValue(f, "r"), 106U);
+}
+
+TEST(DpiExportCalledFromC, DISABLED_AnInterfaceInstanceExportIsCalledFromC) {
+  SimFixture f;
+  RunWithImportsBound(
+      "interface i;\n"
+      "  export \"DPI-C\" function if_f;\n"
+      "  import \"DPI-C\" context function int call_if(input int a);\n"
+      "  function int if_f(input int a); return a + 200; endfunction\n"
+      "  int r;\n"
+      "  initial r = call_if(5);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  i u();\n"
+      "endmodule\n",
+      f, {{"call_if", reinterpret_cast<void*>(&ViaInterfaceExport)}},
+      "subclause_35_07_interface_export");
+  EXPECT_EQ(VariableValue(f, "u.r"), 206U);
+}
+
+TEST(DpiExportCalledFromC, AGenerateBlockExportIsCalledFromC) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module top;\n"
+      "  int r;\n"
+      "  if (1) begin : g\n"
+      "    export \"DPI-C\" function g_f;\n"
+      "    import \"DPI-C\" context function int call_g(input int a);\n"
+      "    function int g_f(input int a); return a + 300; endfunction\n"
+      "    initial r = call_g(5);\n"
+      "  end\n"
+      "endmodule\n",
+      f, {{"call_g", reinterpret_cast<void*>(&ViaGenerateExport)}},
+      "subclause_35_07_generate_export");
+  EXPECT_EQ(VariableValue(f, "r"), 306U);
+}
+
+TEST(DpiExportCalledFromC, AnExportRunsInTheContextOfItsInstance) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module m;\n"
+      "  export \"DPI-C\" function sv_where;\n"
+      "  import \"DPI-C\" context function int where_am_i();\n"
+      "  function int sv_where(); return where_am_i(); endfunction\n"
+      "endmodule\n"
+      "module top;\n"
+      "  import \"DPI-C\" context function int both();\n"
+      "  m u1();\n"
+      "  m u2();\n"
+      "  int r;\n"
+      "  initial r = both();\n"
+      "endmodule\n",
+      f,
+      {{"both", reinterpret_cast<void*>(&WhereFromBothInstances)},
+       {"where_am_i", reinterpret_cast<void*>(&WhereAmI)}},
+      "subclause_35_07_export_context");
+  EXPECT_EQ(VariableValue(f, "r"), 12U);
 }
 
 }  // namespace

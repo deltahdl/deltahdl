@@ -134,4 +134,32 @@ TEST(DpiImportCallInADesign, TwoCallsServeAsOperandsOfOneExpression) {
       4006);
 }
 
+int32_t CombineThroughAnInstance(const std::string& keyword) {
+  return IntVariableAfterRun(
+      keyword +
+          " holder;\n"
+          "  import \"DPI-C\" function int c_combine(input int a, "
+          "input int b);\n"
+          "end" +
+          keyword +
+          "\n"
+          "module top;\n"
+          "  holder u();\n"
+          "  int r;\n"
+          "  initial r = u.c_combine(6, 7);\n"
+          "endmodule\n",
+      {{"c_combine", reinterpret_cast<void*>(&Combine)}},
+      "subclause_35_06_hierarchical_" + keyword, "r");
+}
+
+TEST(DpiImportCallInADesign,
+     DISABLED_AnInterfaceInstancesImportIsCalledThroughItsName) {
+  EXPECT_EQ(CombineThroughAnInstance("interface"), 6007);
+}
+
+TEST(DpiImportCallInADesign,
+     DISABLED_AModuleInstancesImportIsCalledThroughItsName) {
+  EXPECT_EQ(CombineThroughAnInstance("module"), 6007);
+}
+
 }  // namespace

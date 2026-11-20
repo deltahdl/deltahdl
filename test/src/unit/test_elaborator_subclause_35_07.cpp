@@ -242,4 +242,336 @@ TEST(DpiExportElab, ExportInAnInterfaceOfAFunctionItDoesNotDefineIsError) {
                             3, "35.7"));
 }
 
+TEST(DpiExportElab, APackageExportWrittenBeforeItsFunctionIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      export "DPI-C" function f;
+      function int f(); return 1; endfunction
+    endpackage
+    module m;
+      import p::*;
+      int x = f();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, AnInterfaceExportWrittenBeforeItsFunctionIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    interface i;
+      export "DPI-C" function f;
+      function int f(); return 1; endfunction
+    endinterface
+    module m;
+      i u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, AProgramExportWrittenBeforeItsFunctionIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    program p;
+      export "DPI-C" function f;
+      function int f(); return 1; endfunction
+    endprogram
+    module m;
+      p u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, AGenerateBlockExportWrittenBeforeItsFunctionIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      if (1) begin : g
+        export "DPI-C" function f;
+        function int f(); return 1; endfunction
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, ACompilationUnitExportWrittenBeforeItsFunctionIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    export "DPI-C" function f;
+    function int f(); return 1; endfunction
+    module m;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, AProgramExportOfAModulesFunctionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int f(); return 1; endfunction
+      p u();
+    endmodule
+    program p;
+      export "DPI-C" function f;
+    endprogram
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            7, "35.7"));
+}
+
+TEST(DpiExportElab, ACompilationUnitExportOfAModulesFunctionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    export "DPI-C" function f;
+    module m;
+      function int f(); return 1; endfunction
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            2, "35.7"));
+}
+
+TEST(DpiExportElab, AGenerateBlockExportOfTheEnclosingModulesFunctionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int f(); return 1; endfunction
+      if (1) begin : g
+        export "DPI-C" function f;
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            5, "35.7"));
+}
+
+TEST(DpiExportElab, AModuleExportOfItsGenerateBlocksFunctionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      if (1) begin : g
+        function int f(); return 1; endfunction
+      end
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            6, "35.7"));
+}
+
+TEST(DpiExportElab, AnExportOfAWildcardImportedFunctionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      function int f(); return 1; endfunction
+    endpackage
+    module m;
+      import p::*;
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            7, "35.7"));
+}
+
+TEST(DpiExportElab, AnExportOfAnExplicitlyImportedFunctionIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      function int f(); return 1; endfunction
+    endpackage
+    module m;
+      import p::f;
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 'f', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            7, "35.7"));
+}
+
+TEST(DpiExportElab, AnExportOfAnAutomaticFunctionIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function automatic int f(); return 1; endfunction
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, AnExportOfAFunctionInAnAutomaticModuleIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module automatic m;
+      function int f(); return 1; endfunction
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportElab, TwoDefaultedExportsOfOneFunctionAreAnError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      function int f(); return 1; endfunction
+      export "DPI-C" function f;
+      export "DPI-C" function f;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' is already exported "
+                            "in this scope; only one export declaration per "
+                            "function is permitted",
+                            5, "35.7"));
+}
+
+TEST(DpiExportElab, TwoExportsOfOneFunctionInAPackageAreAnError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      function int f(); return 1; endfunction
+      export "DPI-C" a = function f;
+      export "DPI-C" b = function f;
+    endpackage
+    module m;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' is already exported "
+                            "in this scope; only one export declaration per "
+                            "function is permitted",
+                            5, "35.7"));
+}
+
+TEST(DpiExportElab, TwoExportsOfOneFunctionInAnInterfaceAreAnError) {
+  ElabFixture f;
+  Elaborate(R"(
+    interface i;
+      function int f(); return 1; endfunction
+      export "DPI-C" a = function f;
+      export "DPI-C" b = function f;
+    endinterface
+    module m;
+      i u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' is already exported "
+                            "in this scope; only one export declaration per "
+                            "function is permitted",
+                            5, "35.7"));
+}
+
+TEST(DpiExportElab, TwoExportsOfOneFunctionInAProgramAreAnError) {
+  ElabFixture f;
+  Elaborate(R"(
+    program p;
+      function int f(); return 1; endfunction
+      export "DPI-C" a = function f;
+      export "DPI-C" b = function f;
+    endprogram
+    module m;
+      p u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' is already exported "
+                            "in this scope; only one export declaration per "
+                            "function is permitted",
+                            5, "35.7"));
+}
+
+TEST(DpiExportElab, TwoExportsOfOneFunctionInAGenerateBlockAreAnError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      if (1) begin : g
+        function int f(); return 1; endfunction
+        export "DPI-C" a = function f;
+        export "DPI-C" b = function f;
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' is already exported "
+                            "in this scope; only one export declaration per "
+                            "function is permitted",
+                            6, "35.7"));
+}
+
+TEST(DpiExportElab, TwoExportsOfOneFunctionInTheCompilationUnitAreAnError) {
+  ElabFixture f;
+  Elaborate(R"(
+    function int f(); return 1; endfunction
+    export "DPI-C" a = function f;
+    export "DPI-C" b = function f;
+    module m;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "SystemVerilog function 'f' is already exported "
+                            "in this scope; only one export declaration per "
+                            "function is permitted",
+                            4, "35.7"));
+}
+
+TEST(DpiExportElab, DISABLED_TheCIdentifierOfAnExportIsNoSystemVerilogName) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      int r;
+      function int f(input int x); return x; endfunction
+      export "DPI-C" c_f = function f;
+      initial r = c_f(4);
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "undeclared identifier 'c_f'",
+                            6, "23.9"));
+}
+
 }  // namespace

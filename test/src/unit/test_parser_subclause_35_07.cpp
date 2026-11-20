@@ -72,4 +72,29 @@ TEST(DpiParsing, DpiExportRejectsUnknownSpecString) {
       "35.5.4"));
 }
 
+TEST(DpiParsing, AnExportOfAClassScopedNameIsError) {
+  auto r = Parse(R"(
+    module m;
+      class C;
+        static function int f(); return 1; endfunction
+      endclass
+      export "DPI-C" function C::f;
+    endmodule
+  )");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '::'", 6, "35.7"));
+}
+
+TEST(DpiParsing, AnExportOfAHierarchicalNameIsError) {
+  auto r = Parse(R"(
+    interface i;
+      function int f(); return 1; endfunction
+    endinterface
+    module m;
+      i ifc();
+      export "DPI-C" function ifc.f;
+    endmodule
+  )");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '.'", 7, "35.7"));
+}
+
 }  // namespace
