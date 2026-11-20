@@ -5,7 +5,9 @@
 #include <string_view>
 #include <vector>
 
+#include "fixture_parser.h"
 #include "fixture_scratch_dir.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_design.h"
 #include "parser/library_map.h"
 
@@ -179,6 +181,65 @@ TEST(LibraryMapInclude, ConfigDeclaredInAMapFileIsKept) {
   EXPECT_EQ(kConfigs[0]->library, "work");
   ASSERT_EQ(kConfigs[0]->design_cells.size(), 1u);
   EXPECT_EQ(kConfigs[0]->design_cells[0].cell, "top");
+}
+
+void ExpectRejectedAsLibraryText(const std::string& form) {
+  auto r = ParseLibrary("library rtlLib *.v;\n" + form + "\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "expected library declaration, include statement, "
+                            "config declaration, or ';'",
+                            2, "33.3.1"))
+      << form;
+}
+
+TEST(LibraryMapContents, PackageInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText("package p; endpackage");
+}
+
+TEST(LibraryMapContents, InterfaceInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText("interface i; endinterface");
+}
+
+TEST(LibraryMapContents, ProgramInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText("program g; endprogram");
+}
+
+TEST(LibraryMapContents, PrimitiveInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText(
+      "primitive u(output y, input a); table 0 : 1 ; endtable endprimitive");
+}
+
+TEST(LibraryMapContents, CheckerInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText("checker c; endchecker");
+}
+
+TEST(LibraryMapContents, DefineDirectiveInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText("`define W 1");
+}
+
+TEST(LibraryMapContents, TimescaleDirectiveInAMapFileIsRejected) {
+  ExpectRejectedAsLibraryText("`timescale 1ns/1ps");
+}
+
+TEST(LibraryMapContents, IfdefAroundALibraryDeclarationIsRejected) {
+  ExpectRejectedAsLibraryText(
+      "`ifdef GATES\n"
+      "library gateLib *.vg;\n"
+      "`endif");
+}
+
+TEST(LibraryMapContents, ForbiddenFormInAnIncludedMapFileIsRejected) {
+  ScratchDir tmp;
+  auto inner = tmp.Write("inner.map", "package p; endpackage\n");
+  auto outer = tmp.Write("outer.map",
+                         "library rtlLib *.v;\n"
+                         "include inner.map;\n");
+  LibraryMap m;
+  std::vector<std::string> errors;
+  EXPECT_FALSE(m.LoadMapFile(outer, &errors));
+  ASSERT_EQ(errors.size(), 1u);
+  EXPECT_EQ(errors[0], "parse errors in library map file " +
+                           fs::weakly_canonical(inner).string());
 }
 
 }  // namespace

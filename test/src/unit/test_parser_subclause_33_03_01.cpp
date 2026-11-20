@@ -137,6 +137,35 @@ TEST(LibraryMapWildcards, StarMatchesEmptySequence) {
   EXPECT_EQ(m.LibraryForFile("/proj/rtl/topmost.v"), "rtlLib");
 }
 
+TEST(LibraryMapWildcards, StarInADirectoryComponentStaysInThatComponent) {
+  LibraryMap m;
+  auto d = MakeDecl("dlib", {"rtl*/leaf.v"});
+  m.AddDeclaration(d, "/proj");
+  EXPECT_EQ(m.LibraryForFile("/proj/rtl1/leaf.v"), "dlib");
+  EXPECT_EQ(m.LibraryForFile("/proj/rtl/leaf.v"), "dlib");
+  EXPECT_EQ(m.LibraryForFile("/proj/rtl1/deep/leaf.v"), "work");
+  EXPECT_EQ(m.LibraryForFile("/proj/gates/leaf.v"), "work");
+}
+
+TEST(LibraryMapWildcards, QuestionInADirectoryComponentMatchesOneCharacter) {
+  LibraryMap m;
+  auto q = MakeDecl("qlib", {"rtl?/*.v"});
+  m.AddDeclaration(q, "/proj");
+  EXPECT_EQ(m.LibraryForFile("/proj/rtl1/leaf.v"), "qlib");
+  EXPECT_EQ(m.LibraryForFile("/proj/rtl12/leaf.v"), "work");
+  EXPECT_EQ(m.LibraryForFile("/proj/rtl/leaf.v"), "work");
+}
+
+TEST(LibraryMapWildcards, HierarchicalDotsInARelativeSpecStartAtTheMapDir) {
+  LibraryMap m;
+  auto h = MakeDecl("hlib", {"lib/.../*.v"});
+  m.AddDeclaration(h, "/proj/maps");
+  EXPECT_EQ(m.LibraryForFile("/proj/maps/lib/x.v"), "hlib");
+  EXPECT_EQ(m.LibraryForFile("/proj/maps/lib/a/b/x.v"), "hlib");
+  EXPECT_EQ(m.LibraryForFile("/proj/lib/x.v"), "work");
+  EXPECT_EQ(m.LibraryForFile("/proj/maps/other/x.v"), "work");
+}
+
 TEST(LibraryMapTrailingSlash, IncludesAllFilesInDirectory) {
   LibraryMap m;
   auto rtl = MakeDecl("rtlLib", {"/proj/rtl/"});

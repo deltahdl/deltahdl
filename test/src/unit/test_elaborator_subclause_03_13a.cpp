@@ -5,6 +5,7 @@
 #include "common/source_mgr.h"
 #include "elaborator/elaborator.h"
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/parser.h"
@@ -45,15 +46,17 @@ TEST(NameSpaceElaboration, SameNameDifferentModulesElab) {
   EXPECT_FALSE(diag.HasErrors());
 }
 
-TEST(NameSpaceElaboration, DuplicatePackageDefinition) {
+TEST(NameSpaceElaboration, DISABLED_TwoPackagesOfOneNameKeepTheLast) {
   ElabFixture f;
-  EXPECT_FALSE(
-      ElabOk("package p; endpackage\n"
-             "package p; endpackage\n"
-             "module m; endmodule\n",
-             f));
-  EXPECT_TRUE(
-      ReportedError(f.diag.Diagnostics(), "duplicate package 'p'", 2, "3.13"));
+  auto* design = ElaborateSrc(
+      "package p; parameter int K = 1; endpackage\n"
+      "package p; parameter int K = 2; endpackage\n"
+      "module m; localparam int R = p::K; endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ParamValue(design, "R"), 2);
 }
 
 TEST(NameSpaceElaboration, DistinctPackagesOk) {

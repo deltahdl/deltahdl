@@ -1,0 +1,4 @@
+test/src/e2e/library_map/rtl.map
+test/src/e2e/library_map/gates.map
+test/src/e2e/library_map/adder.v
+test/src/e2e/library_map/adder.vg

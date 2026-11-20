@@ -1,0 +1,4 @@
+later m
+test/src/e2e/library_map/later_m.sv:1:1: warning: module 'm' is written to library 'work' more than once in this invocation (§33.3.1.1)
+  module m;
+  ^

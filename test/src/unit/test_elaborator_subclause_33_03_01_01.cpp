@@ -1,8 +1,12 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_param_value.h"
 #include "helpers_reported_error.h"
 #include "helpers_separate_units.h"
 
@@ -133,28 +137,68 @@ TEST(LibraryCellRewrite, APrimitiveAfterAModuleOfItsNameNeitherErrsNorWarns) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
+const RtlirModule* SoleChildBoundAcrossUnits(
+    ElabFixture& f, const std::vector<std::string>& srcs) {
+  Elaborator elab(f.arena, f.diag,
+                  ParseUnitsApart(srcs, f.mgr, f.arena, f.diag));
+  auto* design = elab.Elaborate("top");
+  if (design == nullptr || design->top_modules.size() != 1 ||
+      design->top_modules[0]->children.size() != 1) {
+    return nullptr;
+  }
+  return design->top_modules[0]->children[0].resolved;
+}
+
 TEST(LibraryCellRewrite, TheCheckerEncounteredLastAcrossUnitsIsBound) {
   ElabFixture f;
-  Elaborator elab(f.arena, f.diag,
-                  ParseUnitsApart({"checker chk(input logic x);\n"
-                                   "endchecker\n",
-                                   "\n"
-                                   "checker chk(input logic x);\n"
-                                   "endchecker\n"
-                                   "module top;\n"
-                                   "  logic v;\n"
-                                   "  chk c(v);\n"
-                                   "endmodule\n"},
-                                  f.mgr, f.arena, f.diag));
-  auto* design = elab.Elaborate("top");
+  const RtlirModule* bound =
+      SoleChildBoundAcrossUnits(f, {"checker chk(input logic x);\n"
+                                    "endchecker\n",
+                                    "\n"
+                                    "checker chk(input logic x);\n"
+                                    "endchecker\n"
+                                    "module top;\n"
+                                    "  logic v;\n"
+                                    "  chk c(v);\n"
+                                    "endmodule\n"});
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(f.diag.WarningCount(), 0u);
-  ASSERT_NE(design, nullptr);
-  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
-  const RtlirModule* bound = design->top_modules[0]->children[0].resolved;
   ASSERT_NE(bound, nullptr);
   EXPECT_TRUE(bound->is_checker);
   EXPECT_EQ(bound->loc.line, 2u);
+}
+
+TEST(LibraryCellRewrite,
+     DISABLED_TheModuleInTheLaterPerFileUnitIsBoundWithAWarning) {
+  ElabFixture f;
+  const RtlirModule* bound =
+      SoleChildBoundAcrossUnits(f, {"module m; logic a; endmodule\n",
+                                    "\n"
+                                    "module m; logic b; endmodule\n"
+                                    "module top; m u(); endmodule\n"});
+  EXPECT_FALSE(f.diag.HasErrors());
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->loc.line, 2u);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(),
+                              "module 'm' is written to library 'work' more "
+                              "than once in this invocation",
+                              2, "33.3.1.1"));
+}
+
+TEST(LibraryCellRewrite, DISABLED_ThePackageInTheLaterPerFileUnitIsTheOneKept) {
+  ElabFixture f;
+  Elaborator elab(
+      f.arena, f.diag,
+      ParseUnitsApart({"package p; parameter int K = 1; endpackage\n",
+                       "package p; parameter int K = 2; endpackage\n",
+                       "module m; localparam int R = p::K; "
+                       "endmodule\n"},
+                      f.mgr, f.arena, f.diag));
+  auto* design = elab.Elaborate("m");
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(f.diag.WarningCount(), 0u);
+  ASSERT_NE(design, nullptr);
+  EXPECT_EQ(ParamValue(design, "R"), 2);
 }
 
 }  // namespace

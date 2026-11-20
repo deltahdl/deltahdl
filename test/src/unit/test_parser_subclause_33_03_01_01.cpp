@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <string>
 
 #include "common/arena.h"
@@ -152,28 +154,76 @@ TEST(LibraryMapPathResolution,
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.v").string()), "wildA");
 }
 
-TEST(LibraryMapAmbiguityReport, ClaimByTwoLibrariesStandsAtFirstDeclaration) {
-  ScratchDir tmp;
-  tmp.Write("lib.map",
-            "// Two declarations claim src/cell.v as specifically as each\n"
-            "// other, so no library holds it and the compile stops.\n"
-            "//\n"
-            "library alphaLib src/cell.v;\n"
-            "library betaLib src/cell.v;\n");
-  auto src = tmp.Write("src/cell.v",
+void ExpectClaimByTwoLibrariesReported(ScratchDir& tmp,
+                                       std::initializer_list<const char*> maps,
+                                       uint32_t line) {
+  auto src = tmp.Write("sub/cell.v",
                        "module one_cell;\n"
                        "endmodule\n");
-
   SourceManager mgr;
   Arena arena;
   DiagEngine diag{mgr};
   LibraryMap libs;
   CompilationUnit unit;
   SinglePassCompiler compiler{libs, mgr, arena, diag};
-  ASSERT_TRUE(libs.LoadMapFile(tmp.dir / "lib.map"));
+  for (const char* map : maps) {
+    ASSERT_TRUE(libs.LoadMapFile(tmp.dir / map));
+  }
   EXPECT_EQ(compiler.CompileSource(src, unit), CompileOutcome::kFailed);
   EXPECT_TRUE(ReportedError(diag.Diagnostics(),
-                            "claimed by more than one library", 4, "33.3.1.1"));
+                            "claimed by more than one library", line,
+                            "33.3.1.1"));
+}
+
+TEST(LibraryMapAmbiguityReport, ClaimByTwoLibrariesStandsAtFirstDeclaration) {
+  ScratchDir tmp;
+  tmp.Write("lib.map",
+            "// Two declarations claim sub/cell.v as specifically as each\n"
+            "// other, so no library holds it and the compile stops.\n"
+            "//\n"
+            "library alphaLib sub/cell.v;\n"
+            "library betaLib sub/cell.v;\n");
+  ExpectClaimByTwoLibrariesReported(tmp, {"lib.map"}, 4);
+}
+
+TEST(LibraryMapAmbiguityReport, TieOfWildcardedFileNamesIsReported) {
+  ScratchDir tmp;
+  tmp.Write("lib.map",
+            "library otherLib lib/*.v;\n"
+            "library wildA sub/*.v;\n"
+            "library wildB sub/*.v;\n");
+  ExpectClaimByTwoLibrariesReported(tmp, {"lib.map"}, 2);
+}
+
+TEST(LibraryMapAmbiguityReport, TieOfDirectoriesIsReported) {
+  ScratchDir tmp;
+  tmp.Write("lib.map",
+            "library otherLib lib/;\n"
+            "library dirA sub/;\n"
+            "library dirB sub/;\n");
+  ExpectClaimByTwoLibrariesReported(tmp, {"lib.map"}, 2);
+}
+
+TEST(LibraryMapAmbiguityReport, TieAcrossTwoMapFilesOfOneRunIsReported) {
+  ScratchDir tmp;
+  tmp.Write("one.map", "library alphaLib sub/*.v;\n");
+  tmp.Write("two.map",
+            "\n"
+            "\n"
+            "library betaLib sub/*.v;\n");
+  ExpectClaimByTwoLibrariesReported(tmp, {"one.map", "two.map"}, 1);
+}
+
+TEST(LibraryMapAmbiguityReport, TieWithAnIncludedMapFileIsReported) {
+  ScratchDir tmp;
+  tmp.Write("inner.map",
+            "\n"
+            "\n"
+            "library alphaLib sub/*.v;\n");
+  tmp.Write("outer.map",
+            "include inner.map;\n"
+            "library betaLib sub/*.v;\n");
+  ExpectClaimByTwoLibrariesReported(tmp, {"outer.map"}, 3);
 }
 
 TEST(LibraryMapAmbiguityReport, FileNoDeclarationClaimsHasNoDeclarationToName) {
@@ -207,8 +257,11 @@ TEST(LibraryMapCellWrite, DuplicateModuleInSameLibrarySameInvocationWarns) {
   LibraryMap m;
   m.WriteCell("rtlLib", "top", true, SourceLoc{4, 1, 0}, diag);
   EXPECT_EQ(diag.WarningCount(), 0u);
-  m.WriteCell("rtlLib", "top", true, SourceLoc{9, 1, 0}, diag);
-  EXPECT_GT(diag.WarningCount(), 0u);
+  m.WriteCell("rtlLib", "top", true, SourceLoc{9, 7, 0}, diag);
+  EXPECT_TRUE(ReportedWarning(diag.Diagnostics(),
+                              "module 'top' is written to library 'rtlLib' "
+                              "more than once in this invocation",
+                              7, "33.3.1.1"));
   const LibraryCell* cell = m.CellInLibrary("rtlLib", "top");
   ASSERT_NE(cell, nullptr);
   EXPECT_EQ(cell->loc.file_id, 9u);

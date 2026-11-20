@@ -1,0 +1,1 @@
+library cfgLib ../library_map_config_cell.sv;

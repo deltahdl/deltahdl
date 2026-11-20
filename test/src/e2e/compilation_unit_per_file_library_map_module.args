@@ -1,0 +1,3 @@
+--compilation-unit-per-file
+test/src/e2e/library_map/rtl.map
+test/src/e2e/library_map/adder.v
