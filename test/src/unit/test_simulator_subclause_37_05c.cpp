@@ -94,6 +94,19 @@ TEST_F(ModuleItemsOfARun, TwoAliasStatementsAreReachedInSourceOrder) {
   EXPECT_EQ(SidesOf(vpiRhs, By("top")), (std::vector<std::string>{"d", "b"}));
 }
 
+TEST_F(ModuleItemsOfARun, DISABLED_AnAliasInAGenerateBlockBelongsToItsScope) {
+  Run("module top; wire a, b, c, d;\n"
+      "  alias c = d;\n"
+      "  if (1) begin : g alias a = b; end\n"
+      "endmodule\n");
+  vpiHandle scope = Named(vpiInternalScope, By("top"), "g");
+  ASSERT_NE(scope, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, scope), vpiGenScope);
+  EXPECT_EQ(SidesOf(vpiLhs, scope), (std::vector<std::string>{"a"}));
+  EXPECT_EQ(SidesOf(vpiRhs, scope), (std::vector<std::string>{"b"}));
+  EXPECT_EQ(SidesOf(vpiLhs, By("top")), (std::vector<std::string>{"c"}));
+}
+
 TEST_F(ModuleItemsOfARun, AFourOperandChainGivesThreeStatements) {
   Run("module top; wire a, b, c, d; alias a = b = c = d; endmodule\n");
   EXPECT_EQ(SidesOf(vpiLhs, By("top")),
@@ -273,6 +286,18 @@ TEST_F(ModuleItemsOfARun, ANestedInterfaceInheritsTheDefaultDisableIff) {
       "  ifc i ();\n"
       "endmodule\n");
   vpiHandle condition = vpi_handle(vpiDefaultDisableIff, By("top.i"));
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(OpOf(condition), vpiNotOp);
+}
+
+TEST_F(ModuleItemsOfARun, AnInterfaceInAnInterfaceInheritsTheDefault) {
+  Run("interface outer(input logic rst);\n"
+      "  default disable iff !rst;\n"
+      "  interface inner; endinterface\n"
+      "  inner n ();\n"
+      "endinterface\n"
+      "module top; logic r; outer o (r); endmodule\n");
+  vpiHandle condition = vpi_handle(vpiDefaultDisableIff, By("top.o.n"));
   ASSERT_NE(condition, nullptr);
   EXPECT_EQ(OpOf(condition), vpiNotOp);
 }
