@@ -66,6 +66,27 @@ TEST(ConfigDeclarationParsing, MissingEndconfigReported) {
       ReportedError(r.diags, "expected 'endconfig', got EOF", 3, "33.4.1"));
 }
 
+TEST(ConfigDeclarationParsing, LocalparamAfterTheDesignStatementRejected) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  localparam X = 1;\n"
+      "endconfig\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'localparam'", 3, "33.4.1"));
+}
+
+TEST(ConfigDeclarationParsing, LocalparamAfterARuleStatementRejected) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  default liblist work;\n"
+      "  localparam X = 1;\n"
+      "endconfig\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'localparam'", 4, "33.4.1"));
+}
+
 TEST(ConfigDesignStatementParsing, CollectsQualifiedAndBareCells) {
   auto r = Parse(
       "config c;\n"

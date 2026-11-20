@@ -1,9 +1,20 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 
 namespace {
+
+bool PositionalOverrideRuleRejected(const char* rule, uint32_t line) {
+  auto r = Parse(std::string("config c;\n"
+                             "  design top;\n") +
+                 rule + "endconfig\n");
+  return ReportedError(r.diags, "expected '.', got integer literal", line,
+                       "33.4.3");
+}
 
 TEST(ConfigPositionalParamNotation, SinglePositionalRejected) {
   auto r = Parse(
@@ -42,6 +53,39 @@ TEST(ConfigPositionalParamNotation, NamedAssignmentAccepted) {
       "  instance top.a1 use #(.W(8));\n"
       "endconfig\n");
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ConfigPositionalParamNotation, PositionalUnderACellClauseUseRejected) {
+  EXPECT_TRUE(PositionalOverrideRuleRejected("  cell lib.m use #(8);\n", 3));
+}
+
+TEST(ConfigPositionalParamNotation, PositionalAfterAUseCellRejected) {
+  EXPECT_TRUE(
+      PositionalOverrideRuleRejected("  instance top.a1 use lib.m #(8);\n", 3));
+}
+
+TEST(ConfigPositionalParamNotation, PositionalThenNamedRejected) {
+  EXPECT_TRUE(PositionalOverrideRuleRejected(
+      "  instance top.a1 use #(8, .W(16));\n", 3));
+}
+
+TEST(ConfigPositionalParamNotation, NamedAfterAUseCellAccepted) {
+  auto r = Parse(
+      "config c;\n"
+      "  design top;\n"
+      "  cell lib.m use lib.m #(.W(8));\n"
+      "endconfig\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(ConfigLocalparam, DISABLED_LocalparamWithoutAValueRejected) {
+  auto r = Parse(
+      "config c;\n"
+      "  localparam X;\n"
+      "  design top;\n"
+      "endconfig\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "parameter declaration requires a default value", 2, "33.4.3"));
 }
 
 TEST(ConfigEmptyParamOverride, EmptyParamExprAccepted) {

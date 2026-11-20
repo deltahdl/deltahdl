@@ -8,6 +8,7 @@
 #include "elaborator/rtlir.h"
 #include "fixture_config_unit.h"
 #include "fixture_elaborator.h"
+#include "helpers_config_params.h"
 #include "helpers_config_reports.h"
 #include "helpers_reported_error.h"
 
@@ -52,6 +53,57 @@ TEST(ConfigHierarchicalRules, TwoRulesOnOneSourceReportAtTwoPlaces) {
                             "subhierarchy 'top.bot' that is delegated to "
                             "another config",
                             5, "33.4.2"));
+}
+
+TEST(ConfigHierarchicalRules,
+     InstancePathWrittenBeforeTheDelegationIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top; endmodule\n"
+      "config c;\n"
+      "  design top;\n"
+      "  instance top.bot.a1 liblist lib4;\n"
+      "  instance top.bot use lib1.bot:config;\n"
+      "endconfig\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "instance 'top.bot.a1' in config 'c' lies within "
+                            "subhierarchy 'top.bot' that is delegated to "
+                            "another config",
+                            4, "33.4.2"));
+}
+
+constexpr const char* kCellDelegatedDesign =
+    "module a; endmodule\n"
+    "module bot; a a1(); endmodule\n"
+    "module top; bot bot(); endmodule\n"
+    "config c;\n"
+    "  design top;\n"
+    "  cell bot use bot:config;\n";
+
+constexpr const char* kCellDelegatedConfig =
+    "endconfig\n"
+    "config bot;\n"
+    "  design bot;\n"
+    "endconfig\n";
+
+TEST(ConfigHierarchicalRules,
+     DISABLED_InstancePathInsideACellDelegatedHierarchyIsRejected) {
+  ElabFixture f;
+  ConfigElab(f, std::string(kCellDelegatedDesign) +
+                    "  instance top.bot.a1 liblist work;\n" +
+                    kCellDelegatedConfig);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "lies within subhierarchy 'top.bot'", 7, "33.4.2"));
+}
+
+TEST(ConfigHierarchicalRules, CellDelegationBesideADisjointInstanceAccepted) {
+  ElabFixture f;
+  auto* design = ConfigElab(f, std::string(kCellDelegatedDesign) +
+                                   "  instance top liblist work;\n" +
+                                   kCellDelegatedConfig);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(ConfigHierarchicalRules, DisjointInstancePathsAccepted) {
