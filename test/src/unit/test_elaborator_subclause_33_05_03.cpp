@@ -497,4 +497,137 @@ TEST(SeparateCompilationBinding, SearchOrderNamingRtlLibFirstBindsItsAdder) {
   EXPECT_EQ(BoundAdderLibrary({"rtlLib", "gateLib"}), "rtlLib");
 }
 
+bool BindsWithItsCellPrecompiled(const char* cell, const char* holder,
+                                 const char* top, std::string_view bound) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  Precompile(cell, "rtlLib", path);
+  Precompile(holder, "rtlLib", path);
+  BindHarness h;
+  EXPECT_TRUE(h.binder.LoadLibrary(path));
+  auto* design = h.binder.Bind({top});
+  if (design == nullptr || h.diag.HasErrors()) return false;
+  if (!h.binder.CellsNotPrecompiled().empty()) return false;
+  return bound.empty() || design->all_modules.contains(bound);
+}
+
+std::vector<Diagnostic> BindWithItsCellMissing(const char* holder,
+                                               const char* top) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "rtlLib.dpl";
+  Precompile(holder, "rtlLib", path);
+  BindHarness h;
+  EXPECT_TRUE(h.binder.LoadLibrary(path));
+  EXPECT_EQ(h.binder.Bind({top}), nullptr);
+  return h.diag.Diagnostics();
+}
+
+TEST(SeparateCompilationBinding, InterfaceNeverCompiledStopsTheBind) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kHoldsInterface, "holds_interface"),
+                    "cell 'ifc' was not precompiled", 2, "33.5.3"));
+}
+
+TEST(SeparateCompilationBinding, PrimitiveNeverCompiledStopsTheBind) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kHoldsPrimitive, "holds_primitive"),
+                    "cell 'ubuf' was not precompiled", 4, "33.5.3"));
+}
+
+constexpr const char* kProgram =
+    "program pgm;\n"
+    "endprogram\n";
+constexpr const char* kHoldsProgram =
+    "module holds_program;\n"
+    "  pgm p();\n"
+    "endmodule\n";
+
+TEST(SeparateCompilationBinding, ProgramNeverCompiledStopsTheBind) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kHoldsProgram, "holds_program"),
+                    "cell 'pgm' was not precompiled", 2, "33.5.3"));
+}
+
+TEST(SeparateCompilationBinding, ProgramHeldInALibraryCountsAsPrecompiled) {
+  EXPECT_TRUE(BindsWithItsCellPrecompiled(kProgram, kHoldsProgram,
+                                          "holds_program", ""));
+}
+
+constexpr const char* kChecker =
+    "checker chk;\n"
+    "endchecker\n";
+constexpr const char* kHoldsChecker =
+    "module holds_checker;\n"
+    "  chk c();\n"
+    "endmodule\n";
+
+TEST(SeparateCompilationBinding, CheckerNeverCompiledStopsTheBind) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kHoldsChecker, "holds_checker"),
+                    "cell 'chk' was not precompiled", 2, "33.5.3"));
+}
+
+TEST(SeparateCompilationBinding, CheckerHeldInALibraryCountsAsPrecompiled) {
+  EXPECT_TRUE(BindsWithItsCellPrecompiled(kChecker, kHoldsChecker,
+                                          "holds_checker", ""));
+}
+
+constexpr const char* kLoopGenerateTop =
+    "module loop_top;\n"
+    "  for (genvar i = 0; i < 2; i++) begin : g\n"
+    "    leaf l();\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(SeparateCompilationBinding, CellInALoopGenerateIsBound) {
+  EXPECT_TRUE(
+      BindsWithItsCellPrecompiled(kLeaf, kLoopGenerateTop, "loop_top", "leaf"));
+}
+
+TEST(SeparateCompilationBinding, CellInALoopGenerateIsCheckedBeforeBinding) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kLoopGenerateTop, "loop_top"),
+                    "cell 'leaf' was not precompiled", 3, "33.5.3"));
+}
+
+constexpr const char* kCaseGenerateTop =
+    "module case_top;\n"
+    "  case (1)\n"
+    "    1: begin : g\n"
+    "      leaf l();\n"
+    "    end\n"
+    "  endcase\n"
+    "endmodule\n";
+
+TEST(SeparateCompilationBinding, CellInACaseGenerateIsBound) {
+  EXPECT_TRUE(
+      BindsWithItsCellPrecompiled(kLeaf, kCaseGenerateTop, "case_top", "leaf"));
+}
+
+TEST(SeparateCompilationBinding, CellInACaseGenerateIsCheckedBeforeBinding) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kCaseGenerateTop, "case_top"),
+                    "cell 'leaf' was not precompiled", 4, "33.5.3"));
+}
+
+constexpr const char* kNestedGenerateTop =
+    "module nested_top;\n"
+    "  if (1) begin : outer\n"
+    "    if (1) begin : inner\n"
+    "      leaf l();\n"
+    "    end\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST(SeparateCompilationBinding, CellInANestedGenerateIsBound) {
+  EXPECT_TRUE(BindsWithItsCellPrecompiled(kLeaf, kNestedGenerateTop,
+                                          "nested_top", "leaf"));
+}
+
+TEST(SeparateCompilationBinding, CellInANestedGenerateIsCheckedBeforeBinding) {
+  EXPECT_TRUE(
+      ReportedError(BindWithItsCellMissing(kNestedGenerateTop, "nested_top"),
+                    "cell 'leaf' was not precompiled", 4, "33.5.3"));
+}
+
 }  // namespace

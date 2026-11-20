@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <string>
 #include <vector>
 
 #include "common/arena.h"
@@ -207,6 +208,87 @@ TEST(SinglePassBinding, DesignStillBindsWhenEveryCellIsUpToDate) {
   ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "top");
   EXPECT_TRUE(design->all_modules.contains("leaf"));
+}
+
+struct CellKindSource {
+  const char* name;
+  const char* declaration;
+  const char* instantiation;
+};
+
+constexpr CellKindSource kInterfaceCell{"ifc", "interface ifc;\nendinterface\n",
+                                        "  ifc i();\n"};
+constexpr CellKindSource kProgramCell{"pgm", "program pgm;\nendprogram\n",
+                                      "  pgm p();\n"};
+constexpr CellKindSource kCheckerCell{"chk", "checker chk;\nendchecker\n",
+                                      "  chk c();\n"};
+constexpr CellKindSource kPrimitiveCell{"prim",
+                                        "primitive prim(output y, input a);\n"
+                                        "  table 0 : 0; 1 : 1; endtable\n"
+                                        "endprimitive\n",
+                                        "  wire y, a; prim p(y, a);\n"};
+
+std::vector<Diagnostic> BindCellCompiledEarlier(const CellKindSource& cell,
+                                                bool cell_on_this_line) {
+  ScratchDir tmp;
+  tmp.Write("lib.map", "library rtlLib src/*.v;\n");
+  auto decl = tmp.Write("src/cell.v", cell.declaration);
+  auto top = tmp.Write("src/top.v", std::string("module top;\n") +
+                                        cell.instantiation + "endmodule\n");
+  BindHarness h;
+  EXPECT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
+  CompilationUnit earlier;
+  EXPECT_TRUE(h.compiler.CompileCommandLine({decl}, earlier));
+  EXPECT_NE(h.libs.CellInLibrary("rtlLib", cell.name), nullptr);
+  std::vector<fs::path> line{top};
+  if (cell_on_this_line) line.insert(line.begin(), decl);
+  EXPECT_TRUE(h.compiler.CompileCommandLine(line, h.unit));
+  Elaborator elab(h.arena, h.diag, &h.unit);
+  elab.Elaborate("top");
+  return h.diag.Diagnostics();
+}
+
+bool HasAnError(const std::vector<Diagnostic>& diags) {
+  for (const auto& d : diags) {
+    if (d.severity == DiagSeverity::kError) return true;
+  }
+  return false;
+}
+
+TEST(SinglePassBinding, InterfaceOffThisCommandLineCannotBind) {
+  EXPECT_TRUE(ReportedError(BindCellCompiledEarlier(kInterfaceCell, false),
+                            "unknown module 'ifc'", 2, "23.3.2"));
+}
+
+TEST(SinglePassBinding, InterfaceOnThisCommandLineBinds) {
+  EXPECT_FALSE(HasAnError(BindCellCompiledEarlier(kInterfaceCell, true)));
+}
+
+TEST(SinglePassBinding, ProgramOffThisCommandLineCannotBind) {
+  EXPECT_TRUE(ReportedError(BindCellCompiledEarlier(kProgramCell, false),
+                            "unknown module 'pgm'", 2, "23.3.2"));
+}
+
+TEST(SinglePassBinding, ProgramOnThisCommandLineBinds) {
+  EXPECT_FALSE(HasAnError(BindCellCompiledEarlier(kProgramCell, true)));
+}
+
+TEST(SinglePassBinding, CheckerOffThisCommandLineCannotBind) {
+  EXPECT_TRUE(ReportedError(BindCellCompiledEarlier(kCheckerCell, false),
+                            "unknown module 'chk'", 2, "23.3.2"));
+}
+
+TEST(SinglePassBinding, CheckerOnThisCommandLineBinds) {
+  EXPECT_FALSE(HasAnError(BindCellCompiledEarlier(kCheckerCell, true)));
+}
+
+TEST(SinglePassBinding, PrimitiveOffThisCommandLineCannotBind) {
+  EXPECT_TRUE(ReportedError(BindCellCompiledEarlier(kPrimitiveCell, false),
+                            "unknown module 'prim'", 2, "23.3.2"));
+}
+
+TEST(SinglePassBinding, PrimitiveOnThisCommandLineBinds) {
+  EXPECT_FALSE(HasAnError(BindCellCompiledEarlier(kPrimitiveCell, true)));
 }
 
 }  // namespace

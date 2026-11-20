@@ -1,0 +1,4 @@
+--precompile-into
+sc_cfg_lib
+--precompile-out
+cfg.lib

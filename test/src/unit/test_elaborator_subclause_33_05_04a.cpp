@@ -605,4 +605,71 @@ TEST(ConfigDrivenBinding, DesignStatementLibraryPicksWhichPrecompiledCell) {
   EXPECT_TRUE(design->top_modules[0]->children.empty());
 }
 
+constexpr const char* kTwoAdderTop =
+    "module adder_top;\n"
+    "  adder a1();\n"
+    "  adder a2();\n"
+    "endmodule\n";
+constexpr const char* kAdderCell =
+    "module adder;\n"
+    "endmodule\n";
+
+std::vector<std::string> LibrariesBoundByPrecompiledConfig(
+    const std::string& rules) {
+  ScratchDir tmp;
+  auto rtl = tmp.dir / "rtl.dpl";
+  auto gate = tmp.dir / "gate.dpl";
+  EXPECT_TRUE(PrecompiledLibrary::Save(kTwoAdderTop, "rtlLib", rtl));
+  EXPECT_TRUE(PrecompiledLibrary::Save(kAdderCell, "rtlLib", rtl));
+  EXPECT_TRUE(PrecompiledLibrary::Save(kAdderCell, "gateLib", gate));
+  EXPECT_TRUE(PrecompiledLibrary::Save(
+      "config cfg_rules;\n  design rtlLib.adder_top;\n" + rules + "endconfig\n",
+      "rtlLib", rtl));
+  ConfigBindHarness h;
+  EXPECT_TRUE(h.binder.LoadLibrary(rtl));
+  EXPECT_TRUE(h.binder.LoadLibrary(gate));
+  auto* design = h.binder.BindConfig("cfg_rules");
+  EXPECT_FALSE(h.diag.HasErrors());
+  std::vector<std::string> libraries;
+  if (design == nullptr || design->top_modules.size() != 1) return libraries;
+  for (const auto& child : design->top_modules[0]->children) {
+    libraries.emplace_back(child.resolved == nullptr ? std::string_view()
+                                                     : child.resolved->library);
+  }
+  return libraries;
+}
+
+TEST(ConfigDrivenBinding, PrecompiledDefaultListNamingGateLibFirstBindsIt) {
+  EXPECT_EQ(
+      LibrariesBoundByPrecompiledConfig("  default liblist gateLib rtlLib;\n"),
+      (std::vector<std::string>{"gateLib", "gateLib"}));
+}
+
+TEST(ConfigDrivenBinding, PrecompiledDefaultListNamingRtlLibFirstBindsIt) {
+  EXPECT_EQ(
+      LibrariesBoundByPrecompiledConfig("  default liblist rtlLib gateLib;\n"),
+      (std::vector<std::string>{"rtlLib", "rtlLib"}));
+}
+
+TEST(ConfigDrivenBinding, PrecompiledCellClauseOutranksTheDefaultList) {
+  EXPECT_EQ(
+      LibrariesBoundByPrecompiledConfig("  default liblist rtlLib;\n"
+                                        "  cell adder liblist gateLib;\n"),
+      (std::vector<std::string>{"gateLib", "gateLib"}));
+}
+
+TEST(ConfigDrivenBinding, PrecompiledInstanceClauseRebindsOnlyItsInstance) {
+  EXPECT_EQ(LibrariesBoundByPrecompiledConfig(
+                "  default liblist rtlLib;\n"
+                "  instance adder_top.a2 liblist gateLib;\n"),
+            (std::vector<std::string>{"rtlLib", "gateLib"}));
+}
+
+TEST(ConfigDrivenBinding, PrecompiledInstanceUseClauseBindsItsInstance) {
+  EXPECT_EQ(LibrariesBoundByPrecompiledConfig(
+                "  default liblist rtlLib;\n"
+                "  instance adder_top.a1 use gateLib.adder;\n"),
+            (std::vector<std::string>{"gateLib", "rtlLib"}));
+}
+
 }  // namespace
