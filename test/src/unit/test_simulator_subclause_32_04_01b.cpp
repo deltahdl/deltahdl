@@ -181,9 +181,24 @@ TEST(GateDriverSpecparamRebuild,
   EXPECT_EQ(mgr->GetPrimitiveDrivers().size(), 2u);
 }
 
-std::string AndCellRun(const std::string& sdf_path) {
-  return "module and_cell(input a, input b, output y);\n"
-         "  and #1 g1(y, a, b);\n"
+std::string AndCellRun(const std::string& sdf_path,
+                       const std::string& body = "  and #1 g1(y, a, b);\n") {
+  return "primitive uand(output y, input a, input b);\n"
+         "  table\n"
+         "    0 ? : 0;\n"
+         "    ? 0 : 0;\n"
+         "    1 1 : 1;\n"
+         "  endtable\n"
+         "endprimitive\n"
+         "primitive ulatch(output reg q, input d, input en);\n"
+         "  table\n"
+         "    1 1 : ? : 1;\n"
+         "    0 1 : ? : 0;\n"
+         "    ? 0 : ? : -;\n"
+         "  endtable\n"
+         "endprimitive\n"
+         "module and_cell(input a, input b, output y);\n" +
+         body +
          "endmodule\n"
          "module top;\n"
          "  reg a, b;\n"
@@ -223,6 +238,40 @@ TEST(SdfGateDeviceRun, DeviceEntryTimesTheGateDrivingTheOutput) {
       RunCapture(AndCellRun(WriteAndCellSdf("port", "(DEVICE y (7) (13))")),
                  port),
       "yo=1 at 57\nyo=0 at 113\n");
+}
+
+TEST(SdfGateDeviceRun, DISABLED_DeviceEntryTimesTheUdpDrivingTheOutput) {
+  const std::string kBody = "  uand #1 g1(y, a, b);\n";
+  SimFixture whole;
+  EXPECT_EQ(
+      RunCapture(
+          AndCellRun(WriteAndCellSdf("udp_whole", "(DEVICE (7) (13))"), kBody),
+          whole),
+      "yo=1 at 57\nyo=0 at 113\n");
+  SimFixture port;
+  EXPECT_EQ(
+      RunCapture(
+          AndCellRun(WriteAndCellSdf("udp_port", "(DEVICE y (7) (13))"), kBody),
+          port),
+      "yo=1 at 57\nyo=0 at 113\n");
+}
+
+TEST(SdfGateDeviceRun,
+     DISABLED_DeviceEntryTimesTheSequentialUdpDrivingTheOutput) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(AndCellRun(WriteAndCellSdf("udp_latch", "(DEVICE (7) (13))"),
+                            "  ulatch #1 g1(y, a, b);\n"),
+                 f),
+      "yo=1 at 57\nyo=0 at 113\n");
+}
+
+TEST(SdfGateDeviceRun, UdpCellRunsAtItsDeclaredDelayWithoutAnnotation) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(AndCellRun(WriteAndCellSdf("udp_none", ""),
+                                  "  uand #1 g1(y, a, b);\n"),
+                       f),
+            "yo=1 at 51\nyo=0 at 101\n");
 }
 
 TEST(SdfDelayMapping, ConditionalIopathReachesEveryPathWithItsCondition) {

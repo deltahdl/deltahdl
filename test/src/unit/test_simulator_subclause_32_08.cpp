@@ -1,7 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <fstream>
+#include <ios>
 #include <string>
+#include <vector>
 
 #include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
@@ -399,6 +403,296 @@ TEST(SdfThreeTransitionMapping, DeviceOnASpecifyPathKeepsAllTwelve) {
   for (int i = 0; i < kTransitions; ++i) {
     EXPECT_EQ(pd->delays[i], kExpected[i]) << "transition slot " << i;
   }
+}
+
+struct Mapping {
+  const char* values;
+  uint64_t slots[kTransitions];
+};
+
+const Mapping kOne = {"(5)", {5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5}};
+const Mapping kTwoRising = {"(5) (9)", {5, 9, 5, 5, 9, 9, 5, 5, 9, 9, 9, 5}};
+const Mapping kTwoFalling = {"(9) (4)", {9, 4, 9, 9, 4, 4, 9, 9, 4, 4, 9, 4}};
+const Mapping kThreeTurnOffLast = {"(4) (6) (9)",
+                                   {4, 6, 9, 4, 9, 6, 4, 4, 6, 6, 9, 4}};
+const Mapping kThreeTurnOffLeast = {"(9) (6) (2)",
+                                    {9, 6, 2, 9, 2, 6, 2, 9, 2, 6, 2, 6}};
+const Mapping kSixFirstOperands = {"(7) (3) (9) (2) (8) (4)",
+                                   {7, 3, 9, 2, 8, 4, 7, 7, 3, 4, 9, 2}};
+const Mapping kSixOtherOperands = {"(1) (9) (2) (8) (3) (4)",
+                                   {1, 9, 2, 8, 3, 4, 1, 8, 3, 9, 3, 4}};
+const Mapping kTwelve = {
+    "(21) (22) (23) (24) (25) (26) (27) (28) (29) (30) (31) (32)",
+    {21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}};
+
+std::vector<uint64_t> PathSlotsAfter(const std::string& sdf) {
+  SimFixture f;
+  SpecifyManager mgr;
+  if (!BuildDesign(kPathDesign, f, mgr)) return {};
+  AnnotateFileOnto(sdf, mgr);
+  const PathDelay* pd = PathAToY(mgr);
+  if (pd == nullptr) return {};
+  return std::vector<uint64_t>(pd->delays, pd->delays + kTransitions);
+}
+
+std::vector<uint64_t> LoadSlotsAfter(const std::string& entry) {
+  SdfDesign d;
+  if (!BuildInterconnectDesign(d)) return {};
+  AnnotateFileOnto(TopDelaySdf(entry), d.mgr);
+  const InterconnectDelay* got = LoadOfU2D(d.mgr);
+  if (got == nullptr) return {};
+  return std::vector<uint64_t>(got->delays, got->delays + kTransitions);
+}
+
+void ExpectSlots(const std::vector<uint64_t>& got, const Mapping& m) {
+  ASSERT_EQ(got.size(), static_cast<size_t>(kTransitions)) << m.values;
+  for (int i = 0; i < kTransitions; ++i) {
+    EXPECT_EQ(got[i], m.slots[i]) << m.values << " transition slot " << i;
+  }
+}
+
+void ExpectPathEntry(const char* keyword, const Mapping& m) {
+  ExpectSlots(PathSlotsAfter(
+                  DelaySdf("(" + std::string(keyword) + " " + m.values + ")")),
+              m);
+}
+
+void ExpectLoadEntry(const char* head, const Mapping& m) {
+  ExpectSlots(LoadSlotsAfter("(" + std::string(head) + " " + m.values + ")"),
+              m);
+}
+
+TEST(SdfTwelveTransitionMapping, TwoFallingIopathValuesTakeMaxAndMinForZ) {
+  ExpectPathEntry("IOPATH a y", kTwoFalling);
+}
+
+TEST(SdfTwelveTransitionMapping, ThreeIopathValuesWithTheLeastTurnOffLast) {
+  ExpectPathEntry("IOPATH a y", kThreeTurnOffLeast);
+}
+
+TEST(SdfTwelveTransitionMapping, SixIopathValuesLetTheOtherOperandsWin) {
+  ExpectPathEntry("IOPATH a y", kSixOtherOperands);
+}
+
+TEST(SdfTwelveTransitionMapping, OneDeviceValueReachesEveryPathTransition) {
+  ExpectPathEntry("DEVICE", kOne);
+}
+
+TEST(SdfTwelveTransitionMapping, TwoDeviceValuesSpreadOverThePath) {
+  ExpectPathEntry("DEVICE", kTwoRising);
+  ExpectPathEntry("DEVICE", kTwoFalling);
+}
+
+TEST(SdfTwelveTransitionMapping, ThreeDeviceValuesSpreadOverThePath) {
+  ExpectPathEntry("DEVICE", kThreeTurnOffLast);
+  ExpectPathEntry("DEVICE", kThreeTurnOffLeast);
+}
+
+TEST(SdfTwelveTransitionMapping, SixDeviceValuesLetTheOtherOperandsWin) {
+  ExpectPathEntry("DEVICE", kSixOtherOperands);
+}
+
+TEST(SdfTwelveTransitionMapping, TwelveDeviceValuesAreTakenAsWritten) {
+  ExpectPathEntry("DEVICE", kTwelve);
+}
+
+void ExpectIncrementAddsTheExpansion(const Mapping& m) {
+  const std::vector<uint64_t> kBefore = PathSlotsAfter(DelaySdf(""));
+  ASSERT_EQ(kBefore.size(), static_cast<size_t>(kTransitions));
+  Mapping sum = m;
+  for (int i = 0; i < kTransitions; ++i) sum.slots[i] += kBefore[i];
+  ExpectSlots(PathSlotsAfter(IncrementDelaySdf(std::string("(IOPATH a y ") +
+                                               m.values + ")")),
+              sum);
+}
+
+TEST(SdfTwelveTransitionMapping, IncrementTwoValuesAddTheirExpansion) {
+  ExpectIncrementAddsTheExpansion(kTwoFalling);
+}
+
+TEST(SdfTwelveTransitionMapping, IncrementThreeValuesAddTheirExpansion) {
+  ExpectIncrementAddsTheExpansion(kThreeTurnOffLeast);
+}
+
+TEST(SdfTwelveTransitionMapping, IncrementSixValuesAddTheirExpansion) {
+  ExpectIncrementAddsTheExpansion(kSixOtherOperands);
+}
+
+TEST(SdfTwelveTransitionMapping, TwoFallingInterconnectValuesTakeMaxAndMin) {
+  ExpectLoadEntry("INTERCONNECT u1/q u2/d", kTwoFalling);
+}
+
+TEST(SdfTwelveTransitionMapping, ThreeInterconnectValuesWithTheLeastLast) {
+  ExpectLoadEntry("INTERCONNECT u1/q u2/d", kThreeTurnOffLeast);
+}
+
+TEST(SdfTwelveTransitionMapping, SixInterconnectValuesLetTheOtherOperandsWin) {
+  ExpectLoadEntry("INTERCONNECT u1/q u2/d", kSixOtherOperands);
+}
+
+TEST(SdfTwelveTransitionMapping, OnePortValueReachesEveryTransition) {
+  ExpectLoadEntry("PORT u2/d", kOne);
+}
+
+TEST(SdfTwelveTransitionMapping, TwoPortValuesSpreadAsTheTableGives) {
+  ExpectLoadEntry("PORT u2/d", kTwoRising);
+  ExpectLoadEntry("PORT u2/d", kTwoFalling);
+}
+
+TEST(SdfTwelveTransitionMapping, ThreePortValuesSpreadAsTheTableGives) {
+  ExpectLoadEntry("PORT u2/d", kThreeTurnOffLast);
+  ExpectLoadEntry("PORT u2/d", kThreeTurnOffLeast);
+}
+
+TEST(SdfTwelveTransitionMapping, SixPortValuesSpreadAsTheTableGives) {
+  ExpectLoadEntry("PORT u2/d", kSixFirstOperands);
+  ExpectLoadEntry("PORT u2/d", kSixOtherOperands);
+}
+
+TEST(SdfTwelveTransitionMapping, TwelvePortValuesAreTakenAsWritten) {
+  ExpectLoadEntry("PORT u2/d", kTwelve);
+}
+
+TEST(SdfTwelveTransitionMapping, OneNetdelayValueReachesEveryTransition) {
+  ExpectLoadEntry("NETDELAY n", kOne);
+}
+
+TEST(SdfTwelveTransitionMapping, TwoNetdelayValuesSpreadAsTheTableGives) {
+  ExpectLoadEntry("NETDELAY n", kTwoRising);
+  ExpectLoadEntry("NETDELAY n", kTwoFalling);
+}
+
+TEST(SdfTwelveTransitionMapping, ThreeNetdelayValuesSpreadAsTheTableGives) {
+  ExpectLoadEntry("NETDELAY n", kThreeTurnOffLast);
+  ExpectLoadEntry("NETDELAY n", kThreeTurnOffLeast);
+}
+
+TEST(SdfTwelveTransitionMapping, SixNetdelayValuesSpreadAsTheTableGives) {
+  ExpectLoadEntry("NETDELAY n", kSixFirstOperands);
+  ExpectLoadEntry("NETDELAY n", kSixOtherOperands);
+}
+
+TEST(SdfTwelveTransitionMapping, TwelveNetdelayValuesAreTakenAsWritten) {
+  ExpectLoadEntry("NETDELAY n", kTwelve);
+}
+
+std::vector<uint64_t> GateSlotsAfter(const char* design,
+                                     const std::string& sdf) {
+  SimFixture f;
+  SpecifyManager mgr;
+  if (!BuildDesign(design, f, mgr)) return {};
+  AnnotateFileOnto(sdf, mgr);
+  const PrimitiveDriver* drv = DriverOfY(mgr);
+  if (drv == nullptr) return {};
+  return std::vector<uint64_t>(drv->delays, drv->delays + kTransitions);
+}
+
+void ExpectToXAt(const std::vector<uint64_t>& got, uint64_t to_x) {
+  ASSERT_EQ(got.size(), static_cast<size_t>(kTransitions));
+  EXPECT_EQ(got[6], to_x);
+  EXPECT_EQ(got[8], to_x);
+  EXPECT_EQ(got[11], to_x);
+}
+
+TEST(SdfThreeTransitionMapping, ThreeDeviceValuesOnAGateAreAllKept) {
+  const std::vector<uint64_t> kGot =
+      GateSlotsAfter(kGateDesign, DelaySdf("(DEVICE (30) (10) (20))"));
+  ASSERT_EQ(kGot.size(), static_cast<size_t>(kTransitions));
+  const uint64_t kExpected[6] = {30, 10, 20, 30, 20, 10};
+  for (int i = 0; i < 6; ++i) EXPECT_EQ(kGot[i], kExpected[i]) << "slot " << i;
+  ExpectToXAt(kGot, 10);
+}
+
+TEST(SdfThreeTransitionMapping, MoreThanThreeValuesOnAnAndGateLoseTheExtras) {
+  const std::vector<uint64_t> kGot = GateSlotsAfter(
+      "module t(input a, input b, output y);\n"
+      "  and #(1, 2) g1(y, a, b);\n"
+      "endmodule\n",
+      DelaySdf("(DEVICE (30) (10) (20) (40) (50) (60))"));
+  ASSERT_EQ(kGot.size(), static_cast<size_t>(kTransitions));
+  EXPECT_EQ(kGot[0], 30u);
+  EXPECT_EQ(kGot[1], 10u);
+  const uint64_t kDropped[3] = {40, 50, 60};
+  for (uint64_t dropped : kDropped) {
+    for (int i = 0; i < kTransitions; ++i) {
+      EXPECT_NE(kGot[i], dropped) << "slot " << i << " has " << dropped;
+    }
+  }
+}
+
+TEST(SdfThreeTransitionMapping, DelayToXIsTheSmallestWrittenFirst) {
+  ExpectToXAt(
+      GateSlotsAfter(kGateDesign,
+                     DelaySdf("(DEVICE (10) (30) (20) (40) (50) (60))")),
+      10);
+}
+
+TEST(SdfThreeTransitionMapping, DelayToXIsTheSmallestWrittenThird) {
+  ExpectToXAt(
+      GateSlotsAfter(kGateDesign,
+                     DelaySdf("(DEVICE (30) (20) (10) (40) (50) (60))")),
+      10);
+}
+
+TEST(SdfThreeTransitionMapping, IncrementRaisesToXByTheSmallestWrittenFirst) {
+  ExpectToXAt(GateSlotsAfter(
+                  kGateDesign,
+                  IncrementDelaySdf("(DEVICE (10) (30) (20) (40) (50) (60))")),
+              11);
+}
+
+TEST(SdfThreeTransitionMapping, IncrementRaisesToXByTheSmallestWrittenThird) {
+  ExpectToXAt(GateSlotsAfter(
+                  kGateDesign,
+                  IncrementDelaySdf("(DEVICE (30) (20) (10) (40) (50) (60))")),
+              11);
+}
+
+std::string RunCellWithDevice(const std::string& stem,
+                              const std::string& cell_body) {
+  const std::string kPath = "/tmp/delta_c32_08_" + stem + ".sdf";
+  std::ofstream out(kPath, std::ios::trunc);
+  out << "(DELAYFILE (CELL (CELLTYPE \"dev_cell\") (INSTANCE top/c) "
+         "(DELAY (ABSOLUTE (DEVICE (5) (3) (2) (40) (50) (60))))))\n";
+  out.close();
+  SimFixture f;
+  return RunCapture(
+      "primitive ubuf(output y, input a);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
+      "module dev_cell(input a, output y);\n" +
+          cell_body +
+          "endmodule\n"
+          "module top;\n"
+          "  logic in;\n"
+          "  wire out;\n"
+          "  dev_cell c(.a(in), .y(out));\n"
+          "  always @(out) if ($time > 0) $display(\"t=%0t y=%b\", $time, "
+          "out);\n"
+          "  initial begin\n"
+          "    $sdf_annotate(\"" +
+          kPath +
+          "\");\n"
+          "    in = 0;\n"
+          "    #10 in = 1;\n"
+          "    #20 in = 0;\n"
+          "  end\n"
+          "endmodule\n",
+      f);
+}
+
+TEST(SdfThreeTransitionMapping, MoreThanThreeValuesOnAGateRunLoseTheExtras) {
+  EXPECT_EQ(RunCellWithDevice("gate", "  buf g(y, a);\n"),
+            "t=3 y=0\nt=15 y=1\nt=33 y=0\n");
+}
+
+TEST(SdfThreeTransitionMapping,
+     DISABLED_MoreThanThreeValuesOnAUdpLoseTheExtras) {
+  EXPECT_EQ(RunCellWithDevice("udp", "  ubuf u(y, a);\n"),
+            "t=3 y=0\nt=15 y=1\nt=33 y=0\n");
 }
 
 }  // namespace
