@@ -8,13 +8,9 @@
 #include <vector>
 
 #include "common/types.h"
-#include "elaborator/elaborator.h"
 #include "fixture_config_run.h"
 #include "fixture_scratch_dir.h"
 #include "fixture_simulator.h"
-#include "fixture_vpi_run.h"
-#include "lexer/lexer.h"
-#include "parser/parser.h"
 #include "simulator/evaluation.h"
 #include "simulator/lowerer.h"
 #include "simulator/sim_context.h"
@@ -506,41 +502,178 @@ TEST(LibraryBindingDisplay, VpiGetStrCApiReadsBindingProperties) {
   SetGlobalVpiContext(nullptr);
 }
 
-class LibraryBindingVpiRun : public VpiDesignRun {
- protected:
-  void RunUnderConfig(const std::string& src) {
-    auto fid = f_.mgr.AddFile("<test>", src);
-    Lexer lexer(f_.mgr.FileContent(fid), fid, f_.diag);
-    Parser parser(lexer, f_.arena, f_.diag);
-    auto* cu = parser.Parse();
-    ASSERT_NE(cu, nullptr);
-    ASSERT_FALSE(cu->configs.empty());
-    Elaborator elab(f_.arena, f_.diag, cu);
-    RtlirDesign* design = elab.Elaborate(cu->configs[0]);
-    ASSERT_NE(design, nullptr);
-    ASSERT_FALSE(f_.diag.HasErrors());
-    LowerAndRun(design, f_);
-  }
-};
+TEST(LibraryBindingDisplay, UseClauseBindingReportsTheCellItNames) {
+  ScratchDir tmp;
+  BoundDesign design;
+  ASSERT_TRUE(BuildExampleDesign(tmp, design));
+  ASSERT_TRUE(design.Add(tmp, "fast.v",
+                         "module fast;\n"
+                         "  initial $display(\"[f %m %l]\");\n"
+                         "endmodule\n"));
 
-TEST_F(LibraryBindingVpiRun, InstanceReportsItsLibraryAndCell) {
-  Run("module adder; endmodule\n"
-      "module top; adder a2(); endmodule\n");
-  vpiHandle a2 = By("top.a2");
-  ASSERT_NE(a2, nullptr);
-  EXPECT_STREQ(vpi_get_str(vpiLibrary, a2), "work");
-  EXPECT_STREQ(vpi_get_str(vpiCell, a2), "adder");
-  EXPECT_STREQ(vpi_get_str(vpiConfig, a2), "");
+  auto out = RunConfiguredDesign(tmp, design,
+                                 "config cfg3;\n"
+                                 "  design rtlLib.top;\n"
+                                 "  default liblist aLib rtlLib;\n"
+                                 "  instance top.a2 use work.fast;\n"
+                                 "endconfig\n",
+                                 "cfg3");
+  ASSERT_FALSE(design.diag.HasErrors());
+  EXPECT_TRUE(ReportsLine(out, "[f top.a2 work.fast]"));
+  EXPECT_TRUE(ReportsLine(out, "[l top.a1 aLib.adder]"));
+  EXPECT_FALSE(ReportsLine(out, "[l top.a2"));
 }
 
-TEST_F(LibraryBindingVpiRun, InstanceBoundUnderAConfigReportsTheConfig) {
-  RunUnderConfig(
-      "module adder; endmodule\n"
-      "module top; adder a1(); endmodule\n"
-      "config cfg1; design work.top; endconfig\n");
-  vpiHandle a1 = By("top.a1");
-  ASSERT_NE(a1, nullptr);
-  EXPECT_STREQ(vpi_get_str(vpiConfig, a1), "work.cfg1");
+TEST(LibraryBindingDisplay, DelegatedInstanceReportsTheNestedConfigsBinding) {
+  ScratchDir tmp;
+  BoundDesign design;
+  ASSERT_TRUE(BuildExampleDesign(tmp, design));
+
+  auto out = RunConfiguredDesign(tmp, design,
+                                 "config cfg6;\n"
+                                 "  design rtlLib.top;\n"
+                                 "  default liblist gateLib rtlLib;\n"
+                                 "  instance top.a2 use work.cfg5:config;\n"
+                                 "endconfig\n"
+                                 "config cfg5;\n"
+                                 "  design aLib.adder;\n"
+                                 "  default liblist aLib;\n"
+                                 "endconfig\n",
+                                 "cfg6");
+  ASSERT_FALSE(design.diag.HasErrors());
+  EXPECT_TRUE(ReportsLine(out, "[l top.a2 aLib.adder]"));
+  EXPECT_TRUE(ReportsLine(out, "[m top.a2.f1 aLib.m]"));
+  EXPECT_TRUE(ReportsLine(out, "[l top.a1 gateLib.adder]"));
+  EXPECT_TRUE(ReportsLine(out, "[m top.a1.f1 gateLib.m]"));
 }
 
+TEST(LibraryBindingDisplay, ModuleInstantiatedByBindReportsItsOwnCell) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module probe;\n"
+      "  initial $display(\"[%m %l]\");\n"
+      "endmodule\n"
+      "module t;\n"
+      "endmodule\n"
+      "bind t probe p();\n",
+      f);
+  EXPECT_EQ(out, "[t.p work.probe]\n");
+}
+
+TEST(LibraryBindingDisplay, FunctionCalledFromAMonitoredArgumentNamesItsOwn) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module leaf;\n"
+      "  function string who(); return $sformatf(\"%l\"); endfunction\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "  initial $monitor(\"[%s]\", u.who());\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[work.leaf]\n");
+}
+
+TEST(LibraryBindingDisplay, ClassMethodInAChildNamesTheChild) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module leaf;\n"
+      "  class C;\n"
+      "    function void show(); $display(\"[%l]\"); endfunction\n"
+      "  endclass\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    c.show();\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  leaf u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "[work.leaf]\n");
+}
+
+std::string LogWrittenBy(const std::string& leaf_body,
+                         const std::string& top_body) {
+  ScratchDir tmp;
+  auto path = tmp.dir / "binding.log";
+  std::string open = "    fd = $fopen(\"" + path.string() + "\", \"w\");\n";
+  std::string src =
+      "module leaf;\n"
+      "  integer fd;\n"
+      "  function string who(); return $sformatf(\"%l\"); endfunction\n"
+      "  initial begin\n" +
+      (leaf_body.empty() ? std::string() : open + leaf_body) +
+      "    #1 if (fd != 0) $fclose(fd);\n"
+      "  end\n"
+      "endmodule\n"
+      "module t;\n"
+      "  integer fd;\n"
+      "  leaf u();\n"
+      "  initial begin\n" +
+      (top_body.empty() ? std::string() : open + top_body) +
+      "    #1 if (fd != 0) $fclose(fd);\n"
+      "  end\n"
+      "endmodule\n";
+  SimFixture f;
+  RunCapture(src, f);
+  return FileContents(path);
+}
+
+TEST(LibraryBindingDisplay, FileStrobeInAChildNamesTheChild) {
+  EXPECT_EQ(LogWrittenBy("    $fstrobe(fd, \"[%l]\");\n", ""), "[work.leaf]\n");
+}
+
+TEST(LibraryBindingDisplay, FileMonitorInAChildNamesTheChild) {
+  EXPECT_EQ(LogWrittenBy("    $fmonitor(fd, \"[%l]\");\n", ""),
+            "[work.leaf]\n");
+}
+
+TEST(LibraryBindingDisplay, FileWriteInAChildNamesTheChild) {
+  EXPECT_EQ(LogWrittenBy("    $fwrite(fd, \"[%l]\\n\");\n", ""),
+            "[work.leaf]\n");
+}
+
+TEST(LibraryBindingDisplay, FunctionCalledFromAFileStrobeArgumentNamesItsOwn) {
+  EXPECT_EQ(LogWrittenBy("", "    $fstrobe(fd, \"[%s]\", u.who());\n"),
+            "[work.leaf]\n");
+}
+
+TEST(LibraryBindingDisplay, FunctionCalledFromAFileMonitorArgumentNamesItsOwn) {
+  EXPECT_EQ(LogWrittenBy("", "    $fmonitor(fd, \"[%s]\", u.who());\n"),
+            "[work.leaf]\n");
+}
+
+std::string SeverityReportFromAChild(const std::string& task) {
+  SimFixture f;
+  testing::internal::CaptureStderr();
+  auto out = RunCapture(
+      "module leaf;\n"
+      "  initial " +
+          task +
+          "(\"<%l>\");\n"
+          "endmodule\n"
+          "module t;\n"
+          "  leaf u();\n"
+          "endmodule\n",
+      f);
+  return out + testing::internal::GetCapturedStderr();
+}
+
+TEST(LibraryBindingDisplay, WarningTaskInAChildNamesTheChild) {
+  EXPECT_TRUE(ReportsLine(SeverityReportFromAChild("$warning"), "<work.leaf>"));
+}
+
+TEST(LibraryBindingDisplay, ErrorTaskInAChildNamesTheChild) {
+  EXPECT_TRUE(ReportsLine(SeverityReportFromAChild("$error"), "<work.leaf>"));
+}
+
+TEST(LibraryBindingDisplay, FatalTaskInAChildNamesTheChild) {
+  EXPECT_TRUE(ReportsLine(SeverityReportFromAChild("$fatal"), "<work.leaf>"));
+}
+
+TEST(LibraryBindingDisplay, InfoTaskInAChildNamesTheChild) {
+  EXPECT_TRUE(ReportsLine(SeverityReportFromAChild("$info"), "<work.leaf>"));
+}
 }  // namespace
