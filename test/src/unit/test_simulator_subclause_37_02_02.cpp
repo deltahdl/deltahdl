@@ -1,13 +1,20 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/variable.h"
+#include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -98,6 +105,70 @@ TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
   EXPECT_FALSE(vpi_ctx_.HandleReleased(end_cb));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(ordinary_cb));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
+}
+
+TEST_F(VpiHandleReleaseSim, DISABLED_RestartReleasesAnIterator) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p", kVpiInput, mod);
+  vpiHandle it = vpi_iterate(vpiPort, VpiHandleOf(mod));
+  ASSERT_NE(it, nullptr);
+
+  vpi_ctx_.DispatchRestart();
+
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(VpiObjectOf(it)));
+}
+
+TEST_F(VpiHandleReleaseSim,
+       DISABLED_RestartReleasesASystfBesideARestartCallback) {
+  s_cb_data start{};
+  start.reason = cbStartOfRestart;
+  auto* start_cb = vpi_ctx_.RegisterCb(&start);
+
+  s_vpi_systf_data data{};
+  data.type = vpiSysTask;
+  PLI_BYTE8 name[] = "$restarted";
+  data.tfname = name;
+  vpiHandle systf = vpi_register_systf(&data);
+  ASSERT_NE(systf, nullptr);
+
+  vpi_ctx_.DispatchRestart();
+
+  EXPECT_FALSE(vpi_ctx_.HandleReleased(start_cb));
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(VpiObjectOf(systf)));
+}
+
+TEST_F(VpiHandleReleaseSim, RestartReleasesAScheduledEvent) {
+  auto* var = sim_ctx_.CreateVariable("re", 32);
+  var->value = MakeLogic4VecVal(arena_, 32, 0);
+  vpi_ctx_.Attach(sim_ctx_);
+  PLI_BYTE8 name[] = "re";
+  vpiHandle h = vpi_handle_by_name(name, nullptr);
+  ASSERT_NE(h, nullptr);
+  s_vpi_value val{};
+  val.format = vpiIntVal;
+  val.value.integer = 12;
+  s_vpi_time time{};
+  time.type = vpiSimTime;
+  time.low = 5;
+  vpiHandle ev =
+      vpi_put_value(h, &val, &time, vpiInertialDelay | vpiReturnEvent);
+  ASSERT_NE(ev, nullptr);
+
+  vpi_ctx_.DispatchRestart();
+
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(VpiObjectOf(ev)));
+}
+
+TEST_F(VpiHandleReleaseSim, DISABLED_AScanThatRunsOutReleasesItsIterator) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p", kVpiInput, mod);
+  vpiHandle it = vpi_iterate(vpiPort, VpiHandleOf(mod));
+  ASSERT_NE(it, nullptr);
+  ASSERT_NE(vpi_scan(it), nullptr);
+  ASSERT_EQ(vpi_scan(it), nullptr);
+
+  EXPECT_TRUE(vpi_ctx_.HandleReleased(VpiObjectOf(it)));
+  EXPECT_FALSE(vpi_ctx_.HandleValid(VpiObjectOf(it)));
 }
 
 TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
@@ -213,6 +284,143 @@ TEST_F(VpiHandleReleaseSim, RemovingOneCallbackLeavesAnotherHandleLive) {
 
   EXPECT_TRUE(VpiObjectOf(removed)->released);
   EXPECT_FALSE(VpiObjectOf(kept)->released);
+}
+
+struct GrabbedHandles {
+  vpiHandle frame = nullptr;
+  vpiHandle thread = nullptr;
+  vpiHandle automatic = nullptr;
+  vpiHandle static_local = nullptr;
+  vpiHandle object = nullptr;
+  vpiHandle member = nullptr;
+  vpiHandle static_member = nullptr;
+  vpiHandle callback = nullptr;
+};
+GrabbedHandles g_grabbed;
+
+PLI_INT32 NoteCallback(s_cb_data*) { return 0; }
+
+vpiHandle PlaceCallback(int reason, vpiHandle on) {
+  s_cb_data data{};
+  data.reason = reason;
+  data.cb_rtn = &NoteCallback;
+  data.obj = on;
+  return vpi_register_cb(&data);
+}
+
+PLI_INT32 GrabFrameCalltf(PLI_BYTE8*) {
+  g_grabbed.frame = vpi_handle(vpiFrame, nullptr);
+  if (g_grabbed.frame == nullptr) return 0;
+  g_grabbed.thread = vpi_handle(vpiThread, g_grabbed.frame);
+  vpiHandle it = vpi_iterate(vpiAutomatics, g_grabbed.frame);
+  g_grabbed.automatic = it == nullptr ? nullptr : vpi_scan(it);
+  if (g_grabbed.automatic != nullptr) vpi_release_handle(it);
+  g_grabbed.static_local = vpi_handle_by_name(VpiText("t.tk.s"), nullptr);
+  g_grabbed.callback = PlaceCallback(cbEndOfFrame, g_grabbed.frame);
+  return 0;
+}
+
+PLI_INT32 GrabObjectCalltf(PLI_BYTE8*) {
+  g_grabbed.object =
+      vpi_handle(vpiClassObj, vpi_handle_by_name(VpiText("t.c"), nullptr));
+  vpiHandle it = vpi_iterate(vpiVariables, g_grabbed.object);
+  while (vpiHandle var = it == nullptr ? nullptr : vpi_scan(it)) {
+    const std::string kName = vpi_get_str(vpiName, var);
+    if (kName == "x") g_grabbed.member = var;
+    if (kName == "s") g_grabbed.static_member = var;
+  }
+  return 0;
+}
+
+class HandleReleaseInARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    g_grabbed = {};
+    Register("$grab_frame", &GrabFrameCalltf);
+    Register("$grab_object", &GrabObjectCalltf);
+  }
+
+  static void Register(const char* name, PLI_INT32 (*calltf)(PLI_BYTE8*)) {
+    s_vpi_systf_data data{};
+    data.type = vpiSysTask;
+    data.tfname = VpiText(name);
+    data.calltf = calltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
+  void RunTaskWithLocals() {
+    Run("module t;\n"
+        "  task automatic tk();\n"
+        "    int x;\n"
+        "    static int s;\n"
+        "    $grab_frame;\n"
+        "  endtask\n"
+        "  initial tk();\n"
+        "endmodule\n");
+  }
+
+  bool Released(vpiHandle handle) const {
+    return vpi_.HandleReleased(VpiObjectOf(handle));
+  }
+};
+
+TEST_F(HandleReleaseInARun, AReturningTaskReleasesItsFrameAndItsCallbacks) {
+  RunTaskWithLocals();
+
+  ASSERT_NE(g_grabbed.frame, nullptr);
+  ASSERT_NE(g_grabbed.callback, nullptr);
+  EXPECT_TRUE(Released(g_grabbed.frame));
+  EXPECT_TRUE(Released(g_grabbed.callback));
+}
+
+TEST_F(HandleReleaseInARun, DISABLED_AReturningTaskReleasesItsAutomatics) {
+  RunTaskWithLocals();
+
+  ASSERT_NE(g_grabbed.automatic, nullptr);
+  EXPECT_TRUE(Released(g_grabbed.automatic));
+}
+
+TEST_F(HandleReleaseInARun, AReturningTaskKeepsItsStaticLocal) {
+  RunTaskWithLocals();
+
+  ASSERT_NE(g_grabbed.static_local, nullptr);
+  EXPECT_FALSE(Released(g_grabbed.static_local));
+}
+
+TEST_F(HandleReleaseInARun, AnEndingThreadReleasesItsHandle) {
+  Run("module t;\n"
+      "  task automatic tk();\n"
+      "    $grab_frame;\n"
+      "  endtask\n"
+      "  initial tk();\n"
+      "endmodule\n");
+
+  ASSERT_NE(g_grabbed.thread, nullptr);
+  EXPECT_TRUE(Released(g_grabbed.thread));
+}
+
+TEST_F(HandleReleaseInARun, ReclaimingAnObjectReleasesItsAutomaticMembers) {
+  Run("module t;\n"
+      "  class C;\n"
+      "    int x;\n"
+      "    static int s;\n"
+      "  endclass\n"
+      "  C c;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    $grab_object;\n"
+      "    c = null;\n"
+      "  end\n"
+      "endmodule\n");
+  f_.ctx.CollectGarbage();
+
+  ASSERT_NE(g_grabbed.object, nullptr);
+  ASSERT_NE(g_grabbed.member, nullptr);
+  ASSERT_NE(g_grabbed.static_member, nullptr);
+  EXPECT_TRUE(Released(g_grabbed.object));
+  EXPECT_TRUE(Released(g_grabbed.member));
+  EXPECT_FALSE(Released(g_grabbed.static_member));
 }
 
 }  // namespace

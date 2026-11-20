@@ -3,10 +3,12 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_vpi_run.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -59,6 +61,41 @@ TEST_F(VpiHandleCreationSim, HandlesForDifferentObjectsAreNotEquivalent) {
 
 TEST_F(VpiHandleCreationSim, NullObjectYieldsNoHandle) {
   EXPECT_EQ(vpi_ctx_.CreateHandleFor(nullptr), nullptr);
+}
+
+class HandleEquivalenceInARun : public VpiDesignRun {};
+
+TEST_F(HandleEquivalenceInARun, AScannedAndANamedHandleAreEquivalent) {
+  Run("module t;\n"
+      "  int v;\n"
+      "  int w;\n"
+      "endmodule\n");
+
+  vpiHandle by_name = vpi_handle_by_name(VpiText("t.v"), nullptr);
+  vpiHandle other = vpi_handle_by_name(VpiText("t.w"), nullptr);
+  vpiHandle module = vpi_handle_by_name(VpiText("t"), nullptr);
+  vpiHandle scanned = Named(vpiVariables, module, "v");
+  ASSERT_NE(by_name, nullptr);
+  ASSERT_NE(scanned, nullptr);
+
+  EXPECT_EQ(vpi_compare_objects(scanned, by_name), 1);
+  EXPECT_EQ(vpi_compare_objects(by_name, scanned), 1);
+  EXPECT_EQ(vpi_compare_objects(scanned, other), 0);
+}
+
+TEST_F(HandleEquivalenceInARun, ARelatedAndANamedHandleAreEquivalent) {
+  Run("module t;\n"
+      "  int v;\n"
+      "endmodule\n");
+
+  vpiHandle var = vpi_handle_by_name(VpiText("t.v"), nullptr);
+  vpiHandle module = vpi_handle_by_name(VpiText("t"), nullptr);
+  ASSERT_NE(var, nullptr);
+  vpiHandle related = vpi_handle(vpiModule, var);
+  ASSERT_NE(related, nullptr);
+
+  EXPECT_EQ(vpi_compare_objects(related, module), 1);
+  EXPECT_EQ(vpi_compare_objects(related, var), 0);
 }
 
 }  // namespace
