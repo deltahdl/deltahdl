@@ -132,7 +132,7 @@ TEST(DpiDisableProtocol, ImportedFunctionMustAcknowledgeWhenDisabled) {
   EXPECT_TRUE(DpiCurrentDisableAcknowledged());
 }
 
-TEST(DpiDisableProtocol, ProtocolCheckIsTrivialWithoutDisable) {
+TEST(DpiDisableProtocol, AZeroReturnWithNoDisablePassesTheCheck) {
   ResetDisableState();
   DpiRuntime rt;
 
@@ -432,6 +432,23 @@ TEST(DpiDisableProtocol, AReturnWithNoDisableInEffectIsNotFatal) {
 
   EXPECT_TRUE(rt.VerifyImportReturnUnderDisable(0));
   EXPECT_FALSE(rt.DisableProtocolFatalErrorIssued());
+  rt.LeaveImportCall();
+  ResetDisableState();
+}
+
+TEST(DpiDisableProtocol, DISABLED_AReturnOfOneWithNoDisableInEffectIsFatal) {
+  ResetDisableState();
+  DpiRuntime rt;
+
+  rt.EnterNoncontextImportCall("imp_task", true);
+
+  testing::internal::CaptureStderr();
+  bool ok = rt.VerifyImportReturnUnderDisable(1);
+  testing::internal::GetCapturedStderr();
+
+  EXPECT_FALSE(ok);
+  EXPECT_NE(rt.DisableProtocolFatalError().find("35.9 item b)"),
+            std::string::npos);
   rt.LeaveImportCall();
   ResetDisableState();
 }
