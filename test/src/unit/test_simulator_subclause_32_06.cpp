@@ -12,6 +12,7 @@
 #include "parser/ast_specify.h"
 #include "simulator/specify.h"
 #include "simulator/specify_path_delay.h"
+#include "simulator/specify_sdf.h"
 #include "simulator/specify_timing_check.h"
 
 using namespace delta;
@@ -291,6 +292,203 @@ TEST(SdfMultipleFiles, IncrementModifiesASpecparamFromAnEarlierFile) {
   const PathDelay* annotated = d.PathOf("", "z_out");
   ASSERT_NE(annotated, nullptr);
   EXPECT_EQ(annotated->delays[0], 27u);
+}
+
+TEST(SdfMultipleFiles, AbsoluteValueReplacesWhatAnIncrementFileModified) {
+  const std::string kF1 =
+      WriteSdf("reabs_1.sdf", DelayFile(IopathRecord("a", "ABSOLUTE", "5")));
+  const std::string kF2 =
+      WriteSdf("reabs_2.sdf", DelayFile(IopathRecord("a", "INCREMENT", "3")));
+  const std::string kF3 =
+      WriteSdf("reabs_3.sdf", DelayFile(IopathRecord("a", "ABSOLUTE", "9")));
+
+  Annotated d;
+  ASSERT_TRUE(
+      d.Build(CellDesign(kOneInstance, Call(kF1) + Call(kF2) + Call(kF3))));
+  d.Run();
+
+  const PathDelay* path = d.PathOf("a.", "out_z");
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->delays[0], 9u);
+}
+
+TEST(SdfMultipleFiles, AbsoluteValueReplacesASpecparamFromAnEarlierFile) {
+  const std::string kF1 =
+      WriteSdf("labelabs_1.sdf", LabelRecord("ABSOLUTE", "20"));
+  const std::string kF2 =
+      WriteSdf("labelabs_2.sdf", LabelRecord("ABSOLUTE", "11"));
+
+  Annotated d;
+  ASSERT_TRUE(d.Build(SpecparamDesign(Call(kF1) + Call(kF2))));
+  d.BindSpecparamsOf(d.Top());
+  d.Run();
+
+  EXPECT_EQ(d.Specparam("cap"), 11u);
+  const PathDelay* annotated = d.PathOf("", "z_out");
+  ASSERT_NE(annotated, nullptr);
+  EXPECT_EQ(annotated->delays[0], 11u);
+}
+
+std::string LeafRecord(const std::string& section, const std::string& entry) {
+  return "(DELAYFILE (CELL (CELLTYPE \"iopath_leaf\") (INSTANCE top/a) (DELAY "
+         "(" +
+         section + " " + entry + "))))";
+}
+
+uint64_t LeafDelayAfter(const std::string& stem, const std::string& first,
+                        const std::string& second) {
+  const std::string kF1 = WriteSdf(stem + "_1.sdf", first);
+  const std::string kF2 = WriteSdf(stem + "_2.sdf", second);
+  Annotated d;
+  if (!d.Build(CellDesign(kOneInstance, Call(kF1) + Call(kF2)))) return 0;
+  d.Run();
+  const PathDelay* path = d.PathOf("a.", "out_z");
+  return path == nullptr ? 0 : path->delays[0];
+}
+
+TEST(SdfMultipleFiles, AbsoluteDeviceReplacesAnEarlierFilesDevice) {
+  EXPECT_EQ(LeafDelayAfter("devabs", LeafRecord("ABSOLUTE", "(DEVICE (7))"),
+                           LeafRecord("ABSOLUTE", "(DEVICE (12))")),
+            12u);
+}
+
+TEST(SdfMultipleFiles, IncrementDeviceModifiesAnEarlierFilesDevice) {
+  EXPECT_EQ(LeafDelayAfter("devinc", LeafRecord("ABSOLUTE", "(DEVICE (7))"),
+                           LeafRecord("INCREMENT", "(DEVICE (4))")),
+            11u);
+}
+
+struct PulseLimits {
+  uint64_t reject = 0;
+  uint64_t error = 0;
+};
+
+PulseLimits LeafLimitsAfter(const std::string& stem, const std::string& first,
+                            const std::string& second) {
+  const std::string kF1 = WriteSdf(stem + "_1.sdf", first);
+  const std::string kF2 = WriteSdf(stem + "_2.sdf", second);
+  Annotated d;
+  PulseLimits got;
+  if (!d.Build(CellDesign(kOneInstance, Call(kF1) + Call(kF2)))) return got;
+  d.Run();
+  const PathDelay* path = d.PathOf("a.", "out_z");
+  if (path == nullptr) return got;
+  got.reject = path->reject_limit[0];
+  got.error = path->error_limit[0];
+  return got;
+}
+
+const char* const kFiftyAndPulse =
+    "(IOPATH in_a out_z (50)) (PATHPULSE in_a out_z (10) (20))";
+
+TEST(SdfMultipleFiles, AbsolutePathpulseReplacesAnEarlierFilesLimits) {
+  const PulseLimits kGot = LeafLimitsAfter(
+      "ppabs", LeafRecord("ABSOLUTE", kFiftyAndPulse),
+      LeafRecord("ABSOLUTE", "(PATHPULSE in_a out_z (15) (30))"));
+  EXPECT_EQ(kGot.reject, 15u);
+  EXPECT_EQ(kGot.error, 30u);
+}
+
+TEST(SdfMultipleFiles, IncrementPathpulseModifiesAnEarlierFilesLimits) {
+  const PulseLimits kGot = LeafLimitsAfter(
+      "ppinc", LeafRecord("ABSOLUTE", kFiftyAndPulse),
+      LeafRecord("INCREMENT", "(PATHPULSE in_a out_z (3) (4))"));
+  EXPECT_EQ(kGot.reject, 13u);
+  EXPECT_EQ(kGot.error, 24u);
+}
+
+const char* const kFiftyAndPercent =
+    "(IOPATH in_a out_z (50)) (PATHPULSEPERCENT in_a out_z (20) (40))";
+
+TEST(SdfMultipleFiles, AbsolutePathpulsepercentReplacesAnEarlierFilesLimits) {
+  const PulseLimits kGot = LeafLimitsAfter(
+      "ppcabs", LeafRecord("ABSOLUTE", kFiftyAndPercent),
+      LeafRecord("ABSOLUTE", "(PATHPULSEPERCENT in_a out_z (50) (60))"));
+  EXPECT_EQ(kGot.reject, 25u);
+  EXPECT_EQ(kGot.error, 30u);
+}
+
+TEST(SdfMultipleFiles, IncrementPathpulsepercentModifiesAnEarlierFilesLimits) {
+  const PulseLimits kGot = LeafLimitsAfter(
+      "ppcinc", LeafRecord("ABSOLUTE", kFiftyAndPercent),
+      LeafRecord("INCREMENT", "(PATHPULSEPERCENT in_a out_z (10) (10))"));
+  EXPECT_EQ(kGot.reject, 15u);
+  EXPECT_EQ(kGot.error, 25u);
+}
+
+std::string NetDesign(const std::string& calls) {
+  return "module net_src(out);\n"
+         "  output out;\n"
+         "  reg out;\n"
+         "endmodule\n"
+         "module net_sink(in);\n"
+         "  input in;\n"
+         "  wire in;\n"
+         "endmodule\n"
+         "module top;\n"
+         "  wire n;\n"
+         "  net_src s1(.out(n));\n"
+         "  net_src s2(.out(n));\n"
+         "  net_sink k(.in(n));\n"
+         "  initial begin\n" +
+         calls + "  end\nendmodule\n";
+}
+
+std::string NetRecord(const std::string& section, const std::string& entry) {
+  return "(DELAYFILE (CELL (CELLTYPE \"top\") (INSTANCE top) (DELAY (" +
+         section + " " + entry + "))))";
+}
+
+uint64_t WireDelayAfter(const std::string& stem, const std::string& first,
+                        const std::string& second) {
+  const std::string kF1 = WriteSdf(stem + "_1.sdf", first);
+  const std::string kF2 = WriteSdf(stem + "_2.sdf", second);
+  Annotated d;
+  if (!d.Build(NetDesign(Call(kF1) + Call(kF2)))) return 0;
+  d.Run();
+  const InterconnectDelay* got =
+      d.run_mgr->FindInterconnectDelay("s1/out", "k/in");
+  return got == nullptr ? 0 : got->delays[0];
+}
+
+TEST(SdfMultipleFiles, AbsoluteInterconnectReplacesAnEarlierFilesDelay) {
+  EXPECT_EQ(
+      WireDelayAfter("icabs",
+                     NetRecord("ABSOLUTE", "(INTERCONNECT s1/out k/in (5))"),
+                     NetRecord("ABSOLUTE", "(INTERCONNECT s1/out k/in (8))")),
+      8u);
+}
+
+TEST(SdfMultipleFiles, IncrementInterconnectModifiesAnEarlierFilesDelay) {
+  EXPECT_EQ(
+      WireDelayAfter("icinc",
+                     NetRecord("ABSOLUTE", "(INTERCONNECT s1/out k/in (5))"),
+                     NetRecord("INCREMENT", "(INTERCONNECT s1/out k/in (3))")),
+      8u);
+}
+
+TEST(SdfMultipleFiles, AbsolutePortReplacesAnEarlierFilesDelay) {
+  EXPECT_EQ(WireDelayAfter("portabs", NetRecord("ABSOLUTE", "(PORT k/in (6))"),
+                           NetRecord("ABSOLUTE", "(PORT k/in (13))")),
+            13u);
+}
+
+TEST(SdfMultipleFiles, IncrementPortModifiesAnEarlierFilesDelay) {
+  EXPECT_EQ(WireDelayAfter("portinc", NetRecord("ABSOLUTE", "(PORT k/in (6))"),
+                           NetRecord("INCREMENT", "(PORT k/in (4))")),
+            10u);
+}
+
+TEST(SdfMultipleFiles, AbsoluteNetdelayReplacesAnEarlierFilesDelay) {
+  EXPECT_EQ(WireDelayAfter("ndabs", NetRecord("ABSOLUTE", "(NETDELAY n (6))"),
+                           NetRecord("ABSOLUTE", "(NETDELAY n (14))")),
+            14u);
+}
+
+TEST(SdfMultipleFiles, IncrementNetdelayModifiesAnEarlierFilesDelay) {
+  EXPECT_EQ(WireDelayAfter("ndinc", NetRecord("ABSOLUTE", "(NETDELAY n (6))"),
+                           NetRecord("INCREMENT", "(NETDELAY n (5))")),
+            11u);
 }
 
 }  // namespace
