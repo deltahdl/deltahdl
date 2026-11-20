@@ -333,4 +333,97 @@ TEST(SdfDeviceFallback, OperandNamingAnInstanceOutputReachesItsPaths) {
   }
 }
 
+std::string PathlessPairTop(const std::string& sdf_path) {
+  return "module pl_leaf(input a, output y, output z);\n"
+         "  buf #3 g_y(y, a);\n"
+         "  buf #4 g_z(z, a);\n"
+         "endmodule\n"
+         "module pl_top;\n"
+         "  logic a_in;\n"
+         "  logic y1, z1, y2, z2;\n"
+         "  pl_leaf u1(a_in, y1, z1);\n"
+         "  pl_leaf u2(a_in, y2, z2);\n"
+         "  initial $sdf_annotate(\"" +
+         sdf_path + "\");\nendmodule\n";
+}
+
+std::string DeviceOnPlTop(const std::string& operand) {
+  return "(DELAYFILE (CELL (CELLTYPE \"pl_top\") (INSTANCE pl_top)"
+         " (DELAY (ABSOLUTE (DEVICE " +
+         operand + " (7))))))";
+}
+
+TEST(SdfDeviceFallback, OperandNamingAPathlessInstanceReachesItsPrimitives) {
+  const std::string kSdf = SavedSdf("pathless_instance", DeviceOnPlTop("u1"));
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design, PathlessPairTop(kSdf));
+  ASSERT_NE(mgr, nullptr);
+  const PrimitiveDriver* y1 = DriverFound(*mgr, "u1.", "y");
+  const PrimitiveDriver* z1 = DriverFound(*mgr, "u1.", "z");
+  ASSERT_NE(y1, nullptr);
+  ASSERT_NE(z1, nullptr);
+  EXPECT_EQ(y1->delays[kRiseSlot], 7u);
+  EXPECT_EQ(z1->delays[kRiseSlot], 7u);
+}
+
+TEST(SdfDeviceFallback,
+     OperandNamingAPathlessInstanceOutputReachesItsPrimitive) {
+  const std::string kSdf =
+      SavedSdf("pathless_instance_output", DeviceOnPlTop("u1/y"));
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design, PathlessPairTop(kSdf));
+  ASSERT_NE(mgr, nullptr);
+  const PrimitiveDriver* y1 = DriverFound(*mgr, "u1.", "y");
+  const PrimitiveDriver* z1 = DriverFound(*mgr, "u1.", "z");
+  ASSERT_NE(y1, nullptr);
+  ASSERT_NE(z1, nullptr);
+  EXPECT_EQ(y1->delays[kRiseSlot], 7u);
+  EXPECT_EQ(z1->delays[kRiseSlot], 4u);
+}
+
+TEST(SdfDeviceFallback, OperandNamingOneInstanceLeavesItsSiblingAlone) {
+  const std::string kSdf = SavedSdf("one_of_two", DeviceOnPlTop("u1"));
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design, PathlessPairTop(kSdf));
+  ASSERT_NE(mgr, nullptr);
+  const PrimitiveDriver* y2 = DriverFound(*mgr, "u2.", "y");
+  const PrimitiveDriver* z2 = DriverFound(*mgr, "u2.", "z");
+  ASSERT_NE(y2, nullptr);
+  ASSERT_NE(z2, nullptr);
+  EXPECT_EQ(y2->delays[kRiseSlot], 3u);
+  EXPECT_EQ(z2->delays[kRiseSlot], 4u);
+}
+
+TEST(SdfDeviceFallback, OperandNamingOneInstanceLeavesItsSiblingsPaths) {
+  const std::string kSdf =
+      SavedSdf("one_of_two_paths",
+               "(DELAYFILE (CELL (CELLTYPE \"pp_top\") (INSTANCE pp_top)"
+               " (DELAY (ABSOLUTE (DEVICE u1 (7))))))");
+  SdfDesign design;
+  SpecifyManager* mgr = ManagerOfRun(design,
+                                     "module pp_leaf(input a, output y);\n"
+                                     "  specify\n"
+                                     "    (a => y) = 5;\n"
+                                     "  endspecify\n"
+                                     "endmodule\n"
+                                     "module pp_top;\n"
+                                     "  logic a_in;\n"
+                                     "  logic y1, y2;\n"
+                                     "  pp_leaf u1(a_in, y1);\n"
+                                     "  pp_leaf u2(a_in, y2);\n"
+                                     "  initial $sdf_annotate(\"" +
+                                         kSdf + "\");\nendmodule\n");
+  ASSERT_NE(mgr, nullptr);
+  int reached = 0;
+  for (const auto& pd : mgr->GetPathDelays()) {
+    if (pd.inst_prefix == "u1.") {
+      EXPECT_EQ(pd.delays[kRiseSlot], 7u);
+    } else {
+      EXPECT_EQ(pd.delays[kRiseSlot], 5u) << pd.inst_prefix;
+    }
+    ++reached;
+  }
+  EXPECT_EQ(reached, 2);
+}
+
 }  // namespace
