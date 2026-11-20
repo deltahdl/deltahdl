@@ -124,4 +124,93 @@ TEST(ProtectedEnvelopeProcessingSimulation, DescribingExpressionsChangeNone) {
   EXPECT_EQ(run.result, 42U);
 }
 
+void ExpectTheSealedItemsToRun(const std::string& src) {
+  ProtectedDesignRun run(src, kAuthorKey);
+  EXPECT_FALSE(run.f.diag.HasErrors());
+  EXPECT_EQ(run.result, 42U);
+}
+
+TEST(ProtectedEnvelopeProcessingSimulation, ItemsSealedInAPackageRun) {
+  ExpectTheSealedItemsToRun(
+      "package sealed_pkg;\n"
+      "`pragma protect begin\n"
+      "  function automatic int answer(); return 42; endfunction\n"
+      "`pragma protect end\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int result = 1;\n"
+      "  initial result = sealed_pkg::answer();\n"
+      "endmodule\n");
+}
+
+TEST(ProtectedEnvelopeProcessingSimulation, ItemsSealedInAnInterfaceRun) {
+  ExpectTheSealedItemsToRun(
+      "interface sealed_if;\n"
+      "`pragma protect begin\n"
+      "  int answer = 42;\n"
+      "`pragma protect end\n"
+      "endinterface\n"
+      "module t;\n"
+      "  sealed_if u();\n"
+      "  int result = 1;\n"
+      "  initial #1 result = u.answer;\n"
+      "endmodule\n");
+}
+
+TEST(ProtectedEnvelopeProcessingSimulation, ItemsSealedInAProgramRun) {
+  ExpectTheSealedItemsToRun(
+      "program sealed_pr(output int answer);\n"
+      "`pragma protect begin\n"
+      "  initial answer = 42;\n"
+      "`pragma protect end\n"
+      "endprogram\n"
+      "module t;\n"
+      "  int result;\n"
+      "  sealed_pr p(result);\n"
+      "endmodule\n");
+}
+
+TEST(ProtectedEnvelopeProcessingSimulation, ItemsSealedInAClassRun) {
+  ExpectTheSealedItemsToRun(
+      "module t;\n"
+      "  class sealed_c;\n"
+      "`pragma protect begin\n"
+      "    function int answer(); return 42; endfunction\n"
+      "`pragma protect end\n"
+      "  endclass\n"
+      "  int result = 1;\n"
+      "  initial begin\n"
+      "    sealed_c c;\n"
+      "    c = new;\n"
+      "    result = c.answer();\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(ProtectedEnvelopeProcessingSimulation, AFunctionBodySealedRuns) {
+  ExpectTheSealedItemsToRun(
+      "module t;\n"
+      "  function automatic int answer();\n"
+      "`pragma protect begin\n"
+      "    return 42;\n"
+      "`pragma protect end\n"
+      "  endfunction\n"
+      "  int result = 1;\n"
+      "  initial result = answer();\n"
+      "endmodule\n");
+}
+
+TEST(ProtectedEnvelopeProcessingSimulation, ATaskBodySealedRuns) {
+  ExpectTheSealedItemsToRun(
+      "module t;\n"
+      "  int result = 1;\n"
+      "  task automatic deliver();\n"
+      "`pragma protect begin\n"
+      "    result = 42;\n"
+      "`pragma protect end\n"
+      "  endtask\n"
+      "  initial deliver();\n"
+      "endmodule\n");
+}
+
 }  // namespace

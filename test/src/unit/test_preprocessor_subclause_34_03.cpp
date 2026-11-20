@@ -8,6 +8,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_include_test_dir.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_encoding.h"
@@ -470,6 +471,118 @@ TEST(ProtectedEnvelopeProcessing, AValueShorterThanAFingerprintRecordsNone) {
       run.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied", 3,
       "34.3.2"));
+}
+
+TEST(ProtectedEnvelopeProcessing, AWordInALineCommentOpensNoRegion) {
+  const std::string kSource =
+      "// `pragma protect begin\n"
+      "module m; endmodule\n"
+      "`pragma protect end\n";
+  EXPECT_EQ(Encrypted(kSource), kSource);
+}
+
+TEST(ProtectedEnvelopeProcessing, AWordInALineCommentClosesNoRegion) {
+  std::string transformed = Encrypted(
+      "`pragma protect begin\n"
+      "// `pragma protect end\n"
+      "  logic sealed_bit;\n"
+      "`pragma protect end\n");
+  ASSERT_EQ(RecordedRegions(transformed).size(), 1U);
+  EXPECT_EQ(Recovered(RecordedRegions(transformed)[0], kAuthorKey),
+            "// `pragma protect end\n  logic sealed_bit;\n");
+}
+
+TEST(ProtectedEnvelopeProcessing, AnUnevaluatedConditionalStillHoldsARegion) {
+  std::string transformed = Encrypted(
+      "`ifdef NEVER_DEFINED_ANYWHERE\n"
+      "`pragma protect begin\n"
+      "  logic sealed_bit;\n"
+      "`pragma protect end\n"
+      "`endif\n");
+  EXPECT_EQ(transformed.rfind("`ifdef NEVER_DEFINED_ANYWHERE\n", 0), 0U);
+  size_t closing = transformed.find("`pragma protect end_protected\n");
+  ASSERT_NE(closing, std::string::npos);
+  EXPECT_EQ(transformed.find("`endif\n"), transformed.size() - 7);
+  EXPECT_LT(closing, transformed.size() - 7);
+  ASSERT_EQ(RecordedRegions(transformed).size(), 1U);
+  EXPECT_EQ(Recovered(RecordedRegions(transformed)[0], kAuthorKey),
+            "  logic sealed_bit;\n");
+}
+
+TEST(ProtectedEnvelopeProcessing, AMacroWhoseBodyIsADelimiterOpensNoRegion) {
+  const std::string kSource =
+      "`define OPEN_REGION `pragma protect begin\n"
+      "`OPEN_REGION\n"
+      "  logic open_bit;\n"
+      "`pragma protect end\n";
+  EXPECT_EQ(Encrypted(kSource), kSource);
+}
+
+struct ReadThroughAnInclude {
+  IncludeTestDir tmp;
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  std::string text;
+
+  ReadThroughAnInclude(const std::string& included, std::string_view key) {
+    tmp.WriteFile("sealed_part.svh", included);
+    PreprocConfig config;
+    config.protect_key = key;
+    config.include_dirs.push_back(tmp.dir.string());
+    Preprocessor pp(mgr, diag, config);
+    text = pp.Preprocess(mgr.AddFile(
+        "<test>", "module m;\n`include \"sealed_part.svh\"\nendmodule\n"));
+  }
+};
+
+TEST(ProtectedEnvelopeProcessing, AnIncludedEnvelopeIsDecryptedWithTheKey) {
+  ReadThroughAnInclude run(Encrypted("`pragma protect begin\n"
+                                     "  initial result = 42;\n"
+                                     "`pragma protect end\n"),
+                           kAuthorKey);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_TRUE(Holds(run.text, "initial result = 42;"));
+}
+
+TEST(ProtectedEnvelopeProcessing, AnIncludedEnvelopeUnderAnotherKeyIsReported) {
+  std::string sealed = Encrypted(
+      "`pragma protect begin\n"
+      "  initial result = 42;\n"
+      "`pragma protect end\n");
+  ReadThroughAnInclude run(sealed, kStrangerKey);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineOfTheBlock(sealed), "34.3.2"));
+  EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
+}
+
+std::string SealedUnderACondition(std::string_view opening) {
+  std::string src(opening);
+  src.append(
+      Encrypted("`pragma protect begin\n"
+                "  initial result = 42;\n"
+                "`pragma protect end\n"));
+  src.append("`endif\n");
+  return src;
+}
+
+TEST(ProtectedEnvelopeProcessing,
+     AnEnvelopeCompiledAwayIsNeitherReadNorReported) {
+  ReadWithKey run(SealedUnderACondition("`ifdef NEVER_DEFINED_ANYWHERE\n"),
+                  kStrangerKey);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(Holds(run.text, "initial result = 42;"));
+}
+
+TEST(ProtectedEnvelopeProcessing,
+     AnEnvelopeCompiledInIsReportedUnderAnotherKey) {
+  std::string src = SealedUnderACondition("`ifndef NEVER_DEFINED_ANYWHERE\n");
+  ReadWithKey run(src, kStrangerKey);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineOfTheBlock(src), "34.3.2"));
 }
 
 }  // namespace
