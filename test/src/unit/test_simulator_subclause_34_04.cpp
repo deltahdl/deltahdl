@@ -161,4 +161,92 @@ TEST(ProtectPragmaDirectivesSimulation, ARegionMayOpenInsideAnIncludedFile) {
   EXPECT_EQ(run.result, 42U);
 }
 
+void ExpectTheDesignToRun(const std::string& src) {
+  DesignRun run(src);
+  EXPECT_FALSE(run.f.diag.HasErrors());
+  EXPECT_EQ(run.result, 42U);
+}
+
+TEST(ProtectPragmaDirectivesSimulation, ARegionMayCloseAfterAnInterfaceEnds) {
+  ExpectTheDesignToRun(
+      "interface bus;\n"
+      "`pragma protect begin\n"
+      "  int value = 42;\n"
+      "endinterface\n"
+      "`pragma protect end\n"
+      "module t;\n"
+      "  int result = 1;\n"
+      "  bus b();\n"
+      "  initial #1 result = b.value;\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectivesSimulation, ARegionMayCloseAfterAProgramEnds) {
+  ExpectTheDesignToRun(
+      "program pr(output int answer);\n"
+      "`pragma protect begin\n"
+      "  initial answer = 42;\n"
+      "endprogram\n"
+      "`pragma protect end\n"
+      "module t;\n"
+      "  int result;\n"
+      "  pr p(result);\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectivesSimulation, ARegionMayCloseAfterAFunctionEnds) {
+  ExpectTheDesignToRun(
+      "module t;\n"
+      "  int result = 1;\n"
+      "  function int answer();\n"
+      "`pragma protect begin\n"
+      "    return 42;\n"
+      "  endfunction\n"
+      "  initial result = answer();\n"
+      "`pragma protect end\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectivesSimulation, ARegionMayCloseAfterATaskEnds) {
+  ExpectTheDesignToRun(
+      "module t;\n"
+      "  int result = 1;\n"
+      "  task set_answer();\n"
+      "`pragma protect begin\n"
+      "    result = 42;\n"
+      "  endtask\n"
+      "  initial set_answer();\n"
+      "`pragma protect end\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectivesSimulation, ARegionMayCloseAfterACheckerEnds) {
+  ExpectTheDesignToRun(
+      "checker watch(logic a);\n"
+      "`pragma protect begin\n"
+      "endchecker\n"
+      "module t;\n"
+      "  logic a = 1'b1;\n"
+      "  int result = 1;\n"
+      "  watch w(a);\n"
+      "  initial result = 42;\n"
+      "`pragma protect end\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectivesSimulation,
+     ARegionMayCloseAfterAGenerateBlockEnds) {
+  ExpectTheDesignToRun(
+      "module t;\n"
+      "  int result = 1;\n"
+      "  generate\n"
+      "    if (1) begin : g\n"
+      "`pragma protect begin\n"
+      "      initial result = 42;\n"
+      "    end\n"
+      "  endgenerate\n"
+      "`pragma protect end\n"
+      "endmodule\n");
+}
+
 }  // namespace

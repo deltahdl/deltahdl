@@ -338,6 +338,71 @@ TEST(ProtectPragmaDirectives, AKeywordWrittenInsideANamedBlockOutlivesIt) {
   EXPECT_EQ(run.ValueOf("key_keyname").value, "acme-key");
 }
 
+void ExpectTheKeywordToOutliveItsScope(const std::string& src) {
+  DirectiveRun run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(run.ValueOf("key_keyname").defaulted);
+  EXPECT_EQ(run.ValueOf("key_keyname").value, "acme-key");
+}
+
+TEST(ProtectPragmaDirectives, AKeywordWrittenInsideAnInterfaceOutlivesIt) {
+  ExpectTheKeywordToOutliveItsScope(
+      "interface bus;\n"
+      "  logic req;\n"
+      "`pragma protect key_keyname=\"acme-key\"\n"
+      "endinterface\n"
+      "module m;\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectives, AKeywordWrittenInsideAProgramOutlivesIt) {
+  ExpectTheKeywordToOutliveItsScope(
+      "program pr;\n"
+      "  int count;\n"
+      "`pragma protect key_keyname=\"acme-key\"\n"
+      "endprogram\n"
+      "module m;\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectives, AKeywordWrittenInsideAFunctionOutlivesIt) {
+  ExpectTheKeywordToOutliveItsScope(
+      "module m;\n"
+      "  function int five();\n"
+      "`pragma protect key_keyname=\"acme-key\"\n"
+      "    return 5;\n"
+      "  endfunction\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectives, AKeywordWrittenInsideATaskOutlivesIt) {
+  ExpectTheKeywordToOutliveItsScope(
+      "module m;\n"
+      "  task idle();\n"
+      "`pragma protect key_keyname=\"acme-key\"\n"
+      "  endtask\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectives, AKeywordWrittenInsideACheckerOutlivesIt) {
+  ExpectTheKeywordToOutliveItsScope(
+      "checker watch(logic a);\n"
+      "`pragma protect key_keyname=\"acme-key\"\n"
+      "endchecker\n"
+      "module m;\n"
+      "endmodule\n");
+}
+
+TEST(ProtectPragmaDirectives, AKeywordWrittenInsideAGenerateBlockOutlivesIt) {
+  ExpectTheKeywordToOutliveItsScope(
+      "module m;\n"
+      "  if (1) begin : g\n"
+      "`pragma protect key_keyname=\"acme-key\"\n"
+      "    wire w;\n"
+      "  end\n"
+      "endmodule\n");
+}
+
 TEST(ProtectPragmaDirectives, AnEnvelopeSpansAPackageAndAModule) {
   DirectiveRun run(
       "package p;\n"
