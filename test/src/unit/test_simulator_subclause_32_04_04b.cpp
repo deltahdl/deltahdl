@@ -613,51 +613,261 @@ void ExpectSourceWaitsOnTheDelay(const std::string& stem,
   EXPECT_EQ(ok->value.ToUint64(), 1u);
 }
 
+const char* const kUdpDriver =
+    "primitive udp_buf(out, in);\n"
+    "  output out;\n"
+    "  input in;\n"
+    "  table\n"
+    "    0 : 0;\n"
+    "    1 : 1;\n"
+    "  endtable\n"
+    "endprimitive\n"
+    "module drv(output wire q);\n"
+    "  reg r = 1'b0;\n"
+    "  udp_buf b(q, r);\n"
+    "  initial #5 r = 1'b1;\n"
+    "endmodule\n";
+
+const char* const kSwitchDriver =
+    "module drv(output wire q);\n"
+    "  reg r = 1'b0;\n"
+    "  wire w;\n"
+    "  assign w = r;\n"
+    "  tran t(q, w);\n"
+    "  initial #5 r = 1'b1;\n"
+    "endmodule\n";
+
+const char* const kCheckDriver =
+    "module chk(input wire c, input wire r, output wire q);\n"
+    "  assign q = dr;\n"
+    "  specify\n"
+    "    $setuphold(posedge c, r, 1, 1, , , , dc, dr);\n"
+    "  endspecify\n"
+    "endmodule\n"
+    "module drv(output wire q);\n"
+    "  reg c = 1'b0;\n"
+    "  reg r = 1'b0;\n"
+    "  chk k(.c(c), .r(r), .q(q));\n"
+    "  initial #5 r = 1'b1;\n"
+    "endmodule\n";
+
 TEST(InterconnectDelaySim, AUdpOutputSourceReachesTheLoadAfterTheDelay) {
-  ExpectSourceWaitsOnTheDelay("udp_src",
-                              "primitive udp_buf(out, in);\n"
-                              "  output out;\n"
-                              "  input in;\n"
-                              "  table\n"
-                              "    0 : 0;\n"
-                              "    1 : 1;\n"
-                              "  endtable\n"
-                              "endprimitive\n"
-                              "module drv(output wire q);\n"
-                              "  reg r = 1'b0;\n"
-                              "  udp_buf b(q, r);\n"
-                              "  initial #5 r = 1'b1;\n"
-                              "endmodule\n");
+  ExpectSourceWaitsOnTheDelay("udp_src", kUdpDriver);
 }
 
 TEST(InterconnectDelaySim, ASwitchSourceReachesTheLoadAfterTheDelay) {
-  ExpectSourceWaitsOnTheDelay("switch_src",
-                              "module drv(output wire q);\n"
-                              "  reg r = 1'b0;\n"
-                              "  wire w;\n"
-                              "  assign w = r;\n"
-                              "  tran t(q, w);\n"
-                              "  initial #5 r = 1'b1;\n"
-                              "endmodule\n");
+  ExpectSourceWaitsOnTheDelay("switch_src", kSwitchDriver);
 }
 
 TEST(InterconnectDelaySim,
      ATimingCheckDelayedSourceReachesTheLoadAfterTheDelay) {
-  ExpectSourceWaitsOnTheDelay("check_src",
-                              "module chk(input wire c, input wire r, "
-                              "output wire q);\n"
-                              "  assign q = dr;\n"
-                              "  specify\n"
-                              "    $setuphold(posedge c, r, 1, 1, , , , dc, "
-                              "dr);\n"
-                              "  endspecify\n"
-                              "endmodule\n"
-                              "module drv(output wire q);\n"
-                              "  reg c = 1'b0;\n"
-                              "  reg r = 1'b0;\n"
-                              "  chk k(.c(c), .r(r), .q(q));\n"
-                              "  initial #5 r = 1'b1;\n"
-                              "endmodule\n");
+  ExpectSourceWaitsOnTheDelay("check_src", kCheckDriver);
+}
+
+const char* const kPresetDriver =
+    "module drv(output wire q);\n"
+    "  reg r = 1'b1;\n"
+    "  assign #3 q = r;\n"
+    "endmodule\n";
+
+const char* const kBareChild =
+    "module child(inout wire p);\n"
+    "endmodule\n";
+
+const char* const kDrivingChild =
+    "module child(inout wire p);\n"
+    "  drv k(.q(p));\n"
+    "endmodule\n";
+
+std::string WholeNetDesign(const std::string& modules,
+                           const std::string& top_items,
+                           const std::string& body) {
+  return modules + "module top;\n" + top_items +
+         "  logic ok = 1'b0;\n"
+         "  initial begin\n" +
+         body +
+         "  end\n"
+         "endmodule\n";
+}
+
+void ExpectWholeNetCase(const std::string& stem, const std::string& entry,
+                        const std::string& modules,
+                        const std::string& top_items,
+                        const std::string& checks) {
+  const std::string kSdf = WriteSdfFile(stem + ".sdf", DelayFile(entry));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      WholeNetDesign(modules, top_items,
+                     "    #1 $sdf_annotate(\"" + kSdf + "\");\n" + checks),
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+void ExpectOutsideSourceDelayedInside(const std::string& stem,
+                                      const std::string& driver) {
+  ExpectWholeNetCase(stem, "(INTERCONNECT u1/q c/p (10))", driver + kBareChild,
+                     "  wire n;\n  drv u1(.q(n));\n  child c(.p(n));\n",
+                     "    #6 ok = (n === 1'b1) && (c.p === 1'b0);\n"
+                     "    #13 ok = ok && (c.p === 1'b1);\n");
+}
+
+void ExpectInsideSourceSeenOutside(const std::string& stem,
+                                   const std::string& driver) {
+  ExpectWholeNetCase(stem, "(PORT c/p (10))", driver + kDrivingChild,
+                     "  wire n;\n  child c(.p(n));\n",
+                     "    #6 ok = (n === 1'b1) && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, AUdpOutsideAnInoutPortReachesItAcrossTheDelay) {
+  ExpectOutsideSourceDelayedInside("udp_out", kUdpDriver);
+}
+
+TEST(InterconnectDelaySim, AUdpInsideAnInoutPortReachesTheNetOutside) {
+  ExpectInsideSourceSeenOutside("udp_in", kUdpDriver);
+}
+
+TEST(InterconnectDelaySim, ASwitchOutsideAnInoutPortReachesItAcrossTheDelay) {
+  ExpectOutsideSourceDelayedInside("switch_out", kSwitchDriver);
+}
+
+TEST(InterconnectDelaySim, ASwitchInsideAnInoutPortReachesTheNetOutside) {
+  ExpectInsideSourceSeenOutside("switch_in", kSwitchDriver);
+}
+
+TEST(InterconnectDelaySim,
+     ATimingCheckSignalOutsideAnInoutPortReachesItAcrossTheDelay) {
+  ExpectOutsideSourceDelayedInside("check_out", kCheckDriver);
+}
+
+TEST(InterconnectDelaySim,
+     ATimingCheckSignalInsideAnInoutPortReachesTheNetOutside) {
+  ExpectInsideSourceSeenOutside("check_in", kCheckDriver);
+}
+
+Variable* RunAnnotatedFromTheStart(const std::string& src,
+                                   const std::string& entry, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  if (design == nullptr) return nullptr;
+  Lowerer lowerer(f.ctx, f.arena, f.diag);
+  lowerer.Lower(design);
+  SdfFile file;
+  EXPECT_TRUE(ParseSdf(DelayFile(entry), file));
+  AnnotateSdfToManager(file, f.ctx.AcquireSpecifyManager(), SdfMtm::kTypical,
+                       {}, "top");
+  f.scheduler.Run();
+  return f.ctx.FindVariable("ok");
+}
+
+void ExpectPresetCase(const std::string& entry, const std::string& child,
+                      const std::string& top_items, const std::string& checks) {
+  SimFixture f;
+  auto* ok = RunAnnotatedFromTheStart(
+      WholeNetDesign(std::string(kPresetDriver) + child, top_items, checks),
+      entry, f);
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+TEST(InterconnectDelaySim,
+     DISABLED_ADelayedAssignmentsPresetXReachesTheLoadAfterTheDelay) {
+  ExpectPresetCase("(INTERCONNECT u1/q u2/d (10))",
+                   "module sink(input wire d);\nendmodule\n",
+                   "  wire n;\n  drv u1(.q(n));\n  sink u2(.d(n));\n",
+                   "    #11 ok = (u2.d === 1'bx);\n"
+                   "    #3 ok = ok && (u2.d === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim,
+     DISABLED_APresetXOutsideAnInoutPortReachesItAcrossTheDelay) {
+  ExpectPresetCase("(INTERCONNECT u1/q c/p (10))", kBareChild,
+                   "  wire n;\n  drv u1(.q(n));\n  child c(.p(n));\n",
+                   "    #11 ok = (c.p === 1'bx);\n"
+                   "    #3 ok = ok && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, APresetXInsideAnInoutPortReachesTheNetOutside) {
+  ExpectPresetCase("(PORT c/p (10))", kDrivingChild,
+                   "  wire n;\n  child c(.p(n));\n",
+                   "    #2 ok = (n === 1'bx);\n"
+                   "    #2 ok = ok && (n === 1'b1);\n");
+}
+
+void ExpectNetKindOnBothSides(const std::string& stem, const std::string& child,
+                              const std::string& top_items,
+                              const std::string& checks) {
+  ExpectWholeNetCase(stem, "(PORT c/p (10))", child, top_items, checks);
+}
+
+TEST(InterconnectDelaySim, DISABLED_ATri0NetOutsideAnInoutPortPullsItLow) {
+  ExpectNetKindOnBothSides("tri0_out", kBareChild,
+                           "  tri0 n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b0) && (c.p === 1'b0);\n");
+}
+
+TEST(InterconnectDelaySim, DISABLED_ATri1NetOutsideAnInoutPortPullsItHigh) {
+  ExpectNetKindOnBothSides("tri1_out", kBareChild,
+                           "  tri1 n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b1) && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, DISABLED_ASupply0NetOutsideAnInoutPortHoldsItLow) {
+  ExpectNetKindOnBothSides("supply0_out", kBareChild,
+                           "  supply0 n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b0) && (c.p === 1'b0);\n");
+}
+
+TEST(InterconnectDelaySim, DISABLED_ASupply1NetOutsideAnInoutPortHoldsItHigh) {
+  ExpectNetKindOnBothSides("supply1_out", kBareChild,
+                           "  supply1 n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b1) && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, ATri0PortInsidePullsTheNetOutsideLow) {
+  ExpectNetKindOnBothSides("tri0_in",
+                           "module child(inout tri0 p);\nendmodule\n",
+                           "  wire n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b0) && (c.p === 1'b0);\n");
+}
+
+TEST(InterconnectDelaySim, ATri1PortInsidePullsTheNetOutsideHigh) {
+  ExpectNetKindOnBothSides("tri1_in",
+                           "module child(inout tri1 p);\nendmodule\n",
+                           "  wire n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b1) && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, ASupply0PortInsideHoldsTheNetOutsideLow) {
+  ExpectNetKindOnBothSides("supply0_in",
+                           "module child(inout supply0 p);\nendmodule\n",
+                           "  wire n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b0) && (c.p === 1'b0);\n");
+}
+
+TEST(InterconnectDelaySim, ASupply1PortInsideHoldsTheNetOutsideHigh) {
+  ExpectNetKindOnBothSides("supply1_in",
+                           "module child(inout supply1 p);\nendmodule\n",
+                           "  wire n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b1) && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, ATriregOutsideAnInoutPortKeepsItsChargeOnBothSides) {
+  ExpectNetKindOnBothSides("trireg_out", kBareChild,
+                           "  trireg n;\n  reg e = 1'b1;\n  assign n = e;\n"
+                           "  child c(.p(n));\n",
+                           "    #4 e = 1'bz;\n"
+                           "    #15 ok = (n === 1'b1) && (c.p === 1'b1);\n");
+}
+
+TEST(InterconnectDelaySim, ATriregPortInsideKeepsItsChargeOnBothSides) {
+  ExpectNetKindOnBothSides("trireg_in",
+                           "module child(inout trireg p);\n"
+                           "  reg e = 1'b1;\n"
+                           "  assign p = e;\n"
+                           "  initial #5 e = 1'bz;\n"
+                           "endmodule\n",
+                           "  wire n;\n  child c(.p(n));\n",
+                           "    #19 ok = (n === 1'b1) && (c.p === 1'b1);\n");
 }
 
 }  // namespace
