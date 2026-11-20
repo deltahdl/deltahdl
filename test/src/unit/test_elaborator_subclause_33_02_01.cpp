@@ -120,10 +120,10 @@ TEST(LibraryCellNotation, PlainNameNamesConfigWhenNoCellSharesIt) {
   ExpectInstanceHandedToMidcfg(e.design);
 }
 
-TEST(LibraryCellNotation, PlainNameNamesModuleSharingConfigName) {
+void ExpectModuleSharingConfigNameBound(const char* use_of_midcfg) {
   ConfigElab e;
   e.Run(std::string(kLeafAndMidCells) +
-            "module midcfg; leaf lf(); endmodule\n" + kPlainUseOfMidcfg,
+            "module midcfg; leaf lf(); endmodule\n" + use_of_midcfg,
         {.modules = {"libA", "libB", "lib1", "lib1", "libTop"}});
   auto* top = OnlyTop(e.design);
   ASSERT_NE(top, nullptr);
@@ -135,6 +135,10 @@ TEST(LibraryCellNotation, PlainNameNamesModuleSharingConfigName) {
   auto* leaf = bound->children[0].resolved;
   ASSERT_NE(leaf, nullptr);
   EXPECT_EQ(leaf->library, "libA");
+}
+
+TEST(LibraryCellNotation, PlainNameNamesModuleSharingConfigName) {
+  ExpectModuleSharingConfigNameBound(kPlainUseOfMidcfg);
 }
 
 TEST(LibraryCellNotation, PlainNameNamesPrimitiveSharingConfigName) {
@@ -417,20 +421,7 @@ constexpr const char* kCellConfigUseOfMidcfg =
     "endconfig\n";
 
 TEST(LibraryCellNotation, CellClausePlainNameNamesModuleSharingConfigName) {
-  ConfigElab e;
-  e.Run(std::string(kLeafAndMidCells) +
-            "module midcfg; leaf lf(); endmodule\n" + kCellPlainUseOfMidcfg,
-        {.modules = {"libA", "libB", "lib1", "lib1", "libTop"}});
-  auto* top = OnlyTop(e.design);
-  ASSERT_NE(top, nullptr);
-  ASSERT_EQ(top->children.size(), 1u);
-  auto* bound = top->children[0].resolved;
-  ASSERT_NE(bound, nullptr);
-  EXPECT_EQ(bound->name, "midcfg");
-  ASSERT_EQ(bound->children.size(), 1u);
-  auto* leaf = bound->children[0].resolved;
-  ASSERT_NE(leaf, nullptr);
-  EXPECT_EQ(leaf->library, "libA");
+  ExpectModuleSharingConfigNameBound(kCellPlainUseOfMidcfg);
 }
 
 TEST(LibraryCellNotation, CellClausePlainNameNamesPrimitiveSharingConfigName) {
