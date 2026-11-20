@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -100,6 +102,68 @@ TEST_F(TraversingExpressions, TheRelationIsTheOperationsOwn) {
   leaf.children = {&child};
 
   EXPECT_EQ(vpi_iterate(vpiOperand, VpiHandleOf(&leaf)), nullptr);
+}
+
+class TraversingExpressionsOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle RhsOfTheOnlyContinuousAssignment() {
+    vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
+    if (it == nullptr) return nullptr;
+    return vpi_handle(vpiRhs, vpi_scan(it));
+  }
+
+  void Walk(vpiHandle expr) {
+    if (vpi_get(vpiType, expr) != vpiOperation) {
+      const char* name = vpi_get_str(vpiName, expr);
+      leaves_.emplace_back(name == nullptr ? "" : name);
+      return;
+    }
+    vpiHandle it = vpi_iterate(vpiOperand, expr);
+    if (it == nullptr) return;
+    while (vpiHandle sub = vpi_scan(it)) Walk(sub);
+  }
+
+  std::vector<std::string> leaves_;
+};
+
+TEST_F(TraversingExpressionsOfARun, TheClausesRoutineWalksANestedSourceExpr) {
+  Run("module top;\n"
+      "  int a = 1, b = 2, c = 3;\n"
+      "  wire [31:0] y;\n"
+      "  assign y = (a + b) * c;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  vpiHandle rhs = RhsOfTheOnlyContinuousAssignment();
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, rhs), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, rhs), vpiMultOp);
+  const std::vector<vpiHandle> kOperands = ObjectsOf(vpiOperand, rhs);
+  ASSERT_EQ(kOperands.size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kOperands[0]), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, kOperands[0]), vpiAddOp);
+  EXPECT_NE(vpi_get(vpiType, kOperands[1]), vpiOperation);
+  Walk(rhs);
+  EXPECT_EQ(leaves_, (std::vector<std::string>{"a", "b", "c"}));
+}
+
+TEST_F(TraversingExpressionsOfARun, TheLeastPrecedenceOperatorIsOutermost) {
+  Run("module top;\n"
+      "  int a = 1, b = 2, c = 3;\n"
+      "  wire [31:0] y;\n"
+      "  assign y = a + b * c;\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  vpiHandle rhs = RhsOfTheOnlyContinuousAssignment();
+  ASSERT_NE(rhs, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, rhs), vpiAddOp);
+  const std::vector<vpiHandle> kOperands = ObjectsOf(vpiOperand, rhs);
+  ASSERT_EQ(kOperands.size(), 2U);
+  EXPECT_NE(vpi_get(vpiType, kOperands[0]), vpiOperation);
+  EXPECT_STREQ(vpi_get_str(vpiName, kOperands[0]), "a");
+  EXPECT_EQ(vpi_get(vpiType, kOperands[1]), vpiOperation);
+  EXPECT_EQ(vpi_get(vpiOpType, kOperands[1]), vpiMultOp);
+  Walk(rhs);
+  EXPECT_EQ(leaves_, (std::vector<std::string>{"a", "b", "c"}));
 }
 
 }  // namespace

@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
+#include <utility>
 
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "fixture_simulator.h"
+#include "fixture_vpi_run.h"
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_design_walk.h"
 #include "simulator/vpi_globals.h"
@@ -150,6 +154,100 @@ TEST(DesignWalk, AttachPassesOverInstancesWithNothingToVisit) {
     if (which < 2) EXPECT_EQ(vpi_iterate(vpiModule, nullptr), nullptr);
     SetGlobalVpiContext(nullptr);
   }
+}
+
+class InstancesOfARun : public VpiDesignRun {
+ protected:
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    value.value.integer = -1;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  static std::string FullNameOf(vpiHandle obj) {
+    const char* name = obj == nullptr ? nullptr : vpi_get_str(vpiFullName, obj);
+    return name == nullptr ? "" : name;
+  }
+
+  static void ExpectEachInItsOwnScope(vpiHandle one, vpiHandle two,
+                                      const std::string& first,
+                                      const std::string& second, int relation) {
+    vpiHandle one_scope = vpi_handle(relation, one);
+    vpiHandle two_scope = vpi_handle(relation, two);
+    ASSERT_NE(one_scope, nullptr);
+    ASSERT_NE(two_scope, nullptr);
+    EXPECT_EQ(vpi_compare_objects(one_scope, two_scope), 0);
+    EXPECT_EQ(FullNameOf(one_scope), first.substr(0, first.rfind('.')));
+    EXPECT_EQ(FullNameOf(two_scope), second.substr(0, second.rfind('.')));
+  }
+
+  static void ExpectTwoSeparateObjects(const char* first, const char* second,
+                                       int relation, int type,
+                                       std::pair<int, int> values) {
+    vpiHandle one = vpi_handle_by_name(VpiText(first), nullptr);
+    vpiHandle two = vpi_handle_by_name(VpiText(second), nullptr);
+    ASSERT_NE(one, nullptr);
+    ASSERT_NE(two, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, one), type);
+    EXPECT_EQ(vpi_get(vpiType, two), type);
+    EXPECT_EQ(vpi_compare_objects(one, two), 0);
+    EXPECT_EQ(IntOf(one), values.first);
+    EXPECT_EQ(IntOf(two), values.second);
+    EXPECT_EQ(FullNameOf(one), first);
+    EXPECT_EQ(FullNameOf(two), second);
+    ExpectEachInItsOwnScope(one, two, first, second, relation);
+  }
+};
+
+constexpr const char* kTwoModuleInstances =
+    "module m(input logic [31:0] d);\n"
+    "  wire [31:0] w;\n"
+    "  assign w = d;\n"
+    "  int r;\n"
+    "  initial r = d + 10;\n"
+    "endmodule\n"
+    "module t;\n"
+    "  m m1(1);\n"
+    "  m m2(2);\n"
+    "  initial $noop;\n"
+    "endmodule\n";
+
+TEST_F(InstancesOfARun, EachInstanceOfTheClausesNetIsItsOwnObject) {
+  Run(kTwoModuleInstances);
+  ExpectTwoSeparateObjects("t.m1.w", "t.m2.w", vpiModule, vpiNet, {1, 2});
+}
+
+TEST_F(InstancesOfARun, EachInstanceOfAModuleVariableIsItsOwnObject) {
+  Run(kTwoModuleInstances);
+  ExpectTwoSeparateObjects("t.m1.r", "t.m2.r", vpiModule, vpiIntVar, {11, 12});
+}
+
+TEST_F(InstancesOfARun, EachInstanceOfAnInterfaceVariableIsItsOwnObject) {
+  Run("interface i(input logic [31:0] d);\n"
+      "  int r;\n"
+      "  initial r = d + 20;\n"
+      "endinterface\n"
+      "module t;\n"
+      "  i i1(1);\n"
+      "  i i2(2);\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  ExpectTwoSeparateObjects("t.i1.r", "t.i2.r", vpiScope, vpiIntVar, {21, 22});
+}
+
+TEST_F(InstancesOfARun, EachInstanceOfAProgramVariableIsItsOwnObject) {
+  Run("program p(input logic [31:0] d);\n"
+      "  int r;\n"
+      "  initial r = d + 30;\n"
+      "endprogram\n"
+      "module t;\n"
+      "  p p1(1);\n"
+      "  p p2(2);\n"
+      "  initial $noop;\n"
+      "endmodule\n");
+  ExpectTwoSeparateObjects("t.p1.r", "t.p2.r", vpiScope, vpiIntVar, {31, 32});
 }
 
 }  // namespace
