@@ -659,4 +659,66 @@ TEST(SdfPulseLimitAnnotation, PathpulsepercentIncrementAddsAShareOfTheDelay) {
   EXPECT_EQ(pd->error_limit[0], 42u);
 }
 
+TEST(SdfPulseLimitAnnotation,
+     PathpulsepercentIncrementBelowZeroLeavesTheLimitAtZero) {
+  Design d;
+  ASSERT_TRUE(d.Build(kFiftyDelayPathSrc));
+
+  d.Annotate(
+      SdfCellText("(DELAY (ABSOLUTE (PATHPULSEPERCENT A Z (20) (40))))"
+                  " (DELAY (INCREMENT (PATHPULSEPERCENT A Z (-30) (-10))))"));
+
+  const auto* pd = d.Path();
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 50u);
+  EXPECT_EQ(pd->reject_limit[0], 0u);
+  EXPECT_EQ(pd->error_limit[0], 15u);
+}
+
+TEST(SdfPulseLimitAnnotation,
+     PathpulsepercentIncrementWithinRangeLeavesTheDelay) {
+  Design d;
+  ASSERT_TRUE(d.Build(kFiftyDelayPathSrc));
+
+  d.Annotate(
+      SdfCellText("(DELAY (ABSOLUTE (PATHPULSEPERCENT A Z (20) (40))))"
+                  " (DELAY (INCREMENT (PATHPULSEPERCENT A Z (10) (-10))))"));
+
+  const auto* pd = d.Path();
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delays[0], 50u);
+  EXPECT_EQ(pd->reject_limit[0], 15u);
+  EXPECT_EQ(pd->error_limit[0], 15u);
+}
+
+void ExpectEveryDelayKeptAfter(const std::string& sdf) {
+  Design d;
+  ASSERT_TRUE(d.Build(kRiseFallPathSrc));
+  ASSERT_NE(d.Path(), nullptr);
+  const PathDelay kBefore = *d.Path();
+  ASSERT_EQ(kBefore.delays[0], 20u);
+  ASSERT_EQ(kBefore.delays[1], 80u);
+
+  d.Annotate(sdf);
+
+  const auto* pd = d.Path();
+  ASSERT_NE(pd, nullptr);
+  EXPECT_EQ(pd->delay_count, kBefore.delay_count);
+  for (int i = 0; i < 12; ++i) {
+    EXPECT_EQ(pd->delays[i], kBefore.delays[i]) << "slot " << i;
+  }
+}
+
+TEST(SdfPulseLimitAnnotation, PathpulseLeavesEveryTransitionDelay) {
+  ExpectEveryDelayKeptAfter(
+      SdfCellText("(DELAY (ABSOLUTE (PATHPULSE A Z (5) (10))))"
+                  " (DELAY (INCREMENT (PATHPULSE A Z (1) (2))))"));
+}
+
+TEST(SdfPulseLimitAnnotation, PathpulsepercentLeavesEveryTransitionDelay) {
+  ExpectEveryDelayKeptAfter(
+      SdfCellText("(DELAY (ABSOLUTE (PATHPULSEPERCENT A Z (25) (50))))"
+                  " (DELAY (INCREMENT (PATHPULSEPERCENT A Z (10) (10))))"));
+}
+
 }  // namespace
