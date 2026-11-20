@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <map>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -9,6 +10,7 @@
 #include "common/types.h"
 #include "fixture_simulator.h"
 #include "helpers_dpi_bump_import.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -303,6 +305,47 @@ TEST(DpiValueChangeInADesign, AnOutputActualNamingABitSelectStillPropagates) {
 
   EXPECT_EQ(run.events, 1);
   EXPECT_EQ(run.Actual(), 7U);
+}
+
+void WriteNineAndEleven(int* o, int* p) {
+  *o = 9;
+  *p = 11;
+}
+
+int32_t ProcessesWokenByWriteback(const char* watchers, const char* var) {
+  SimFixture f;
+  RunWithImportsBound(
+      std::string("module top;\n"
+                  "  import \"DPI-C\" function void c_write2(output int o, "
+                  "output int p);\n"
+                  "  int o;\n"
+                  "  int p;\n"
+                  "  int seen_o = -1;\n"
+                  "  int seen_both = -1;\n") +
+          watchers +
+          "  initial #1 c_write2(o, p);\n"
+          "endmodule\n",
+      f, {{"c_write2", reinterpret_cast<void*>(&WriteNineAndEleven)}},
+      "subclause_35_06_02_wakeups");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* found = f.ctx.FindVariable(var);
+  EXPECT_NE(found, nullptr);
+  return found == nullptr ? INT32_MIN
+                          : static_cast<int32_t>(found->value.ToUint64());
+}
+
+TEST(DpiValueChangeInADesign,
+     AProcessWaitingOnAnOutputActualWakesOnTheNewValue) {
+  EXPECT_EQ(ProcessesWokenByWriteback("  initial @(o) seen_o = o;\n", "seen_o"),
+            9);
+}
+
+TEST(DpiValueChangeInADesign,
+     BothOutputActualsHoldTheirValuesOnceAWaiterWakes) {
+  EXPECT_EQ(
+      ProcessesWokenByWriteback(
+          "  initial @(o or p) #0 seen_both = o * 100 + p;\n", "seen_both"),
+      911);
 }
 
 }  // namespace

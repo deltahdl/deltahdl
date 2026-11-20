@@ -1,11 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "helpers_dpi_take_int.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
@@ -207,11 +210,13 @@ struct WideActual {
     formal.width = decl.width;
     func.args = {formal};
     auto* seen_slot = &seen;
-    func.arg_impl = [seen_slot, wrote,
+    const auto* wrote_slot = &wrote;
+    func.arg_impl = [seen_slot, wrote_slot,
                      decl](std::vector<DpiArgValue>& args) -> DpiArgValue {
       *seen_slot = args[0].AsLogicVecWords();
-      if (!wrote.empty()) {
-        args[0] = DpiArgValue::FromLogicVecWords(wrote, decl.width, decl.kind);
+      if (!wrote_slot->empty()) {
+        args[0] =
+            DpiArgValue::FromLogicVecWords(*wrote_slot, decl.width, decl.kind);
       }
       return DpiArgValue::FromInt(0);
     };
@@ -364,6 +369,186 @@ TEST(DpiArgumentPassingInADesign,
   TwoStateFormal run(DataTypeKind::kInt, SvLogicVecVal{0b1101, 0});
 
   EXPECT_EQ(run.seen.AsInt(), 13);
+}
+
+int32_t IntAfterRun(const std::string& src,
+                    const std::map<std::string, void*>& functions,
+                    const std::string& dir, const char* var) {
+  SimFixture f;
+  RunWithImportsBound(src, f, functions, dir);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* found = f.ctx.FindVariable(var);
+  EXPECT_NE(found, nullptr);
+  return found == nullptr ? INT32_MIN
+                          : static_cast<int32_t>(found->value.ToUint64());
+}
+
+int PassInt(int a) { return a; }
+char PassByte(char a) { return a; }
+void WriteMinusOneByte(char* o) { *o = -1; }
+void IncrementShortint(int16_t* io) { *io = static_cast<int16_t>(*io + 1); }
+void WriteTwoAndAHalf(double* o) { *o = 2.5; }
+
+int32_t CoercedResult(const char* decls, const char* body, const char* c_name,
+                      void* c_function) {
+  return IntAfterRun(std::string("module top;\n") + decls +
+                         "  int r;\n"
+                         "  initial begin\n" +
+                         body +
+                         "  end\n"
+                         "endmodule\n",
+                     {{c_name, c_function}}, "subclause_35_06_01_coercion",
+                     "r");
+}
+
+TEST(DpiCoercionInADesign,
+     DISABLED_ASignedByteActualIsSignExtendedIntoAnIntFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function int c_pass(input int "
+                          "a);\n  byte bs = -3;\n",
+                          "    r = c_pass(bs);\n", "c_pass",
+                          reinterpret_cast<void*>(&PassInt)),
+            -3);
+}
+
+TEST(DpiCoercionInADesign, AnUnsignedByteActualIsZeroExtendedIntoAnIntFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function int c_pass(input int "
+                          "a);\n  byte unsigned bu = 253;\n",
+                          "    r = c_pass(bu);\n", "c_pass",
+                          reinterpret_cast<void*>(&PassInt)),
+            253);
+}
+
+TEST(DpiCoercionInADesign, AnIntActualIsTruncatedIntoAByteFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function byte c_pass_byte(input "
+                          "byte a);\n  int big = 300;\n",
+                          "    r = c_pass_byte(big);\n", "c_pass_byte",
+                          reinterpret_cast<void*>(&PassByte)),
+            44);
+}
+
+TEST(DpiCoercionInADesign,
+     DISABLED_APositiveRealActualIsRoundedIntoAnIntFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function int c_pass(input int "
+                          "a);\n  real x = 2.5;\n",
+                          "    r = c_pass(x);\n", "c_pass",
+                          reinterpret_cast<void*>(&PassInt)),
+            3);
+}
+
+TEST(DpiCoercionInADesign,
+     DISABLED_ASignedShortintActualIsSignExtendedIntoAnIntFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function int c_pass(input int "
+                          "a);\n  shortint ss = -300;\n",
+                          "    r = c_pass(ss);\n", "c_pass",
+                          reinterpret_cast<void*>(&PassInt)),
+            -300);
+}
+
+TEST(DpiCoercionInADesign, ANegativeIntegerActualReachesAnIntFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function int c_pass(input int "
+                          "a);\n  integer n = -7;\n",
+                          "    r = c_pass(n);\n", "c_pass",
+                          reinterpret_cast<void*>(&PassInt)),
+            -7);
+}
+
+TEST(DpiCoercionInADesign, DISABLED_ARealActualIsRoundedIntoAnIntFormal) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function int c_pass(input int "
+                          "a);\n  real x = -2.5;\n",
+                          "    r = c_pass(x);\n", "c_pass",
+                          reinterpret_cast<void*>(&PassInt)),
+            -3);
+}
+
+TEST(DpiCoercionInADesign, AByteOutputIsSignExtendedIntoAnIntActual) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function void c_out_byte(output "
+                          "byte o);\n",
+                          "    c_out_byte(r);\n", "c_out_byte",
+                          reinterpret_cast<void*>(&WriteMinusOneByte)),
+            -1);
+}
+
+TEST(DpiCoercionInADesign, ARealOutputIsRoundedIntoAnIntActual) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function void c_out_real(output "
+                          "real o);\n",
+                          "    c_out_real(r);\n", "c_out_real",
+                          reinterpret_cast<void*>(&WriteTwoAndAHalf)),
+            3);
+}
+
+TEST(DpiCoercionInADesign, AnInoutIsCoercedInAndBackOut) {
+  EXPECT_EQ(CoercedResult("  import \"DPI-C\" function void c_inc(inout "
+                          "shortint io);\n",
+                          "    r = 70000;\n    c_inc(r);\n", "c_inc",
+                          reinterpret_cast<void*>(&IncrementShortint)),
+            4465);
+}
+
+int input_seen_after_output = 0;
+
+void WriteOutputThenReadInput(int a, int* b) {
+  *b = 7;
+  input_seen_after_output = a;
+}
+
+void AddToInoutThenReadInput(int a, int* b) {
+  *b += 10;
+  input_seen_after_output = a;
+}
+
+void WriteWideOutputThenReadWideInput(const uint32_t* a, uint32_t* b) {
+  b[0] = 7;
+  input_seen_after_output = static_cast<int>(a[0]);
+}
+
+int32_t AliasedRun(const char* formals, const char* c_name, void* c_function) {
+  input_seen_after_output = -1;
+  return CoercedResult(
+      (std::string("  import \"DPI-C\" function void ") + c_name + "(" +
+       formals + ");\n")
+          .c_str(),
+      (std::string("    r = 5;\n    ") + c_name + "(r, r);\n").c_str(), c_name,
+      c_function);
+}
+
+TEST(DpiCopyInCopyOutInADesign,
+     AnInputKeepsItsEntryValueBesideAnAliasedOutput) {
+  EXPECT_EQ(AliasedRun("input int a, output int b", "c_alias_out",
+                       reinterpret_cast<void*>(&WriteOutputThenReadInput)),
+            7);
+  EXPECT_EQ(input_seen_after_output, 5);
+}
+
+TEST(DpiCopyInCopyOutInADesign, AnInputKeepsItsEntryValueBesideAnAliasedInout) {
+  EXPECT_EQ(AliasedRun("input int a, inout int b", "c_alias_inout",
+                       reinterpret_cast<void*>(&AddToInoutThenReadInput)),
+            15);
+  EXPECT_EQ(input_seen_after_output, 5);
+}
+
+TEST(DpiCopyInCopyOutInADesign,
+     AWideInputKeepsItsEntryValueBesideAnAliasedWideOutput) {
+  SimFixture f;
+  input_seen_after_output = -1;
+  RunWithImportsBound(
+      "module top;\n"
+      "  import \"DPI-C\" function void c_alias_wide(input bit [127:0] a, "
+      "output bit [127:0] b);\n"
+      "  bit [127:0] r;\n"
+      "  initial begin\n"
+      "    r = 5;\n"
+      "    c_alias_wide(r, r);\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"c_alias_wide",
+        reinterpret_cast<void*>(&WriteWideOutputThenReadWideInput)}},
+      "subclause_35_06_01_alias_wide");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* r = f.ctx.FindVariable("r");
+  ASSERT_NE(r, nullptr);
+  EXPECT_EQ(r->value.ToUint64(), 7U);
+  EXPECT_EQ(input_seen_after_output, 5);
 }
 
 }  // namespace

@@ -1,8 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <map>
+#include <string>
+
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "helpers_dpi_take_int.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -96,6 +103,60 @@ TEST(DpiWysiwygOpenArray, ThePackedDimensionNormalizesWhereTheUnpackedDoesNot) {
   EXPECT_EQ(DpiRuntime::SvSize(unpacked), DpiRuntime::SvSize(packed));
   EXPECT_EQ(DpiRuntime::SvLow(unpacked), 11);
   EXPECT_EQ(DpiRuntime::SvLow(packed), 0);
+}
+
+int32_t IntAfterRun(const std::string& src,
+                    const std::map<std::string, void*>& functions,
+                    const std::string& dir, const char* var) {
+  SimFixture f;
+  RunWithImportsBound(src, f, functions, dir);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* found = f.ctx.FindVariable(var);
+  EXPECT_NE(found, nullptr);
+  return found == nullptr ? INT32_MIN
+                          : static_cast<int32_t>(found->value.ToUint64());
+}
+
+int SumOfOpenArray(const svOpenArrayHandle h) {
+  int sum = 0;
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    auto* element = static_cast<int*>(svGetArrElemPtr1(h, i));
+    if (element != nullptr) sum += *element;
+  }
+  return sum * 100 + svSize(h, 1);
+}
+
+int32_t OpenArraySum(const char* decl, const char* fill, const char* actual) {
+  return IntAfterRun(std::string("module top;\n"
+                                 "  import \"DPI-C\" function int c_sum(input "
+                                 "int a []);\n") +
+                         decl +
+                         "  int r;\n"
+                         "  initial begin\n" +
+                         fill + "    r = c_sum(" + actual +
+                         ");\n"
+                         "  end\n"
+                         "endmodule\n",
+                     {{"c_sum", reinterpret_cast<void*>(&SumOfOpenArray)}},
+                     "subclause_35_06_01_01_open", "r");
+}
+
+TEST(DpiOpenArrayInADesign, DISABLED_ADynamicArrayActualFillsAnOpenFormal) {
+  EXPECT_EQ(OpenArraySum("  int d [];\n", "    d = '{4, 5, 6};\n", "d"), 1503);
+}
+
+TEST(DpiOpenArrayInADesign,
+     DISABLED_ADynamicArrayResizedBetweenCallsSizesTheFormal) {
+  EXPECT_EQ(OpenArraySum("  int d [];\n",
+                         "    d = '{4, 5, 6};\n    void'(c_sum(d));\n"
+                         "    d = new[5](d);\n",
+                         "d"),
+            1505);
+}
+
+TEST(DpiOpenArrayInADesign, AFixedArrayWithOffsetBoundsFillsAnOpenFormal) {
+  EXPECT_EQ(OpenArraySum("  int s [2:4];\n", "    s = '{1, 2, 3};\n", "s"),
+            603);
 }
 
 }  // namespace

@@ -1,9 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -85,6 +89,60 @@ TEST(DpiCallArgumentBinding, NamedBindingOmittingDefaultedFormal) {
   auto* call = ParseExprFrom("sv_probe(.a(3))", f);
   auto result = EvalFunctionCall(call, f.ctx, f.arena).ToUint64();
   EXPECT_EQ(result, 3099u);
+}
+
+int32_t IntAfterRun(const std::string& src,
+                    const std::map<std::string, void*>& functions,
+                    const std::string& dir, const char* var) {
+  SimFixture f;
+  RunWithImportsBound(src, f, functions, dir);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* found = f.ctx.FindVariable(var);
+  EXPECT_NE(found, nullptr);
+  return found == nullptr ? INT32_MIN
+                          : static_cast<int32_t>(found->value.ToUint64());
+}
+
+int Combine(int a, int b) { return a * 1000 + b; }
+
+int32_t CombineResult(const char* decl_tail, const char* body) {
+  return IntAfterRun(std::string("module top;\n"
+                                 "  import \"DPI-C\" function int c_combine("
+                                 "input int a, input int b") +
+                         decl_tail +
+                         ");\n"
+                         "  int v = 3;\n"
+                         "  int r;\n" +
+                         body + "endmodule\n",
+                     {{"c_combine", reinterpret_cast<void*>(&Combine)}},
+                     "subclause_35_06_calls", "r");
+}
+
+TEST(DpiImportCallInADesign, AnOmittedDefaultedArgumentReachesTheImport) {
+  EXPECT_EQ(CombineResult(" = 99", "  initial r = c_combine(4);\n"), 4099);
+}
+
+TEST(DpiImportCallInADesign, NamedArgumentsBindOutOfOrder) {
+  EXPECT_EQ(CombineResult("", "  initial r = c_combine(.b(2), .a(7));\n"),
+            7002);
+}
+
+TEST(DpiImportCallInADesign, ANamedCallMayOmitADefaultedArgument) {
+  EXPECT_EQ(CombineResult(" = 99", "  initial r = c_combine(.a(5));\n"), 5099);
+}
+
+TEST(DpiImportCallInADesign, AnImportServesInAContinuousAssignment) {
+  EXPECT_EQ(CombineResult("",
+                          "  wire integer w;\n"
+                          "  assign w = c_combine(v, 1);\n"
+                          "  initial #1 r = w;\n"),
+            3001);
+}
+
+TEST(DpiImportCallInADesign, TwoCallsServeAsOperandsOfOneExpression) {
+  EXPECT_EQ(
+      CombineResult("", "  initial r = c_combine(1, 2) + c_combine(v, 4);\n"),
+      4006);
 }
 
 }  // namespace
