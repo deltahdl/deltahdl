@@ -1,10 +1,14 @@
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -114,6 +118,131 @@ TEST(DpiTwoLayers, ExportedSvBodyIsUnchangedByWhichForeignEntryCallsIt) {
 
   EXPECT_EQ(kDirect.AsInt(), 42);
   EXPECT_EQ(from_import.AsInt(), 42);
+}
+
+int SubtractTwo(int a) { return a - 2; }
+
+std::map<std::string, void*> SubtractTwoBound() {
+  return {{"subtract_two", reinterpret_cast<void*>(&SubtractTwo)}};
+}
+
+constexpr const char* kSubtractTwoImport =
+    "  import \"DPI-C\" function int subtract_two(input int a);\n";
+
+uint64_t ValueOfRAfter(const std::string& src,
+                       const std::map<std::string, void*>& functions,
+                       const char* dir, const char* r = "r") {
+  SimFixture f;
+  RunWithImportsBound(src, f, functions, std::string("subclause_35_03_") + dir);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* var = f.ctx.FindVariable(r);
+  return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
+}
+
+TEST(DpiCLinkage, APackageImportCallReachesItsCSymbol) {
+  EXPECT_EQ(ValueOfRAfter(std::string("package pk;\n") + kSubtractTwoImport +
+                              "endpackage\n"
+                              "module t;\n"
+                              "  import pk::*;\n"
+                              "  int r;\n"
+                              "  initial r = subtract_two(50);\n"
+                              "endmodule\n",
+                          SubtractTwoBound(), "package"),
+            48U);
+}
+
+TEST(DpiCLinkage, AUnitImportCallReachesItsCSymbol) {
+  EXPECT_EQ(ValueOfRAfter(std::string(kSubtractTwoImport) +
+                              "module t;\n"
+                              "  int r;\n"
+                              "  initial r = subtract_two(60);\n"
+                              "endmodule\n",
+                          SubtractTwoBound(), "unit"),
+            58U);
+}
+
+TEST(DpiCLinkage, ANonTopInstancesImportCallReachesItsCSymbol) {
+  EXPECT_EQ(ValueOfRAfter(std::string("module child;\n") + kSubtractTwoImport +
+                              "  int r;\n"
+                              "  initial r = subtract_two(70);\n"
+                              "endmodule\n"
+                              "module t;\n"
+                              "  child c();\n"
+                              "endmodule\n",
+                          SubtractTwoBound(), "non_top", "c.r"),
+            68U);
+}
+
+const char* export_to_call = "";
+
+int CallsTheExport(int a) {
+  auto exported =
+      reinterpret_cast<int (*)(int)>(dlsym(RTLD_DEFAULT, export_to_call));
+  return exported == nullptr ? -1 : exported(a) + 1;
+}
+
+std::string ExportAndCaller(const char* name) {
+  export_to_call = name;
+  return std::string("  export \"DPI-C\" ") + name +
+         " = function triple;\n"
+         "  function int triple(input int a); return a * 3; endfunction\n"
+         "  import \"DPI-C\" context function int calls_the_export("
+         "input int a);\n";
+}
+
+uint64_t ValueAfterCallingTheExport(const std::string& src, const char* dir,
+                                    const char* r) {
+  return ValueOfRAfter(
+      src, {{"calls_the_export", reinterpret_cast<void*>(&CallsTheExport)}},
+      dir, r);
+}
+
+TEST(DpiCLinkage, AModuleExportIsCalledFromC) {
+  EXPECT_EQ(
+      ValueAfterCallingTheExport("module t;\n" + ExportAndCaller("triple_mod") +
+                                     "  int r;\n"
+                                     "  initial r = calls_the_export(4);\n"
+                                     "endmodule\n",
+                                 "module_export", "r"),
+      13U);
+}
+
+TEST(DpiCLinkage, DISABLED_APackageExportIsCalledFromC) {
+  EXPECT_EQ(ValueAfterCallingTheExport(
+                "package pk;\n" + ExportAndCaller("triple_pk") +
+                    "endpackage\n"
+                    "module t;\n"
+                    "  int r;\n"
+                    "  initial r = pk::calls_the_export(5);\n"
+                    "endmodule\n",
+                "package_export", "r"),
+            16U);
+}
+
+TEST(DpiCLinkage, DISABLED_AnInterfaceExportIsCalledFromC) {
+  EXPECT_EQ(ValueAfterCallingTheExport(
+                "interface ifc;\n" + ExportAndCaller("triple_ifc") +
+                    "  int r;\n"
+                    "  initial r = calls_the_export(6);\n"
+                    "endinterface\n"
+                    "module t;\n"
+                    "  ifc i();\n"
+                    "endmodule\n",
+                "interface_export", "i.r"),
+            19U);
+}
+
+TEST(DpiCLinkage, DISABLED_AProgramExportIsCalledFromC) {
+  EXPECT_EQ(ValueAfterCallingTheExport(
+                "program pr;\n" + ExportAndCaller("triple_pr") +
+                    "  int r;\n"
+                    "  initial r = calls_the_export(7);\n"
+                    "endprogram\n"
+                    "module t;\n"
+                    "  pr p();\n"
+                    "endmodule\n",
+                "program_export", "p.r"),
+            22U);
 }
 
 }  // namespace

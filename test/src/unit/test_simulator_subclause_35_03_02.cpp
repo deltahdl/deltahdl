@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
@@ -94,38 +95,47 @@ TEST(DpiForeignLayer, SameSvCodeUsableWithDifferentForeignDataAccessMethods) {
   EXPECT_EQ(kViaInput, kViaArgpass);
 }
 
-TEST(DpiForeignLayer, SameSvCodeUsableAcrossForeignLayersOnWriteBackPath) {
-  const auto kMakeWriter = [](int32_t produced) {
-    DpiRtFunction func;
-    func.sv_name = "sv_emit";
-    func.return_type = DataTypeKind::kInt;
-    func.args = {DpiArg{}};
-    func.args[0].direction = Direction::kOutput;
-    func.args[0].type = DataTypeKind::kInt;
-    func.arg_impl = [produced](std::vector<DpiArgValue>& args) -> DpiArgValue {
-      args[0] = DpiArgValue::FromInt(produced);
-      return DpiArgValue::FromInt(0);
-    };
-    return func;
+void EmitThroughPointers(int* o, int* io) {
+  *io += 3;
+  *o = *io * 2;
+}
+
+DpiRtFunction EmitImport() {
+  return CImport("sv_emit", DataTypeKind::kVoid,
+                 {CFormal("o", DataTypeKind::kInt, Direction::kOutput),
+                  CFormal("io", DataTypeKind::kInt, Direction::kInout)});
+}
+
+std::vector<DpiArgValue> EmitActuals() {
+  return {DpiRuntime::UndeterminedOutputValue(DataTypeKind::kInt),
+          DpiArgValue::FromInt(5)};
+}
+
+TEST(DpiForeignLayer, OutputsAgreeWhetherWrittenInAVectorOrThroughCPointers) {
+  DpiRuntime vector_layer;
+  DpiRtFunction by_vector = EmitImport();
+  by_vector.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
+    args[1] = DpiArgValue::FromInt(args[1].AsInt() + 3);
+    args[0] = DpiArgValue::FromInt(args[1].AsInt() * 2);
+    return DpiArgValue::FromInt(0);
   };
+  vector_layer.RegisterImport(by_vector);
+  std::vector<DpiArgValue> via_vector = EmitActuals();
+  vector_layer.CallImportWithArgs("sv_emit", via_vector);
 
-  DpiRuntime rt_layer_a;
-  DpiRtFunction layer_a = kMakeWriter(8);
-  layer_a.c_name = "c_emit_const";
-  rt_layer_a.RegisterImport(layer_a);
+  DpiCBinding pointer_layer;
+  pointer_layer.dpi.RegisterImport(EmitImport());
+  pointer_layer.Bind(
+      {{"sv_emit", reinterpret_cast<void*>(&EmitThroughPointers)}},
+      "subclause_35_03_02_write_back");
+  ASSERT_TRUE(pointer_layer.diag.Diagnostics().empty());
+  std::vector<DpiArgValue> via_pointers = EmitActuals();
+  pointer_layer.Call("sv_emit", via_pointers);
 
-  DpiRuntime rt_layer_b;
-  DpiRtFunction layer_b = kMakeWriter(8);
-  layer_b.c_name = "c_emit_other";
-  rt_layer_b.RegisterImport(layer_b);
-
-  std::vector<DpiArgValue> actuals_a = {DpiArgValue::FromInt(0)};
-  std::vector<DpiArgValue> actuals_b = {DpiArgValue::FromInt(0)};
-  rt_layer_a.CallImportWithArgs("sv_emit", actuals_a);
-  rt_layer_b.CallImportWithArgs("sv_emit", actuals_b);
-
-  EXPECT_EQ(actuals_a[0].AsInt(), 8);
-  EXPECT_EQ(actuals_a[0].AsInt(), actuals_b[0].AsInt());
+  EXPECT_EQ(via_vector[0].AsInt(), 16);
+  EXPECT_EQ(via_vector[1].AsInt(), 8);
+  EXPECT_EQ(via_pointers[0].AsInt(), via_vector[0].AsInt());
+  EXPECT_EQ(via_pointers[1].AsInt(), via_vector[1].AsInt());
 }
 
 TEST(DpiForeignLayer, MixedDirectionCallExercisesFullArgPassingMechanism) {
