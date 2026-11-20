@@ -129,5 +129,86 @@ TEST_F(PliMechanism, ANameEncounteredInADeclarationReachesItsApplications) {
   EXPECT_EQ(std::count(g_reached.begin(), g_reached.end(), "probe-calltf"), 1);
 }
 
+void ExpectCompiledThenCalled(const std::string& src) {
+  RegisterProbe();
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(g_reached,
+            (std::vector<std::string>{"probe-compiletf", "probe-calltf"}));
+  EXPECT_EQ(g_probe_user_data_seen, g_probe_user_data);
+}
+
+TEST_F(PliMechanism, ANameInAContinuousAssignmentIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "module t;\n"
+      "  wire [31:0] w;\n"
+      "  assign w = $probe();\n"
+      "endmodule\n");
+}
+
+TEST_F(PliMechanism, DISABLED_ANameInAPackageFunctionBodyIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "package p;\n"
+      "  function int f(); return $probe(); endfunction\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial r = p::f();\n"
+      "endmodule\n");
+}
+
+TEST_F(PliMechanism, DISABLED_ANameInAPackageTaskBodyIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "package p;\n"
+      "  task k(output int o); o = $probe(); endtask\n"
+      "endpackage\n"
+      "module t;\n"
+      "  int r;\n"
+      "  initial p::k(r);\n"
+      "endmodule\n");
+}
+
+TEST_F(PliMechanism, DISABLED_ANameInAClassMethodIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "module t;\n"
+      "  class C; function int m(); return $probe(); endfunction endclass\n"
+      "  C o;\n"
+      "  int r;\n"
+      "  initial begin o = new; r = o.m(); end\n"
+      "endmodule\n");
+}
+
+TEST_F(PliMechanism, ANameInAProgramIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "program t;\n"
+      "  int r;\n"
+      "  initial r = $probe();\n"
+      "endprogram\n");
+}
+
+TEST_F(PliMechanism, ANameInAnInterfaceIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "interface i;\n"
+      "  int r;\n"
+      "  initial r = $probe();\n"
+      "endinterface\n"
+      "module t;\n"
+      "  i u();\n"
+      "endmodule\n");
+}
+
+TEST_F(PliMechanism, ANameInAnAlwaysProcedureIsCompiledThenCalled) {
+  ExpectCompiledThenCalled(
+      "module t;\n"
+      "  logic c = 0;\n"
+      "  int r;\n"
+      "  always @(posedge c) r = $probe();\n"
+      "  initial #1 c = 1;\n"
+      "endmodule\n");
+}
+
 }  // namespace
 }  // namespace delta
