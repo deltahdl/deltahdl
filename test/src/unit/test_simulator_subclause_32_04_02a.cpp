@@ -709,4 +709,74 @@ TEST(SdfTimingCheckNegativeLimits, NonNegativeValuesEndNegativeHandling) {
   EXPECT_EQ(check->signed_limit2, 20 - kShift);
 }
 
+TEST_F(SdfTimingCheckConditionMatching,
+       BareCheckReachesEveryDataConditionedDeclaration) {
+  Build(kDataConditionedDesign);
+  Run("(SETUPHOLD data clk (5) (6))");
+
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, "!mode"), 5, 6);
+  ExpectLimits(Declared(SpecifyEdge::kPosedge, ""), 5, 6);
+}
+
+TEST(SdfTimingCheckDataEdge, BareCheckReachesEveryDataEdgeSibling) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kDataEdgeDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 2u);
+
+  Annotate(SdfWith("(SETUPHOLD data clk (5) (6))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    EXPECT_EQ(tc.limit, 5u);
+    EXPECT_EQ(tc.limit2, 6u);
+  }
+}
+
+const char* const kSingleSignalSiblingsDesign =
+    "module t(input clk, input mode);\n"
+    "  reg ntf;\n"
+    "  specify\n"
+    "    $width(posedge clk &&& mode, 1, 0, ntf);\n"
+    "    $width(negedge clk &&& !mode, 2, 0, ntf);\n"
+    "    $width(edge clk, 3, 0, ntf);\n"
+    "    $period(posedge clk &&& mode, 4, ntf);\n"
+    "    $period(negedge clk, 5, ntf);\n"
+    "  endspecify\n"
+    "endmodule\n";
+
+TEST(SdfTimingCheckBareSingleSignal, WidthReachesEveryWidthOnTheSignal) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kSingleSignalSiblingsDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 5u);
+
+  Annotate(SdfWith("(WIDTH clk (9))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    if (tc.kind == TimingCheckKind::kWidth) {
+      EXPECT_EQ(tc.limit, 9u) << tc.condition;
+    } else {
+      EXPECT_NE(tc.limit, 9u) << tc.condition;
+    }
+  }
+}
+
+TEST(SdfTimingCheckBareSingleSignal, PeriodReachesEveryPeriodOnTheSignal) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(BuildTimingChecksFromSource(kSingleSignalSiblingsDesign, f, mgr));
+  ASSERT_EQ(mgr.TimingCheckCount(), 5u);
+
+  Annotate(SdfWith("(PERIOD clk (8))"), mgr);
+
+  for (const auto& tc : mgr.GetTimingChecks()) {
+    if (tc.kind == TimingCheckKind::kPeriod) {
+      EXPECT_EQ(tc.limit, 8u) << tc.condition;
+    } else {
+      EXPECT_NE(tc.limit, 8u) << tc.condition;
+    }
+  }
+}
+
 }  // namespace
