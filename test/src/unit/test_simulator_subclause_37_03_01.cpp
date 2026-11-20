@@ -1,12 +1,16 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <type_traits>
+#include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -136,6 +140,59 @@ TEST_F(VpiObjectAccess, HandleReturnsNoHandleForAbsentRelationship) {
   net.type = vpiNet;
 
   EXPECT_EQ(vpi_handle(vpiModule, VpiHandleOf(&net)), nullptr);
+}
+
+class ObjectAccessOfARun : public VpiDesignRun {
+ protected:
+  void RunNestedDesign() {
+    Run("module m;\n"
+        "  wire w1;\n"
+        "  wire w2;\n"
+        "endmodule\n"
+        "module top;\n"
+        "  m m1();\n"
+        "endmodule\n");
+  }
+
+  static std::string FullName(vpiHandle obj) {
+    const char* name = vpi_get_str(vpiFullName, obj);
+    return name == nullptr ? "" : name;
+  }
+};
+
+TEST_F(ObjectAccessOfARun, ANameFromTheTopLevelReachesTheWire) {
+  RunNestedDesign();
+
+  vpiHandle net = vpi_handle_by_name(VpiText("top.m1.w1"), nullptr);
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, net), vpiNet);
+  EXPECT_EQ(FullName(net), "top.m1.w1");
+}
+
+TEST_F(ObjectAccessOfARun, TheWiresModuleIsTheInstanceHoldingIt) {
+  RunNestedDesign();
+
+  vpiHandle net = vpi_handle_by_name(VpiText("top.m1.w1"), nullptr);
+  ASSERT_NE(net, nullptr);
+  vpiHandle mod = vpi_handle(vpiModule, net);
+  ASSERT_NE(mod, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, mod), vpiModule);
+  EXPECT_EQ(FullName(mod), "top.m1");
+}
+
+TEST_F(ObjectAccessOfARun, AnIterationOverTheInstanceGivesEachOfItsNets) {
+  RunNestedDesign();
+
+  vpiHandle mod = vpi_handle_by_name(VpiText("top.m1"), nullptr);
+  ASSERT_NE(mod, nullptr);
+  vpiHandle itr = vpi_iterate(vpiNet, mod);
+  ASSERT_NE(itr, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, itr), vpiIterator);
+  std::vector<std::string> names;
+  while (vpiHandle net = vpi_scan(itr)) names.push_back(FullName(net));
+  std::sort(names.begin(), names.end());
+
+  EXPECT_EQ(names, (std::vector<std::string>{"top.m1.w1", "top.m1.w2"}));
 }
 
 }  // namespace
