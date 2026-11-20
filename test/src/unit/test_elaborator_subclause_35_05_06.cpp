@@ -338,4 +338,77 @@ TEST(DpiExportFormalType, ExportedTaskWithAssociativeFormalIsError) {
                             5, "35.5.6"));
 }
 
+void ExpectImportFormalRefused(const char* src, int line) {
+  ElabFixture f;
+  ElaborateSrcAllowingParseErrors(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "not permitted for a DPI imported subroutine", line,
+                            "35.5.6"));
+}
+
+TEST(DpiImportFormalType, AnImportedTaskWithAnEventFormalIsError) {
+  ExpectImportFormalRefused(R"(
+    module m;
+      import "DPI-C" task t(input event e);
+    endmodule
+  )",
+                            3);
+}
+
+TEST(DpiImportFormalType, AnImportedTaskWithAnIntFormalIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      import "DPI-C" task t(input int e);
+    endmodule
+  )",
+            f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiImportFormalType, AVirtualInterfaceFormalIsError) {
+  ExpectImportFormalRefused(R"(
+    interface ifc;
+    endinterface
+    module m;
+      import "DPI-C" function void f(input virtual ifc v);
+    endmodule
+  )",
+                            5);
+}
+
+TEST(DpiImportFormalType, APackageImportWithAnEventFormalIsError) {
+  ExpectImportFormalRefused(R"(
+    package pk;
+      import "DPI-C" function void f(input event e);
+    endpackage
+    module m;
+    endmodule
+  )",
+                            3);
+}
+
+TEST(DpiImportFormalType, AUnitImportWithAnEventFormalIsError) {
+  ExpectImportFormalRefused(R"(
+    import "DPI-C" function void f(input event e);
+    module m;
+    endmodule
+  )",
+                            2);
+}
+
+TEST(DpiImportFormalType, APackageImportWithAnIntFormalIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    package pk;
+      import "DPI-C" function void f(input int e);
+    endpackage
+    import "DPI-C" function void g(input int e);
+    module m;
+    endmodule
+  )",
+            f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace

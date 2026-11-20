@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -170,6 +172,31 @@ TEST(DpiExportResult, ExportedFunctionWithTypedefOfIntResultIsOk) {
   )",
             f, "m");
   EXPECT_FALSE(f.has_errors);
+}
+
+void ExpectTypedefResultRefused(const char* typedef_decl, const char* name) {
+  ElabFixture f;
+  Elaborate(std::string(typedef_decl) +
+                "\nmodule m;\n  import \"DPI-C\" function " + name +
+                " f();\nendmodule\n",
+            f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string("imported function 'f' has result "
+                                        "type '") +
+                                name + "', which is not permitted for DPI",
+                            3, "35.5.5"));
+}
+
+TEST(DpiImportResult, ATypedefOfAnEnumAsResultIsError) {
+  ExpectTypedefResultRefused("typedef enum {A, B} e_t;", "e_t");
+}
+
+TEST(DpiImportResult, ATypedefOfAPackedStructAsResultIsError) {
+  ExpectTypedefResultRefused("typedef struct packed {bit a;} ps_t;", "ps_t");
+}
+
+TEST(DpiImportResult, ATypedefOfAnUnpackedStructAsResultIsError) {
+  ExpectTypedefResultRefused("typedef struct {bit a;} us_t;", "us_t");
 }
 
 }  // namespace

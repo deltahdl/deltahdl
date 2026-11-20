@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <string>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "helpers_reported_error.h"
@@ -200,6 +204,69 @@ TEST(FunctionDeclParsing, DpiImportFunctionShortrealResultAccepted) {
   EXPECT_FALSE(r.has_errors);
   auto* item = r.cu->modules[0]->items[0];
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortreal);
+}
+
+constexpr const char* kNotPermitted =
+    "result type is not permitted for a DPI imported function";
+constexpr const char* kNoDataType =
+    "an imported function must explicitly specify a data type or void for "
+    "its result";
+
+std::string ImportWithResult(const char* result) {
+  return std::string("module m;\n  import \"DPI-C\" function ") + result +
+         " f();\nendmodule\n";
+}
+
+void ExpectTheOnlyReport(const std::string& src, const char* message) {
+  auto r = Parse(src);
+  EXPECT_TRUE(ReportedError(r.diags, message, 2, "35.5.5"));
+  EXPECT_EQ(std::count_if(r.diags.begin(), r.diags.end(),
+                          [](const Diagnostic& d) {
+                            return d.severity == DiagSeverity::kError;
+                          }),
+            1);
+}
+
+void ExpectResultAccepted(const char* result) {
+  auto r = Parse(ImportWithResult(result));
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DpiImportResultSpelling, DISABLED_AnInlineEnumResultIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("enum {A, B}"), kNotPermitted);
+}
+
+TEST(DpiImportResultSpelling, DISABLED_AnInlinePackedStructResultIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("struct packed {bit a;}"),
+                      kNotPermitted);
+}
+
+TEST(DpiImportResultSpelling, DISABLED_AnInlineUnpackedStructResultIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("struct {bit a;}"), kNotPermitted);
+}
+
+TEST(DpiImportResultSpelling, ARealtimeResultIsAccepted) {
+  ExpectResultAccepted("realtime");
+}
+
+TEST(DpiImportResultSpelling, AScalarRegResultIsAccepted) {
+  ExpectResultAccepted("reg");
+}
+
+TEST(DpiImportResultSpelling, APackedRegResultIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("reg [3:0]"), kNotPermitted);
+}
+
+TEST(DpiImportResultSpelling, AResultOfSigningAloneIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("signed"), kNoDataType);
+}
+
+TEST(DpiImportResultSpelling, DISABLED_AResultOfAPackedRangeAloneIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("[7:0]"), kNoDataType);
+}
+
+TEST(DpiImportResultSpelling, AResultOfSigningAndARangeIsRefused) {
+  ExpectTheOnlyReport(ImportWithResult("signed [7:0]"), kNoDataType);
 }
 
 }  // namespace

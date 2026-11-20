@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -501,6 +503,90 @@ TEST(DpiDeclElab, TwoImportsOfOneNameDrawOneReport) {
                             "DPI import name 'sv_k' already declared in this "
                             "scope",
                             4, "35.5.4"));
+}
+
+void ExpectSignatureDisagreement(const char* src, const char* name, int line) {
+  ElabFixture f;
+  Elaborate(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            std::string("DPI declaration of linkage name '") +
+                                name +
+                                "' disagrees with the earlier declaration's "
+                                "type signature",
+                            line, "35.5.4"));
+}
+
+TEST(DpiDeclElab, DifferentFormalCountsUnderOneLinkageDisagree) {
+  ExpectSignatureDisagreement(R"(
+    module m;
+      import "DPI-C" link = function int a(input int x);
+    endmodule
+    module n;
+      import "DPI-C" link = function int b(input int x, input int y);
+    endmodule
+  )",
+                              "link", 6);
+}
+
+TEST(DpiDeclElab, AnImportedTaskAndFunctionUnderOneLinkageDisagree) {
+  ExpectSignatureDisagreement(R"(
+    module m;
+      import "DPI-C" link = task a(input int x);
+    endmodule
+    module n;
+      import "DPI-C" link = function int b(input int x);
+    endmodule
+  )",
+                              "link", 6);
+}
+
+TEST(DpiDeclElab, DISABLED_AModuleImportDisagreesWithAUnitImportWhereItStands) {
+  ExpectSignatureDisagreement(R"(
+    import "DPI-C" link = function int a(input int x);
+    module m;
+      import "DPI-C" link = function bit b(input int x);
+    endmodule
+  )",
+                              "link", 4);
+}
+
+TEST(DpiDeclElab,
+     DISABLED_APackageImportDisagreesWithAUnitImportWhereItStands) {
+  ExpectSignatureDisagreement(R"(
+    import "DPI-C" link = function int a(input int x);
+    package pk;
+      import "DPI-C" link = function bit b(input int x);
+    endpackage
+    module m;
+    endmodule
+  )",
+                              "link", 4);
+}
+
+TEST(DpiDeclElab, DISABLED_AnImportAndAnExportOfOneExplicitLinkageDisagree) {
+  ExpectSignatureDisagreement(R"(
+    module m;
+      import "DPI-C" link = function int a(input int x);
+    endmodule
+    module n;
+      function bit b(input int x); return 1; endfunction
+      export "DPI-C" link = function b;
+    endmodule
+  )",
+                              "link", 7);
+}
+
+TEST(DpiDeclElab, DISABLED_AnImportAndAnExportOfOneDefaultedLinkageDisagree) {
+  ExpectSignatureDisagreement(R"(
+    module m;
+      import "DPI-C" function int foo(input int x);
+    endmodule
+    module n;
+      function bit foo(input int x); return 1; endfunction
+      export "DPI-C" function foo;
+    endmodule
+  )",
+                              "foo", 7);
 }
 
 }  // namespace

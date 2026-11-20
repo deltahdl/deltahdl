@@ -1,12 +1,16 @@
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
 #include <functional>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "common/arena.h"
 #include "common/types.h"
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/scheduler.h"
@@ -149,6 +153,56 @@ TEST(DpiReentrancy, ImportedTaskCallWithoutTimingControlDoesNotSuspend) {
   EXPECT_EQ(time_after, kCallTime);
   EXPECT_FALSE(pending_after);
   EXPECT_EQ(sched.CurrentTime().ticks, kCallTime);
+}
+
+const char* blocking_export = "";
+
+int CallsTheBlockingExport() {
+  auto exported =
+      reinterpret_cast<int (*)()>(dlsym(RTLD_DEFAULT, blocking_export));
+  if (exported != nullptr) exported();
+  return 0;
+}
+
+uint64_t ResumeTimeOfTheEnablingProcess(const char* export_name,
+                                        const char* body, const char* releaser,
+                                        const char* dir) {
+  blocking_export = export_name;
+  SimFixture f;
+  RunWithImportsBound(
+      std::string("module top;\n"
+                  "  event e;\n"
+                  "  bit flag;\n"
+                  "  int t1;\n"
+                  "  export \"DPI-C\" task ") +
+          export_name +
+          ";\n"
+          "  import \"DPI-C\" context task c_blocks();\n"
+          "  task " +
+          export_name + "(); " + body +
+          " endtask\n"
+          "  initial begin c_blocks(); t1 = $time; end\n"
+          "  initial " +
+          releaser +
+          ";\n"
+          "endmodule\n",
+      f, {{"c_blocks", reinterpret_cast<void*>(&CallsTheBlockingExport)}},
+      std::string("subclause_35_05_01_05_") + dir);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* t1 = f.ctx.FindVariable("t1");
+  return t1 == nullptr ? ~uint64_t{0} : t1->value.ToUint64();
+}
+
+TEST(DpiReentrancyInADesign, AnExportedTaskBlockedOnAnEventHoldsTheImport) {
+  EXPECT_EQ(ResumeTimeOfTheEnablingProcess("sv_blocks_on_event", "@e;",
+                                           "#9 -> e", "event_control"),
+            9U);
+}
+
+TEST(DpiReentrancyInADesign, AnExportedTaskBlockedInAWaitHoldsTheImport) {
+  EXPECT_EQ(ResumeTimeOfTheEnablingProcess("sv_blocks_on_wait", "wait (flag);",
+                                           "#11 flag = 1", "wait_statement"),
+            11U);
 }
 
 }  // namespace

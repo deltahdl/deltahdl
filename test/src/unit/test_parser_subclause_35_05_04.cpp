@@ -668,4 +668,28 @@ TEST(DpiParsing, PackageImportInsideClassBodyKeepsThePackageReport) {
       "26.3"));
 }
 
+void ExpectDeprecatedSpecWarning(const char* src) {
+  auto r = Parse(src);
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedWarning(
+      r.diags,
+      "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; use of the "
+      "\"DPI-C\" string may require changes in the DPI application's C code",
+      2, "35.5.4"));
+}
+
+TEST(FunctionDeclParsing, DpiDeprecatedStringOnAnImportedTaskWarns) {
+  ExpectDeprecatedSpecWarning(
+      "module m;\n"
+      "  import \"DPI\" task t();\n"
+      "endmodule\n");
+}
+
+TEST(FunctionDeclParsing, DpiDeprecatedStringOnAnExportedTaskWarns) {
+  ExpectDeprecatedSpecWarning(
+      "module m;\n"
+      "  task t; endtask export \"DPI\" task t;\n"
+      "endmodule\n");
+}
+
 }  // namespace

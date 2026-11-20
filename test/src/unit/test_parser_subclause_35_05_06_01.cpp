@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
+#include "fixture_parser.h"
 #include "fixture_program.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -49,6 +53,50 @@ TEST_F(DpiParseTest, DpiImportSizedUnpackedFormalIsNotOpen) {
   ASSERT_EQ(items[0]->func_args[0].unpacked_dims.size(), 1u);
   EXPECT_NE(items[0]->func_args[0].unpacked_dims[0], nullptr);
   EXPECT_FALSE(diag_.HasErrors());
+}
+
+std::string ImportWithFormal(const char* formal) {
+  return std::string("module m;\n  import \"DPI-C\" function void f(") +
+         formal + ");\nendmodule\n";
+}
+
+void ExpectUnsizedPackedBesideSizedRefused(const char* formal) {
+  auto r = Parse(ImportWithFormal(formal));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "formal argument 'a' gives a packed dimension no range alongside a "
+      "sized one; a packed dimension left unspecified must be the only packed "
+      "dimension of the argument",
+      2, "35.5.6.1"));
+}
+
+void ExpectFormalAccepted(const char* formal) {
+  auto r = Parse(ImportWithFormal(formal));
+  EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DpiOpenPackedDimension, AnUnsizedDimensionBeforeASizedOneIsRefused) {
+  ExpectUnsizedPackedBesideSizedRefused("input bit [] [3:0] a");
+}
+
+TEST(DpiOpenPackedDimension, AnUnsizedDimensionAfterASizedOneIsRefused) {
+  ExpectUnsizedPackedBesideSizedRefused("input logic [3:0] [] a");
+}
+
+TEST(DpiOpenPackedDimension, ASoleUnsizedDimensionWithOpenUnpackedIsAccepted) {
+  ExpectFormalAccepted("input bit [] a []");
+}
+
+TEST(DpiOpenPackedDimension, ASoleUnsizedDimensionWithSizedUnpackedIsAccepted) {
+  ExpectFormalAccepted("input logic [] a [3:1]");
+}
+
+TEST(DpiOpenPackedDimension, ASoleUnsizedDimensionWithNoNameIsAccepted) {
+  ExpectFormalAccepted("input bit []");
+}
+
+TEST(DpiOpenPackedDimension, SeveralSizedDimensionsBesideOpenUnpackedAreOk) {
+  ExpectFormalAccepted("input bit [3:0] [1:0] a [][]");
 }
 
 }  // namespace
