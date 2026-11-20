@@ -313,8 +313,7 @@ void WriteNineAndEleven(int* o, int* p) {
 }
 
 int32_t ProcessesWokenByWriteback(const char* watchers, const char* var) {
-  SimFixture f;
-  RunWithImportsBound(
+  return IntVariableAfterRun(
       std::string("module top;\n"
                   "  import \"DPI-C\" function void c_write2(output int o, "
                   "output int p);\n"
@@ -325,13 +324,8 @@ int32_t ProcessesWokenByWriteback(const char* watchers, const char* var) {
           watchers +
           "  initial #1 c_write2(o, p);\n"
           "endmodule\n",
-      f, {{"c_write2", reinterpret_cast<void*>(&WriteNineAndEleven)}},
-      "subclause_35_06_02_wakeups");
-  EXPECT_TRUE(f.diag.Diagnostics().empty());
-  auto* found = f.ctx.FindVariable(var);
-  EXPECT_NE(found, nullptr);
-  return found == nullptr ? INT32_MIN
-                          : static_cast<int32_t>(found->value.ToUint64());
+      {{"c_write2", reinterpret_cast<void*>(&WriteNineAndEleven)}},
+      "subclause_35_06_02_wakeups", var);
 }
 
 TEST(DpiValueChangeInADesign,

@@ -91,31 +91,20 @@ TEST(DpiCallArgumentBinding, NamedBindingOmittingDefaultedFormal) {
   EXPECT_EQ(result, 3099u);
 }
 
-int32_t IntAfterRun(const std::string& src,
-                    const std::map<std::string, void*>& functions,
-                    const std::string& dir, const char* var) {
-  SimFixture f;
-  RunWithImportsBound(src, f, functions, dir);
-  EXPECT_TRUE(f.diag.Diagnostics().empty());
-  auto* found = f.ctx.FindVariable(var);
-  EXPECT_NE(found, nullptr);
-  return found == nullptr ? INT32_MIN
-                          : static_cast<int32_t>(found->value.ToUint64());
-}
-
 int Combine(int a, int b) { return a * 1000 + b; }
 
 int32_t CombineResult(const char* decl_tail, const char* body) {
-  return IntAfterRun(std::string("module top;\n"
-                                 "  import \"DPI-C\" function int c_combine("
-                                 "input int a, input int b") +
-                         decl_tail +
-                         ");\n"
-                         "  int v = 3;\n"
-                         "  int r;\n" +
-                         body + "endmodule\n",
-                     {{"c_combine", reinterpret_cast<void*>(&Combine)}},
-                     "subclause_35_06_calls", "r");
+  return IntVariableAfterRun(
+      std::string("module top;\n"
+                  "  import \"DPI-C\" function int c_combine("
+                  "input int a, input int b") +
+          decl_tail +
+          ");\n"
+          "  int v = 3;\n"
+          "  int r;\n" +
+          body + "endmodule\n",
+      {{"c_combine", reinterpret_cast<void*>(&Combine)}},
+      "subclause_35_06_calls", "r");
 }
 
 TEST(DpiImportCallInADesign, AnOmittedDefaultedArgumentReachesTheImport) {

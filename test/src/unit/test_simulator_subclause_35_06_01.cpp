@@ -371,18 +371,6 @@ TEST(DpiArgumentPassingInADesign,
   EXPECT_EQ(run.seen.AsInt(), 13);
 }
 
-int32_t IntAfterRun(const std::string& src,
-                    const std::map<std::string, void*>& functions,
-                    const std::string& dir, const char* var) {
-  SimFixture f;
-  RunWithImportsBound(src, f, functions, dir);
-  EXPECT_TRUE(f.diag.Diagnostics().empty());
-  auto* found = f.ctx.FindVariable(var);
-  EXPECT_NE(found, nullptr);
-  return found == nullptr ? INT32_MIN
-                          : static_cast<int32_t>(found->value.ToUint64());
-}
-
 int PassInt(int a) { return a; }
 char PassByte(char a) { return a; }
 void WriteMinusOneByte(char* o) { *o = -1; }
@@ -391,14 +379,14 @@ void WriteTwoAndAHalf(double* o) { *o = 2.5; }
 
 int32_t CoercedResult(const char* decls, const char* body, const char* c_name,
                       void* c_function) {
-  return IntAfterRun(std::string("module top;\n") + decls +
-                         "  int r;\n"
-                         "  initial begin\n" +
-                         body +
-                         "  end\n"
-                         "endmodule\n",
-                     {{c_name, c_function}}, "subclause_35_06_01_coercion",
-                     "r");
+  return IntVariableAfterRun(std::string("module top;\n") + decls +
+                                 "  int r;\n"
+                                 "  initial begin\n" +
+                                 body +
+                                 "  end\n"
+                                 "endmodule\n",
+                             {{c_name, c_function}},
+                             "subclause_35_06_01_coercion", "r");
 }
 
 TEST(DpiCoercionInADesign,

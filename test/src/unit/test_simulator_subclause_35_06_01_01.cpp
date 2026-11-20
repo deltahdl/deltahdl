@@ -4,7 +4,6 @@
 #include <map>
 #include <string>
 
-#include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
 #include "helpers_dpi_take_int.h"
 #include "simulator/dpi_arg_value.h"
@@ -105,18 +104,6 @@ TEST(DpiWysiwygOpenArray, ThePackedDimensionNormalizesWhereTheUnpackedDoesNot) {
   EXPECT_EQ(DpiRuntime::SvLow(packed), 0);
 }
 
-int32_t IntAfterRun(const std::string& src,
-                    const std::map<std::string, void*>& functions,
-                    const std::string& dir, const char* var) {
-  SimFixture f;
-  RunWithImportsBound(src, f, functions, dir);
-  EXPECT_TRUE(f.diag.Diagnostics().empty());
-  auto* found = f.ctx.FindVariable(var);
-  EXPECT_NE(found, nullptr);
-  return found == nullptr ? INT32_MIN
-                          : static_cast<int32_t>(found->value.ToUint64());
-}
-
 int SumOfOpenArray(const svOpenArrayHandle h) {
   int sum = 0;
   for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
@@ -127,18 +114,19 @@ int SumOfOpenArray(const svOpenArrayHandle h) {
 }
 
 int32_t OpenArraySum(const char* decl, const char* fill, const char* actual) {
-  return IntAfterRun(std::string("module top;\n"
-                                 "  import \"DPI-C\" function int c_sum(input "
-                                 "int a []);\n") +
-                         decl +
-                         "  int r;\n"
-                         "  initial begin\n" +
-                         fill + "    r = c_sum(" + actual +
-                         ");\n"
-                         "  end\n"
-                         "endmodule\n",
-                     {{"c_sum", reinterpret_cast<void*>(&SumOfOpenArray)}},
-                     "subclause_35_06_01_01_open", "r");
+  return IntVariableAfterRun(
+      std::string("module top;\n"
+                  "  import \"DPI-C\" function int c_sum(input "
+                  "int a []);\n") +
+          decl +
+          "  int r;\n"
+          "  initial begin\n" +
+          fill + "    r = c_sum(" + actual +
+          ");\n"
+          "  end\n"
+          "endmodule\n",
+      {{"c_sum", reinterpret_cast<void*>(&SumOfOpenArray)}},
+      "subclause_35_06_01_01_open", "r");
 }
 
 TEST(DpiOpenArrayInADesign, DISABLED_ADynamicArrayActualFillsAnOpenFormal) {

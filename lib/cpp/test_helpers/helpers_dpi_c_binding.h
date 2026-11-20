@@ -53,6 +53,18 @@ inline void RunWithImportsBound(const std::string& src, SimFixture& f,
   f.scheduler.Run();
 }
 
+inline int32_t IntVariableAfterRun(
+    const std::string& src, const std::map<std::string, void*>& functions,
+    const std::string& dir_name, const char* var) {
+  SimFixture f;
+  RunWithImportsBound(src, f, functions, dir_name);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  auto* found = f.ctx.FindVariable(var);
+  EXPECT_NE(found, nullptr);
+  return found == nullptr ? INT32_MIN
+                          : static_cast<int32_t>(found->value.ToUint64());
+}
+
 inline DpiArg CFormal(std::string_view name, DataTypeKind type,
                       Direction direction, uint32_t width = 0) {
   DpiArg formal;
