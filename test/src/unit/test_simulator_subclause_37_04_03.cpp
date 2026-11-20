@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
+#include "fixture_vpi_run.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -69,6 +72,65 @@ TEST_F(VpiRelationTraversal, TheOneToOneRoutineAgreesAboutANullRef) {
   mod->top_module = true;
 
   EXPECT_EQ(vpi_handle(vpiPort, nullptr), nullptr);
+}
+
+int g_current_call_type = 0;
+
+PLI_INT32 RecordCurrentCall(PLI_BYTE8*) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  g_current_call_type = call == nullptr ? 0 : vpi_get(vpiType, call);
+  return 0;
+}
+
+class RelationTraversalOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    g_current_call_type = 0;
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText("$record_call");
+    data.calltf = &RecordCurrentCall;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
+
+TEST_F(RelationTraversalOfARun, ATaggedOneToOneRelationIsWalkedByItsTag) {
+  Run("module top; wire [3:0] w; endmodule\n");
+  vpiHandle net = vpi_handle_by_name(VpiText("top.w"), nullptr);
+  ASSERT_NE(net, nullptr);
+  vpiHandle left = vpi_handle(vpiLeftRange, net);
+  vpiHandle right = vpi_handle(vpiRightRange, net);
+  ASSERT_NE(left, nullptr);
+  ASSERT_NE(right, nullptr);
+  EXPECT_EQ(IntOf(left), 3);
+  EXPECT_EQ(IntOf(right), 0);
+}
+
+TEST_F(RelationTraversalOfARun, ATaggedOneToManyRelationIsScannedByItsTag) {
+  Run("module leaf; endmodule\n"
+      "module top; leaf u1(); leaf u2(); endmodule\n");
+  vpiHandle top = vpi_handle_by_name(VpiText("top"), nullptr);
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(NamesOf(vpiInternalScope, top),
+            (std::vector<std::string>{"u1", "u2"}));
+}
+
+TEST_F(RelationTraversalOfARun, AOneToOneRelationFromACircleTakesANullRef) {
+  Run("module top; initial $record_call; endmodule\n");
+  EXPECT_EQ(g_current_call_type, vpiSysTaskCall);
+}
+
+TEST_F(RelationTraversalOfARun, AOneToManyRelationFromACircleTakesANullRef) {
+  Run("module top; endmodule\n");
+  EXPECT_EQ(NamesOf(vpiModule, nullptr), (std::vector<std::string>{"top"}));
 }
 
 }  // namespace
