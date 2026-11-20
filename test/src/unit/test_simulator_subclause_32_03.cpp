@@ -1,11 +1,17 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <fstream>
+#include <ios>
 #include <string>
 #include <string_view>
 
+#include "common/diagnostic.h"
+#include "fixture_sdf_design.h"
 #include "fixture_simulator.h"
 #include "fixture_specify_manager.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_specify.h"
 #include "simulator/sdf_parser.h"
 #include "simulator/specify.h"
@@ -735,6 +741,174 @@ TEST(SdfAnnotator, SilentIgnoredWarnedAndAnnotatedAllCoexist) {
   EXPECT_EQ(result.warnings.size(), 1u);
   EXPECT_EQ(mgr.GetPathDelay("a", "y"), 1u);
   EXPECT_EQ(mgr.GetPathDelay("b", "z"), 31u);
+}
+
+constexpr const char* kTimingenvConstraints[] = {
+    "(PATHCONSTRAINT a y (10))",
+    "(PERIODCONSTRAINT clk (20))",
+    "(SUM (a y) (b z) (30))",
+    "(DIFF (a y) (b z) (5))",
+    "(SKEWCONSTRAINT (posedge clk) (2))",
+    "(ARRIVAL (posedge clk) a (1) (2) (3) (4))",
+    "(DEPARTURE (posedge clk) y (1) (2) (3) (4))",
+    "(SLACK a (1) (2) (3) (4))",
+    "(WAVEFORM clk 10 (posedge 0 5) (negedge 5 10))",
+};
+
+TEST(SdfAnnotator, EveryTimingenvConstraintKindIsIgnoredWithoutWarnings) {
+  for (const char* constraint : kTimingenvConstraints) {
+    SimFixture f;
+    SpecifyManager mgr;
+    auto result = AnnotateOntoDesign(
+        std::string("(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+                    " (TIMINGENV ") +
+            constraint + ") (DELAY (ABSOLUTE (IOPATH a y (6))))))",
+        f, mgr);
+    EXPECT_TRUE(result.warnings.empty()) << constraint;
+    EXPECT_EQ(mgr.GetPathDelay("a", "y"), 6u) << constraint;
+  }
+}
+
+TEST(SdfAnnotator, SpecparamBesideALabelledOneKeepsItsValue) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(
+      BuildSpecifyFromSource("module t(input a, output y);\n"
+                             "  specify\n"
+                             "    specparam tRise = 11, tFall = 12;\n"
+                             "    (a => y) = 21;\n"
+                             "  endspecify\n"
+                             "endmodule\n",
+                             f, mgr));
+  auto result = AnnotateFileOnto(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (LABEL (ABSOLUTE (tRise 9)))))",
+      mgr);
+  EXPECT_TRUE(result.warnings.empty());
+  EXPECT_EQ(SpecparamOf(mgr, "tRise"), 9u);
+  EXPECT_EQ(SpecparamOf(mgr, "tFall"), 12u);
+}
+
+TEST(SdfAnnotator, LabelNamingARegWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  ASSERT_TRUE(
+      BuildSpecifyFromSource("module t(input a, output y);\n"
+                             "  reg notaspec;\n"
+                             "  specify\n"
+                             "    specparam tRise = 11;\n"
+                             "    (a => y) = 21;\n"
+                             "  endspecify\n"
+                             "endmodule\n",
+                             f, mgr));
+  auto result = AnnotateFileOnto(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (LABEL (ABSOLUTE (notaspec 9) (tRise 8)))))",
+      mgr);
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("notaspec"), std::string::npos);
+  EXPECT_EQ(SpecparamOf(mgr, "tRise"), 8u);
+}
+
+TEST(SdfAnnotator, CheckCarryingCcondWarnsAndTheNextCheckLands) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1) (TIMINGCHECK"
+      " (SETUPHOLD d (posedge clk) (1) (2) (CCOND en))"
+      " (SETUP d (posedge clk) (5)))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("CCOND"), std::string::npos);
+  EXPECT_EQ(LimitOf(mgr, TimingCheckKind::kSetup), 5u);
+}
+
+TEST(SdfAnnotator, CondelseIopathWithNoIfnonePathWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (CONDELSE (IOPATH a y (13) (17)))))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("IOPATH delay from a to y"),
+            std::string::npos);
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 21u);
+}
+
+TEST(SdfAnnotator, PathpulsepercentMatchingNoDeclaredPathWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (PATHPULSEPERCENT a z (25) (35))))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("PATHPULSEPERCENT"), std::string::npos);
+}
+
+TEST(SdfAnnotator, IncrementIopathMatchingNoDeclaredPathWarns) {
+  SimFixture f;
+  SpecifyManager mgr;
+  auto result = AnnotateOntoDesign(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (INCREMENT (IOPATH a z (3)) (IOPATH a y (4))))))",
+      f, mgr);
+
+  ASSERT_EQ(result.warnings.size(), 1u);
+  EXPECT_NE(result.warnings[0].find("IOPATH"), std::string::npos);
+  EXPECT_EQ(mgr.GetPathDelay("a", "y"), 25u);
+  EXPECT_EQ(mgr.GetPathDelays().size(), 2u);
+}
+
+std::string AnnotatedTop(const std::string& sdf_text) {
+  const std::string kPath = "/tmp/delta_c32_03_annotated.sdf";
+  std::ofstream(kPath, std::ios::trunc) << sdf_text;
+  return "module t(input a, output y);\n"
+         "  specify\n"
+         "    (a => y) = 21;\n"
+         "  endspecify\n"
+         "endmodule\n"
+         "module top;\n"
+         "  wire a, y;\n"
+         "  t u1(a, y);\n"
+         "  initial $sdf_annotate(\"" +
+         kPath +
+         "\");\n"
+         "endmodule\n";
+}
+
+std::size_t WarningCount(const SdfDesign& d) {
+  std::size_t count = 0;
+  for (const Diagnostic& diag : d.f.diag.Diagnostics()) {
+    if (diag.severity == DiagSeverity::kWarning) ++count;
+  }
+  return count;
+}
+
+TEST(SdfAnnotator, TimingenvLoadedByTheTaskReportsNothing) {
+  SdfDesign d;
+  ASSERT_TRUE(d.Lower(AnnotatedTop(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (TIMINGENV (PATHCONSTRAINT a y (10)) (PERIODCONSTRAINT a (20)))))")));
+  d.f.scheduler.Run();
+  EXPECT_EQ(WarningCount(d), 0u);
+  EXPECT_FALSE(d.f.has_errors);
+}
+
+TEST(SdfAnnotator, DISABLED_UnannotatableDataLoadedByTheTaskIsWarnedAtTheCall) {
+  const std::string kSrc = AnnotatedTop(
+      "(DELAYFILE (CELL (CELLTYPE \"t\") (INSTANCE u1)"
+      " (DELAY (ABSOLUTE (IOPATH y a (3))))))");
+  SdfDesign d;
+  ASSERT_TRUE(d.Lower(kSrc));
+  d.f.scheduler.Run();
+  ASSERT_EQ(WarningCount(d), 1u);
+  EXPECT_TRUE(ReportedWarning(d.f.diag.Diagnostics(), "IOPATH",
+                              LineHolding(kSrc, "$sdf_annotate"), "32.3"));
 }
 
 }  // namespace
