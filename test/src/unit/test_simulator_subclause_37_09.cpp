@@ -113,7 +113,37 @@ TEST_F(Program, AProgramOfNoProceduresIteratesToNone) {
   EXPECT_EQ(vpi_iterate(vpiProcess, VpiHandleOf(&program)), nullptr);
 }
 
-class ProgramsOfARun : public VpiDesignRun {};
+TEST_F(Program, AProgramIteratesItsInterfacesAndEachReachesIt) {
+  VpiObject program;
+  program.type = vpiProgram;
+  VpiObject iface;
+  iface.type = vpiInterface;
+  iface.parent = &program;
+  VpiObject array;
+  array.type = vpiInterfaceArray;
+  array.parent = &program;
+  program.children = {&array, &iface};
+
+  vpiHandle ifaces = vpi_iterate(vpiInterface, VpiHandleOf(&program));
+  ASSERT_NE(ifaces, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(ifaces)), &iface);
+  EXPECT_EQ(vpi_scan(ifaces), nullptr);
+  vpiHandle arrays = vpi_iterate(vpiInterfaceArray, VpiHandleOf(&program));
+  ASSERT_NE(arrays, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(arrays)), &array);
+  EXPECT_EQ(vpi_scan(arrays), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&iface))),
+            &program);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(&array))),
+            &program);
+}
+
+class ProgramsOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle Prog() {
+    return vpi_handle_by_name(VpiText("top.p0"), nullptr);
+  }
+};
 
 constexpr const char* kProgramInstance =
     "program prog; int v; endprogram\n"
@@ -136,6 +166,59 @@ TEST_F(ProgramsOfARun, AProgramInstancesDefinitionIsItsProgram) {
   EXPECT_STREQ(
       vpi_get_str(vpiDefName, vpi_handle_by_name(VpiText("top.p0"), nullptr)),
       "prog");
+}
+
+constexpr const char* kProgramOfEveryKind =
+    "program prog(input logic clk); wire a, b, c; int v;\n"
+    "  assign a = b;\n"
+    "  initial v = 1;\n"
+    "  default clocking cb @(posedge clk); endclocking\n"
+    "  assign b = c;\n"
+    "  final v = 2;\n"
+    "  clocking other @(negedge clk); endclocking\n"
+    "  initial v = 3;\n"
+    "endprogram\n"
+    "module top; logic clk; prog p0(clk); endmodule\n";
+
+TEST_F(ProgramsOfARun, AProgramIteratesItsContinuousAssignments) {
+  Run(kProgramOfEveryKind);
+  EXPECT_EQ(KindsOf(vpiContAssign, Prog()),
+            (std::vector<int>{vpiContAssign, vpiContAssign}));
+}
+
+TEST_F(ProgramsOfARun, AProgramIteratesItsDefaultAndOtherClocking) {
+  Run(kProgramOfEveryKind);
+  EXPECT_EQ(NamesOf(vpiClockingBlock, Prog()),
+            (std::vector<std::string>{"cb", "other"}));
+}
+
+TEST_F(ProgramsOfARun, AProgramIteratesItsProceduresInSourceOrder) {
+  Run(kProgramOfEveryKind);
+  EXPECT_EQ(KindsOf(vpiProcess, Prog()),
+            (std::vector<int>{vpiInitial, vpiFinal, vpiInitial}));
+}
+
+TEST_F(ProgramsOfARun, EveryChildOfAProgramReachesItAsItsInstance) {
+  Run(kProgramOfEveryKind);
+  vpiHandle prog = Prog();
+  ASSERT_NE(prog, nullptr);
+  for (int kind : {vpiContAssign, vpiClockingBlock, vpiProcess}) {
+    std::vector<vpiHandle> children = ObjectsOf(kind, prog);
+    EXPECT_FALSE(children.empty()) << kind;
+    for (vpiHandle child : children) {
+      EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, child)), VpiObjectOf(prog))
+          << kind;
+    }
+  }
+}
+
+TEST_F(ProgramsOfARun, AProgramHoldingNoneOfAKindIteratesNone) {
+  Run("program prog; int v; endprogram\n"
+      "module top; prog p0(); endmodule\n");
+  for (int kind : {vpiContAssign, vpiClockingBlock, vpiInterface,
+                   vpiInterfaceArray, vpiProcess}) {
+    EXPECT_EQ(vpi_iterate(kind, Prog()), nullptr) << kind;
+  }
 }
 
 }  // namespace
