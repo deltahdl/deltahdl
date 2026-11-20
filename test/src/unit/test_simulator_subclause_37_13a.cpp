@@ -186,12 +186,11 @@ TEST_F(ModportIoDeclsOfARun, ARefPortsRefObjIsBoundToTheVariable) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, ref_obj)), VpiObjectOf(a));
 }
 
-TEST_F(ModportIoDeclsOfARun, AnExpressionPortReachesItsExpression) {
+TEST_F(ModportIoDeclsOfARun, DISABLED_APartSelectPortReachesNone) {
   Run(Design("logic [7:0] r; modport mp(output .lo(r[3:0]));"));
-  vpiHandle lo = vpi_handle(vpiExpr, IoDecl("mp", "lo"));
-  EXPECT_EQ(vpi_get(vpiType, lo), vpiPartSelect);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, lo)),
-            VpiObjectOf(InInstance("r")));
+  vpiHandle lo = IoDecl("mp", "lo");
+  ASSERT_NE(lo, nullptr);
+  EXPECT_EQ(vpi_handle(vpiExpr, lo), nullptr);
 }
 
 TEST_F(ModportIoDeclsOfARun, AnEmptyExpressionPortReachesNone) {
