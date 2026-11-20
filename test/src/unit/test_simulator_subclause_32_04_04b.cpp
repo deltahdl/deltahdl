@@ -350,9 +350,8 @@ TEST(InterconnectDelaySim, AConstantConnectionsPendingDriveStillArrives) {
   EXPECT_EQ(captured.str(), "00\n11\n");
 }
 
-TEST(InterconnectDelaySim, AnInoutLoadSeesTheDelayedValueAndItsNetDoesNot) {
-  const std::string kSdf =
-      WriteSdfFile("inout_load.sdf", DelayFile("(INTERCONNECT u/o c/p (5))"));
+void ExpectInoutLoadDelayed(const std::string& stem, const std::string& entry) {
+  const std::string kSdf = WriteSdfFile(stem + ".sdf", DelayFile(entry));
   SimFixture f;
   auto* ok = RunAndFindVar(
       "module drv(output wire o);\n"
@@ -379,6 +378,14 @@ TEST(InterconnectDelaySim, AnInoutLoadSeesTheDelayedValueAndItsNetDoesNot) {
       f, "ok");
   ASSERT_NE(ok, nullptr);
   EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+TEST(InterconnectDelaySim, AnInoutLoadSeesTheDelayedValueAndItsNetDoesNot) {
+  ExpectInoutLoadDelayed("inout_load", "(INTERCONNECT u/o c/p (5))");
+}
+
+TEST(InterconnectDelaySim, ANetDelayOnAnInoutPortDelaysTheValueThere) {
+  ExpectInoutLoadDelayed("inout_netdelay", "(NETDELAY c/p (5))");
 }
 
 TEST(InterconnectDelaySim, AValueAnInoutDrivesOutGoesWhenItLetsGo) {
@@ -516,6 +523,141 @@ TEST(InterconnectDelaySim, AnInoutInAGenerateBlockKeepsToTheBlocksNet) {
       f, "ok");
   ASSERT_NE(ok, nullptr);
   EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+TEST(InterconnectDelaySim, PendingTransitionsEachReachTheLoadInTurn) {
+  const std::string kSdf = WriteSdfFile(
+      "in_turn.sdf", DelayFile("(INTERCONNECT src u/din ((10) (0) (0)))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(
+      StimulusDesign(kSdf, "    #4 src = 8'hA5;\n    #3 src = 8'h3C;\n",
+                     "    #16 ok = (out === 8'hA5);\n"
+                     "    #3 ok = ok && (out === 8'h3C);\n"),
+      f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+std::string ReportingDesign(const std::string& sdf_path,
+                            const std::string& reporting,
+                            const std::string& leaf_items = {}) {
+  return "module leaf(input logic [7:0] din, output logic [7:0] dout);\n"
+         "  assign dout = din;\n" +
+         leaf_items +
+         "endmodule\n"
+         "module top;\n"
+         "  logic [7:0] src = 8'h00;\n"
+         "  logic [7:0] out;\n"
+         "  leaf u(.din(src), .dout(out));\n"
+         "  initial begin\n"
+         "    #1 $sdf_annotate(\"" +
+         sdf_path +
+         "\");\n"
+         "    #4 src = 8'hA5;\n"
+         "  end\n"
+         "  initial begin\n" +
+         reporting +
+         "  end\n"
+         "endmodule\n";
+}
+
+TEST(InterconnectDelaySim, DisplayDuringTheDelayShowsTheLoadsOldValue) {
+  const std::string kSdf =
+      WriteSdfFile("display.sdf", DelayFile("(INTERCONNECT src u/din (10))"));
+  SimFixture f;
+  EXPECT_EQ(RunCapture(ReportingDesign(kSdf,
+                                       "    #8 $display(\"%h %h\", "
+                                       "u.din, src);\n"),
+                       f),
+            "00 a5\n");
+}
+
+TEST(InterconnectDelaySim, MonitorReportsTheLoadAtTheEndOfTheDelay) {
+  const std::string kSdf =
+      WriteSdfFile("monitor.sdf", DelayFile("(INTERCONNECT src u/din (10))"));
+  SimFixture f;
+  EXPECT_EQ(RunCapture(ReportingDesign(kSdf, "",
+                                       "  initial $monitor(\"%0t %h\", $time, "
+                                       "din);\n"),
+                       f),
+            "0 00\n15 a5\n");
+}
+
+std::string SourceDesign(const std::string& sdf_path,
+                         const std::string& driver) {
+  return driver +
+         "module sink(input wire d);\n"
+         "endmodule\n"
+         "module top;\n"
+         "  wire n;\n"
+         "  logic ok = 1'b0;\n"
+         "  drv u1(.q(n));\n"
+         "  sink u2(.d(n));\n"
+         "  initial begin\n"
+         "    #1 $sdf_annotate(\"" +
+         sdf_path +
+         "\");\n"
+         "    #6 ok = (n === 1'b1) && (u2.d === 1'b0);\n"
+         "    #13 ok = ok && (u2.d === 1'b1);\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+void ExpectSourceWaitsOnTheDelay(const std::string& stem,
+                                 const std::string& driver) {
+  const std::string kSdf =
+      WriteSdfFile(stem + ".sdf", DelayFile("(INTERCONNECT u1/q u2/d (10))"));
+  SimFixture f;
+  auto* ok = RunAndFindVar(SourceDesign(kSdf, driver), f, "ok");
+  ASSERT_NE(ok, nullptr);
+  EXPECT_EQ(ok->value.ToUint64(), 1u);
+}
+
+TEST(InterconnectDelaySim, AUdpOutputSourceReachesTheLoadAfterTheDelay) {
+  ExpectSourceWaitsOnTheDelay("udp_src",
+                              "primitive udp_buf(out, in);\n"
+                              "  output out;\n"
+                              "  input in;\n"
+                              "  table\n"
+                              "    0 : 0;\n"
+                              "    1 : 1;\n"
+                              "  endtable\n"
+                              "endprimitive\n"
+                              "module drv(output wire q);\n"
+                              "  reg r = 1'b0;\n"
+                              "  udp_buf b(q, r);\n"
+                              "  initial #5 r = 1'b1;\n"
+                              "endmodule\n");
+}
+
+TEST(InterconnectDelaySim, ASwitchSourceReachesTheLoadAfterTheDelay) {
+  ExpectSourceWaitsOnTheDelay("switch_src",
+                              "module drv(output wire q);\n"
+                              "  reg r = 1'b0;\n"
+                              "  wire w;\n"
+                              "  assign w = r;\n"
+                              "  tran t(q, w);\n"
+                              "  initial #5 r = 1'b1;\n"
+                              "endmodule\n");
+}
+
+TEST(InterconnectDelaySim,
+     ATimingCheckDelayedSourceReachesTheLoadAfterTheDelay) {
+  ExpectSourceWaitsOnTheDelay("check_src",
+                              "module chk(input wire c, input wire r, "
+                              "output wire q);\n"
+                              "  assign q = dr;\n"
+                              "  specify\n"
+                              "    $setuphold(posedge c, r, 1, 1, , , , dc, "
+                              "dr);\n"
+                              "  endspecify\n"
+                              "endmodule\n"
+                              "module drv(output wire q);\n"
+                              "  reg c = 1'b0;\n"
+                              "  reg r = 1'b0;\n"
+                              "  chk k(.c(c), .r(r), .q(q));\n"
+                              "  initial #5 r = 1'b1;\n"
+                              "endmodule\n");
 }
 
 }  // namespace

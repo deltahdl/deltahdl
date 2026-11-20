@@ -807,4 +807,169 @@ TEST(SdfInterconnectAnnotation, SingleValueEntryBroadcastsAcrossAllSlots) {
   }
 }
 
+void ExpectNetdelayAnnotatedUnder(const std::string& version) {
+  Design d;
+  ASSERT_TRUE(d.Build(kPairSrc));
+  auto result = d.Annotate(SdfDelay("(NETDELAY u2/d (4))", version));
+  EXPECT_FALSE(d.AnyWarningMentions(result, "NETDELAY"));
+  ASSERT_NE(d.Load("u2/d"), nullptr);
+  EXPECT_EQ(d.Load("u2/d")->delays[0], 4u);
+}
+
+TEST(SdfInterconnectAnnotation, NetdelayIsAnnotatedUnderTheFirstOviVersion) {
+  ExpectNetdelayAnnotatedUnder("1.0");
+}
+
+TEST(SdfInterconnectAnnotation, NetdelayIsAnnotatedUnderTheSecondOviVersion) {
+  ExpectNetdelayAnnotatedUnder("2.0");
+}
+
+const char* const kPinLoadSrc =
+    "primitive udp_buf(out, in);\n"
+    "  output out;\n"
+    "  input in;\n"
+    "  table\n"
+    "    0 : 0;\n"
+    "    1 : 1;\n"
+    "  endtable\n"
+    "endprimitive\n"
+    "module drv(q);\n"
+    "  output q;\n"
+    "  reg q;\n"
+    "endmodule\n"
+    "module top;\n"
+    "  wire n;\n"
+    "  wire o1;\n"
+    "  wire o2;\n"
+    "  drv u1(.q(n));\n"
+    "  and g1(o1, n, n);\n"
+    "  udp_buf ud1(o2, n);\n"
+    "endmodule\n";
+
+void ExpectPinEntryRefused(const std::string& entry) {
+  Design d;
+  ASSERT_TRUE(d.Build(kPinLoadSrc));
+  auto result = d.Annotate(SdfDelay(entry));
+  EXPECT_TRUE(d.AnyWarningMentions(result, "primitive pin"));
+  EXPECT_TRUE(d.mgr.GetInterconnectDelays().empty());
+}
+
+TEST(SdfInterconnectAnnotation, GatePinLoadOfAnInterconnectIsRefused) {
+  ExpectPinEntryRefused("(INTERCONNECT u1/q g1/in (4))");
+}
+
+TEST(SdfInterconnectAnnotation, UdpPinLoadOfAnInterconnectIsRefused) {
+  ExpectPinEntryRefused("(INTERCONNECT u1/q ud1/in (4))");
+}
+
+TEST(SdfInterconnectAnnotation, NetdelayNamingAGatePinIsRefused) {
+  ExpectPinEntryRefused("(NETDELAY g1/in (4))");
+}
+
+TEST(SdfInterconnectAnnotation, NetdelayNamingAUdpPinIsRefused) {
+  ExpectPinEntryRefused("(NETDELAY ud1/in (4))");
+}
+
+TEST(SdfInterconnectAnnotation, NetdelayNamingAnInoutPortIsAnnotated) {
+  Design d;
+  ASSERT_TRUE(d.Build(kInoutSrc));
+  auto result = d.Annotate(SdfDelay("(NETDELAY u2/io (5))"));
+  EXPECT_TRUE(result.warnings.empty());
+  const auto* got = d.mgr.FindInterconnectDelay("u1/q", "u2/io");
+  ASSERT_NE(got, nullptr);
+  EXPECT_EQ(got->delays[0], 5u);
+}
+
+std::string Replaced(std::string src, const std::string& from,
+                     const std::string& to) {
+  const auto kAt = src.find(from);
+  EXPECT_NE(kAt, std::string::npos);
+  if (kAt != std::string::npos) src.replace(kAt, from.size(), to);
+  return src;
+}
+
+TEST(SdfInterconnectAnnotation, UpHierarchyDelayReachesAPortOnTheNetAbove) {
+  Design d;
+  ASSERT_TRUE(d.Build(Replaced(kDeepSrc, "  ld_l1 u2(.d(n));\n",
+                               "  ld_l1 u2(.d(n));\n  ld_l1 u3(.d(n));\n")));
+  d.Annotate(SdfDelay("(INTERCONNECT u1/b/a/q u2/m2/d (6))"));
+  const auto* side = d.mgr.FindInterconnectDelay("u1/b/a/q", "u3/d");
+  ASSERT_NE(side, nullptr);
+  EXPECT_EQ(side->delays[0], 6u);
+  EXPECT_EQ(d.mgr.FindInterconnectDelay("u1/b/a/q", "u3/m2/d"), nullptr);
+  EXPECT_EQ(d.mgr.FindInterconnectDelay("u1/b/a/q", "u3/m2/m1/d"), nullptr);
+}
+
+TEST(SdfInterconnectAnnotation,
+     DISABLED_DownHierarchyDelayIsFromAPortOnTheNetAbove) {
+  Design d;
+  ASSERT_TRUE(
+      d.Build("module drv(q);\n"
+              "  output q;\n"
+              "  reg q;\n"
+              "endmodule\n"
+              "module wrap(q);\n"
+              "  output q;\n"
+              "  wire q;\n"
+              "  drv s(.q(q));\n"
+              "endmodule\n"
+              "module sink(din);\n"
+              "  input din;\n"
+              "  wire din;\n"
+              "endmodule\n"
+              "module mid(i);\n"
+              "  input i;\n"
+              "  wire i;\n"
+              "  sink c(.din(i));\n"
+              "endmodule\n"
+              "module top;\n"
+              "  wire w;\n"
+              "  wrap u1(.q(w));\n"
+              "  drv u3(.q(w));\n"
+              "  mid u2(.i(w));\n"
+              "endmodule\n"));
+  d.Annotate(SdfDelay("(INTERCONNECT u1/q u2/c/din (5))"));
+  const auto* side = d.mgr.FindInterconnectDelay("u3/q", "u2/c/din");
+  ASSERT_NE(side, nullptr);
+  EXPECT_EQ(side->delays[0], 5u);
+}
+
+std::string TwoDeepSources() {
+  return Replaced(kDeepSrc, "  src_l1 u1(.q(n));\n",
+                  "  src_l1 s1(.q(n));\n  src_l1 s2(.q(n));\n");
+}
+
+uint64_t DelayOf(const Design& d, const char* src, const char* load) {
+  const auto* got = d.mgr.FindInterconnectDelay(src, load);
+  EXPECT_NE(got, nullptr) << src << " -> " << load;
+  return got ? got->delays[0] : 0;
+}
+
+TEST(SdfInterconnectAnnotation, OverlapsOfEachSourceResolveToTheirSubsets) {
+  Design d;
+  ASSERT_TRUE(d.Build(TwoDeepSources()));
+  d.Annotate(
+      SdfDelay("(INTERCONNECT s2/q u2/d (4))"
+               " (INTERCONNECT s2/q u2/m2/m1/d (9))"
+               " (INTERCONNECT s1/q u2/d (3))"
+               " (INTERCONNECT s1/q u2/m2/m1/d (7))"));
+  EXPECT_EQ(DelayOf(d, "s1/q", "u2/d"), 3u);
+  EXPECT_EQ(DelayOf(d, "s1/q", "u2/m2/d"), 3u);
+  EXPECT_EQ(DelayOf(d, "s1/q", "u2/m2/m1/d"), 7u);
+  EXPECT_EQ(DelayOf(d, "s2/q", "u2/d"), 4u);
+  EXPECT_EQ(DelayOf(d, "s2/q", "u2/m2/d"), 4u);
+  EXPECT_EQ(DelayOf(d, "s2/q", "u2/m2/m1/d"), 9u);
+}
+
+TEST(SdfInterconnectAnnotation, OneSourcesOverlapsLeaveTheOtherSourceAlone) {
+  Design d;
+  ASSERT_TRUE(d.Build(TwoDeepSources()));
+  d.Annotate(
+      SdfDelay("(INTERCONNECT s1/q u2/d (3))"
+               " (INTERCONNECT s1/q u2/m2/m1/d (7))"));
+  EXPECT_EQ(DelayOf(d, "s1/q", "u2/m2/m1/d"), 7u);
+  EXPECT_EQ(d.mgr.FindInterconnectDelay("s2/q", "u2/d"), nullptr);
+  EXPECT_EQ(d.mgr.FindInterconnectDelay("s2/q", "u2/m2/m1/d"), nullptr);
+}
+
 }  // namespace
