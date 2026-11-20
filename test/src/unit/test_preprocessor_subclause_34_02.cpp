@@ -548,7 +548,10 @@ TEST(ProtectedEnvelopeOverview, DISABLED_LaterOfTwoValuesStandsWhenReading) {
   EXPECT_FALSE(right.diags.HasErrors());
   EXPECT_TRUE(right.Produced(kSealedDesign)) << right.produced;
   ReadWithTheKeys wrong(ReadingKeyNamedTwice(kKeyName, "no-such-key"));
-  EXPECT_TRUE(wrong.diags.HasErrors());
+  EXPECT_TRUE(ReportedError(wrong.diags.Diagnostics(),
+                            "protect pragma data_keyname names no key held by "
+                            "the data_keyowner in effect",
+                            9, "34.5.12"));
   EXPECT_FALSE(wrong.Produced(kSealedDesign)) << wrong.produced;
 }
 
