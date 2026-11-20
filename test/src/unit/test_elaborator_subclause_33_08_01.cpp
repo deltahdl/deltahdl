@@ -479,4 +479,58 @@ TEST(CommandLineLibrarySearchOrder,
   EXPECT_EQ(BoundLibrary(ElaborateWithOrder(d, "top", order), "u"), "aLib");
 }
 
+TEST(CommandLineLibrarySearchOrder, ProgramCellIsRankedByTheCommandLineOrder) {
+  ScratchDir tmp;
+  LibraryDesign d;
+  CellKindFixture c;
+  c.base = "pgm";
+  c.cell = "program pgm;\nendprogram\n";
+  c.top = "module top;\n  pgm p();\nendmodule\n";
+  ASSERT_TRUE(BuildCellKindDesign(tmp, d, c));
+  ASSERT_TRUE(UnitHoldsCellIn(d.unit, "pgm", "aLib"));
+
+  auto order = d.map.ResolveSearchOrder({"gateLib"});
+  auto* bound = BoundCell(ElaborateWithOrder(d, "top", order), "p");
+  ASSERT_NE(bound, nullptr);
+  EXPECT_TRUE(bound->is_program);
+  EXPECT_EQ(bound->library, "gateLib");
+}
+
+TEST(CommandLineLibrarySearchOrder, CheckerCellIsRankedByTheCommandLineOrder) {
+  ScratchDir tmp;
+  LibraryDesign d;
+  CellKindFixture c;
+  c.base = "chk";
+  c.cell = "checker chk;\nendchecker\n";
+  c.top = "module top;\n  chk c1();\nendmodule\n";
+  ASSERT_TRUE(BuildCellKindDesign(tmp, d, c));
+  ASSERT_TRUE(UnitHoldsCellIn(d.unit, "chk", "aLib"));
+
+  auto order = d.map.ResolveSearchOrder({"gateLib"});
+  auto* bound = BoundCell(ElaborateWithOrder(d, "top", order), "c1");
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(bound->name, "chk");
+  EXPECT_EQ(bound->library, "gateLib");
+}
+
+TEST(CommandLineLibrarySearchOrder, TopLevelCellIsChosenByTheCommandLineOrder) {
+  ScratchDir tmp;
+  LibraryDesign d;
+  const std::string kTopCell = "module top;\nendmodule\n";
+  std::vector<SourceFile> files;
+  files.push_back({"top.v", kTopCell});
+  files.push_back({"top.vg", kTopCell});
+  ASSERT_TRUE(Assemble(tmp, d,
+                       "library rtlLib top.v;\n"
+                       "library gateLib top.vg;\n",
+                       files));
+  ASSERT_TRUE(UnitHoldsCellIn(d.unit, "top", "rtlLib"));
+
+  auto order = d.map.ResolveSearchOrder({"gateLib"});
+  EXPECT_EQ(Joined(order), "gateLib rtlLib");
+  auto* top = SoleTopOf(ElaborateWithOrder(d, "top", order));
+  ASSERT_NE(top, nullptr);
+  EXPECT_EQ(top->library, "gateLib");
+}
+
 }  // namespace

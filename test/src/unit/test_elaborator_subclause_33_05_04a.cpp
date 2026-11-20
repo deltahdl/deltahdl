@@ -615,7 +615,7 @@ constexpr const char* kAdderCell =
     "endmodule\n";
 
 std::vector<std::string> LibrariesBoundByPrecompiledConfig(
-    const std::string& rules) {
+    const std::string& rules, const std::vector<std::string>& order = {}) {
   ScratchDir tmp;
   auto rtl = tmp.dir / "rtl.dpl";
   auto gate = tmp.dir / "gate.dpl";
@@ -628,6 +628,7 @@ std::vector<std::string> LibrariesBoundByPrecompiledConfig(
   ConfigBindHarness h;
   EXPECT_TRUE(h.binder.LoadLibrary(rtl));
   EXPECT_TRUE(h.binder.LoadLibrary(gate));
+  if (!order.empty()) h.binder.SetLibrarySearchOrder(order);
   auto* design = h.binder.BindConfig("cfg_rules");
   EXPECT_FALSE(h.diag.HasErrors());
   std::vector<std::string> libraries;
@@ -670,6 +671,17 @@ TEST(ConfigDrivenBinding, PrecompiledInstanceUseClauseBindsItsInstance) {
                 "  default liblist rtlLib;\n"
                 "  instance adder_top.a1 use gateLib.adder;\n"),
             (std::vector<std::string>{"gateLib", "rtlLib"}));
+}
+
+TEST(ConfigDrivenBinding, PrecompiledConfigOutranksTheCommandLineSearchOrder) {
+  EXPECT_EQ(LibrariesBoundByPrecompiledConfig("  default liblist rtlLib;\n",
+                                              {"gateLib", "rtlLib"}),
+            (std::vector<std::string>{"rtlLib", "rtlLib"}));
+}
+
+TEST(ConfigDrivenBinding, PrecompiledConfigWithNoDefaultOutranksTheOrder) {
+  EXPECT_EQ(LibrariesBoundByPrecompiledConfig("", {"gateLib", "rtlLib"}),
+            (std::vector<std::string>{"rtlLib", "rtlLib"}));
 }
 
 }  // namespace
