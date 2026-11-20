@@ -90,4 +90,199 @@ TEST(DpiExportedTaskElab, ExportOfAnOutOfBlockClassMethodTaskSaysTask) {
                             8, "35.7"));
 }
 
+TEST(DpiExportedTaskElab, AnExportOfAnUndefinedTaskIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      export "DPI-C" task t;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
+}
+
+TEST(DpiExportedTaskElab, AnExportOfAnotherModulesTaskIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module other;
+      task t; endtask
+    endmodule
+    module m;
+      export "DPI-C" task t;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            6, "35.7"));
+}
+
+TEST(DpiExportedTaskElab, APackageExportOfItsOwnTaskIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      export "DPI-C" task t;
+      task t; endtask
+    endpackage
+    module m;
+      import p::*;
+      initial t;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportedTaskElab, APackageExportOfATaskItDoesNotDefineIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    package p;
+      export "DPI-C" task t;
+    endpackage
+    module m;
+      task t; endtask
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
+}
+
+TEST(DpiExportedTaskElab, AnInterfaceExportOfItsOwnTaskIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    interface i;
+      export "DPI-C" task t;
+      task t; endtask
+    endinterface
+    module m;
+      i u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportedTaskElab, AnInterfaceExportOfATaskItDoesNotDefineIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    interface i;
+      export "DPI-C" task t;
+    endinterface
+    module m;
+      task t; endtask
+      i u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
+}
+
+TEST(DpiExportedTaskElab, AProgramExportOfItsOwnTaskIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    program p;
+      export "DPI-C" task t;
+      task t; endtask
+    endprogram
+    module m;
+      p u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportedTaskElab, AProgramExportOfATaskItDoesNotDefineIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    program p;
+      export "DPI-C" task t;
+    endprogram
+    module m;
+      task t; endtask
+      p u();
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            3, "35.7"));
+}
+
+TEST(DpiExportedTaskElab, ACompilationUnitExportOfItsOwnTaskIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    export "DPI-C" task t;
+    task t; endtask
+    module m;
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportedTaskElab, ACompilationUnitExportOfATaskItDoesNotDefineIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    export "DPI-C" task t;
+    module m;
+      task t; endtask
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            2, "35.7"));
+}
+
+TEST(DpiExportedTaskElab, AGenerateBlockExportOfItsOwnTaskIsOk) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      if (1) begin : g
+        export "DPI-C" task t;
+        task t; endtask
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(DpiExportedTaskElab, AGenerateBlockExportOfTheModulesTaskIsError) {
+  ElabFixture f;
+  Elaborate(R"(
+    module m;
+      task t; endtask
+      if (1) begin : g
+        export "DPI-C" task t;
+      end
+    endmodule
+  )",
+            f, "m");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "DPI export names 't', which is not a "
+                            "SystemVerilog function or task defined in the "
+                            "enclosing scope",
+                            5, "35.7"));
+}
+
 }  // namespace

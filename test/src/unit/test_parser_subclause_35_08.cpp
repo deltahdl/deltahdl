@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -34,6 +35,19 @@ TEST(FunctionDeclParsing, DpiExportCIdentifierBesideTaskIdentifier) {
   EXPECT_TRUE(item->dpi_is_task);
   EXPECT_EQ(item->name, "sv_task");
   EXPECT_EQ(item->dpi_c_name, "c_task");
+}
+
+TEST(DpiParsing, ATaskExportInsideAClassBodyIsError) {
+  auto r = Parse(R"(
+    class C;
+      task t(); endtask
+      export "DPI-C" task t;
+    endclass
+  )");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "DPI export declaration is not allowed in class "
+                            "scope; class member functions cannot be exported",
+                            4, "35.7"));
 }
 
 }  // namespace
