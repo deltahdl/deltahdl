@@ -112,5 +112,68 @@ TEST_F(DefiningSystfNames, ADefinedNameIsCaseSensitive) {
       2, "20.1"));
 }
 
+int RegisteredTaskCallsFrom(const char* src) {
+  g_user_task_calls = 0;
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$my_task");
+  task.calltf = UserTaskCalltf;
+  EXPECT_NE(vpi_register_systf(&task), nullptr);
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  EXPECT_NE(design, nullptr);
+  if (design == nullptr) return -1;
+  LowerAndRun(design, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return g_user_task_calls;
+}
+
+TEST_F(DefiningSystfNames, ARegisteredNameIsReachedFromInsideAFunction) {
+  EXPECT_EQ(
+      RegisteredTaskCallsFrom("module t;\n"
+                              "  function void f(); $my_task; endfunction\n"
+                              "  initial f();\n"
+                              "endmodule\n"),
+      1);
+}
+
+TEST_F(DefiningSystfNames, ARegisteredNameIsReachedFromInsideATask) {
+  EXPECT_EQ(RegisteredTaskCallsFrom("module t;\n"
+                                    "  task k(); #1 $my_task; endtask\n"
+                                    "  initial k();\n"
+                                    "endmodule\n"),
+            1);
+}
+
+TEST_F(DefiningSystfNames, ARegisteredNameIsReachedFromInsideAClassMethod) {
+  EXPECT_EQ(
+      RegisteredTaskCallsFrom("module t;\n"
+                              "  class C;\n"
+                              "    function void m(); $my_task; endfunction\n"
+                              "  endclass\n"
+                              "  C c;\n"
+                              "  initial begin c = new; c.m(); end\n"
+                              "endmodule\n"),
+      1);
+}
+
+TEST_F(DefiningSystfNames, ARegisteredNameIsReachedFromInsideAProgram) {
+  EXPECT_EQ(RegisteredTaskCallsFrom("program t;\n"
+                                    "  initial $my_task;\n"
+                                    "endprogram\n"),
+            1);
+}
+
+TEST_F(DefiningSystfNames, ARegisteredNameIsReachedFromAPackageSubroutine) {
+  EXPECT_EQ(
+      RegisteredTaskCallsFrom("package p;\n"
+                              "  function void f(); $my_task; endfunction\n"
+                              "endpackage\n"
+                              "module t;\n"
+                              "  initial p::f();\n"
+                              "endmodule\n"),
+      1);
+}
+
 }  // namespace
 }  // namespace delta
