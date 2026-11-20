@@ -224,4 +224,52 @@ TEST(SdfLabelInsideAnInstance, SpecparamReadingTheAnnotatedOneFollowsIt) {
   EXPECT_EQ(path->delays[0], 15u);
 }
 
+std::string DelayCellRun(std::string_view stem, std::string_view body) {
+  const std::string kSdf = SdfWrittenFor(
+      stem, LabelFileText("dcell", "board/i_d", LabelEntry("d", 20)));
+  std::string cell = "module dcell;\n  specparam d = 10;\n";
+  cell.append(body).append("endmodule\n");
+  LabelledRun run;
+  testing::internal::CaptureStdout();
+  bool started = run.Start(DesignOf(cell, "  dcell i_d();\n", kSdf));
+  std::string out = testing::internal::GetCapturedStdout();
+  return started ? out : "";
+}
+
+TEST(SdfSpecparamReevaluationInAssignments,
+     ContinuousAssignmentDelayUsesTheAnnotatedValue) {
+  EXPECT_EQ(DelayCellRun("assign",
+                         "  logic a = 0;\n  wire y;\n"
+                         "  assign #d y = a;\n"
+                         "  initial #5 a = 1;\n"
+                         "  always @(posedge y) $display(\"y=%0t\", $time);\n"),
+            "y=25\n");
+}
+
+TEST(SdfSpecparamReevaluationInAssignments,
+     NetDeclarationDelayUsesTheAnnotatedValue) {
+  EXPECT_EQ(DelayCellRun("netdecl",
+                         "  logic a = 0;\n  wire #d w = a;\n"
+                         "  initial #5 a = 1;\n"
+                         "  always @(posedge w) $display(\"w=%0t\", $time);\n"),
+            "w=25\n");
+}
+
+TEST(SdfSpecparamReevaluationInAssignments,
+     ProceduralReadOfTheSpecparamTakesTheAnnotatedValue) {
+  EXPECT_EQ(DelayCellRun("procread",
+                         "  int x;\n"
+                         "  initial begin #1 x = d; $display(\"x=%0d\", x); "
+                         "end\n"),
+            "x=20\n");
+}
+
+TEST(SdfSpecparamReevaluationInAssignments,
+     ContinuousAssignmentReadingTheSpecparamIsReevaluated) {
+  EXPECT_EQ(DelayCellRun("contread",
+                         "  int z;\n  assign z = d + 1;\n"
+                         "  initial #1 $display(\"z=%0d\", z);\n"),
+            "z=21\n");
+}
+
 }  // namespace
