@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <array>
+
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -10,10 +12,18 @@ extern "C" {
 PLI_INT32 vpi_get_1364v1995(PLI_INT32 property, vpiHandle obj);
 PLI_INT32 vpi_get_1364v2001(PLI_INT32 property, vpiHandle obj);
 PLI_INT32 vpi_get_1364v2005(PLI_INT32 property, vpiHandle obj);
+PLI_INT32 vpi_get_1800v2005(PLI_INT32 property, vpiHandle obj);
+PLI_INT32 vpi_get_1800v2009(PLI_INT32 property, vpiHandle obj);
+PLI_INT32 vpi_get_1800v2012(PLI_INT32 property, vpiHandle obj);
 }
 
 namespace delta {
 namespace {
+
+using VpiGetRoutine = PLI_INT32 (*)(PLI_INT32, vpiHandle);
+
+constexpr std::array<VpiGetRoutine, 3> kThe1800Gets = {
+    vpi_get_1800v2005, vpi_get_1800v2009, vpi_get_1800v2012};
 
 class VpiDeprecatedDefinitions : public ::testing::Test {
  protected:
@@ -174,6 +184,69 @@ TEST_F(VpiDeprecatedDefinitions, AnErrorTheCurrentRoutineRecordsIsKept) {
   ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
   EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), vpiUndefined);
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiIntegerVar);
+}
+
+TEST_F(VpiDeprecatedDefinitions, MemoryIsAnArrayOfRegsUnderEvery1800Mode) {
+  for (VpiGetRoutine get : kThe1800Gets) {
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&word_)), vpiReg);
+  }
+  ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1800v2005));
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&word_)), vpiReg);
+}
+
+TEST_F(VpiDeprecatedDefinitions,
+       IntegerAndTimeArraysAreVariablesWithVpiArrayUnderThe2001Mode) {
+  EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&integer_array_)),
+            vpiIntegerVar);
+  EXPECT_EQ(vpi_get_1364v2001(vpiArray, VpiHandleOf(&integer_array_)), 1);
+  EXPECT_EQ(vpi_get_1364v2001(vpiType, VpiHandleOf(&time_array_)), vpiTimeVar);
+  EXPECT_EQ(vpi_get_1364v2001(vpiArray, VpiHandleOf(&time_array_)), 1);
+  ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v2001));
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiIntegerVar);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&integer_array_)), 1);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&time_array_)), vpiTimeVar);
+  EXPECT_EQ(vpi_get(vpiArray, VpiHandleOf(&time_array_)), 1);
+}
+
+TEST_F(VpiDeprecatedDefinitions, ATimeArrayIsATimeVarWithVpiArrayUnder2005) {
+  EXPECT_EQ(vpi_get_1364v2005(vpiType, VpiHandleOf(&time_array_)), vpiTimeVar);
+  EXPECT_EQ(vpi_get_1364v2005(vpiArray, VpiHandleOf(&time_array_)), 1);
+}
+
+TEST_F(VpiDeprecatedDefinitions, ArraysOfEveryVariableAreRegArraysFrom1800On) {
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&time_array_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&real_array_)), vpiRegArray);
+  for (VpiGetRoutine get : kThe1800Gets) {
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&integer_array_)), vpiRegArray);
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&time_array_)), vpiRegArray);
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&real_array_)), vpiRegArray);
+  }
+  ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1800v2005));
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&integer_array_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&time_array_)), vpiRegArray);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&real_array_)), vpiRegArray);
+}
+
+TEST_F(VpiDeprecatedDefinitions,
+       A1364ApplicationKeepsItsModeBesideA1800Default) {
+  ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1800v2009));
+  EXPECT_EQ(vpi_get_1364v1995(vpiType, VpiHandleOf(&memory_)), vpiMemory);
+  EXPECT_EQ(vpi_get_1364v1995(vpiType, VpiHandleOf(&word_)), vpiMemoryWord);
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+}
+
+TEST_F(VpiDeprecatedDefinitions,
+       DISABLED_An1800ApplicationKeepsItsModeBesideA1364Default) {
+  ASSERT_TRUE(ctx_.SetDefaultCompatibilityMode(vpiMode1364v1995));
+  for (VpiGetRoutine get : kThe1800Gets) {
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&memory_)), vpiRegArray);
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&word_)), vpiReg);
+    EXPECT_EQ(get(vpiType, VpiHandleOf(&integer_array_)), vpiRegArray);
+    EXPECT_EQ(get(vpiArray, VpiHandleOf(&integer_array_)), 0);
+  }
+  EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&memory_)), vpiMemory);
 }
 
 }  // namespace

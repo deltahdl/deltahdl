@@ -1,0 +1,4 @@
+--vpi-compat-mode
+1364v1995
+-sv_lib
+vpi_compat_mode_reaches_an_application
