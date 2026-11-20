@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -7,6 +8,7 @@
 #include "fixture_simulator.h"
 #include "helpers_preprocess_and_get.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -109,6 +111,68 @@ TEST(ProtectBeginDescriptionSimulation, ADesignWhoseKeysTravelInBlocksRuns) {
   src += "  initial result = 42;\n";
   src += "`pragma protect end\nendmodule\n";
   KeyBlockDesignRun run(src, keys);
+  EXPECT_FALSE(run.f.diag.HasErrors());
+  EXPECT_EQ(run.result, 42U);
+}
+
+std::string EnvelopeWrittenByHand(std::string_view cleartext) {
+  std::string envelope = "`pragma protect begin_protected\n";
+  envelope.append("`pragma protect encoding=(enctype=\"");
+  envelope.append(kBlockEnctype).append("\", bytes=");
+  envelope.append(std::to_string(ProtectedRegionBlockSize(cleartext)));
+  envelope.append(")\n`pragma protect data_block\n");
+  envelope.append(EncryptProtectedRegion(cleartext, kAuthorKey));
+  envelope.append("\n`pragma protect end_protected\n");
+  return envelope;
+}
+
+struct HandWrittenEnvelopeRun {
+  SimFixture f;
+  Preprocessor pp;
+  uint64_t result = 0;
+
+  explicit HandWrittenEnvelopeRun(std::string_view cleartext)
+      : pp(f.mgr, f.diag, KeyConfig(kAuthorKey)) {
+    std::string src = "module t;\n  int result = 1;\n";
+    src.append(EnvelopeWrittenByHand(cleartext)).append("endmodule\n");
+    result = RunPreprocessedSim(f, f.mgr.AddFile("<test>", src), "result", pp);
+  }
+};
+
+constexpr std::string_view kSealedStatement = "  initial result = 42;\n";
+
+TEST(ProtectBeginDescriptionSimulation, AnUnpaddedHandWrittenEnvelopeRuns) {
+  HandWrittenEnvelopeRun run(kSealedStatement);
+  EXPECT_FALSE(run.f.diag.HasErrors());
+  EXPECT_EQ(run.result, 42U);
+}
+
+TEST(ProtectBeginDescriptionSimulation, ShortCommentPaddingLeavesTheDesign) {
+  std::string padded = "// q7#Lx\n/* zR2 */ /*k*/\n";
+  padded.append(kSealedStatement);
+  padded.append("/* m9 */\n// Vt0p\n");
+  HandWrittenEnvelopeRun run(padded);
+  EXPECT_FALSE(run.f.diag.HasErrors());
+  EXPECT_EQ(run.result, 42U);
+}
+
+TEST(ProtectBeginDescriptionSimulation, LongCommentPaddingLeavesTheDesign) {
+  std::string noise;
+  for (size_t n = 0; n < 400; ++n) {
+    noise.push_back(static_cast<char>('!' + (n * 37) % 90));
+  }
+  for (char& c : noise) {
+    if (c == '*' || c == '/') c = '#';
+  }
+  std::string padded = "/* ";
+  padded.append(noise.substr(0, 120)).append("\n");
+  padded.append(noise.substr(120, 140)).append("\n   ");
+  padded.append(noise.substr(260)).append(" */\n// ");
+  padded.append(noise).append("\n");
+  padded.append(kSealedStatement);
+  padded.append("// ").append(noise).append("\n/*\n");
+  padded.append(noise).append("\n").append(noise).append("\n*/");
+  HandWrittenEnvelopeRun run(padded);
   EXPECT_FALSE(run.f.diag.HasErrors());
   EXPECT_EQ(run.result, 42U);
 }

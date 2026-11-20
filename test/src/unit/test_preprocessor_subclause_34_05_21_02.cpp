@@ -8,14 +8,17 @@
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
 #include "fixture_preprocessor.h"
+#include "helpers_protect_block_lines.h"
 #include "helpers_protect_keys.h"
 #include "helpers_protect_keyword_value.h"
 #include "helpers_reported_error.h"
+#include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_digest.h"
 #include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_digest_block.h"
 #include "preprocessor/protect_encoding.h"
+#include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
 
@@ -427,6 +430,70 @@ TEST(ProtectDigestAlgorithms, Md5GivesRfc1321sExamples) {
                 "1234567890123456789012345678901234567890123456789012345678901"
                 "2345678901234567890")),
             "57edf4a22be3c955ac49da2e2107b67a");
+}
+
+std::string DigestThroughTheIdentifier(std::string_view text,
+                                       std::string_view identifier) {
+  std::string digest;
+  EXPECT_TRUE(ProtectMessageDigest(text, identifier, &digest)) << identifier;
+  return LowercaseHex(digest);
+}
+
+TEST(ProtectDigestAlgorithms, TheSha1IdentifierGivesFips1802sExamples) {
+  EXPECT_EQ(DigestThroughTheIdentifier("abc", "sha1"),
+            "a9993e364706816aba3e25717850c26c9cd0d89d");
+  EXPECT_EQ(
+      DigestThroughTheIdentifier(
+          "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", "sha1"),
+      "84983e441c3bd26ebaae4aa1f95129e5e54670f1");
+}
+
+TEST(ProtectDigestAlgorithms, TheMd5IdentifierGivesRfc1321sExamples) {
+  EXPECT_EQ(DigestThroughTheIdentifier("", "md5"),
+            "d41d8cd98f00b204e9800998ecf8427e");
+  EXPECT_EQ(DigestThroughTheIdentifier("abc", "md5"),
+            "900150983cd24fb0d6963f7d28e17f72");
+}
+
+constexpr std::string_view kDigestedDesign = "module gimbal_m; endmodule\n";
+constexpr std::string_view kDigestingKey = "the-digest-authors-exchange-key";
+
+std::string BytesOfTheBlockAfter(std::string_view envelope,
+                                 std::string_view keyword) {
+  std::string opening = "`pragma protect ";
+  opening.append(keyword).append("\n");
+  std::string bytes;
+  EXPECT_TRUE(ProtectBlockBytesAfter(envelope, opening, kBlockEnctype, &bytes))
+      << envelope;
+  std::string opened;
+  EXPECT_TRUE(DecryptProtectedBlock(bytes, kDigestingKey, &opened, kDataMethod))
+      << envelope;
+  return opened;
+}
+
+std::string DigestCarriedUnder(std::string_view identifier,
+                               std::string* sealed) {
+  std::string region = "`pragma protect digest_method=\"";
+  region.append(identifier).append("\"\n`pragma protect begin\n");
+  region.append("`pragma protect digest_block\n").append(kDigestedDesign);
+  region.append("`pragma protect end\n");
+  std::string envelope = EncryptEnvelopes(region, kDigestingKey);
+  EXPECT_FALSE(Holds(envelope, kDigestedDesign)) << envelope;
+  *sealed = BytesOfTheBlockAfter(envelope, "data_block");
+  EXPECT_TRUE(Holds(*sealed, kDigestedDesign)) << *sealed;
+  return BytesOfTheBlockAfter(envelope, "digest_block");
+}
+
+TEST(ProtectDigestMethodEncryptionInput, ASha1DigestBlockHoldsTheSha1Digest) {
+  std::string sealed;
+  std::string carried = DigestCarriedUnder("sha1", &sealed);
+  EXPECT_EQ(LowercaseHex(carried), LowercaseHex(Sha1Digest(sealed)));
+}
+
+TEST(ProtectDigestMethodEncryptionInput, AnMd5DigestBlockHoldsTheMd5Digest) {
+  std::string sealed;
+  std::string carried = DigestCarriedUnder("md5", &sealed);
+  EXPECT_EQ(LowercaseHex(carried), LowercaseHex(Md5Digest(sealed)));
 }
 
 }  // namespace

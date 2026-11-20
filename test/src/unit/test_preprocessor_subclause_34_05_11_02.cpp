@@ -465,4 +465,32 @@ TEST(ProtectDataMethodCipher, ADesCbcBlockWithoutAPrefixIsOpened) {
   EXPECT_EQ(recovered, kSealedDesign);
 }
 
+TEST(ProtectDataMethodCipher, ThreeBlocksChainAsThePublishedCbcExample) {
+  const std::string kKey = BytesOfHex("0123456789ABCDEF");
+  const std::string kIv = BytesOfHex("1234567890ABCDEF");
+  const std::string kText = "Now is the time for all ";
+  ASSERT_EQ(HexOfBytes(kText),
+            "4E6F77206973207468652074696D6520666F7220616C6C20");
+  std::string ciphered = DesCbcEncrypt(kText, kKey, kIv);
+  ASSERT_GE(ciphered.size(), 3 * kDesBlockBytes);
+  EXPECT_EQ(HexOfBytes(ciphered.substr(0, 3 * kDesBlockBytes)),
+            "E5C7CDDE872BF27C43E934008C389C0F683788499A7C05F6");
+
+  std::string recovered;
+  ASSERT_TRUE(DesCbcDecrypt(ciphered, kKey, kIv, &recovered));
+  EXPECT_EQ(recovered, kText);
+}
+
+TEST(ProtectDataMethodCipher, KeysDifferingOnlyInParityAreOneKey) {
+  ExpectDesVector("133457799BBCDFF0", "0123456789ABCDEF", "85E813540F0AB405");
+  const std::string kIv = BytesOfHex("0011223344556677");
+  const std::string kText = "parity bits carry no key";
+  std::string ciphered =
+      DesCbcEncrypt(kText, BytesOfHex("133457799BBCDFF0"), kIv);
+  std::string recovered;
+  ASSERT_TRUE(
+      DesCbcDecrypt(ciphered, BytesOfHex("133457799BBCDFF1"), kIv, &recovered));
+  EXPECT_EQ(recovered, kText);
+}
+
 }  // namespace

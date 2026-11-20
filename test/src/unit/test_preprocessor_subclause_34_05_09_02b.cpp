@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 
@@ -234,6 +235,81 @@ TEST(ProtectBlockWriting, AKeyBlockWrittenInUuencodeIsReadBack) {
   std::string read = Preprocess(sealed, f, config);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(Holds(read, kEncodingSealedDesign));
+}
+
+TEST(ProtectBase64Writing, TheWritingIsRfc2045sForEveryFinalGroup) {
+  ProtectEncoding base64 = Stated(kBase64Enctype, 0);
+  EXPECT_EQ(EncodeProtectBlock("acme public", base64), "YWNtZSBwdWJsaWM=");
+  EXPECT_EQ(EncodeProtectBlock("acme", base64), "YWNtZQ==");
+  EXPECT_EQ(EncodeProtectBlock("acm", base64), "YWNt");
+}
+
+bool Rfc2045Decoded(std::string_view text, std::string* bytes) {
+  constexpr std::string_view kAlphabet =
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  if (text.empty() || text.size() % 4 != 0) return false;
+  size_t padding = 0;
+  while (padding < 2 && text[text.size() - 1 - padding] == '=') ++padding;
+  size_t carried = text.size() - padding;
+  uint32_t bits = 0;
+  size_t held = 0;
+  bytes->clear();
+  for (size_t at = 0; at < carried; ++at) {
+    size_t value = kAlphabet.find(text[at]);
+    if (value == std::string_view::npos) return false;
+    bits = (bits << 6) | static_cast<uint32_t>(value);
+    held += 6;
+    if (held >= 8) {
+      held -= 8;
+      bytes->push_back(static_cast<char>((bits >> held) & 0xFFU));
+    }
+  }
+  return (bits & ((1U << held) - 1U)) == 0;
+}
+
+std::string JoinedLines(std::string_view lines) {
+  std::string joined;
+  for (char c : lines) {
+    if (c != '\n') joined.push_back(c);
+  }
+  return joined;
+}
+
+void ExpectTheBlockInRfc2045sBase64(std::string_view envelope,
+                                    std::string_view keyword) {
+  std::string opening = "`pragma protect ";
+  opening.append(keyword).append("\n");
+  std::string lines = BlockLinesAfter(envelope, opening);
+  ASSERT_FALSE(lines.empty()) << keyword << "\n" << envelope;
+  std::string strict;
+  ASSERT_TRUE(Rfc2045Decoded(JoinedLines(lines), &strict)) << keyword << "\n"
+                                                           << lines;
+  std::string ours;
+  ASSERT_TRUE(DecodeProtectBlock(lines, kBase64Enctype, &ours)) << keyword;
+  EXPECT_EQ(strict, ours) << keyword;
+}
+
+TEST(ProtectBase64Writing, EveryBlockOfAnEnvelopeIsRfc2045sText) {
+  std::string refused;
+  ASSERT_FALSE(Rfc2045Decoded("YWNtZQ", &refused));
+  ASSERT_FALSE(Rfc2045Decoded("YWNt*Q==", &refused));
+  ASSERT_FALSE(Rfc2045Decoded("YWNtZR==", &refused));
+  ASSERT_TRUE(Rfc2045Decoded("YWNtZQ==", &refused));
+  ASSERT_EQ(refused, "acme");
+  std::string inside = "`pragma protect key_keyowner=\"";
+  inside.append(kKeyProvider).append("\"\n");
+  inside.append(NamesScheme(kBase64Enctype));
+  inside.append("`pragma protect key_public_key\n");
+  inside.append(kDesignationInBase64).append("\n");
+  inside.append("`pragma protect digest_block\n");
+  ProtectKeyList keys;
+  keys.Add({std::string(kKeyProvider), std::string(kDesignatedKey),
+            std::string(kProviderKey)});
+  std::string envelope = EncryptEnvelopes(RegionHolding(inside), "", keys);
+  ASSERT_FALSE(Holds(envelope, kEncodingSealedDesign)) << envelope;
+  for (std::string_view keyword : {"key_block", "data_block", "digest_block"}) {
+    ExpectTheBlockInRfc2045sBase64(envelope, keyword);
+  }
 }
 
 }  // namespace

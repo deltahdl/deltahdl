@@ -8,11 +8,15 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_block_lines.h"
 #include "helpers_protect_keys.h"
 #include "helpers_reported_error.h"
 #include "helpers_text_lines.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_des.h"
+#include "preprocessor/protect_digest_algorithms.h"
 #include "preprocessor/protect_digest_key.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_envelope_output.h"
 #include "preprocessor/protect_key_method.h"
 #include "preprocessor/protect_keywords.h"
@@ -298,6 +302,65 @@ TEST(ProtectKeyMethodEncryptionInput,
   EXPECT_EQ(TimesWritten(run.envelope, kKeyBlockLine), 0U) << run.envelope;
   EXPECT_FALSE(Holds(run.envelope, kKeyMethodDirective)) << run.envelope;
   EXPECT_FALSE(Holds(run.envelope, kSealedDesign)) << run.envelope;
+}
+
+std::string DesKeyOfTheEntitysKey() {
+  std::string input(kEntityKey);
+  input.append(4, '\0');
+  return Sha1Digest(input).substr(0, kDesKeyBytes);
+}
+
+std::string KeyBlockBytesOf(std::string_view envelope) {
+  std::string bytes;
+  EXPECT_TRUE(
+      ProtectBlockBytesAfter(envelope, kKeyBlockLine, kBlockEnctype, &bytes))
+      << envelope;
+  return bytes;
+}
+
+std::string KeyBlockContentUnderDesCbc(std::string_view envelope) {
+  std::string bytes = KeyBlockBytesOf(envelope);
+  EXPECT_GT(bytes.size(), kDesBlockBytes) << envelope;
+  std::string content;
+  EXPECT_TRUE(DesCbcDecrypt(bytes.substr(kDesBlockBytes),
+                            DesKeyOfTheEntitysKey(),
+                            bytes.substr(0, kDesBlockBytes), &content))
+      << envelope;
+  return content;
+}
+
+TEST(ProtectKeyMethodEncryptionInput,
+     AKeyBlockUnderTheRequiredCipherIsAnIvThenDesCbcText) {
+  AuthorsRun run(SignedRegion(Writes("key_method", kKeyCipher)),
+                 TheEntitysKey());
+  ASSERT_FALSE(run.diag.HasErrors()) << run.envelope;
+  std::string content = KeyBlockContentUnderDesCbc(run.envelope);
+  EXPECT_TRUE(Holds(content, "`pragma protect data_decrypt_key")) << content;
+  EXPECT_TRUE(Holds(content, "`pragma protect data_method")) << content;
+}
+
+TEST(ProtectKeyMethodDecryptionInput,
+     AKeyBlockSealedElsewhereUnderDesCbcOpens) {
+  AuthorsRun run(SignedRegion(Writes("key_method", kKeyCipher)),
+                 TheEntitysKey());
+  std::string content = KeyBlockContentUnderDesCbc(run.envelope);
+  ASSERT_TRUE(Holds(content, "`pragma protect data_decrypt_key")) << content;
+  const std::string kIv = "\x5a\x17\xc3\x08\x91\x4e\xb2\x6d";
+  std::string sealed = kIv;
+  sealed.append(DesCbcEncrypt(content, DesKeyOfTheEntitysKey(), kIv));
+  ASSERT_EQ(sealed.size(), KeyBlockBytesOf(run.envelope).size());
+  std::string rebuilt =
+      WithProtectBlockBytes(run.envelope, kKeyBlockLine, sealed, kBlockEnctype);
+  ASSERT_NE(rebuilt, run.envelope);
+
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  PreprocConfig config;
+  config.protect_keys = TheEntitysKey();
+  Preprocessor pp(mgr, diag, std::move(config));
+  std::string text = pp.Preprocess(mgr.AddFile("<test>", rebuilt));
+  EXPECT_FALSE(diag.HasErrors()) << rebuilt;
+  EXPECT_TRUE(Holds(text, kSealedDesign)) << text;
 }
 
 }  // namespace

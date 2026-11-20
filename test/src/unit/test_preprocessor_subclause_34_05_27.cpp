@@ -71,6 +71,26 @@ struct KeyedEncryptionRun {
                               mgr.AddFile("<test>", src))) {}
 };
 
+void ExpectAnUnenvelopedBlockReportedUnder(const std::string& subclause) {
+  std::string src = Region(kKeyBlockDirective);
+  EncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
+                            "key_block is written where no previously", 2,
+                            subclause));
+}
+
+void ExpectAChangedDataExpressionReportedUnder(const std::string& subclause) {
+  std::string described =
+      Designation(kFirstProvider, kFirstProviderKeyName, "design-2026");
+  described.append(
+      Designation(kSecondProvider, kSecondProviderKeyName, "design-2027"));
+  std::string src = Region(described);
+  KeyedEncryptionRun run(src);
+  EXPECT_TRUE(ReportedError(
+      run.diag.Diagnostics(), "data decryption expressions change value",
+      LineHolding(src, kSecondProviderKeyName), subclause));
+}
+
 TEST(ProtectKeyBlockEncryptionInput, ABlockContainedByNothingIsReported) {
   std::string src = "module m;\n";
   src.append(kKeyBlockDirective);
@@ -90,11 +110,7 @@ TEST(ProtectKeyBlockEncryptionInput, ABlockASealedModelContainsIsIgnored) {
 }
 
 TEST(ProtectKeyBlockEncryptionInput, ABlockInsideARegionToSealIsReported) {
-  std::string src = Region(kKeyBlockDirective);
-  EncryptionRun run(src);
-  EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
-                            "key_block is written where no previously", 2,
-                            "34.5.27"));
+  ExpectAnUnenvelopedBlockReportedUnder("34.5.27");
 }
 
 TEST(ProtectKeyBlockEncryptionInput, TwoBlocksAgreeingAboutTheDataAreAccepted) {
@@ -109,15 +125,7 @@ TEST(ProtectKeyBlockEncryptionInput, TwoBlocksAgreeingAboutTheDataAreAccepted) {
 
 TEST(ProtectKeyBlockEncryptionInput,
      ADataExpressionChangedBetweenTwoBlocksIsReported) {
-  std::string described =
-      Designation(kFirstProvider, kFirstProviderKeyName, "design-2026");
-  described.append(
-      Designation(kSecondProvider, kSecondProviderKeyName, "design-2027"));
-  std::string src = Region(described);
-  KeyedEncryptionRun run(src);
-  EXPECT_TRUE(ReportedError(
-      run.diag.Diagnostics(), "data decryption expressions change value",
-      LineHolding(src, kSecondProviderKeyName), "34.5.27"));
+  ExpectAChangedDataExpressionReportedUnder("34.5.27");
 }
 
 TEST(ProtectKeyBlockEncryptionInput, EachOtherDataExpressionIsHeldToAgreeing) {
@@ -167,6 +175,16 @@ TEST(ProtectKeyBlockEncryptionInput,
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(), "data decryption expressions change value",
       LineHolding(src, kSecondProviderKeyName), "34.5.27"));
+}
+
+TEST(ProtectKeyBlockEncryptionInput,
+     DISABLED_AnUnenvelopedBlockIsReportedUnderTheDescription) {
+  ExpectAnUnenvelopedBlockReportedUnder("34.5.27.2");
+}
+
+TEST(ProtectKeyBlockEncryptionInput,
+     DISABLED_AChangedDataExpressionIsReportedUnderTheDescription) {
+  ExpectAChangedDataExpressionReportedUnder("34.5.27.2");
 }
 
 }  // namespace
