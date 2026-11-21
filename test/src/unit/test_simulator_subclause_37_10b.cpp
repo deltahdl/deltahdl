@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -286,6 +287,23 @@ TEST_F(InstanceItemsOfARun, EveryObjectReachesItsImmediateInstance) {
     ASSERT_NE(item, nullptr) << c.item;
     EXPECT_EQ(VpiObjectOf(InstanceOf(item)), VpiObjectOf(scope)) << c.item;
   }
+}
+
+TEST_F(InstanceItemsOfARun,
+       DISABLED_ANullReferenceIteratesEveryTopLevelInstance) {
+  Run("package pk; int pv; endpackage\n"
+      "interface ifc; endinterface\n"
+      "program prg; endprogram\n"
+      "module sub; endmodule\n"
+      "module top; ifc i0(); sub m1(); endmodule\n");
+  std::vector<std::string> expected = NamesOf(vpiPackage, nullptr);
+  ASSERT_NE(std::ranges::find(expected, "pk"), expected.end());
+  expected.emplace_back("prg");
+  expected.emplace_back("top");
+  std::ranges::sort(expected);
+  EXPECT_EQ(NamesOf(vpiInstance, nullptr), expected);
+  EXPECT_EQ(NamesOf(vpiProgram, nullptr), (std::vector<std::string>{"prg"}));
+  EXPECT_EQ(NamesOf(vpiModule, nullptr), (std::vector<std::string>{"top"}));
 }
 
 }  // namespace

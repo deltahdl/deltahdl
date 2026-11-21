@@ -220,6 +220,15 @@ TEST_F(VirtualInterfaceVarsInEveryPlace,
 }
 
 TEST_F(VirtualInterfaceVarsInEveryPlace,
+       DISABLED_ALocalReachesItsInterfaceTypespec) {
+  Run(kEveryPlace);
+  EXPECT_EQ(InterfaceTypeOf(Local(Tf("t"), "tl")), "SBus");
+  EXPECT_EQ(InterfaceTypeOf(Local(Tf("t"), "tlp")), "phy");
+  EXPECT_EQ(InterfaceTypeOf(Local(Tf("f"), "fl")), "SBus");
+  EXPECT_EQ(InterfaceTypeOf(By("top.blk.x")), "SBus");
+}
+
+TEST_F(VirtualInterfaceVarsInEveryPlace,
        AnUnassignedClassPropertyHoldsNothing) {
   Run(kEveryPlace);
   vpiHandle cp = Property("cp");

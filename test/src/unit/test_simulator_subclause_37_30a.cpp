@@ -162,6 +162,20 @@ class InterfaceTypespecsOfARun : public VpiDesignRun {
     }
     return assigned;
   }
+
+  static std::vector<int> ValuesOf(vpiHandle typespec) {
+    std::vector<int> values;
+    for (vpiHandle assign : ObjectsOf(vpiParamAssign, typespec)) {
+      values.push_back(IntValueOf(vpi_handle(vpiRhs, assign)));
+    }
+    return values;
+  }
+
+  static std::string DefNameOf(vpiHandle typespec) {
+    const char* name =
+        typespec == nullptr ? nullptr : vpi_get_str(vpiDefName, typespec);
+    return name == nullptr ? "<null>" : name;
+  }
 };
 
 constexpr const char* kSBus =
@@ -225,13 +239,18 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedInterfacesParam) {
       "  typedef virtual bus #(4, 5) vb_t;\n"
       "  class C; typedef virtual bus #(6) cv_t; endclass\n"
       "endmodule\n");
-  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top"), "vb_t")),
-            (std::vector<std::pair<std::string, int>>{{"W", vpiConstant},
-                                                      {"D", vpiConstant}}));
+  vpiHandle vb = Named(vpiTypedef, By("top"), "vb_t");
+  EXPECT_EQ(Assigned(vb), (std::vector<std::pair<std::string, int>>{
+                              {"W", vpiConstant}, {"D", vpiConstant}}));
+  EXPECT_EQ(ValuesOf(vb), (std::vector<int>{4, 5}));
+  EXPECT_EQ(DefNameOf(vb), "bus");
   vpiHandle defn = Named(vpiClassDefn, By("top"), "C");
   ASSERT_NE(defn, nullptr);
-  EXPECT_EQ(Assigned(Named(vpiTypedef, defn, "cv_t")),
+  vpiHandle cv = Named(vpiTypedef, defn, "cv_t");
+  EXPECT_EQ(Assigned(cv),
             (std::vector<std::pair<std::string, int>>{{"W", vpiConstant}}));
+  EXPECT_EQ(ValuesOf(cv), (std::vector<int>{6}));
+  EXPECT_EQ(DefNameOf(cv), "bus");
 }
 
 TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsAUnitInterfacesParam) {
@@ -239,10 +258,16 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsAUnitInterfacesParam) {
       "package pk; typedef virtual ubus #(7) vp_t; endpackage\n"
       "typedef virtual ubus #(3) vu_t;\n"
       "module top; vu_t vu; ubus #(3) u(); endmodule\n");
-  EXPECT_EQ(Assigned(Named(vpiTypedef, By("pk"), "vp_t")),
+  vpiHandle vp = Named(vpiTypedef, By("pk"), "vp_t");
+  EXPECT_EQ(Assigned(vp),
             (std::vector<std::pair<std::string, int>>{{"N", vpiConstant}}));
-  EXPECT_EQ(Assigned(vpi_handle(vpiTypespec, By("top.vu"))),
+  EXPECT_EQ(ValuesOf(vp), (std::vector<int>{7}));
+  vpiHandle vu = vpi_handle(vpiTypespec, By("top.vu"));
+  EXPECT_EQ(Assigned(vu),
             (std::vector<std::pair<std::string, int>>{{"N", vpiConstant}}));
+  EXPECT_EQ(ValuesOf(vu), (std::vector<int>{3}));
+  EXPECT_EQ(DefNameOf(vp), "ubus");
+  EXPECT_EQ(DefNameOf(vu), "ubus");
 }
 
 TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedHoldersParam) {
@@ -256,10 +281,16 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedHoldersParam) {
       "  endmodule\n"
       "  inner i();\n"
       "endmodule\n");
-  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top.i"), "t")),
+  vpiHandle t = Named(vpiTypedef, By("top.i"), "t");
+  vpiHandle o = Named(vpiTypedef, By("top.i"), "o");
+  EXPECT_EQ(Assigned(t),
             (std::vector<std::pair<std::string, int>>{{"K", vpiConstant}}));
-  EXPECT_EQ(Assigned(Named(vpiTypedef, By("top.i"), "o")),
+  EXPECT_EQ(Assigned(o),
             (std::vector<std::pair<std::string, int>>{{"X", vpiConstant}}));
+  EXPECT_EQ(ValuesOf(t), (std::vector<int>{3}));
+  EXPECT_EQ(ValuesOf(o), (std::vector<int>{4}));
+  EXPECT_EQ(DefNameOf(t), "bus");
+  EXPECT_EQ(DefNameOf(o), "outer");
 }
 
 }  // namespace

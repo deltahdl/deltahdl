@@ -772,5 +772,32 @@ TEST_F(TypespecsOfARun, AnEnumOfAKeywordBaseReachesThatKeywordsTypespec) {
   EXPECT_EQ(BoundsOf(in_place), (std::vector<int>{1, 0}));
 }
 
+TEST_F(TypespecsOfARun,
+       DISABLED_AnArrayVarOfAnUnpackedArrayTypedefReachesItByName) {
+  Run("interface SBus; logic a; modport phy(input a); endinterface\n"
+      "package pk; typedef byte pa_t [2]; endpackage\n"
+      "typedef logic [3:0] ua_t [1:2];\n"
+      "interface ifc; typedef int ia_t [3]; ia_t ia; endinterface\n"
+      "program prg; typedef bit pg_t [2]; pg_t pg; endprogram\n"
+      "module top;\n"
+      "  typedef logic [3:0] la_t [1:2];\n"
+      "  typedef virtual SBus.phy SBphy [1:4];\n"
+      "  typedef logic [3:0] nib_t;\n"
+      "  la_t la; ua_t ua; pk::pa_t pa; SBphy arr; nib_t n;\n"
+      "  ifc i(); prg p();\n"
+      "endmodule\n");
+  Names names;
+  for (const char* var : {"top.la", "top.ua", "top.pa", "top.arr", "top.i.ia",
+                          "top.p.pg", "top.n"}) {
+    vpiHandle typespec = vpi_handle(vpiTypespec, By(var));
+    const char* name =
+        typespec == nullptr ? nullptr : vpi_get_str(vpiName, typespec);
+    names.emplace_back(name == nullptr ? "<null>" : name);
+  }
+  EXPECT_EQ(names,
+            (Names{"la_t", "ua_t", "pa_t", "SBphy", "ia_t", "pg_t", "nib_t"}));
+  EXPECT_EQ(KindOf(vpi_handle(vpiTypespec, By("top.la"))), vpiArrayTypespec);
+}
+
 }  // namespace
 }  // namespace delta
