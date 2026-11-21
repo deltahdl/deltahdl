@@ -65,6 +65,16 @@ TEST_F(ModulePathModel, ModuleIsNullForInterfaceNestedInModule) {
   EXPECT_EQ(vpi_handle(kVpiModule, VpiHandleOf(path)), nullptr);
 }
 
+TEST_F(ModulePathModel, ModuleIsNullForATopLevelInterface) {
+  VpiHandle iface = MakeObject(vpiInterface);
+  VpiHandle path = MakeObject(vpiModPath);
+  path->parent = iface;
+  iface->children.push_back(path);
+
+  EXPECT_EQ(vpi_handle(kVpiModule, VpiHandleOf(path)), nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, VpiHandleOf(path))), iface);
+}
+
 TEST_F(ModulePathModel, CarveOutAppliesOnlyToModPath) {
   auto* mod = vpi_ctx_.CreateModule("host", "host");
   VpiHandle other = MakeObject(vpiNet);
