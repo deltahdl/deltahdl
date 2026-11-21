@@ -515,6 +515,21 @@ TEST_F(SeparateUnitsVpi, AModulesTaskEnableReachesItsOwnUnitsTask) {
             UnitMarked("mark1"));
 }
 
+TEST_F(SeparateUnitsVpi, DISABLED_AUnitClasssMethodReachesItsOwnUnitsFunction) {
+  RunUnits(
+      {"int mark0;\nfunction int f(); return 1; endfunction\n"
+       "module top; endmodule\n",
+       "int mark1;\nfunction int f(); return 2; endfunction\n"
+       "class C; function void m(); void'(f()); endfunction endclass\n"
+       "module other; endmodule\n"});
+  VpiObject* second = UnitMarked("mark1");
+  ASSERT_NE(second, nullptr);
+  vpiHandle m =
+      Named(vpiMethods, Named(vpiClassDefn, VpiHandleOf(second), "C"), "m");
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(UnitOfCallee(vpi_handle(vpiStmt, m), vpiFunction), second);
+}
+
 TEST_F(SeparateUnitsVpi, AGenerateBlocksCallReachesItsOwnUnitsFunction) {
   RunUnits(UnitsOfOneName(
       "", "if (1) begin : g\n  initial begin : b void'(f()); end\nend\n"));
