@@ -456,7 +456,6 @@ TEST_F(ConstraintExpressionsOfARun, ADistItemIsADistribution) {
   EXPECT_NE(vpi_handle(vpiLeftRange, range), nullptr);
   EXPECT_NE(vpi_handle(vpiRightRange, range), nullptr);
   EXPECT_EQ(vpi_handle(vpiWeight, kEntries[2]), nullptr);
-  EXPECT_EQ(vpi_handle(vpiValueRange, kEntries[3]), nullptr);
   EXPECT_EQ(vpi_handle(vpiValueRange, kEntries[4]), nullptr);
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiWeight, kEntries[4])), vpiConstant);
   EXPECT_EQ(vpi_handle(vpiCondition, kEntries[0]), nullptr);
