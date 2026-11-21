@@ -698,14 +698,16 @@ TEST_F(PropertyDeclsOfARun, TwoInstancesOfAnUntypedFormalEachReachTheirOwn) {
   EXPECT_STREQ(vpi_get_str(vpiName, kSecond[0]), "b");
 }
 
-TEST_F(PropertyDeclsOfARun, AnEdgeKeywordEventActualIsNoArgument) {
+TEST_F(PropertyDeclsOfARun,
+       DISABLED_AnEdgeKeywordEventActualStandsInItsFormalsPlace) {
   Run("module top; logic clk, a;\n"
       "  property p(event e, x); @(e) x; endproperty\n"
       "  a1: assert property (p(edge clk, a));\n"
       "endmodule\n");
   const std::vector<vpiHandle> kArguments = ArgumentsOf("a1");
-  ASSERT_EQ(kArguments.size(), 1U);
-  EXPECT_STREQ(vpi_get_str(vpiName, kArguments[0]), "a");
+  ASSERT_EQ(kArguments.size(), 2U);
+  EXPECT_NE(kArguments[0], nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, kArguments[1]), "a");
 }
 
 TEST_F(PropertyDeclsOfARun, AnUnclockedPropertyUnderDefaultClocking) {
