@@ -11,6 +11,7 @@
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
