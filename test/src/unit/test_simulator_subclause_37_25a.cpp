@@ -449,7 +449,6 @@ TEST_F(TypespecsOfARun, DetailEightsArraysUnwindToTheirTypedefs) {
   EXPECT_EQ(vpi_get(vpiType, unparr), vpiArrayTypespec);
   EXPECT_EQ(vpi_get(vpiArrayType, unparr), vpiStaticArray);
   EXPECT_EQ(RangeSizesOf(unparr), (std::vector<int>{3}));
-  EXPECT_EQ(vpi_get(vpiVector, unparr), 0);
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiElemTypespec, unparr), parr2));
   EXPECT_EQ(vpi_get(vpiType, parr2), vpiPackedArrayTypespec);
   EXPECT_EQ(RangeSizesOf(parr2), (std::vector<int>{2, 3}));

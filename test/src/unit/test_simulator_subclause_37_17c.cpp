@@ -38,5 +38,67 @@ TEST_F(PortVariablesOfARun, APortExpressionObjectsTypespecIsItsTypedef) {
   EXPECT_STREQ(TypespecOf("top.k"), "e_t");
 }
 
+class ScopedVariablesOfARun : public VpiDesignRun {
+ protected:
+  static vpiHandle CompilationUnit() {
+    for (vpiHandle scope : ObjectsOf(vpiPackage, nullptr)) {
+      if (vpi_get(vpiUnit, scope) == 1) return scope;
+    }
+    return nullptr;
+  }
+
+  static void ExpectTypespecsOfScope(vpiHandle scope) {
+    ASSERT_NE(scope, nullptr);
+    vpiHandle number = vpi_handle(vpiTypespec, Named(vpiVariables, scope, "i"));
+    ASSERT_NE(number, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, number), vpiIntTypespec);
+    EXPECT_EQ(vpi_get_str(vpiName, number), nullptr);
+    vpiHandle nibble = vpi_handle(vpiTypespec, Named(vpiVariables, scope, "n"));
+    ASSERT_NE(nibble, nullptr);
+    EXPECT_NE(vpi_compare_objects(nibble, Named(vpiTypedef, scope, "nib_t")),
+              0);
+    vpiHandle choice = vpi_handle(vpiTypespec, Named(vpiVariables, scope, "e"));
+    ASSERT_NE(choice, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, choice), vpiEnumTypespec);
+  }
+};
+
+constexpr const char* kScopedVariables =
+    "typedef bit [3:0] nib_t; int i; nib_t n; enum {UA, UB} e;\n"
+    "package pk; typedef bit [3:0] nib_t; int i; nib_t n; enum {PA, PB} e;\n"
+    "endpackage\n"
+    "module top;\n"
+    "  if (1) begin : blk typedef bit [3:0] b_t; b_t v; int g; end\n"
+    "endmodule\n";
+
+TEST_F(ScopedVariablesOfARun, DISABLED_APackagesVariablesReachTheirTypespecs) {
+  Run(kScopedVariables);
+  ExpectTypespecsOfScope(By("pk"));
+}
+
+TEST_F(ScopedVariablesOfARun,
+       DISABLED_TheCompilationUnitsVariablesReachTheirTypespecs) {
+  Run(kScopedVariables);
+  ExpectTypespecsOfScope(CompilationUnit());
+}
+
+TEST_F(ScopedVariablesOfARun,
+       AGenerateBlocksBuiltInVariableReachesItsTypespec) {
+  Run(kScopedVariables);
+  vpiHandle typespec = vpi_handle(vpiTypespec, By("top.blk.g"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
+}
+
+TEST_F(ScopedVariablesOfARun,
+       DISABLED_AGenerateBlocksVariableReachesItsBlocksTypedef) {
+  Run(kScopedVariables);
+  vpiHandle typespec = vpi_handle(vpiTypespec, By("top.blk.v"));
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_NE(
+      vpi_compare_objects(typespec, Named(vpiTypedef, By("top.blk"), "b_t")),
+      0);
+}
+
 }  // namespace
 }  // namespace delta
