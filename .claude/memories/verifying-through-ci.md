@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 84445ccd-f1b9-420f-afbd-5b1a412da9aa
-  modified: 2026-11-09T21:00:00.000Z
+  modified: 2026-11-21T02:54:13.359Z
 ---
 
 # Checking locally, then verifying through CI
@@ -16,7 +16,7 @@ A change runs locally only as far as it takes to show that it works. Each new te
 
 **How to apply:**
 
-- **Red, then green.** Build and run each new test before writing its fix, and read why it fails: it must fail for the reason its issue names ([test-driven-development](test-driven-development.md)). Then write the fix and run the test again, with the files holding the rule's existing tests.
+- **Red, then green.** Each new test runs before its fix and again after it, per [test-driven-development](test-driven-development.md), the second time with the files holding the rule's existing tests.
 - **Before every push,** run the `pre-push-checks` skill over the committed change. It builds and runs the touched test files. Name as extra targets at most the files that hold the existing tests of the rule in hand, never a list of every target that might reach the changed code.
 - **Scope.** CI runs all of these, and gives the verdict on them:
   - the other unit tests, and any changed line that only their tests reach;

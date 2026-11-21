@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: bb5048d0-508d-423a-95b6-240378a5c78f
-  modified: 2026-10-21T15:47:31.538Z
+  modified: 2026-11-21T02:53:08.441Z
 ---
 
 # A push that starts no run
@@ -28,6 +28,6 @@ several minutes, check the commit's check suites; at 0, run
 `gh workflow run deltahdl.yml --ref main`, confirm with
 `gh run list --workflow deltahdl.yml --limit 1` that the queued run names
 the pushed SHA, and watch that run id in the background as
-[long-running-commands-in-the-background](long-running-commands-in-the-background.md) has it. The dispatched run's event is
+[watching-a-ci-run](watching-a-ci-run.md) has it. The dispatched run's event is
 `workflow_dispatch`, so a watcher keyed on
 [gh-run-list-commit-takes-a-full-sha](gh-run-list-commit-takes-a-full-sha.md) still finds it by its SHA.

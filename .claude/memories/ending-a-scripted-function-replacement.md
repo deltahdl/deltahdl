@@ -5,13 +5,13 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 0ce081b6-fd14-4da5-87da-08ca53aae436
-  modified: 2026-10-09T18:37:29.907Z
+  modified: 2026-11-21T02:50:40.298Z
 ---
 
 # Ending a scripted function replacement
 
 When a script swaps out a whole function body, find the old body's end by searching for `"\n}\n"` from the signature: the brace that closes a function under Google style stands alone in column 0. Searching for `"}\n"` stops at the first indented brace that closes an `if` or a loop inside the function.
 
-**Why:** that search left the tail of the old body after the new one twice in a row (`CallResultClass`, then `MemberIndexKind`). Each time, build-coverage-lib and a clang-tidy shard refused the file as statements outside any function, and each cost a red run and a push of its own to repair.
+**Why:** a search that stops early leaves the tail of the old body after the new one. The compiler then refuses the file as statements outside any function, which turns build-coverage-lib and a clang-tidy shard red and costs a push of its own to repair.
 
-**How to apply:** before pushing a scripted replacement, also count the file's braces (an awk depth count ending at 0 is not enough on its own) and read the lines just after the new function's closing brace. Local builds are not run here ([verifying-through-ci](verifying-through-ci.md)), so the read is the check.
+**How to apply:** after a scripted replacement, read the lines just after the new function's closing brace, then build the touched target as [verifying-through-ci](verifying-through-ci.md) describes. A brace-depth count that ends at 0 is not enough on its own, because the leftover tail can be balanced.

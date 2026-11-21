@@ -5,14 +5,14 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 71fdefb1-3397-48b8-838f-7c5e17be7223
-  modified: 2026-11-08T02:13:51.068Z
+  modified: 2026-11-21T02:52:48.347Z
 ---
 
 # Scans stand on their own
 
 Each scanning job and step in the workflows reports its own result, whatever any other scan found.
 
-**Why:** A job or step that never ran reports neither green nor red, so a breach left standing in the first scan hides every scan behind it for as long as it stands. When the yamllint job sat behind a pair of jobs that decided from the changed paths whether linting was needed, a push touching neither the workflow nor `etc/clang_tidy/` skipped it. Running a scan on every run costs one runner and answers the question in the run graph.
+**Why:** A job or step that never ran reports neither green nor red, so a breach left standing in the first scan hides every scan behind it for as long as it stands. A scan behind a job that decides from the changed paths whether it is needed is skipped by every push that touches none of those paths, and says nothing. Running a scan on every run costs one runner and answers the question in the run graph.
 
 **How to apply:**
 

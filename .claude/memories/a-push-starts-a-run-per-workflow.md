@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: fb164f96-9266-4e2a-88a8-70f275fdbb36
-  modified: 2026-10-21T03:34:54.604Z
+  modified: 2026-11-21T02:53:07.131Z
 ---
 
 # A push starts a run per workflow
@@ -23,4 +23,4 @@ going.
 **How to apply:** In a watcher, loop over every run id the commit lists
 rather than taking the first. The SHA it names is a full one, as
 [gh-run-list-commit-takes-a-full-sha](gh-run-list-commit-takes-a-full-sha.md) has it, and the watcher runs in the
-background, as [long-running-commands-in-the-background](long-running-commands-in-the-background.md) has it.
+background, as [watching-a-ci-run](watching-a-ci-run.md) has it.

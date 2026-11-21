@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 84445ccd-f1b9-420f-afbd-5b1a412da9aa
-  modified: 2026-11-09T08:17:14.871Z
+  modified: 2026-11-21T02:53:12.692Z
 ---
 
 # gh run list --commit takes a full SHA
@@ -22,5 +22,5 @@ polls until its timeout while the run it was meant to watch has long passed.
 command so it calls `git rev-parse` itself, as
 `sha=$(git rev-parse HEAD) && until … --commit "$sha" …`, never with a SHA
 typed out, so that no copied SHA can be wrong. The watcher
-itself is described in [long-running-commands-in-the-background](long-running-commands-in-the-background.md) and the reading
+itself is described in [watching-a-ci-run](watching-a-ci-run.md) and the reading
 of its result in [reading-a-ci-run](reading-a-ci-run.md).

@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 31a6b48c-0ebd-473c-a398-53773533f58e
-  modified: 2026-09-28T23:01:36.313Z
+  modified: 2026-11-21T02:53:30.718Z
 ---
 
 # Issue sections take headings
@@ -22,4 +22,5 @@ only emphasis run into the paragraph.
 **How to apply:** use `##` for sections, since the issue title stands above
 them; a short noun phrase for the heading, no trailing period. When editing an
 issue written with bolded leads, convert them to headings. This is the one
-formatting rule for issues; otherwise [issues-have-no-fixed-form](issues-have-no-fixed-form.md) holds.
+formatting rule for issues; otherwise their layout is free, per
+[issues-define-their-terms](issues-define-their-terms.md).

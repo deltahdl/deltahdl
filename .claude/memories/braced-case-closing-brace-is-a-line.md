@@ -5,12 +5,12 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 0ce081b6-fd14-4da5-87da-08ca53aae436
-  modified: 2026-10-08T14:59:58.772Z
+  modified: 2026-11-21T02:52:33.657Z
 ---
 
 # A braced case's closing brace is an uncovered line
 
-`assert-coverage` counted line 215 of `src/simulator/vpi_put_value_bits.cpp` uncovered with every region and branch of the file covered. That line was the `}` of `case kVpiRealVal: { const int64_t kRounded = …; …; break; }`. The brace comes after the `break`, so no execution ever reaches it, and llvm-cov counts it as a line of the case.
+In `case X: { const int64_t kRounded = …; …; break; }`, the closing `}` comes after the `break`, so no execution ever reaches it, and llvm-cov counts it as an uncovered line of the case even when every region and branch of the file is covered.
 
 **Why:** the coverage gate requires 100% of lines as well as branches. A braced case therefore keeps a file one line short however thoroughly it is tested, and an issue closed on its tests stays open in fact.
 

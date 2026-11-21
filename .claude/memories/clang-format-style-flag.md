@@ -1,19 +1,21 @@
 ---
 name: clang-format-style-flag
-description: "Run clang-format -i --style=google on every touched file, from the LLVM major install-llvm defaults to; the style flag is required and the tool may be run locally."
+description: "Run clang-format -i --style=google on every touched .cpp and .h file, and on nothing else, from the LLVM major install-llvm defaults to."
 metadata:
   node_type: memory
   type: feedback
   originSessionId: 71fdefb1-3397-48b8-838f-7c5e17be7223
-  modified: 2026-11-08T03:24:30.634Z
+  modified: 2026-11-21T02:51:33.406Z
 ---
 
 # Formatting with clang-format
 
-Always run `clang-format -i --style=google` on every file a change touches.
+Run `clang-format -i --style=google` on every `.cpp` and `.h` file a change touches, and on no other file, with the `clang-format` of the LLVM major CI installs.
 
-**Why:** The `-i` rewrites the file, so running it is how the committed bytes come to exist; the `pre-push-checks` skill then confirms the result with the judging form CI runs ([verifying-through-ci](verifying-through-ci.md)). The style flag matters because the repository has no `.clang-format` file, so a bare `clang-format -i` falls back to LLVM style and reformats the entire file, splitting `if`/`return` and changing switch indentation. That produces a large spurious diff which buries the real change and fails the gate. CI checks with `clang-format --dry-run --Werror --style=google`.
+**Why:**
 
-**The major CI runs:** Run the `clang-format` of the LLVM major the `major` input of `.github/actions/install-llvm/action.yml` defaults to, as `$(brew --prefix llvm@<major>)/bin/clang-format`. The bare `clang-format` on the PATH is Homebrew's newest LLVM, and a newer major lays out some code differently: LLVM 23 moved the closing `};` of a braced initializer that begins on its own line, and LLVM 22, which the `clang-format` job runs, refused that layout. A change formatted with the wrong major fails that job on a line the change never meant to touch.
+- **The style flag.** The repository has no `.clang-format` file, so a bare `clang-format -i` falls back to LLVM style and reformats the entire file, splitting `if`/`return` and changing switch indentation. The spurious diff buries the real change and fails the gate, which checks with `clang-format --dry-run --Werror --style=google`.
+- **C++ paths only.** clang-format formats whatever it is given as C++. A `CMakeLists.txt` comes out with `if (X)` / `set(...) else() set(...) endif()` on one line, CMake can no longer parse it, and every build job of the run fails.
+- **The major.** A different major lays out some code differently, such as the closing `};` of a braced initializer that begins on its own line, so a change formatted with the wrong one fails the `clang-format` job on a line the change never meant to touch. The bare `clang-format` on the PATH is Homebrew's newest LLVM, which can be ahead of CI ([ci-toolchain-versions](ci-toolchain-versions.md)).
 
-**How to apply:** Pass the style flag every time, to the binary of the major CI installs. If it is missed, `git checkout` the files, re-apply the edits, and re-format with the flag. The `pre-push-checks` skill runs the `--dry-run --Werror` form over the touched files before the push. The formatting gate runs across all of `src/` and `test/`, so it stays red on pre-existing violations regardless of the change in hand.
+**How to apply:** Use `$(brew --prefix llvm@<major>)/bin/clang-format`, with the major the `major` input of `.github/actions/install-llvm/action.yml` defaults to. Name the files explicitly, or filter a list by extension first, as in `git status --porcelain | awk '{print $2}' | grep -E '\.(cpp|h)$'`. Before committing, check `git diff --stat` for a file whose line count changed unexpectedly. If the flag was missed, `git checkout` the files, re-apply the edits and format again. The `pre-push-checks` skill then runs the `--dry-run --Werror` form over the touched files ([verifying-through-ci](verifying-through-ci.md)).

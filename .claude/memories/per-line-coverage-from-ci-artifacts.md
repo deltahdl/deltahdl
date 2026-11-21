@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: reference
   originSessionId: db1b45f3-3ddb-419c-ae00-cf0b0b977fee
-  modified: 2026-11-09T08:17:17.207Z
+  modified: 2026-11-21T02:51:40.612Z
 ---
 
 # Per-line coverage from CI artifacts
@@ -32,15 +32,15 @@ Use the Homebrew LLVM of the major CI ran, `/opt/homebrew/opt/llvm@<major>/bin`
 (the assert-coverage log prints `major: N`), which reads the Linux objects.
 A newer major refuses the raw profiles of an older one, since each major
 writes its own raw format version, and the merge then ends "no profile can
-be merged"; the default `llvm` formula floats ahead of CI's
-[unpinned-ci-toolchain](unpinned-ci-toolchain.md). If the export reports mismatched data, take both
+be merged"; the plain `llvm` formula can be ahead of CI's major
+([ci-toolchain-versions](ci-toolchain-versions.md)). If the export reports mismatched data, take both
 binaries from the `build-coverage-lib` artifact's `build.tar` instead
 (`./src/deltahdl` and `./src/libdeltahdl_lib.so`). Before a push, the
 `pre-push-checks` skill reads the coverage of the changed lines locally
 ([verifying-through-ci](verifying-through-ci.md)); this procedure is for a red run after one.
 
-**Why:** a guess at the missed line cost a whole CI round more than once; the
-report gives a count, and two plausible branches can share a file.
+**Why:** the report gives only a count, and two plausible branches can share a
+file, so a guess at the missed line can cost a whole CI round.
 
 **How to apply:** reach for it as soon as a red coverage run's per-file diff
 names a file and the missed line is not obvious from the change.

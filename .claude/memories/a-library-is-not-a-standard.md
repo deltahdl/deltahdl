@@ -2,7 +2,10 @@
 name: a-library-is-not-a-standard
 description: "Code the UVM library or sv-tests writes that IEEE 1800-2023 forbids is reported, never held as 'needs decision'; check 1800-2023 and ~/IEEE 1800.2-2020.pdf, then expect the failing tests' rejection"
 metadata:
+  node_type: memory
   type: feedback
+  originSessionId: e10149e7-3409-4014-9cb5-13a14e355d4b
+  modified: 2026-11-21T02:52:45.765Z
 ---
 
 # A library is not a standard
@@ -18,10 +21,9 @@ a decision for a person.
 the UVM standard, cites IEEE 1800 without a date in its Clause 2, so the
 latest edition governs UVM's code, and it defines the UVM API rather than the
 library's source; classes the library marks `@uvm-contrib` and `m_`
-implementation methods are not in that API. Two issues were held on a
-'needs decision' issue because reporting a library construct failed 92 UVM
-tests, although the standards answered the question and the evaluation
-already had a table of expected rejections.
+implementation methods are not in that API. However many of the suite's
+tests a report makes fail, the standards still answer the question, and the
+evaluation's table of expected rejections is where those tests go.
 
 **How to apply:** Before writing any question about a construct the suite or
 a library relies on, read the rule in `~/IEEE 1800-2023.pdf` and whether
