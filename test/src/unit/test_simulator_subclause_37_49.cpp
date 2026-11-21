@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -318,6 +319,94 @@ TEST_F(AssertionsOfARun, AnAssertionReachesTheClockingBlockClockingIt) {
   EXPECT_EQ(kBlockOf(Named(vpiAssertion, top, "p1")), "");
   EXPECT_EQ(kBlockOf(Named(vpiAssertion, top, "p2")), "other");
   EXPECT_EQ(kBlockOf(Named(vpiAssertion, top, "p3")), "cb");
+}
+
+std::string FullNameOf(vpiHandle obj) {
+  const char* name = obj == nullptr ? nullptr : vpi_get_str(vpiFullName, obj);
+  return name == nullptr ? "" : name;
+}
+
+TEST_F(AssertionsOfARun, EveryConcurrentAndDeferredKindIsAnAssertion) {
+  Run("module top; logic clk, a;\n"
+      "  r1: restrict property (@(posedge clk) a);\n"
+      "  c1: cover property (@(posedge clk) a);\n"
+      "  c2: cover sequence (@(posedge clk) a);\n"
+      "  initial begin\n"
+      "    m1: assume #0 (a);\n"
+      "    k1: cover final (a);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  const auto kTypeOf = [top](const char* name) {
+    vpiHandle assertion = Named(vpiAssertion, top, name);
+    return assertion == nullptr ? 0 : vpi_get(vpiType, assertion);
+  };
+  EXPECT_EQ(kTypeOf("r1"), vpiRestrict);
+  EXPECT_EQ(kTypeOf("c1"), vpiCover);
+  EXPECT_EQ(kTypeOf("c2"), vpiCover);
+  EXPECT_EQ(kTypeOf("m1"), vpiImmediateAssume);
+  EXPECT_EQ(kTypeOf("k1"), vpiImmediateCover);
+  EXPECT_EQ(vpi_get(vpiIsCoverSequence, Named(vpiAssertion, top, "c1")), 0);
+  EXPECT_EQ(vpi_get(vpiIsCoverSequence, Named(vpiAssertion, top, "c2")), 1);
+}
+
+constexpr const char* kAssertionsInEveryInstance =
+    "interface bus(input logic clk); logic a;\n"
+    "  ai: assert property (@(posedge clk) a);\n"
+    "endinterface\n"
+    "program prg(input logic clk); logic a;\n"
+    "  ap: assert property (@(posedge clk) a);\n"
+    "endprogram\n"
+    "module top; logic clk, a; bus b(clk); prg p(clk);\n"
+    "  am: assert property (@(posedge clk) a);\n"
+    "  if (1) begin : g ag: assert property (@(posedge clk) a); end\n"
+    "  initial begin ad: assert (a); end\n"
+    "endmodule\n";
+
+TEST_F(AssertionsOfARun, AnAssertionsInstanceIsTheInstanceAroundIt) {
+  Run(kAssertionsInEveryInstance);
+  const auto kInstanceOf = [](const char* scope, const char* name) {
+    return FullNameOf(
+        vpi_handle(vpiInstance, Named(vpiAssertion, By(scope), name)));
+  };
+  EXPECT_EQ(kInstanceOf("top", "am"), "top");
+  EXPECT_EQ(kInstanceOf("top", "ad"), "top");
+  EXPECT_EQ(kInstanceOf("top.b", "ai"), "top.b");
+  EXPECT_EQ(kInstanceOf("top.p", "ap"), "top.p");
+  EXPECT_EQ(kInstanceOf("top.g", "ag"), "top");
+}
+
+TEST_F(AssertionsOfARun, IteratingFromNullReachesEveryAssertionOfTheDesign) {
+  Run(kAssertionsInEveryInstance);
+  std::vector<std::string> names;
+  for (vpiHandle assertion : ObjectsOf(vpiAssertion, nullptr)) {
+    names.push_back(FullNameOf(assertion));
+  }
+  for (const char* name :
+       {"top.am", "top.ad", "top.b.ai", "top.p.ap", "top.g.ag"}) {
+    EXPECT_EQ(std::count(names.begin(), names.end(), name), 1) << name;
+  }
+}
+
+TEST_F(AssertionsOfARun, AnAssertionReportsItsFileAndColumn) {
+  Run("module top; logic clk, a;\n"
+      "  a1: assert property (@(posedge clk) a); a2: assert #0 (a);\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  ASSERT_NE(top, nullptr);
+  vpiHandle a1 = Named(vpiAssertion, top, "a1");
+  vpiHandle a2 = Named(vpiAssertion, top, "a2");
+  ASSERT_NE(a1, nullptr);
+  ASSERT_NE(a2, nullptr);
+  const char* file = vpi_get_str(vpiFile, a1);
+  ASSERT_NE(file, nullptr);
+  EXPECT_STREQ(file, "<test>");
+  const int kFirst = vpi_get(vpiColumn, a1);
+  const int kSecond = vpi_get(vpiColumn, a2);
+  EXPECT_TRUE(kFirst == 3 || kFirst == 7) << kFirst;
+  EXPECT_TRUE(kSecond == 43 || kSecond == 47) << kSecond;
+  EXPECT_EQ(kSecond - kFirst, 40);
 }
 
 }  // namespace
