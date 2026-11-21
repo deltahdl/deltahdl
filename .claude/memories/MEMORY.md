@@ -46,8 +46,8 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Tests
 
-- [Test-driven development](test-driven-development.md) — tests first, each seen to fail for its issue's reason before the fix; a test lands in the same commit as its code, unless its issue asks for tests alone.
-- [Tests land before their fix](tests-land-before-their-fix.md) — only for an `lrm-tests` issue, asking for tests ahead of the functionality: all its tests in the one commit that closes it, `DISABLED_` where deltahdl fails; a rule's issue lands tests and fix in one commit.
+- [Test-driven development](test-driven-development.md) — tests first, each seen to fail for its issue's reason before the fix; a test lands in the same commit as its code, and no src line lands uncovered.
+- [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
