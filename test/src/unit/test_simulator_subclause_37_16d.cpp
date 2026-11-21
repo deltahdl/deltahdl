@@ -188,7 +188,7 @@ TEST_F(NetPropertiesOfARun,
       "  initial if (0) force q = m;\n"
       "endmodule\n");
   const std::vector<int> kNone{0, 0, 0, 0, 0};
-  const std::vector<int> kActive{1, 1, 1, 1, 1};
+  const std::vector<int> kActive{2, 1, 2, 1, 1};
   EXPECT_EQ(Counts(), (std::vector<std::vector<int>>{kNone, kActive, kNone,
                                                      kActive, kNone}));
 }
