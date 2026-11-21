@@ -1,11 +1,11 @@
 ---
 name: a-commit-closes-an-issue
-description: "Every commit closes at least one issue and may close as many as it chooses to finish, with no upper limit, wherever in the repository they fall, every case of each one's rule passing; an issue too large for one commit is split by rule before its work starts."
+description: "Every commit closes at least one issue and may close as many as it chooses to finish, with no upper limit, wherever in the repository they fall, every case of each one's rule passing; an issue too large for one commit is split by rule before its work starts; only a red-run fix, naming each issue it touches with Refs, or a change the user asks for may close none."
 metadata:
   node_type: memory
   type: feedback
   originSessionId: 84445ccd-f1b9-420f-afbd-5b1a412da9aa
-  modified: 2026-11-08T17:41:51.536Z
+  modified: 2026-11-21T02:10:53.013Z
 ---
 
 # A commit closes at least one issue
@@ -14,10 +14,12 @@ Every commit closes at least one issue. It may close as many as the work chooses
 
 **Why:** A string of commits that each reference an issue and none closes it leaves a rule half fixed on `main`, its cases never tested together as [fixing-a-rule-in-full](fixing-a-rule-in-full.md) asks, and the open issue list stops saying what is still wrong.
 
-Two kinds of commit close nothing:
+Two kinds of commit may close nothing:
 
-- the fix for a red run of the session's own push, which goes in a push of its own per [fixing-a-red-run](fixing-a-red-run.md);
+- the fix for a red run of the session's own push, which goes in a push of its own per [fixing-a-red-run](fixing-a-red-run.md), and writes `Refs #N` on its own line for every issue whose tests it changes;
 - a change the user asks for directly.
+
+Tests deltahdl fails are no exception: a commit touching a rule's issue finishes that rule, its code fixed and every case passing, and closes the issue.
 
 Something found and fixed on the spot along the way rides in a commit that closes an issue.
 

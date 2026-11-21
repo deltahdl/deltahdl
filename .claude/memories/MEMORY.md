@@ -10,7 +10,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
-- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it chooses, with no upper limit, wherever in the repository they fall, every case of each one's rule passing; split by rule an issue that cannot land in one.
+- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it chooses, with no upper limit, wherever in the repository they fall, every case of each one's rule passing; split by rule an issue that cannot land in one; only a red-run fix, naming each issue it touches with `Refs`, or a change the user asks for may close none.
 - [Closing keywords](closing-keywords.md) — nine words close an issue from anywhere in a message; `Closes #N` on its own line per finished issue, `Refs #N` or `See #N` to mention.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.
@@ -55,7 +55,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Tests
 
 - [Test-driven development](test-driven-development.md) — tests first, each run and seen to fail for its issue's reason before the fix; a Python test lands in the same commit as its code.
-- [Tests land before their fix](tests-land-before-their-fix.md) — push a C++ unit test once written: plain name when deltahdl passes it, `DISABLED_` in front until the fix removes it.
+- [Tests land before their fix](tests-land-before-their-fix.md) — only for an `lrm-tests` issue, asking for tests ahead of the functionality: push each test once written, `DISABLED_` when deltahdl fails it; a rule's issue lands tests and fix in one commit.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
