@@ -6,6 +6,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Commits and pushes
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main` and push a finished change without asking.
+- [One commit per push](one-commit-per-push.md) — every push carries exactly one commit; push or amend the unpushed one before committing again.
 - [Draining the push queue first](draining-the-push-queue-first.md) — push what sits committed but unpushed before starting new work.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name a removed path to `git add`; it then stages none.

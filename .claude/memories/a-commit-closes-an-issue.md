@@ -5,12 +5,12 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 84445ccd-f1b9-420f-afbd-5b1a412da9aa
-  modified: 2026-11-21T02:10:53.013Z
+  modified: 2026-11-21T02:19:33.373Z
 ---
 
 # A commit closes at least one issue
 
-Every commit closes at least one issue. It may close as many as the work chooses to finish together, with no upper limit: one group of issues whose fixes go through the same code, several groups, or unrelated issues taken in the same piece of work. A commit need not be pushed the moment it finishes one issue when more are close to done. The issues may fall anywhere in the repository: source, tests, scripts, workflows, documentation or the notes. Every case of the rule of each issue it closes passes in that commit. When an issue's open cases cannot all land in one commit, it is split by rule before its work starts, per [one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md), so that each part closes with the commit that finishes it. Only a second rule leaves the issue: a case of a rule it already documents stays in it, per [what-does-not-get-filed](what-does-not-get-filed.md).
+Every commit closes at least one issue. It may close as many as the work chooses to finish together, with no upper limit: one group of issues whose fixes go through the same code, several groups, or unrelated issues taken in the same piece of work. A commit need not be made the moment one issue is finished when more are close to done; they join the same commit, since each push carries one commit ([one-commit-per-push](one-commit-per-push.md)). The issues may fall anywhere in the repository: source, tests, scripts, workflows, documentation or the notes. Every case of the rule of each issue it closes passes in that commit. When an issue's open cases cannot all land in one commit, it is split by rule before its work starts, per [one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md), so that each part closes with the commit that finishes it. Only a second rule leaves the issue: a case of a rule it already documents stays in it, per [what-does-not-get-filed](what-does-not-get-filed.md).
 
 **Why:** A string of commits that each reference an issue and none closes it leaves a rule half fixed on `main`, its cases never tested together as [fixing-a-rule-in-full](fixing-a-rule-in-full.md) asks, and the open issue list stops saying what is still wrong.
 
