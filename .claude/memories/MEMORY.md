@@ -10,7 +10,8 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name to `git add` a path neither on disk nor in the index; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
-- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it finishes, every case of each one's rule passing; only a red-run fix or a change the user asks for may close none.
+- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it finishes, every case of each one's rule passing; only a red-run fix, writing `Refs #N` for each issue whose tests it changes, or a change the user asks for may close none.
+- [A commit body is left unwrapped](commit-body-left-unwrapped.md) — each body paragraph on one line, never broken at a column; pre-push-checks refuses a paragraph running onto a second line.
 - [Closing keywords](closing-keywords.md) — nine words close an issue from anywhere in a message; `Closes #N` on its own line per finished issue, `Refs #N` or `See #N` to mention.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.

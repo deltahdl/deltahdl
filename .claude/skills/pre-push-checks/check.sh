@@ -42,6 +42,13 @@ check_messages() {
       report "$sha subject has $length characters, more than 72"
     fi
     git log -1 --format=%B "$sha" | grep -E '^(Closes|Refs|See) #[0-9]+$' | sed 's/^/    /'
+    broken=$(git log -1 --format=%b "$sha" | awk '
+      /^$/ || /^((Closes|Refs|See) #|[A-Z][A-Za-z-]*: |[-*] |[0-9]+\. |[[:space:]])/ { prose = 0; next }
+      prose { print NR; exit }
+      { prose = 1 }')
+    if [ -n "$broken" ]; then
+      report "$sha body continues a paragraph on line $broken; write each paragraph on one line"
+    fi
   done < "$work/commits"
 }
 

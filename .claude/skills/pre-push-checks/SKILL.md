@@ -21,7 +21,7 @@ Every touched file under `test/src/unit/` is built and run as its own target. Na
 
 ## What it checks
 
-- **Commit messages:** each subject is 72 characters or fewer, and each commit's `Closes`, `Refs` and `See` lines are printed so that a commit closing no issue shows.
+- **Commit messages:** each subject is 72 characters or fewer; each commit's `Closes`, `Refs` and `See` lines are printed so that a commit closing no issue shows; and no body paragraph runs onto a second line, so a body line of prose follows only a blank line, a trailer, a list item or an indented line.
 - **Format and size:** every touched `.cpp` and `.h` file is `clang-format --style=google` clean and at most 1000 lines long.
 - **Registration:** every touched unit test file is listed by `add_unit_test` in `test/CMakeLists.txt` and declares a test, every touched src `.cpp` is listed in `src/CMakeLists.txt`, and no test name is declared twice anywhere under `test/src/unit/`.
 - **Build and tests:** the library and the test targets build with `-Werror`, and every test in them passes.
