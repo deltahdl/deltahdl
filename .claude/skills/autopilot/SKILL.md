@@ -5,7 +5,7 @@ description: Start, restart or stop the standing reminders, with or without the 
 
 # Autopilot
 
-Every form's work, reading, searching and filing as well as code, is done in the session itself: no Agent or Workflow call takes any part of it, per `.claude/memories/working-without-subagents.md`.
+Every form's work, reading, searching and filing as well as code, is done in the session itself: no Agent or Workflow call takes any part of it, as the `permissions.deny` entries for both tools in `.claude/settings.json` enforce.
 
 ## The five standing reminders
 

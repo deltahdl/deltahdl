@@ -19,7 +19,7 @@ An issue that asks to solve a rule is different: its commit delivers the functio
 **How to apply:**
 
 - For an `lrm-tests` issue, build and run each new test under its plain name first, and read why it fails. A test that passes keeps its plain name. A test that fails because deltahdl does not do what its case states takes the prefix. A test that fails for another reason is wrong and is corrected, or has found a defect of another rule, which becomes a case of that rule's issue with a test of its own ([what-does-not-get-filed](what-does-not-get-filed.md)).
-- Choose a name no other test has once the prefix is gone ([unique-test-names](unique-test-names.md)).
+- Choose a name no other test has once the prefix is gone.
 - A test that carries the prefix shows nothing about its case. The case stays unticked in its rule's issue, with the test named beside it ([a-rule-conforms-only-when-tests-show-it](a-rule-conforms-only-when-tests-show-it.md)).
 - To run a test that carries the prefix, pass `--gtest_also_run_disabled_tests --gtest_filter=Suite.DISABLED_Name` to its binary.
 - The fix of a rule removes the prefix from every test of the rule and closes its issue only when no test of its cases still carries one.

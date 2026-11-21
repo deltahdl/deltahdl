@@ -15,7 +15,6 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.
 - [No CI-skip directives](no-ci-skip-in-commit-messages.md) — never suppress a run from a commit message; the `on:` triggers already decide.
-- [The length of a commit subject](commit-subject-length.md) — a short subject naming the change, the detail in an unwrapped body.
 - [Sharing code a change mirrors](sharing-code-a-change-mirrors.md) — share two bodies or tests a change makes equal before pushing; CPD refuses 100 identical tokens.
 - [No comments in any file](no-comments-in-any-file.md) — only clang-format's namespace end comments, the six annex headers and inputs whose comment is tested; the why goes in the commit.
 - [The module's own terms](module-terms-in-descriptions.md) — write about module M so a reader who has never heard of its callers understands it.
@@ -25,11 +24,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Formatting and prose
 
-- [Formatting with clang-format](clang-format-style-flag.md) — `clang-format -i --style=google` on every touched `.cpp` and `.h` file and nothing else, from the `llvm@<major>` `install-llvm` defaults to.
-- [Ending a scripted function replacement](ending-a-scripted-function-replacement.md) — end the old body at `"\n}\n"` in column 0, never at the first `"}\n"`.
 - [Annex files are not edited](annex-files-are-not-edited.md) — `vpi_user.h` is Annex K.2's text byte for byte; a platform shim goes in the build, never in the file.
-- [Include what you use](include-what-you-use.md) — include the header declaring each symbol used and none unused, no umbrella headers; an include finding fails the job.
-- [Markdown opens with a heading](markdown-top-level-heading.md) — MD041 runs over every Markdown file in the checkout with `--dot`, so the notes are linted too.
 - [Accuracy over fitting a column](prose-length-over-column-fitting.md) — never buy a shorter line with a less accurate word; move the text instead.
 - [The user's words are restated, never copied](user-words-are-never-recorded-verbatim.md) — everything written carries the user's point in fresh words, never their sentences.
 
@@ -39,16 +34,13 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [The LRM is the source of truth](lrm-source-of-truth.md) — check every non-cosmetic change, and every statement of what a clause requires, against the clause; the standard beats the linter.
 - [A shall outranks an example and a can](shall-outranks-examples-and-can.md) — §1.5 and §1.10 settle a clash inside the standard; only two equal requirements go to a person.
 - [One edition only](single-edition-1800-2023.md) — IEEE 1800-2023 alone; another edition's numbering is translated to 2023 and never carried into deltahdl.
-- [The 2017 edition](the-2017-edition.md) — `~/IEEE 1800-2017.pdf`, read only to judge an sv-tests tag in its own edition.
 - [No local paths in code or workflows](no-local-paths-in-code-or-workflows.md) — outside `.claude/`, write `IEEE 1800-2023`, never the path `~/IEEE 1800-2023.pdf`.
 - [A library is not a standard](a-library-is-not-a-standard.md) — a construct UVM or sv-tests writes against 1800-2023 is reported, never held for a person.
 - [The standard's wording belongs to IEEE](lrm-text-is-copyrighted.md) — cite the clause number and paraphrase; never quote the standard's sentences verbatim.
-- [The standard guides structure](lrm-guides-structure.md) — mirror the entities the clause defines when grouping parameters into a struct.
 - [One LRM page per call](reading-the-lrm-one-page-per-call.md) — one `Read` page per tool call, waiting for each; batching blocks every result in the turn.
 - [Never convert the LRM to text](not-converting-the-lrm-to-text.md) — `extract_text()` spends the same budget, and `pdftotext` loses the structure.
 - [Standard names listed explicitly](standard-names-listed-explicitly.md) — list and match each mandated name exactly; never a pattern for a closed set, never a decision for the user.
 - [Locating a clause](locating-a-clause.md) — the Read tool alone, never `pypdf`; the contents pages at physical 11 to 27, then printed page plus one.
-- [Zooming on a formula](zooming-on-a-formula.md) — rasterize a crop with `pdftoppm` at 300 dpi when a glyph is ambiguous in the page rendering.
 - [Oversized tool output](oversized-tool-output.md) — read large files in bounded windows; one huge result truncates everything after it.
 
 ## Tests
@@ -58,16 +50,11 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
-- [Naming a const local](const-local-naming.md) — `kCamelCase`, or drop the `const`; a `const` reference is a plain `lower_case` variable.
-- [One declaration per test name](unique-test-names.md) — each `Suite.Name` in one file only; a CI job fails on duplicates.
 - [Rename rather than delete a duplicate](renaming-rather-than-deleting-a-duplicate-test.md) — keep both files covering one rule and qualify the names.
 - [A test that constrains a fix](a-test-that-constrains-a-fix.md) — a case failing only on a wrong fix is not redundant; name the wrong fix it catches before deleting it.
 - [Letter suffixes on split test files](test-file-letter-suffixes.md) — every file in a split family ends with a letter; the bare name means one file.
-- [Check the letter before writing](checking-for-the-letter-before-writing.md) — `ls test/src/unit/` first, or a redirect silently destroys existing cases.
 - [A VpiDesignRun SetUp calls the base first](vpi-design-run-setup.md) — an override skipping `VpiDesignRun::SetUp()` builds no VPI model, and its cases read leftovers.
 - [The VPI error status is read alone](vpi-error-status-is-read-alone.md) — read `vpi_chk_error` into a local right after the call it checks, never beside another VPI call.
-- [Parenthesizing a split-literal array element](parenthesizing-a-split-literal-array-element.md) — wrap each array element made of adjacent string literals in parentheses, or `-Wstring-concatenation` fails the build.
-- [No empty test files](no-empty-test-files.md) — a file with no `TEST` fails a job; a new lettered file lands with its first test.
 - [Sweeping a citation change](sweeping-a-citation-change.md) — grep the whole tree for the message the diagnostic prints, not only the files named after the old subclause.
 - [A braced case's closing brace is a line](braced-case-closing-brace-is-a-line.md) — `case X: { …; break; }` leaves a `}` llvm-cov counts and nothing runs; move the work into a helper.
 - [Header templates are covered through the library](header-templates-are-covered-through-the-library.md) — drive one library caller through every branch; a test's own instantiation earns none.
@@ -78,19 +65,13 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Checking locally, then verifying through CI](verifying-through-ci.md) — run locally only what shows a change works: new tests, the rule's test files, `pre-push-checks` over touched files; suite-wide runs are CI's.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — only a test asserting the standard's outcome shows a case conforms; an untested case is filed.
 - [Reading a CI run](reading-a-ci-run.md) — no push while a run is in progress or queued; `gh run view --log-failed` after.
-- [Per-line coverage from CI artifacts](per-line-coverage-from-ci-artifacts.md) — read missed lines from the run's coverage artifacts with the local `llvm@<major>` CI ran.
-- [Fetching a failed job's log](fetching-a-failed-job-log.md) — when `--log-failed` breaks off or is empty, use `gh api --allow-escape-sequences .../actions/jobs/<id>/logs`.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run.
-- [A push that starts no run](a-push-that-starts-no-run.md) — a pushed commit with no check suite gets its run from `gh workflow run deltahdl.yml --ref main`.
 - [A push starts a run per workflow](a-push-starts-a-run-per-workflow.md) — one commit can start several runs and `--limit 1` picks one; watch every run the commit lists.
-- [Force-cancelling a hung run](force-cancelling-a-hung-run.md) — a hung job ignores a plain cancel; `gh run cancel --force`, then `gh run rerun --failed`.
 - [Watching a CI run](watching-a-ci-run.md) — `gh run watch <id> --interval 60 --exit-status` in the background; the default poll trips the secondary rate limit.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute, a CI watch included, runs with `run_in_background: true`.
 - [Waiting while anything runs in the background](waiting-while-anything-runs-in-the-background.md) — a background command is its turn's last call; until its notification, nothing but waiting, for the issue in hand or any other.
 - [Fixing a red run after a push](fixing-a-red-run.md) — fix your push's red run, caused or inherited, in a push of its own first; red only on `assert-coverage` holds nothing up.
-- [Gate limits live in tracked files](gate-limits-live-in-tracked-files.md) — read a gate's limit from its clang-tidy config or workflow, never a tool default; files stop at 1000 lines.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
-- [Fetching an sv-tests file](fetching-an-sv-tests-file.md) — `gh api` against `chipsalliance/sv-tests`, piped through `base64 -d`.
 - [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.
 
 ## Scripts and CI mechanisms
@@ -98,17 +79,13 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Failing loudly](failing-loudly-in-orchestrators.md) — an orchestrator under `scripts/` raises or exits non-zero; it never skips and carries on.
 - [Positive prompts](positive-prompts.md) — write a skill's instructions or an autopilot reminder as the action wanted, not the one forbidden.
 - [CI shows all output](ci-shows-all-output.md) — every step prints all its tools say: no quiet flags, no /dev/null.
-- [Composite actions](composite-actions.md) — a CI mechanism is `.github/actions/<name>/action.yml`, not a shell script.
-- [Naming an inserted step](naming-an-inserted-pipeline-step.md) — give it a real position or a descriptive name, never "Step 0".
 - [CI toolchain versions](ci-toolchain-versions.md) — LLVM's major is install-llvm's default, moved in its own commit; platform-named jobs pin their image; the rest floats; Actions tags stay at their major.
 - [What an allowlist entry rests on](allowlist-entries-rest-on-a-reading.md) — a name joins a list under `etc/` only for the reason it admits, given in the commit that adds the line.
 - [Never weakening a gate](never-weakening-a-gate.md) — fix a red gate in the code: no lowered threshold, disabled check, exempted name or `continue-on-error`.
-- [A failing Pages deployment](a-failing-pages-deployment.md) — fixed in the repository's Pages settings (Source: GitHub Actions), never in the workflow.
 - [The test clang-tidy config mirrors the source one](clang-tidy-test-config-mirrors-src.md) — change `etc/clang_tidy/src.yml` and `test_src_unit.yml` together.
 - [Scans stand on their own](scans-stand-on-their-own.md) — no scanning job needs another or a path detector; each step reporting findings carries `if: ${{ !cancelled() }}`.
 - [A workflow's paths name the programs its jobs run](workflow-paths-name-the-programs-its-jobs-run.md) — a tree whose program a job runs goes in the `paths` filter and the `assert-no-comments` trees.
 - [The cache budget is two generations](cache-budget-is-two-generations.md) — twice what one run of every cached job stores has to fit in the 10 GB Actions cache.
-- [RETRY_TIMEOUT is set generously](retry-timeout-is-generous.md) — install-llvm's per-attempt bound catches a stall; raise it for a long command, never tighten it.
 
 ## Issues
 
@@ -123,11 +100,6 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Issues state the conclusion](issues-state-conclusions-not-the-trail.md) — a finding that settles a question replaces the options it ruled out.
 - [A question the rules answer is not a decision](a-question-the-rules-answer-is-not-a-decision.md) — 'needs decision' only when the reminders, the issue, its links and both standards leave it open; read the whole memory first.
 - [Comments from other accounts are ignored](comments-from-other-accounts-are-ignored.md) — only `jdrowne` counts on an issue; anyone else's comment gets no action or reply.
-- [gh search returns at most 1000 issues](gh-search-returns-at-most-1000-issues.md) — list open issues with `--limit 10000` and no `--search`, filtering labels in jq.
-
-## Delegation
-
-- [Working without subagents](working-without-subagents.md) — no Agent or Workflow call for any part of the work, unless the user's own message asks for one.
 
 ## Talking with the user
 

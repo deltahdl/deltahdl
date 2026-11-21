@@ -34,9 +34,9 @@ working even as a citation, since `31402` no longer reads as `3.14.2`.
 
 - Name a new helper for the action it takes and the result it returns.
 - When a naming check refuses a name, rename it by meaning rather than
-  deleting the characters the check objects to ([const-local-naming](const-local-naming.md)).
+  deleting the characters the check objects to.
 - When an existing name of this kind turns up, rename it or file an issue for
   it unless an open one already covers it.
 - The struct a refactor groups parameters into is named after the entity the
-  standard defines ([lrm-guides-structure](lrm-guides-structure.md)). That entity's name, never its
+  standard defines. That entity's name, never its
   clause number, is what goes into the identifier.

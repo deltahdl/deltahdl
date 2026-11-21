@@ -17,5 +17,3 @@ metadata:
 **Everything else** floats to its latest release: g++ and gcc carry no version suffix, and PMD and GoogleTest resolve their latest release through the GitHub API at run time.
 
 **Actions tags** stay at their major version (`@v5`, `@v4`). Floating within a major is the safe mechanism; a moving ref such as a branch is a supply-chain risk.
-
-Related: [composite-actions](composite-actions.md) for the shape a CI mechanism is written in, and [clang-format-style-flag](clang-format-style-flag.md) for running the matching formatter locally.
