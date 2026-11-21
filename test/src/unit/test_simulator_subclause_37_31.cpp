@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -572,5 +574,374 @@ TEST_F(ClassDefinitionsOfARun, APropertyOfAPackagesTypedefHasItsKind) {
   EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, defn, "own")), vpiRealVar);
   EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, defn, "other")), vpiIntVar);
 }
+
+std::vector<std::string> OrderedNamesOf(int type, vpiHandle ref) {
+  std::vector<std::string> names;
+  for (vpiHandle h : ScanAll(vpi_iterate(type, ref))) {
+    const char* name = vpi_get_str(vpiName, h);
+    names.emplace_back(name == nullptr ? "" : name);
+  }
+  return names;
+}
+
+constexpr const char* kClassesInEveryPlace =
+    "class UB; endclass\n"
+    "class UD extends UB; class UN; endclass endclass\n"
+    "package p;\n"
+    "  class PB; endclass\n"
+    "  class PD extends PB; class PN; endclass endclass\n"
+    "endpackage\n"
+    "interface ifc;\n"
+    "  class IB; endclass\n"
+    "  class ID extends IB; class IN; endclass endclass\n"
+    "endinterface\n"
+    "program prg;\n"
+    "  class GB; endclass\n"
+    "  class GD extends GB; class GN; endclass endclass\n"
+    "endprogram\n"
+    "module top;\n"
+    "  ifc i();\n"
+    "  prg r();\n"
+    "  class MB; endclass\n"
+    "  class MD extends MB; class MN; endclass endclass\n"
+    "endmodule\n";
+
+struct ClassPlace {
+  const char* scope;
+  const char* base;
+  const char* derived;
+  const char* nested;
+};
+
+class ClassesInEveryPlace : public ClassDefinitionsOfARun {
+ protected:
+  void SetUp() override {
+    ClassDefinitionsOfARun::SetUp();
+    Run(kClassesInEveryPlace);
+  }
+
+  static vpiHandle Unit() {
+    for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
+      if (vpi_get(vpiUnit, pkg) == 1) return pkg;
+    }
+    return nullptr;
+  }
+
+  static std::string WhereOf(const ClassPlace& place) {
+    return place.scope == nullptr ? "$unit" : place.scope;
+  }
+
+  static vpiHandle ScopeOf(const ClassPlace& place) {
+    return place.scope == nullptr ? Unit() : By(place.scope);
+  }
+
+  static vpiHandle DefnOf(const ClassPlace& place, const char* name) {
+    return place.scope == nullptr ? Named(vpiClassDefn, nullptr, name)
+                                  : DefnIn(By(place.scope), name);
+  }
+};
+
+constexpr ClassPlace kEveryPlace[] = {
+    {"top", "MB", "MD", "MN"},   {"p", "PB", "PD", "PN"},
+    {"top.i", "IB", "ID", "IN"}, {"top.r", "GB", "GD", "GN"},
+    {nullptr, "UB", "UD", "UN"},
+};
+
+TEST_F(ClassesInEveryPlace, AnInterfaceClassIsAClassDefnOfItsInstance) {
+  EXPECT_EQ(NamesOf(vpiClassDefn, By("top.i")),
+            (std::vector<std::string>{"IB", "ID"}));
+  EXPECT_STREQ(vpi_get_str(vpiFullName, DefnIn(By("top.i"), "ID")), "top.i.ID");
+}
+
+TEST_F(ClassesInEveryPlace, AProgramClassIsAClassDefnOfItsInstance) {
+  EXPECT_EQ(NamesOf(vpiClassDefn, By("top.r")),
+            (std::vector<std::string>{"GB", "GD"}));
+  EXPECT_STREQ(vpi_get_str(vpiFullName, DefnIn(By("top.r"), "GD")), "top.r.GD");
+}
+
+TEST_F(ClassesInEveryPlace, AClassReachesTheInstanceAndScopeDeclaringIt) {
+  for (const ClassPlace& place : kEveryPlace) {
+    vpiHandle declaring = ScopeOf(place);
+    ASSERT_NE(declaring, nullptr) << WhereOf(place);
+    vpiHandle defn = DefnOf(place, place.derived);
+    ASSERT_NE(defn, nullptr) << WhereOf(place);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, defn)),
+              VpiObjectOf(declaring))
+        << WhereOf(place);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, defn)), VpiObjectOf(declaring))
+        << WhereOf(place);
+  }
+}
+
+TEST_F(ClassesInEveryPlace, ANestedClassIsAnInternalScopeInEveryPlace) {
+  for (const ClassPlace& place : kEveryPlace) {
+    vpiHandle outer = DefnOf(place, place.derived);
+    ASSERT_NE(outer, nullptr) << WhereOf(place);
+    EXPECT_EQ(NamesOf(vpiInternalScope, outer),
+              std::vector<std::string>{place.nested})
+        << WhereOf(place);
+    vpiHandle nested = Named(vpiInternalScope, outer, place.nested);
+    ASSERT_NE(nested, nullptr) << WhereOf(place);
+    EXPECT_EQ(vpi_get(vpiType, nested), vpiClassDefn) << WhereOf(place);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, nested)), VpiObjectOf(outer))
+        << WhereOf(place);
+  }
+}
+
+TEST_F(ClassesInEveryPlace, ANestedClassReachesTheInstanceAroundItsOuterClass) {
+  for (const ClassPlace& place : kEveryPlace) {
+    vpiHandle nested =
+        Named(vpiInternalScope, DefnOf(place, place.derived), place.nested);
+    ASSERT_NE(nested, nullptr) << WhereOf(place);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, nested)),
+              VpiObjectOf(ScopeOf(place)))
+        << WhereOf(place);
+  }
+}
+
+TEST_F(ClassesInEveryPlace, ADerivedClassReachesItsBaseInEveryPlace) {
+  for (const ClassPlace& place : kEveryPlace) {
+    vpiHandle base = DefnOf(place, place.base);
+    ASSERT_NE(base, nullptr) << WhereOf(place);
+    vpiHandle extends = vpi_handle(vpiExtends, DefnOf(place, place.derived));
+    ASSERT_NE(extends, nullptr) << WhereOf(place);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn,
+                                     vpi_handle(vpiClassTypespec, extends))),
+              VpiObjectOf(base))
+        << WhereOf(place);
+    EXPECT_EQ(vpi_handle(vpiExtends, base), nullptr) << WhereOf(place);
+    EXPECT_EQ(NamesOf(vpiDerivedClasses, base),
+              std::vector<std::string>{place.derived})
+        << WhereOf(place);
+  }
+}
+
+TEST_F(ClassDefinitionsOfARun, AnExtendsClauseWithoutArgumentsHasNoArgument) {
+  Run("module top;\n"
+      "  class B; function new(int a = 1, int b = 2); endfunction endclass\n"
+      "  class N extends B; endclass\n"
+      "  class E extends B(); endclass\n"
+      "  class D extends B(default); endclass\n"
+      "endmodule\n");
+  vpiHandle base = DefnIn(By("top"), "B");
+  ASSERT_NE(base, nullptr);
+  for (const char* derived : {"N", "E", "D"}) {
+    vpiHandle extends = vpi_handle(vpiExtends, DefnIn(By("top"), derived));
+    ASSERT_NE(extends, nullptr) << derived;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn,
+                                     vpi_handle(vpiClassTypespec, extends))),
+              VpiObjectOf(base))
+        << derived;
+    EXPECT_EQ(vpi_iterate(vpiArgument, extends), nullptr) << derived;
+  }
+}
+
+TEST_F(ClassDefinitionsOfARun, AnExtendsClausesArgumentsComeInWrittenOrder) {
+  Run("module top;\n"
+      "  class B; function new(int a, int b); endfunction endclass\n"
+      "  class T extends B(3, 4 + 1); endclass\n"
+      "endmodule\n");
+  vpiHandle extends = vpi_handle(vpiExtends, DefnIn(By("top"), "T"));
+  ASSERT_NE(extends, nullptr);
+  EXPECT_EQ(IntsOf(vpiArgument, extends), (std::vector<int>{3, 5}));
+}
+
+constexpr const char* kImportedBases =
+    "package p; class Base; endclass endpackage\n"
+    "module wild; import p::*; class W extends Base; endclass endmodule\n"
+    "module one; import p::Base; class E extends Base; endclass endmodule\n"
+    "module top; wild w(); one o();\n"
+    "  class Q extends p::Base; endclass endmodule\n";
+
+TEST_F(ClassDefinitionsOfARun, APackageBaseListsAModuleClassNamingItQualified) {
+  Run(kImportedBases);
+  const std::vector<std::string> kDerived =
+      NamesOf(vpiDerivedClasses, DefnIn(By("p"), "Base"));
+  EXPECT_NE(std::ranges::find(kDerived, "Q"), kDerived.end());
+}
+
+TEST_F(ClassDefinitionsOfARun,
+       DISABLED_APackageBaseListsAModuleClassImportingIt) {
+  Run(kImportedBases);
+  EXPECT_EQ(NamesOf(vpiDerivedClasses, DefnIn(By("p"), "Base")),
+            (std::vector<std::string>{"E", "Q", "W"}));
+}
+
+TEST_F(ClassDefinitionsOfARun, DISABLED_AnImportedBaseIsReachedThroughExtends) {
+  Run(kImportedBases);
+  vpiHandle base = DefnIn(By("p"), "Base");
+  ASSERT_NE(base, nullptr);
+  for (const auto& [scope, derived] :
+       {std::pair{"top.w", "W"}, std::pair{"top.o", "E"}}) {
+    vpiHandle typespec = vpi_handle(
+        vpiClassTypespec, vpi_handle(vpiExtends, DefnIn(By(scope), derived)));
+    ASSERT_NE(typespec, nullptr) << scope;
+    EXPECT_STREQ(vpi_get_str(vpiName, typespec), "Base") << scope;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiClassDefn, typespec)),
+              VpiObjectOf(base))
+        << scope;
+  }
+}
+
+TEST_F(ClassDefinitionsOfARun, ABaseListsTheClassOfEachLoopGenerateBlock) {
+  Run("module top;\n"
+      "  class Base; endclass\n"
+      "  for (genvar i = 0; i < 2; i++) begin : g\n"
+      "    class D extends Base; endclass\n"
+      "  end\n"
+      "endmodule\n");
+  std::vector<std::string> derived;
+  for (vpiHandle defn :
+       ObjectsOf(vpiDerivedClasses, DefnIn(By("top"), "Base"))) {
+    derived.emplace_back(vpi_get_str(vpiFullName, defn));
+  }
+  std::ranges::sort(derived);
+  EXPECT_EQ(derived, (std::vector<std::string>{"top.g[0].D", "top.g[1].D"}));
+}
+
+TEST_F(ClassDefinitionsOfARun,
+       DISABLED_ABaseListsTheClassesDerivedFromItThroughAnother) {
+  Run("module top; class A; endclass class B extends A; endclass\n"
+      "  class C extends B; endclass endmodule\n");
+  EXPECT_EQ(NamesOf(vpiDerivedClasses, DefnIn(By("top"), "A")),
+            (std::vector<std::string>{"B", "C"}));
+  EXPECT_EQ(NamesOf(vpiDerivedClasses, DefnIn(By("top"), "B")),
+            std::vector<std::string>{"C"});
+  EXPECT_TRUE(NamesOf(vpiDerivedClasses, DefnIn(By("top"), "C")).empty());
+}
+
+TEST_F(ClassDefinitionsOfARun, AnExplicitConstructorIsAMethodOfItsClass) {
+  Run("module top; class C; function new(); endfunction\n"
+      "  task t; endtask endclass endmodule\n");
+  EXPECT_EQ(NamesOf(vpiMethods, DefnIn(By("top"), "C")),
+            (std::vector<std::string>{"new", "t"}));
+}
+
+TEST_F(ClassDefinitionsOfARun, AClassDefnIteratesItsStaticAndAutomaticEvents) {
+  Run("module top; class C; static event se; static event sa[2];\n"
+      "  event e; event ea[2]; endclass endmodule\n");
+  vpiHandle defn = DefnIn(By("top"), "C");
+  EXPECT_EQ(NamesOf(vpiNamedEvent, defn),
+            (std::vector<std::string>{"e", "se"}));
+  EXPECT_EQ(NamesOf(vpiNamedEventArray, defn),
+            (std::vector<std::string>{"ea", "sa"}));
+}
+
+void ExpectValueRoutinesRefused(vpiHandle member, const char* name) {
+  ASSERT_NE(member, nullptr) << name;
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  value.value.integer = 0x5eed;
+  vpi_get_value(member, &value);
+  s_vpi_error_info get_info = {};
+  const PLI_INT32 kGetStatus = vpi_chk_error(&get_info);
+  EXPECT_EQ(kGetStatus, vpiError) << "get " << name;
+  EXPECT_EQ(value.value.integer, 0x5eed) << "get " << name;
+  vpiHandle ret = vpi_put_value(member, &value, nullptr, vpiNoDelay);
+  s_vpi_error_info put_info = {};
+  const PLI_INT32 kPutStatus = vpi_chk_error(&put_info);
+  EXPECT_EQ(ret, nullptr) << "put " << name;
+  EXPECT_EQ(kPutStatus, vpiError) << "put " << name;
+}
+
+constexpr const char* kClassMembersOfARun =
+    "module top;\n"
+    "  class C; static int s = 3; event e; event ea[2]; endclass\n"
+    "  C h = new;\n"
+    "endmodule\n";
+
+TEST_F(ClassDefinitionsOfARun, AClassDefnsEventsRefuseTheValueRoutines) {
+  Run(kClassMembersOfARun);
+  vpiHandle defn = DefnIn(By("top"), "C");
+  ExpectValueRoutinesRefused(Named(vpiNamedEvent, defn, "e"), "e");
+  ExpectValueRoutinesRefused(Named(vpiNamedEventArray, defn, "ea"), "ea");
+}
+
+TEST_F(ClassDefinitionsOfARun,
+       AClassDefnsStaticPropertyRefusesTheValueRoutines) {
+  Run(kClassMembersOfARun);
+  ExpectValueRoutinesRefused(Named(vpiVariables, DefnIn(By("top"), "C"), "s"),
+                             "s");
+}
+
+TEST_F(ClassDefinitionsOfARun, AStaticPropertyReadThroughAnObjectHasItsValue) {
+  Run(kClassMembersOfARun);
+  vpiHandle obj = vpi_handle(vpiClassObj, By("top.h"));
+  ASSERT_NE(obj, nullptr);
+  vpiHandle s = Named(vpiVariables, obj, "s");
+  ASSERT_NE(s, nullptr);
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(s, &value);
+  s_vpi_error_info info = {};
+  const PLI_INT32 kStatus = vpi_chk_error(&info);
+  EXPECT_EQ(kStatus, 0);
+  EXPECT_EQ(value.value.integer, 3);
+}
+
+TEST_F(ClassDefinitionsOfARun,
+       AnInlineConstraintOfARunIsNoConstraintOfTheClass) {
+  Run("module top;\n"
+      "  class C; rand int x;\n"
+      "    constraint c1 { x > 0; }\n"
+      "    constraint c2 { x < 10; }\n"
+      "    function void f(); void'(randomize() with { x == 3; }); "
+      "endfunction\n"
+      "  endclass\n"
+      "  initial begin automatic C o = new; o.f(); end\n"
+      "endmodule\n");
+  EXPECT_EQ(OrderedNamesOf(vpiConstraint, DefnIn(By("top"), "C")),
+            (std::vector<std::string>{"c1", "c2"}));
+}
+
+constexpr const char* kInheritedConstraints =
+    "module top;\n"
+    "  class B; rand int x; constraint b1 { x > 0; } endclass\n"
+    "  class D extends B; constraint d1 { x < 9; } endclass\n"
+    "endmodule\n";
+
+TEST_F(ClassDefinitionsOfARun, ADerivedClassDefnLeavesOutItsBasesConstraints) {
+  Run(kInheritedConstraints);
+  EXPECT_EQ(OrderedNamesOf(vpiConstraint, DefnIn(By("top"), "D")),
+            std::vector<std::string>{"d1"});
+}
+
+TEST_F(ClassDefinitionsOfARun,
+       DISABLED_ABasesConstraintsAreReachedThroughExtends) {
+  Run(kInheritedConstraints);
+  vpiHandle extends = vpi_handle(vpiExtends, DefnIn(By("top"), "D"));
+  ASSERT_NE(extends, nullptr);
+  EXPECT_EQ(
+      OrderedNamesOf(vpiConstraint, vpi_handle(vpiClassTypespec, extends)),
+      std::vector<std::string>{"b1"});
+}
+
+TEST_F(ClassDefinitionsOfARun, ExternConstraintsComeInTheirPrototypesOrder) {
+  Run("module top;\n"
+      "  class C; rand int x;\n"
+      "    extern constraint z;\n"
+      "    extern constraint a;\n"
+      "    constraint m { x != 1; }\n"
+      "  endclass\n"
+      "  constraint C::a { x > 0; }\n"
+      "  constraint C::z { x < 9; }\n"
+      "endmodule\n");
+  EXPECT_EQ(OrderedNamesOf(vpiConstraint, DefnIn(By("top"), "C")),
+            (std::vector<std::string>{"z", "a", "m"}));
+}
+
+TEST_F(ClassDefinitionsOfARun, AnImplicitPrototypePlacesItsConstraint) {
+  Run("module top;\n"
+      "  class C; rand int x;\n"
+      "    constraint k { x > 0; }\n"
+      "    constraint q;\n"
+      "    constraint b { x < 9; }\n"
+      "  endclass\n"
+      "  constraint C::q { x != 4; }\n"
+      "endmodule\n");
+  EXPECT_EQ(OrderedNamesOf(vpiConstraint, DefnIn(By("top"), "C")),
+            (std::vector<std::string>{"k", "q", "b"}));
+}
+
 }  // namespace
 }  // namespace delta
