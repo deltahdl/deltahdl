@@ -22,28 +22,6 @@ namespace {
 
 class NetIndicesOfARun : public VpiDesignRun {
  protected:
-  static int IntOf(vpiHandle obj) {
-    s_vpi_value value = {};
-    value.format = vpiIntVal;
-    vpi_get_value(obj, &value);
-    return value.value.integer;
-  }
-
-  static std::vector<int> IntsOf(int type, vpiHandle ref) {
-    std::vector<int> values;
-    for (vpiHandle obj : ObjectsOf(type, ref)) values.push_back(IntOf(obj));
-    return values;
-  }
-
-  static std::vector<int> BoundsOf(vpiHandle obj) {
-    std::vector<int> bounds;
-    for (vpiHandle range : ObjectsOf(vpiRange, obj)) {
-      bounds.push_back(IntOf(vpi_handle(vpiLeftRange, range)));
-      bounds.push_back(IntOf(vpi_handle(vpiRightRange, range)));
-    }
-    return bounds;
-  }
-
   static std::vector<int> LeftRightOf(vpiHandle obj) {
     return {IntOf(vpi_handle(vpiLeftRange, obj)),
             IntOf(vpi_handle(vpiRightRange, obj))};

@@ -69,6 +69,28 @@ class VpiDesignRun : public ::testing::Test {
     return objects;
   }
 
+  static int IntOf(vpiHandle obj) {
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+
+  static std::vector<int> IntsOf(int type, vpiHandle ref) {
+    std::vector<int> values;
+    for (vpiHandle obj : ObjectsOf(type, ref)) values.push_back(IntOf(obj));
+    return values;
+  }
+
+  static std::vector<int> BoundsOf(vpiHandle obj) {
+    std::vector<int> bounds;
+    for (vpiHandle range : ObjectsOf(vpiRange, obj)) {
+      bounds.push_back(IntOf(vpi_handle(vpiLeftRange, range)));
+      bounds.push_back(IntOf(vpi_handle(vpiRightRange, range)));
+    }
+    return bounds;
+  }
+
   static std::string CalleeOf(vpiHandle call) {
     for (const int kRelation : {vpiTask, vpiFunction}) {
       vpiHandle called = vpi_handle(kRelation, call);
