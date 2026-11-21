@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -29,6 +30,14 @@ class NetIndicesOfARun : public VpiDesignRun {
 
   static int KindOf(vpiHandle obj) {
     return obj == nullptr ? 0 : vpi_get(vpiType, obj);
+  }
+
+  static void ExpectAggregateNetKinds(
+      const std::function<vpiHandle(const char*)>& find) {
+    EXPECT_EQ(KindOf(find("us")), vpiStructNet);
+    EXPECT_EQ(KindOf(find("uu")), vpiUnionNet);
+    EXPECT_EQ(KindOf(find("ps")), vpiStructNet);
+    EXPECT_EQ(KindOf(find("pu")), vpiUnionNet);
   }
 
   void RunPreprocessed(const std::string& src) {
@@ -205,6 +214,36 @@ TEST_F(NetIndicesOfARun, UnpackedStructAndUnionNetsAreTheirOwnKinds) {
 TEST_F(NetIndicesOfARun, AnInterconnectIsAnInterconnectNet) {
   Run("module top; interconnect w; endmodule\n");
   EXPECT_EQ(KindOf(By("top.w")), vpiInterconnectNet);
+}
+
+constexpr const char* kAggregateNets =
+    "  wire struct { logic a; logic [1:0] b; } us;\n"
+    "  wire union { logic [1:0] a; logic b; } uu;\n"
+    "  wire struct packed { logic a; logic b; } ps;\n"
+    "  wire union packed { logic [1:0] a; logic [1:0] b; } pu;\n";
+
+TEST_F(NetIndicesOfARun,
+       StructAndUnionNetsOfEveryInstanceAndBlockAreTheirKinds) {
+  Run(std::string("interface ifc;\n") + kAggregateNets +
+      "endinterface\nprogram prg;\n" + kAggregateNets +
+      "endprogram\nmodule top; ifc i(); prg g();\n  if (1) begin : blk\n" +
+      kAggregateNets + "  end\n" + kAggregateNets + "endmodule\n");
+  for (const char* scope : {"top.", "top.i.", "top.g.", "top.blk."}) {
+    SCOPED_TRACE(scope);
+    ExpectAggregateNetKinds(
+        [&](const char* name) { return By(std::string(scope) + name); });
+  }
+}
+
+TEST_F(NetIndicesOfARun, DISABLED_TheUnitsStructAndUnionNetsAreTheirKinds) {
+  Run(std::string(kAggregateNets) + "module top; endmodule\n");
+  vpiHandle unit = nullptr;
+  for (vpiHandle scope : ObjectsOf(vpiPackage, nullptr)) {
+    if (vpi_get(vpiUnit, scope) == 1) unit = scope;
+  }
+  ASSERT_NE(unit, nullptr);
+  ExpectAggregateNetKinds(
+      [&](const char* name) { return Named(vpiNet, unit, name); });
 }
 
 TEST_F(NetIndicesOfARun, StructAndUnionNetsReachTheirMemberNets) {

@@ -101,6 +101,17 @@ TEST_F(InstanceItemsOfARun, InterfacesAndProgramsIterateTheirItems) {
   }
 }
 
+TEST_F(InstanceItemsOfARun, TheCompilationUnitIteratesItsNets) {
+  Run("wire uw; tri [3:0] ut;\nmodule top; wire mw; endmodule\n");
+  EXPECT_EQ(NamesOf(vpiNet, Unit()), (std::vector<std::string>{"ut", "uw"}));
+}
+
+TEST_F(InstanceItemsOfARun, DISABLED_APackageIteratesItsNets) {
+  Run("package pk; wire pw; tri [3:0] pt; endpackage\n"
+      "module top; wire mw; endmodule\n");
+  EXPECT_EQ(NamesOf(vpiNet, By("pk")), (std::vector<std::string>{"pt", "pw"}));
+}
+
 constexpr const char* kArraysAndLoners =
     "interface ifc; endinterface\n"
     "program prg; endprogram\n"
