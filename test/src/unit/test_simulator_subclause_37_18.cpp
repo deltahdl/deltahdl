@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -260,6 +261,18 @@ class PackedArrayVarsOfARun : public VpiDesignRun {
       sizes.push_back(vpi_get(vpiSize, range));
     }
     return sizes;
+  }
+
+  static std::vector<vpiHandle> PathOf(vpiHandle var,
+                                       const std::vector<size_t>& picks) {
+    std::vector<vpiHandle> path = {var};
+    for (size_t pick : picks) {
+      const std::vector<vpiHandle> kElements =
+          ObjectsOf(vpiElement, path.back());
+      if (pick >= kElements.size()) break;
+      path.push_back(kElements[pick]);
+    }
+    return path;
   }
 
   static VpiObject* ParentOf(vpiHandle obj) {
@@ -651,17 +664,13 @@ std::string ThreeDimensionsDesign() {
 
 TEST_F(PackedArrayVarsOfARun, EverySubelementsParentIsTheOutermostVar) {
   Run(ThreeDimensionsDesign());
-  vpiHandle v = By("top.v");
-  ASSERT_NE(v, nullptr);
-  const std::vector<vpiHandle> kRows = ObjectsOf(vpiElement, v);
-  ASSERT_EQ(kRows.size(), 2U);
-  const std::vector<vpiHandle> kMiddle = ObjectsOf(vpiElement, kRows[0]);
-  ASSERT_EQ(kMiddle.size(), 3U);
-  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, kMiddle[2]);
-  ASSERT_EQ(kLeaves.size(), 4U);
-  EXPECT_EQ(ParentOf(kRows[0]), VpiObjectOf(v));
-  EXPECT_EQ(ParentOf(kMiddle[2]), VpiObjectOf(v));
-  EXPECT_EQ(ParentOf(kLeaves[3]), VpiObjectOf(v));
+  ASSERT_NE(By("top.v"), nullptr);
+  const std::vector<vpiHandle> kPath = PathOf(By("top.v"), {0, 2, 3});
+  ASSERT_EQ(kPath.size(), 4U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kPath[3]), "v[1][2][0]");
+  for (size_t depth = 1; depth < kPath.size(); ++depth) {
+    EXPECT_EQ(ParentOf(kPath[depth]), VpiObjectOf(kPath[0])) << depth;
+  }
 }
 
 TEST_F(PackedArrayVarsOfARun, AnEnumOrUnionSubelementsParentIsTheOutermostVar) {
@@ -749,16 +758,10 @@ TEST_F(PackedArrayVarsOfARun, ARowsIndexIsItsOwnAndTheWholeVarHasNone) {
 TEST_F(PackedArrayVarsOfARun,
        DISABLED_ADeeperSubelementsIndicesRunFromItsOwnOutward) {
   Run(ThreeDimensionsDesign());
-  vpiHandle v = By("top.v");
-  ASSERT_NE(v, nullptr);
-  const std::vector<vpiHandle> kRows = ObjectsOf(vpiElement, v);
-  ASSERT_EQ(kRows.size(), 2U);
-  const std::vector<vpiHandle> kMiddle = ObjectsOf(vpiElement, kRows[0]);
-  ASSERT_EQ(kMiddle.size(), 3U);
-  const std::vector<vpiHandle> kLeaves = ObjectsOf(vpiElement, kMiddle[2]);
-  ASSERT_EQ(kLeaves.size(), 4U);
-  EXPECT_EQ(IntsOf(vpiIndex, kMiddle[2]), (std::vector<int>{2, 1}));
-  EXPECT_EQ(IntsOf(vpiIndex, kLeaves[3]), (std::vector<int>{0, 2, 1}));
+  const std::vector<vpiHandle> kPath = PathOf(By("top.v"), {0, 2, 3});
+  ASSERT_EQ(kPath.size(), 4U);
+  EXPECT_EQ(IntsOf(vpiIndex, kPath[2]), (std::vector<int>{2, 1}));
+  EXPECT_EQ(IntsOf(vpiIndex, kPath[3]), (std::vector<int>{0, 2, 1}));
 }
 
 TEST_F(PackedArrayVarsOfARun, DISABLED_ARowsTypespecIsTheVarsTypeLessOneRange) {
