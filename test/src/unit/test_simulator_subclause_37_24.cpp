@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
 
@@ -256,6 +257,19 @@ class InterconnectsOfARun : public VpiDesignRun {
            std::to_string(IntOf(vpi_handle(vpiRightRange, array)));
   }
 
+  static std::vector<std::string> TypespecNamesOf(vpiHandle obj) {
+    std::vector<std::string> names = NamesOf(vpiTypespec, obj);
+    std::sort(names.begin(), names.end());
+    return names;
+  }
+
+  static std::vector<int> PackedOf(const std::vector<vpiHandle>& arrays) {
+    std::vector<int> packed;
+    packed.reserve(arrays.size());
+    for (vpiHandle array : arrays) packed.push_back(vpi_get(vpiPacked, array));
+    return packed;
+  }
+
   static std::string TypespecNameOf(vpiHandle obj) {
     vpiHandle typespec = vpi_handle(vpiTypespec, obj);
     if (typespec == nullptr) return "(none)";
@@ -442,6 +456,207 @@ TEST_F(InterconnectsOfARun, AnInterconnectChainsDeadEndTakesTheTypespec) {
   EXPECT_EQ(TypespecNameOf(LowConnOf("top.m.l", "r")), "byte_t");
   EXPECT_EQ(TypespecNameOf(LowConnOf("top.m", "p")), "byte_t");
   EXPECT_EQ(TypespecNameOf(By("top.c")), "byte_t");
+}
+
+TEST_F(InterconnectsOfARun, AnInterfacesInterconnectIsANetOrAnArray) {
+  Run("interface ifc; interconnect ic; interconnect ia [0:1]; endinterface\n"
+      "module top; ifc i(); endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.i.ic")), vpiInterconnectNet);
+  vpiHandle array = By("top.i.ia");
+  EXPECT_EQ(vpi_get(vpiType, array), vpiInterconnectArray);
+  EXPECT_EQ(KindsOf(vpiElement, array),
+            std::vector<int>(2, vpiInterconnectNet));
+}
+
+TEST_F(InterconnectsOfARun, AGenerateBlocksInterconnectIsANetOrAnArray) {
+  Run("module top;\n"
+      "  if (1) begin : g interconnect ic; interconnect ia [0:1]; end\n"
+      "  for (genvar k = 0; k < 2; k++) begin : l\n"
+      "    interconnect ic; interconnect ia [0:2];\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.g.ic")), vpiInterconnectNet);
+  vpiHandle conditional = By("top.g.ia");
+  EXPECT_EQ(vpi_get(vpiType, conditional), vpiInterconnectArray);
+  EXPECT_EQ(KindsOf(vpiElement, conditional),
+            std::vector<int>(2, vpiInterconnectNet));
+  EXPECT_EQ(vpi_get(vpiType, By("top.l[1].ic")), vpiInterconnectNet);
+  vpiHandle looped = By("top.l[1].ia");
+  EXPECT_EQ(vpi_get(vpiType, looped), vpiInterconnectArray);
+  EXPECT_EQ(KindsOf(vpiElement, looped),
+            std::vector<int>(3, vpiInterconnectNet));
+}
+
+TEST_F(InterconnectsOfARun, AProgramsInterconnectIsANetOrAnArray) {
+  Run("program p; interconnect ic; interconnect ia [0:1]; endprogram\n"
+      "module top; p q(); endmodule\n");
+  EXPECT_EQ(vpi_get(vpiType, By("top.q.ic")), vpiInterconnectNet);
+  vpiHandle array = By("top.q.ia");
+  EXPECT_EQ(vpi_get(vpiType, array), vpiInterconnectArray);
+  EXPECT_EQ(KindsOf(vpiElement, array),
+            std::vector<int>(2, vpiInterconnectNet));
+}
+
+TEST_F(InterconnectsOfARun, DISABLED_ANonAnsiInterconnectPortIsANetOrAnArray) {
+  Run("module m(ip, ia);\n"
+      "  input interconnect ip;\n"
+      "  inout interconnect ia [0:1];\n"
+      "endmodule\n"
+      "module top; m u(); endmodule\n");
+  vpiHandle net = LowConnOf("top.u", "ip");
+  ASSERT_NE(net, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, net), vpiInterconnectNet);
+  vpiHandle array = LowConnOf("top.u", "ia");
+  ASSERT_NE(array, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, array), vpiInterconnectArray);
+  EXPECT_EQ(KindsOf(vpiElement, array),
+            std::vector<int>(2, vpiInterconnectNet));
+}
+
+TEST_F(InterconnectsOfARun, APackedInterconnectArrayIteratesItsRange) {
+  Run("module m(interconnect [1:0] p); endmodule\n"
+      "module top; interconnect [3:0] w; m u(); endmodule\n");
+  EXPECT_EQ(RangesOf(By("top.w")), (std::vector<std::string>{"3:0"}));
+  vpiHandle port_array = LowConnOf("top.u", "p");
+  ASSERT_NE(port_array, nullptr);
+  EXPECT_EQ(RangesOf(port_array), (std::vector<std::string>{"1:0"}));
+  EXPECT_EQ(BoundsOf(port_array), "1:0");
+}
+
+TEST_F(InterconnectsOfARun, AnUnpackedOnlyInterconnectArrayIsNotPacked) {
+  Run("module m(interconnect ip [1:0][0:2]); endmodule\n"
+      "module top; interconnect n [0:1]; interconnect ia [0:1][3:1];\n"
+      "  m u();\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiPacked, By("top.n")), 0);
+  vpiHandle body = By("top.ia");
+  EXPECT_EQ(vpi_get(vpiPacked, body), 0);
+  EXPECT_EQ(PackedOf(ObjectsOf(vpiElement, body)), std::vector<int>(2, 0));
+  vpiHandle port_array = LowConnOf("top.u", "ip");
+  ASSERT_NE(port_array, nullptr);
+  EXPECT_EQ(vpi_get(vpiPacked, port_array), 0);
+  EXPECT_EQ(PackedOf(ObjectsOf(vpiElement, port_array)),
+            std::vector<int>(2, 0));
+}
+
+TEST_F(InterconnectsOfARun, EachPackedDimensionIsOneLevelOfElements) {
+  Run("module m(interconnect [1:0][3:0] p, interconnect [1:0] q [0:2]);\n"
+      "endmodule\n"
+      "module top; interconnect [1:0][3:0] w; m u(); endmodule\n");
+  vpiHandle body = By("top.w");
+  vpiHandle port = LowConnOf("top.u", "p");
+  ASSERT_NE(port, nullptr);
+  for (vpiHandle array : {body, port}) {
+    const std::vector<vpiHandle> kWords = ObjectsOf(vpiElement, array);
+    EXPECT_EQ(KindsOf(vpiElement, array),
+              std::vector<int>(2, vpiInterconnectArray));
+    EXPECT_EQ(PackedOf(kWords), std::vector<int>(kWords.size(), 1));
+    for (vpiHandle word : kWords) {
+      EXPECT_EQ(KindsOf(vpiElement, word),
+                std::vector<int>(4, vpiInterconnectNet));
+    }
+  }
+  vpiHandle mixed = LowConnOf("top.u", "q");
+  ASSERT_NE(mixed, nullptr);
+  EXPECT_EQ(vpi_get(vpiPacked, mixed), 0);
+  const std::vector<vpiHandle> kWords = ObjectsOf(vpiElement, mixed);
+  EXPECT_EQ(KindsOf(vpiElement, mixed),
+            std::vector<int>(3, vpiInterconnectArray));
+  EXPECT_EQ(PackedOf(kWords), std::vector<int>(kWords.size(), 1));
+  for (vpiHandle word : kWords) {
+    EXPECT_EQ(KindsOf(vpiElement, word),
+              std::vector<int>(2, vpiInterconnectNet));
+  }
+}
+
+TEST_F(InterconnectsOfARun, AnUnpackedStructNetGivesAnInterconnectItsMembers) {
+  Run("typedef struct { logic a; logic [1:0] b; } us_t;\n"
+      "module leaf(interconnect q); endmodule\n"
+      "module top; wire us_t s; leaf u(s); endmodule\n");
+  vpiHandle port = LowConnOf("top.u", "q");
+  ASSERT_NE(port, nullptr);
+  EXPECT_EQ(NamesOf(vpiMember, port), (std::vector<std::string>{"a", "b"}));
+  EXPECT_EQ(KindsOf(vpiMember, port), std::vector<int>(2, vpiInterconnectNet));
+  EXPECT_TRUE(ObjectsOf(vpiElement, port).empty());
+}
+
+TEST_F(InterconnectsOfARun,
+       DISABLED_AnInterconnectNetIteratesItsOneNetsTypespec) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "module leaf(interconnect p); endmodule\n"
+      "module bytes(input byte_t q); endmodule\n"
+      "module top; wire byte_t w; interconnect d;\n"
+      "  leaf u(w); bytes e(d);\n"
+      "endmodule\n");
+  EXPECT_EQ(TypespecNamesOf(LowConnOf("top.u", "p")),
+            (std::vector<std::string>{"byte_t"}));
+  EXPECT_EQ(TypespecNamesOf(By("top.d")), (std::vector<std::string>{"byte_t"}));
+}
+
+TEST_F(InterconnectsOfARun,
+       DISABLED_AnInterconnectNetIteratesEachNetsTypespec) {
+  Run("typedef logic [7:0] byte_t;\n"
+      "typedef logic [7:0] octet_t;\n"
+      "module bytes(input byte_t q); endmodule\n"
+      "module octets(input octet_t q); endmodule\n"
+      "module top; interconnect c; bytes a(c); octets b(c); endmodule\n");
+  EXPECT_EQ(TypespecNamesOf(By("top.c")),
+            (std::vector<std::string>{"byte_t", "octet_t"}));
+}
+
+TEST_F(InterconnectsOfARun, AnUnpackedArrayNetGivesAnInterconnectItsElements) {
+  Run("module leaf(interconnect p, interconnect r); endmodule\n"
+      "module top; wire logic [1:0] w [0:1]; wire logic v [2];\n"
+      "  leaf u(w, v);\n"
+      "endmodule\n");
+  for (const char* port_name : {"p", "r"}) {
+    vpiHandle port = LowConnOf("top.u", port_name);
+    ASSERT_NE(port, nullptr);
+    EXPECT_EQ(KindsOf(vpiElement, port),
+              std::vector<int>(2, vpiInterconnectNet));
+    const std::string kName = port_name;
+    EXPECT_EQ(NamesOf(vpiElement, port),
+              (std::vector<std::string>{kName + "[0]", kName + "[1]"}));
+    EXPECT_TRUE(ObjectsOf(vpiMember, port).empty());
+  }
+}
+
+TEST_F(InterconnectsOfARun, AnUnpackedArrayMemberGivesItsInterconnectElements) {
+  Run("typedef struct { logic f; logic [1:0] m [0:2]; } ua_t;\n"
+      "module leaf(interconnect q); endmodule\n"
+      "module top; wire ua_t s; leaf u(s); endmodule\n");
+  vpiHandle port = LowConnOf("top.u", "q");
+  ASSERT_NE(port, nullptr);
+  vpiHandle member = Named(vpiMember, port, "m");
+  ASSERT_NE(member, nullptr);
+  EXPECT_EQ(KindsOf(vpiElement, member),
+            std::vector<int>(3, vpiInterconnectNet));
+  EXPECT_TRUE(ObjectsOf(vpiMember, member).empty());
+}
+
+TEST_F(InterconnectsOfARun, ABodyInterconnectOnAPackedArrayPortHasElements) {
+  Run("typedef struct packed { logic a; logic b; } s_t;\n"
+      "module sink(input s_t [2:0] d); endmodule\n"
+      "module top; interconnect c; sink v(c); endmodule\n");
+  vpiHandle body = By("top.c");
+  EXPECT_EQ(KindsOf(vpiElement, body), std::vector<int>(3, vpiInterconnectNet));
+  std::vector<std::string> names = NamesOf(vpiElement, body);
+  std::sort(names.begin(), names.end());
+  EXPECT_EQ(names, (std::vector<std::string>{"c[0]", "c[1]", "c[2]"}));
+  EXPECT_TRUE(ObjectsOf(vpiMember, body).empty());
+}
+
+TEST_F(InterconnectsOfARun, DISABLED_ABodyInterconnectsElementsFollowItsRange) {
+  Run("typedef struct packed { logic a; logic b; } s_t;\n"
+      "module falling(input s_t [2:0] d); endmodule\n"
+      "module rising(input s_t [0:1] d); endmodule\n"
+      "module top; interconnect c; interconnect e;\n"
+      "  falling v(c); rising x(e);\n"
+      "endmodule\n");
+  EXPECT_EQ(NamesOf(vpiElement, By("top.c")),
+            (std::vector<std::string>{"c[2]", "c[1]", "c[0]"}));
+  EXPECT_EQ(NamesOf(vpiElement, By("top.e")),
+            (std::vector<std::string>{"e[0]", "e[1]"}));
 }
 
 }  // namespace
