@@ -1,10 +1,14 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
@@ -469,6 +473,301 @@ TEST_F(ClockingBlocksOfARun,
   ExpectBlockPrefixedBy("wait_local", "lv");
   ExpectBlockPrefixedBy(
       Named(vpiTaskFunc, Named(vpiClassDefn, By("top"), "C"), "run"), "cv");
+}
+
+std::string FullNameOf(vpiHandle obj) {
+  const char* name = obj == nullptr ? nullptr : vpi_get_str(vpiFullName, obj);
+  return name == nullptr ? "" : name;
+}
+
+int DelayOf(vpiHandle control) {
+  vpiHandle delay = vpi_handle(vpiDelay, control);
+  if (delay == nullptr) return -1;
+  s_vpi_value value = {};
+  value.format = vpiIntVal;
+  vpi_get_value(delay, &value);
+  return value.value.integer;
+}
+
+TEST_F(ClockingBlocksOfARun, AnInterfaceInstanceIteratesItsClockingBlocks) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking c1 @(posedge clk); endclocking\n"
+      "  clocking c2 @(negedge clk); endclocking\n"
+      "endinterface\n"
+      "module top; logic clk; bus b(clk); endmodule\n");
+  EXPECT_EQ(NamesOf(vpiClockingBlock, By("top.b")),
+            (std::vector<std::string>{"c1", "c2"}));
+}
+
+TEST_F(ClockingBlocksOfARun, AProgramInstanceIteratesItsClockingBlocks) {
+  Run("program prg(input logic clk);\n"
+      "  clocking c1 @(posedge clk); endclocking\n"
+      "  clocking c2 @(negedge clk); endclocking\n"
+      "endprogram\n"
+      "module top; logic clk; prg p(clk); endmodule\n");
+  EXPECT_EQ(NamesOf(vpiClockingBlock, By("top.p")),
+            (std::vector<std::string>{"c1", "c2"}));
+}
+
+TEST_F(ClockingBlocksOfARun, AClockingBlocksInstanceIsTheInstanceDeclaringIt) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking ci @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "program prg(input logic clk);\n"
+      "  clocking cp @(posedge clk); endclocking\n"
+      "endprogram\n"
+      "module top; logic clk; bus b(clk); prg p(clk);\n"
+      "  clocking cm @(posedge clk); endclocking\n"
+      "  if (1) begin : g clocking cg @(posedge clk); endclocking end\n"
+      "endmodule\n");
+  EXPECT_EQ(FullNameOf(vpi_handle(vpiInstance, By("top.cm"))), "top");
+  EXPECT_EQ(FullNameOf(vpi_handle(vpiInstance, By("top.b.ci"))), "top.b");
+  EXPECT_EQ(FullNameOf(vpi_handle(vpiInstance, By("top.p.cp"))), "top.p");
+  EXPECT_EQ(FullNameOf(vpi_handle(vpiInstance, By("top.g.cg"))), "top");
+}
+
+constexpr const char* kTwoBlocksWithEveryIoDecl =
+    "module top; logic clk, a, b, c, d, e, f;\n"
+    "  clocking first @(posedge clk); input a; endclocking\n"
+    "  clocking cb @(posedge clk);\n"
+    "    input a; output b; inout c;\n"
+    "    input #1 d; output #2 e; input #1 output #2 f;\n"
+    "    property p; a; endproperty\n"
+    "    sequence s; a; endsequence\n"
+    "  endclocking\n"
+    "  if (1) begin : g\n"
+    "    clocking cg @(posedge clk);\n"
+    "      input a; output #2 b; inout c;\n"
+    "      property p; a; endproperty\n"
+    "      sequence s; a; endsequence\n"
+    "    endclocking\n"
+    "  end\n"
+    "endmodule\n";
+
+TEST_F(ClockingBlocksOfARun, AnIoDeclReachesTheBlockDeclaringIt) {
+  Run(kTwoBlocksWithEveryIoDecl);
+  for (const char* block : {"top.cb", "top.g.cg"}) {
+    vpiHandle cb = By(block);
+    ASSERT_NE(cb, nullptr) << block;
+    const std::vector<vpiHandle> kDecls = ObjectsOf(vpiClockingIODecl, cb);
+    EXPECT_FALSE(kDecls.empty()) << block;
+    for (vpiHandle decl : kDecls) {
+      EXPECT_EQ(FullNameOf(vpi_handle(vpiClockingBlock, decl)), block)
+          << vpi_get_str(vpiName, decl);
+    }
+  }
+}
+
+TEST_F(ClockingBlocksOfARun, AClockingBlockIteratesItsPropertyAndSequence) {
+  Run(kTwoBlocksWithEveryIoDecl);
+  for (const char* block : {"top.cb", "top.g.cg"}) {
+    SCOPED_TRACE(block);
+    EXPECT_EQ(NamesOf(vpiPropertyDecl, By(block)),
+              std::vector<std::string>{"p"});
+    EXPECT_EQ(NamesOf(vpiSequenceDecl, By(block)),
+              std::vector<std::string>{"s"});
+  }
+}
+
+TEST_F(ClockingBlocksOfARun, APropertyAndSequenceReachTheBlockDeclaringThem) {
+  Run(kTwoBlocksWithEveryIoDecl);
+  for (const char* block : {"top.cb", "top.g.cg"}) {
+    SCOPED_TRACE(block);
+    vpiHandle property = Named(vpiPropertyDecl, By(block), "p");
+    ASSERT_NE(property, nullptr);
+    EXPECT_EQ(FullNameOf(vpi_handle(vpiClockingBlock, property)), block);
+    vpiHandle sequence = Named(vpiSequenceDecl, By(block), "s");
+    ASSERT_NE(sequence, nullptr);
+    EXPECT_EQ(FullNameOf(vpi_handle(vpiClockingBlock, sequence)), block);
+  }
+}
+
+TEST_F(ClockingBlocksOfARun, AnIoDeclNamedAfterANetReachesTheNet) {
+  Run("module top; logic clk; wire w;\n"
+      "  clocking cb @(posedge clk); input w; endclocking\n"
+      "endmodule\n");
+  vpiHandle w = Named(vpiClockingIODecl, By("top.cb"), "w");
+  ASSERT_NE(w, nullptr);
+  vpiHandle expr = vpi_handle(vpiExpr, w);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, expr), vpiNet);
+  EXPECT_EQ(VpiObjectOf(expr), VpiObjectOf(By("top.w")));
+}
+
+TEST_F(ClockingBlocksOfARun, AnIoDeclsClockingExpressionIsItsExpr) {
+  Run("module mem; logic enable; endmodule\n"
+      "module top; logic clk, enable; mem mem1();\n"
+      "  clocking cb @(posedge clk); input enable = top.mem1.enable;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  vpiHandle enable = Named(vpiClockingIODecl, By("top.cb"), "enable");
+  ASSERT_NE(enable, nullptr);
+  vpiHandle expr = vpi_handle(vpiExpr, enable);
+  ASSERT_NE(expr, nullptr);
+  EXPECT_EQ(FullNameOf(expr), "top.mem1.enable");
+}
+
+TEST_F(ClockingBlocksOfARun, AnInoutClockingSignalIsAnInoutIoDecl) {
+  Run("module top; logic clk, c;\n"
+      "  clocking cb @(posedge clk); inout c; endclocking\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kDecls =
+      ObjectsOf(vpiClockingIODecl, By("top.cb"));
+  ASSERT_EQ(kDecls.size(), 1U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kDecls[0]), "c");
+  EXPECT_EQ(vpi_get(vpiDirection, kDecls[0]), vpiInout);
+}
+
+TEST_F(ClockingBlocksOfARun, AnUnprefixedClockingBlockHasNoPrefix) {
+  Run("module top; logic clk, d;\n"
+      "  clocking cb @(posedge clk); input d; endclocking\n"
+      "  task wait_block; @(cb); endtask\n"
+      "  task wait_clockvar; @(cb.d); endtask\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kBlocks = ObjectsOf(vpiClockingBlock, By("top"));
+  ASSERT_EQ(kBlocks.size(), 1U);
+  EXPECT_EQ(vpi_handle(vpiPrefix, kBlocks[0]), nullptr);
+  vpiHandle named = vpi_handle(vpiCondition, ControlOf("wait_block"));
+  ASSERT_NE(named, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, named), vpiClockingBlock);
+  EXPECT_EQ(vpi_handle(vpiPrefix, named), nullptr);
+  vpiHandle clockvar = vpi_handle(vpiCondition, ControlOf("wait_clockvar"));
+  ASSERT_NE(clockvar, nullptr);
+  vpiHandle prefix = vpi_handle(vpiPrefix, clockvar);
+  ASSERT_NE(prefix, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, prefix), vpiClockingBlock);
+  EXPECT_EQ(vpi_handle(vpiPrefix, prefix), nullptr);
+}
+
+TEST_F(ClockingBlocksOfARun,
+       AnInterfacesAndProgramsVirtualInterfaceClockingBlockHasPrefix) {
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "interface host; task run(virtual bus hv); @(hv.cb); endtask\n"
+      "endinterface\n"
+      "program prg; virtual bus pv; task run; @(pv.cb); endtask endprogram\n"
+      "module top; logic clk; bus b(clk); host h(); prg p(); endmodule\n");
+  ExpectBlockPrefixedBy(Named(vpiTaskFunc, By("top.h"), "run"), "hv");
+  ExpectBlockPrefixedBy(Named(vpiTaskFunc, By("top.p"), "run"), "pv");
+}
+
+std::vector<VpiObject*> g_actuals;
+
+PLI_INT32 RecordActualCalltf(PLI_BYTE8*) {
+  vpiHandle wait = vpi_handle_by_name(VpiText("top.wait_cb"), nullptr);
+  vpiHandle block = vpi_handle(vpiCondition, vpi_handle(vpiStmt, wait));
+  g_actuals.push_back(VpiObjectOf(vpi_handle(vpiActual, block)));
+  return 0;
+}
+
+TEST_F(ClockingBlocksOfARun, AReassignedVirtualInterfacesBlockFollowsIt) {
+  g_actuals.clear();
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$record_actual");
+  data.calltf = &RecordActualCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run("interface bus(input logic clk);\n"
+      "  clocking cb @(posedge clk); endclocking\n"
+      "endinterface\n"
+      "module top; logic clk; bus b1(clk), b2(clk); virtual bus vif;\n"
+      "  task wait_cb; @(vif.cb); endtask\n"
+      "  initial begin\n"
+      "    vif = b1; #1 $record_actual;\n"
+      "    vif = b2; #1 $record_actual;\n"
+      "    vif = null; #1 $record_actual;\n"
+      "  end\n"
+      "endmodule\n");
+  ASSERT_EQ(g_actuals.size(), 3U);
+  EXPECT_EQ(g_actuals[0], VpiObjectOf(By("top.b1.cb")));
+  EXPECT_EQ(g_actuals[1], VpiObjectOf(By("top.b2.cb")));
+  EXPECT_EQ(g_actuals[2], nullptr);
+  EXPECT_NE(g_actuals[0], nullptr);
+  EXPECT_NE(g_actuals[0], g_actuals[1]);
+}
+
+TEST_F(ClockingBlocksOfARun, AnIoDeclsOwnInputSkewIsItsDelayControl) {
+  Run("module top; logic clk, a;\n"
+      "  clocking cb @(posedge clk); input posedge #1 a; endclocking\n"
+      "endmodule\n");
+  vpiHandle skew = vpi_handle(vpiInputSkew, By("top.cb.a"));
+  ASSERT_NE(skew, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, skew), vpiDelayControl);
+  EXPECT_EQ(DelayOf(skew), 1);
+}
+
+TEST_F(ClockingBlocksOfARun, AnIoDeclsOwnOutputEdgeAndSkewAreReported) {
+  Run("module top; logic clk, b;\n"
+      "  clocking cb @(posedge clk); output negedge #2 b; endclocking\n"
+      "endmodule\n");
+  vpiHandle b = Named(vpiClockingIODecl, By("top.cb"), "b");
+  ASSERT_NE(b, nullptr);
+  EXPECT_EQ(vpi_get(vpiOutputEdge, b), vpiNegedge);
+  vpiHandle skew = vpi_handle(vpiOutputSkew, b);
+  ASSERT_NE(skew, nullptr);
+  EXPECT_EQ(IntegerOf(skew), 2);
+}
+
+TEST_F(ClockingBlocksOfARun, ATwoWayIoDeclReportsBothDirectionsSkews) {
+  Run("module top; logic clk, d, e;\n"
+      "  clocking cb @(posedge clk);\n"
+      "    default input negedge #4 output posedge #5;\n"
+      "    input posedge #1 output negedge #2 d; inout e;\n"
+      "  endclocking\n"
+      "endmodule\n");
+  struct Expected {
+    const char* name;
+    int input_edge;
+    int input_skew;
+    int output_edge;
+    int output_skew;
+  };
+  for (const Expected& want : {Expected{"d", vpiPosedge, 1, vpiNegedge, 2},
+                               Expected{"e", vpiNegedge, 4, vpiPosedge, 5}}) {
+    SCOPED_TRACE(want.name);
+    vpiHandle decl = Named(vpiClockingIODecl, By("top.cb"), want.name);
+    ASSERT_NE(decl, nullptr);
+    EXPECT_EQ(vpi_get(vpiInputEdge, decl), want.input_edge);
+    EXPECT_EQ(vpi_get(vpiOutputEdge, decl), want.output_edge);
+    vpiHandle input = vpi_handle(vpiInputSkew, decl);
+    vpiHandle output = vpi_handle(vpiOutputSkew, decl);
+    ASSERT_NE(input, nullptr);
+    ASSERT_NE(output, nullptr);
+    EXPECT_EQ(DelayOf(input), want.input_skew);
+    EXPECT_EQ(IntegerOf(output), want.output_skew);
+  }
+}
+
+TEST_F(ClockingBlocksOfARun, ABlocksOutputSkewIsItsDefaultOutputDelay) {
+  Run("module top; logic clk;\n"
+      "  clocking cb @(posedge clk); default output #3; endclocking\n"
+      "endmodule\n");
+  vpiHandle skew = vpi_handle(vpiOutputSkew, By("top.cb"));
+  ASSERT_NE(skew, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, skew), vpiDelayControl);
+  EXPECT_EQ(DelayOf(skew), 3);
+}
+
+TEST_F(ClockingBlocksOfARun, ABlocksOutputEdgeIsItsDefaultOutputEdge) {
+  Run("module top; logic clk;\n"
+      "  clocking cp @(posedge clk); default output posedge #1; endclocking\n"
+      "  clocking cn @(posedge clk); default output negedge #1; endclocking\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiOutputEdge, By("top.cp")), vpiPosedge);
+  EXPECT_EQ(vpi_get(vpiOutputEdge, By("top.cn")), vpiNegedge);
+}
+
+TEST_F(ClockingBlocksOfARun, ABlockWithoutDefaultSkewsHasNone) {
+  Run("module top; logic clk, a;\n"
+      "  clocking cb @(posedge clk); input a; endclocking\n"
+      "endmodule\n");
+  vpiHandle cb = By("top.cb");
+  ASSERT_NE(cb, nullptr);
+  EXPECT_EQ(vpi_handle(vpiInputSkew, cb), nullptr);
+  EXPECT_EQ(vpi_handle(vpiOutputSkew, cb), nullptr);
+  EXPECT_EQ(vpi_get(vpiInputEdge, cb), vpiNoEdge);
+  EXPECT_EQ(vpi_get(vpiOutputEdge, cb), vpiNoEdge);
 }
 
 }  // namespace
