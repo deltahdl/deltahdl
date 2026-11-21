@@ -5,12 +5,12 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: b425c181-0dc9-4105-9628-ad8462acdd57
-  modified: 2026-11-21T02:13:31.402Z
+  modified: 2026-11-21T02:16:38.319Z
 ---
 
 # Tests land before their fix
 
-This holds only for an issue that asks for tests before deltahdl has the functionality they test: an issue labelled `lrm-tests`, which asks for the tests of one section of a standard ahead of any fix and changes nothing under `src/`. The `bylabel` form of the autopilot skill works through such issues. For one of them, a unit test under `test/src/unit/` is committed and pushed once it is written and has been run, whether or not deltahdl passes it. A test deltahdl passes carries its plain name. A test deltahdl fails carries `DISABLED_` in front of its name, as in `TEST(Suite, DISABLED_Name)`: GoogleTest builds a test so named and leaves it out of a run unless asked for it, so it neither passes nor fails. The commit that later makes deltahdl pass the test removes the prefix.
+This holds only for an issue that asks for tests before deltahdl has the functionality they test: an issue labelled `lrm-tests`, which asks for the tests of one section of a standard ahead of any fix and changes nothing under `src/`. The `bylabel` form of the autopilot skill works through such issues. For one of them, every test the issue asks for is written and run, whether or not deltahdl passes it, and all of them land together in the one commit that closes the issue: never a test pushed on its own as soon as it is written, so that no issue closes across several pushes. A test deltahdl passes carries its plain name. A test deltahdl fails carries `DISABLED_` in front of its name, as in `TEST(Suite, DISABLED_Name)`: GoogleTest builds a test so named and leaves it out of a run unless asked for it, so it neither passes nor fails. The commit that later makes deltahdl pass the test removes the prefix.
 
 An issue that asks to solve a rule is different: its commit delivers the functionality and every case's test together, each test passing under its plain name, and closes the issue ([a-commit-closes-an-issue](a-commit-closes-an-issue.md), [fixing-a-rule-in-full](fixing-a-rule-in-full.md)). Its tests are still written and run before the fix and seen to fail ([test-driven-development](test-driven-development.md)), but they are not pushed disabled ahead of it.
 
