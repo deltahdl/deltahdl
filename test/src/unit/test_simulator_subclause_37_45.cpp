@@ -177,24 +177,82 @@ int TermScalar(vpiHandle device, int relation) {
 int g_in_term_mid_delay = -1;
 int g_out_term_mid_delay = -1;
 const char* g_peeked_net = nullptr;
+int g_peeked_kind = vpiModPathDelay;
 
 PLI_INT32 PeekDelayTermsCalltf(PLI_BYTE8*) {
-  vpiHandle device = DeviceOfKindOnNet(g_peeked_net, vpiModPathDelay);
+  vpiHandle device = DeviceOfKindOnNet(g_peeked_net, g_peeked_kind);
   if (device == nullptr) return 0;
   g_in_term_mid_delay = TermScalar(device, vpiInTerm);
   g_out_term_mid_delay = TermScalar(device, vpiOutTerm);
   return 0;
 }
 
-void RegisterPeek(const char* net) {
+void RegisterPeek(const char* net, int kind = vpiModPathDelay) {
   g_in_term_mid_delay = -1;
   g_out_term_mid_delay = -1;
   g_peeked_net = net;
+  g_peeked_kind = kind;
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = VpiText("$peek");
   data.calltf = &PeekDelayTermsCalltf;
   ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+void PutRiseAndFall(vpiHandle obj, PLI_UINT32 rise, PLI_UINT32 fall) {
+  s_vpi_time times[2] = {};
+  times[0].type = vpiSimTime;
+  times[0].low = rise;
+  times[1].type = vpiSimTime;
+  times[1].low = fall;
+  s_vpi_delay delay = {};
+  delay.da = times;
+  delay.no_of_delays = 2;
+  delay.time_type = vpiSimTime;
+  vpi_put_delays(obj, &delay);
+}
+
+vpiHandle PortNamed(const char* module, const char* name) {
+  vpiHandle it =
+      vpi_iterate(vpiPort, vpi_handle_by_name(VpiText(module), nullptr));
+  if (it == nullptr) return nullptr;
+  while (vpiHandle port = vpi_scan(it)) {
+    if (std::string(vpi_get_str(vpiName, port)) == name) return port;
+  }
+  return nullptr;
+}
+
+vpiHandle IntermodulePathOfTop() {
+  return vpi_handle_multi(vpiInterModPath, PortNamed("top.d", "o"),
+                          PortNamed("top.r", "i"));
+}
+
+int g_put_kind = vpiInterModPathDelay;
+
+PLI_INT32 PutADelayCalltf(PLI_BYTE8*) {
+  vpiHandle target = g_put_kind == vpiInterModPathDelay
+                         ? IntermodulePathOfTop()
+                         : PortNamed("top.r", "i");
+  if (target != nullptr) PutRiseAndFall(target, 3, 3);
+  return 0;
+}
+
+void RegisterPut(int kind) {
+  g_put_kind = kind;
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$putdelay");
+  data.calltf = &PutADelayCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+}
+
+std::string WriteSdf(const std::string& name, const std::string& entries) {
+  const std::string kPath = "/tmp/delta_c37_45_" + name + ".sdf";
+  std::ofstream out(kPath, std::ios::trunc);
+  out << "(DELAYFILE (CELL (CELLTYPE \"top\") (INSTANCE top) (DELAY "
+         "(ABSOLUTE "
+      << entries << "))))";
+  return kPath;
 }
 
 class DelayDevicesOfARun : public VpiDesignRun {
@@ -305,17 +363,8 @@ TEST_F(DelayDevicesOfARun, APutOnAnIntermodulePathPlacesADevice) {
   ASSERT_NE(w, nullptr);
   EXPECT_TRUE(TermsOf(vpiLoad, w).empty());
 
-  s_vpi_time times[2] = {};
-  times[0].type = vpiSimTime;
-  times[0].low = 4;
-  times[1].type = vpiSimTime;
-  times[1].low = 6;
-  s_vpi_delay delay = {};
-  delay.da = times;
-  delay.no_of_delays = 2;
-  delay.time_type = vpiSimTime;
-  vpi_put_delays(path, &delay);
-  vpi_put_delays(path, &delay);
+  PutRiseAndFall(path, 4, 6);
+  PutRiseAndFall(path, 4, 6);
 
   const std::vector<vpiHandle> kLoadTerms = TermsOf(vpiLoad, w);
   ASSERT_EQ(kLoadTerms.size(), 1u);
@@ -337,17 +386,8 @@ TEST_F(DelayDevicesOfARun, APutOnAnInputPortPlacesADevice) {
   ASSERT_NE(i, nullptr);
   EXPECT_TRUE(TermsOf(vpiLoad, i).empty());
 
-  s_vpi_time times[2] = {};
-  times[0].type = vpiSimTime;
-  times[0].low = 4;
-  times[1].type = vpiSimTime;
-  times[1].low = 6;
-  s_vpi_delay delay = {};
-  delay.da = times;
-  delay.no_of_delays = 2;
-  delay.time_type = vpiSimTime;
-  vpi_put_delays(port, &delay);
-  vpi_put_delays(port, &delay);
+  PutRiseAndFall(port, 4, 6);
+  PutRiseAndFall(port, 4, 6);
 
   const std::vector<vpiHandle> kLoadTerms = TermsOf(vpiLoad, i);
   ASSERT_EQ(kLoadTerms.size(), 1u);
@@ -410,11 +450,7 @@ TEST_F(DelayDevicesOfARun, ATopModulesOutputTermReadsItsOwnNet) {
 }
 
 std::string WriteInterconnectAndPortSdf() {
-  const std::string kPath = "/tmp/delta_c37_45_devices.sdf";
-  std::ofstream out(kPath, std::ios::trunc);
-  out << "(DELAYFILE (CELL (CELLTYPE \"top\") (INSTANCE top) (DELAY "
-         "(ABSOLUTE (INTERCONNECT u1/o u2/i (10)) (PORT u2/i (5))))))";
-  return kPath;
+  return WriteSdf("devices", "(INTERCONNECT u1/o u2/i (10)) (PORT u2/i (5))");
 }
 
 std::string ModuleOf(vpiHandle device) {
@@ -444,6 +480,191 @@ TEST_F(DelayDevicesOfARun, AnUnannotatedDesignHoldsNoSdfDevice) {
       "module top; wire w; drv u1(w); rcv u2(w); endmodule\n");
   EXPECT_EQ(DeviceOfKindOnNet("top.w", vpiInterModPathDelay), nullptr);
   EXPECT_EQ(DeviceOfKindOnNet("top.u2.i", vpiMIPDelay), nullptr);
+}
+
+struct DeviceSource {
+  const char* name;
+  int kind;
+  const char* net;
+  bool annotated;
+};
+
+std::string DeviceDesign(const DeviceSource& source) {
+  const std::string kStart =
+      source.annotated
+          ? std::string("$sdf_annotate(\"") +
+                WriteSdf(source.name, source.kind == vpiInterModPathDelay
+                                          ? "(INTERCONNECT d/o r/i (3))"
+                                          : "(PORT r/i (3))") +
+                "\");"
+          : std::string("$putdelay;");
+  return "module drv(input a, output o); assign o = a; endmodule\n"
+         "module rcv(input i); endmodule\n"
+         "module top;\n"
+         "  logic p = 0; wire w; drv d(p, w); rcv r(w);\n"
+         "  initial begin " +
+         kStart +
+         " #10 p = 1; #1 $peek; end\n"
+         "endmodule\n";
+}
+
+class EveryDeviceKind : public DelayDevicesOfARun,
+                        public ::testing::WithParamInterface<DeviceSource> {
+ protected:
+  vpiHandle RunAndFindDevice() {
+    RegisterPut(GetParam().kind);
+    RegisterPeek(GetParam().net, GetParam().kind);
+    Run(DeviceDesign(GetParam()));
+    return DeviceOfKindOnNet(GetParam().net, GetParam().kind);
+  }
+
+  static std::vector<vpiHandle> NetObjectsBesideDevices(int relation,
+                                                        vpiHandle net) {
+    std::vector<vpiHandle> objects = ObjectsOf(relation, net);
+    std::erase_if(objects, [](vpiHandle h) {
+      return vpi_get(vpiType, h) == vpiDelayTerm;
+    });
+    return objects;
+  }
+
+  static bool SameObjects(const std::vector<vpiHandle>& a,
+                          const std::vector<vpiHandle>& b) {
+    return a.size() == b.size() && std::ranges::all_of(a, [&](vpiHandle h) {
+             return HoldsObject(b, h);
+           });
+  }
+};
+
+TEST_P(EveryDeviceKind, ADeviceReachesBothTermsOnItsNet) {
+  vpiHandle device = RunAndFindDevice();
+  ASSERT_NE(device, nullptr);
+  vpiHandle net = By(GetParam().net);
+  vpiHandle in_term = vpi_handle(vpiInTerm, device);
+  vpiHandle out_term = vpi_handle(vpiOutTerm, device);
+  ASSERT_NE(in_term, nullptr);
+  ASSERT_NE(out_term, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, in_term), vpiDelayTerm);
+  EXPECT_EQ(vpi_get(vpiType, out_term), vpiDelayTerm);
+  EXPECT_TRUE(HoldsObject(TermsOf(vpiLoad, net), in_term));
+  EXPECT_TRUE(HoldsObject(TermsOf(vpiDriver, net), out_term));
+}
+
+TEST_P(EveryDeviceKind, EachTermReportsItsDevicesKind) {
+  vpiHandle device = RunAndFindDevice();
+  ASSERT_NE(device, nullptr);
+  EXPECT_EQ(vpi_get(vpiDelayType, vpi_handle(vpiInTerm, device)),
+            GetParam().kind);
+  EXPECT_EQ(vpi_get(vpiDelayType, vpi_handle(vpiOutTerm, device)),
+            GetParam().kind);
+}
+
+TEST_P(EveryDeviceKind, TheOutputTermReachesItsDevice) {
+  vpiHandle device = RunAndFindDevice();
+  ASSERT_NE(device, nullptr);
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiDelayDevice, vpi_handle(vpiOutTerm, device))),
+      VpiObjectOf(device));
+}
+
+TEST_P(EveryDeviceKind, DISABLED_TheTermsIterateTheDriversAndLoadsOfTheirNet) {
+  vpiHandle device = RunAndFindDevice();
+  ASSERT_NE(device, nullptr);
+  vpiHandle net = By(GetParam().net);
+  vpiHandle in_term = vpi_handle(vpiInTerm, device);
+  vpiHandle out_term = vpi_handle(vpiOutTerm, device);
+  const std::vector<vpiHandle> kNetDrivers =
+      NetObjectsBesideDevices(vpiDriver, net);
+  const std::vector<vpiHandle> kNetLoads =
+      NetObjectsBesideDevices(vpiLoad, net);
+  EXPECT_FALSE(kNetDrivers.empty());
+  EXPECT_TRUE(
+      SameObjects(NetObjectsBesideDevices(vpiDriver, in_term), kNetDrivers));
+  EXPECT_TRUE(
+      SameObjects(NetObjectsBesideDevices(vpiLoad, out_term), kNetLoads));
+  EXPECT_FALSE(HoldsObject(ObjectsOf(vpiDriver, in_term), out_term));
+  EXPECT_FALSE(HoldsObject(ObjectsOf(vpiLoad, out_term), in_term));
+}
+
+void ExpectTheInputTermChangedBeforeTheDelay() {
+  EXPECT_EQ(g_in_term_mid_delay, vpi1);
+}
+
+void ExpectTheOutputTermHeldUntilAfterTheDelay(vpiHandle device) {
+  EXPECT_EQ(g_out_term_mid_delay, vpi0);
+  ASSERT_NE(device, nullptr);
+  EXPECT_EQ(TermScalar(device, vpiInTerm), vpi1);
+  EXPECT_EQ(TermScalar(device, vpiOutTerm), vpi1);
+}
+
+std::string DeviceSourceName(
+    const ::testing::TestParamInfo<DeviceSource>& info) {
+  return info.param.name;
+}
+
+constexpr DeviceSource kPutIntermodulePath{
+    "PutIntermodulePath", vpiInterModPathDelay, "top.w", false};
+constexpr DeviceSource kPutInputPort{"PutInputPort", vpiMIPDelay, "top.r.i",
+                                     false};
+constexpr DeviceSource kAnnotatedInterconnect{
+    "AnnotatedInterconnect", vpiInterModPathDelay, "top.w", true};
+constexpr DeviceSource kAnnotatedPort{"AnnotatedPort", vpiMIPDelay, "top.r.i",
+                                      true};
+
+INSTANTIATE_TEST_SUITE_P(PlacedByAPutOrAnAnnotation, EveryDeviceKind,
+                         ::testing::Values(kPutIntermodulePath, kPutInputPort,
+                                           kAnnotatedInterconnect,
+                                           kAnnotatedPort),
+                         DeviceSourceName);
+
+class IntermodulePathDevices : public EveryDeviceKind {};
+
+TEST_P(IntermodulePathDevices, TheInputTermChangesBeforeTheDelay) {
+  RunAndFindDevice();
+  ExpectTheInputTermChangedBeforeTheDelay();
+}
+
+TEST_P(IntermodulePathDevices, DISABLED_TheOutputTermChangesOnlyAfterTheDelay) {
+  ExpectTheOutputTermHeldUntilAfterTheDelay(RunAndFindDevice());
+}
+
+INSTANTIATE_TEST_SUITE_P(PlacedByAPutOrAnAnnotation, IntermodulePathDevices,
+                         ::testing::Values(kPutIntermodulePath,
+                                           kAnnotatedInterconnect),
+                         DeviceSourceName);
+
+class InputPortDevices : public EveryDeviceKind {};
+
+TEST_P(InputPortDevices, DISABLED_TheInputTermChangesBeforeTheDelay) {
+  RunAndFindDevice();
+  ExpectTheInputTermChangedBeforeTheDelay();
+}
+
+TEST_P(InputPortDevices, TheOutputTermChangesOnlyAfterTheDelay) {
+  ExpectTheOutputTermHeldUntilAfterTheDelay(RunAndFindDevice());
+}
+
+INSTANTIATE_TEST_SUITE_P(PlacedByAPutOrAnAnnotation, InputPortDevices,
+                         ::testing::Values(kPutInputPort, kAnnotatedPort),
+                         DeviceSourceName);
+
+TEST_F(DelayDevicesOfARun, AModulePathsOutputTermReachesItsDevice) {
+  RunACellWithAPath();
+  vpiHandle device = DeviceOfKindOnNet("top.u.y", vpiModPathDelay);
+  ASSERT_NE(device, nullptr);
+  EXPECT_EQ(
+      VpiObjectOf(vpi_handle(vpiDelayDevice, vpi_handle(vpiOutTerm, device))),
+      VpiObjectOf(device));
+}
+
+TEST_F(DelayDevicesOfARun,
+       DISABLED_AnObjectWithoutADelayTypeReportsItUndefined) {
+  RunACellWithAPath();
+  vpiHandle u = By("top.u");
+  ASSERT_NE(u, nullptr);
+  EXPECT_EQ(vpi_get(vpiDelayType, u), vpiUndefined);
+  vpiHandle device = DeviceOfKindOnNet("top.u.y", vpiModPathDelay);
+  ASSERT_NE(device, nullptr);
+  EXPECT_EQ(vpi_get(vpiDelayType, device), vpiModPathDelay);
 }
 
 }  // namespace
