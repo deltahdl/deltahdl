@@ -23,8 +23,8 @@ namespace {
 class NetIndicesOfARun : public VpiDesignRun {
  protected:
   static std::vector<int> LeftRightOf(vpiHandle obj) {
-    return {IntOf(vpi_handle(vpiLeftRange, obj)),
-            IntOf(vpi_handle(vpiRightRange, obj))};
+    return {IntegerOf(vpi_handle(vpiLeftRange, obj)),
+            IntegerOf(vpi_handle(vpiRightRange, obj))};
   }
 
   static int KindOf(vpiHandle obj) {
@@ -128,7 +128,7 @@ TEST_F(NetIndicesOfARun, ABitOfAnArrayNetElementReachesItsOwnIndex) {
   Run("module top; wire [3:0] m [0:2]; endmodule\n");
   vpiHandle bit = BitOfElementOfM();
   ASSERT_NE(bit, nullptr);
-  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, bit)), 2);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiIndex, bit)), 2);
 }
 
 TEST_F(NetIndicesOfARun,
@@ -262,7 +262,7 @@ TEST_F(NetIndicesOfARun, ABitNetHasOneNetBitPerBit) {
   EXPECT_EQ(IntsOf(vpiIndex, kBits[3]), (std::vector<int>{0}));
   vpiHandle bit2 = vpi_handle_by_index(b, 2);
   ASSERT_NE(bit2, nullptr);
-  EXPECT_EQ(IntOf(bit2), 1);
+  EXPECT_EQ(IntegerOf(bit2), 1);
 }
 
 TEST_F(NetIndicesOfARun, ANetBitAndAnArrayNetsNetCarryTheDeclaredNetType) {

@@ -18,7 +18,7 @@ TEST_F(NetDetailsOfARun, ANetBitReachesItsIndicesWorkingOutward) {
   Run("module top; wire [1:0][2:0] w; endmodule\n");
   const std::vector<vpiHandle> kBits = ObjectsOf(vpiBit, By("top.w"));
   ASSERT_EQ(kBits.size(), 6U);
-  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, kBits[0])), 2);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiIndex, kBits[0])), 2);
   EXPECT_EQ(IntsOf(vpiIndex, kBits[0]), (std::vector<int>{2, 1}));
   EXPECT_EQ(IntsOf(vpiIndex, kBits[4]), (std::vector<int>{1, 0}));
 }
@@ -27,7 +27,7 @@ TEST_F(NetDetailsOfARun, ANetInAnArrayNetReachesItsIndices) {
   Run("module top; wire [3:0] m [0:2]; wire n [0:2][4:5]; endmodule\n");
   vpiHandle m1 = vpi_handle_by_index(By("top.m"), 1);
   ASSERT_NE(m1, nullptr);
-  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, m1)), 1);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiIndex, m1)), 1);
   EXPECT_EQ(IntsOf(vpiIndex, m1), (std::vector<int>{1}));
   vpiHandle n1 = vpi_handle_by_index(By("top.n"), 1);
   ASSERT_NE(n1, nullptr);
@@ -35,7 +35,7 @@ TEST_F(NetDetailsOfARun, ANetInAnArrayNetReachesItsIndices) {
   vpiHandle n15 = vpi_handle_by_index(n1, 5);
   ASSERT_NE(n15, nullptr);
   EXPECT_EQ(vpi_get(vpiType, n15), vpiNet);
-  EXPECT_EQ(IntOf(vpi_handle(vpiIndex, n15)), 5);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiIndex, n15)), 5);
   EXPECT_EQ(IntsOf(vpiIndex, n15), (std::vector<int>{5, 1}));
 }
 
@@ -44,8 +44,8 @@ TEST_F(NetDetailsOfARun, ANetReachesTheRangesItDeclares) {
       "  wire [2:1] b [0:1];\n"
       "endmodule\n");
   EXPECT_EQ(BoundsOf(By("top.p")), (std::vector<int>{3, 0, 1, 2}));
-  EXPECT_EQ(IntOf(vpi_handle(vpiLeftRange, By("top.p"))), 3);
-  EXPECT_EQ(IntOf(vpi_handle(vpiRightRange, By("top.p"))), 0);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiLeftRange, By("top.p"))), 3);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiRightRange, By("top.p"))), 0);
   EXPECT_EQ(BoundsOf(By("top.a")), (std::vector<int>{5, 4, 6, 8}));
   EXPECT_EQ(vpi_iterate(vpiRange, By("top.s")), nullptr);
   EXPECT_EQ(BoundsOf(By("top.b")), (std::vector<int>{0, 1}));
@@ -254,10 +254,10 @@ TEST_F(NetDetailsOfARun, APackedArrayNetsStructSubelementHasMemberNets) {
   ASSERT_NE(bvec, nullptr);
   EXPECT_STREQ(vpi_get_str(vpiFullName, bvec), "top.pn[1].bvec");
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, bvec)), VpiObjectOf(kLeaves[0]));
-  EXPECT_EQ(IntOf(bvec), 9);
+  EXPECT_EQ(IntegerOf(bvec), 9);
   vpiHandle i1 = Named(vpiMember, kLeaves[1], "i1");
   ASSERT_NE(i1, nullptr);
-  EXPECT_EQ(IntOf(i1), 5);
+  EXPECT_EQ(IntegerOf(i1), 5);
 }
 
 TEST_F(NetDetailsOfARun, ANetDecompilesToItsPrefixedName) {
@@ -290,8 +290,8 @@ TEST_F(NetDetailsOfARun, APackageStructsPackedArrayNetHasMemberNets) {
   ASSERT_EQ(kLeaves.size(), 2U);
   EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
             (std::vector<std::string>{"a", "b"}));
-  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "a")), 1);
-  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
+  EXPECT_EQ(IntegerOf(Named(vpiMember, kLeaves[0], "a")), 1);
+  EXPECT_EQ(IntegerOf(Named(vpiMember, kLeaves[1], "b")), 4);
 }
 
 TEST_F(NetDetailsOfARun, AnInlineStructsPackedArrayNetHasMemberNets) {
@@ -308,8 +308,8 @@ TEST_F(NetDetailsOfARun, AnInlineStructsPackedArrayNetHasMemberNets) {
   EXPECT_EQ(vpi_get(vpiType, kLeaves[0]), vpiStructNet);
   EXPECT_EQ(NamesOf(vpiMember, kLeaves[0]),
             (std::vector<std::string>{"a", "b"}));
-  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[0], "a")), 1);
-  EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
+  EXPECT_EQ(IntegerOf(Named(vpiMember, kLeaves[0], "a")), 1);
+  EXPECT_EQ(IntegerOf(Named(vpiMember, kLeaves[1], "b")), 4);
 }
 
 TEST_F(NetDetailsOfARun, AnImplicitlyDeclaredNetReportsImplicitDecl) {

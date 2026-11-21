@@ -69,7 +69,7 @@ class VpiDesignRun : public ::testing::Test {
     return objects;
   }
 
-  static int IntOf(vpiHandle obj) {
+  static int IntegerOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
     vpi_get_value(obj, &value);
@@ -78,15 +78,15 @@ class VpiDesignRun : public ::testing::Test {
 
   static std::vector<int> IntsOf(int type, vpiHandle ref) {
     std::vector<int> values;
-    for (vpiHandle obj : ObjectsOf(type, ref)) values.push_back(IntOf(obj));
+    for (vpiHandle obj : ObjectsOf(type, ref)) values.push_back(IntegerOf(obj));
     return values;
   }
 
   static std::vector<int> BoundsOf(vpiHandle obj) {
     std::vector<int> bounds;
     for (vpiHandle range : ObjectsOf(vpiRange, obj)) {
-      bounds.push_back(IntOf(vpi_handle(vpiLeftRange, range)));
-      bounds.push_back(IntOf(vpi_handle(vpiRightRange, range)));
+      bounds.push_back(IntegerOf(vpi_handle(vpiLeftRange, range)));
+      bounds.push_back(IntegerOf(vpi_handle(vpiRightRange, range)));
     }
     return bounds;
   }
