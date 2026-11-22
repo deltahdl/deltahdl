@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -31,6 +32,18 @@ class VpiDelaysSimBase : public ::testing::Test {
     obj->type = type;
     obj->delays = std::move(delays);
     return obj;
+  }
+
+  bool AcceptsDelays(int type, int n, std::vector<VpiDelayInfo> delays) {
+    VpiHandle obj = MakeDelayObject(type, std::move(delays));
+    std::vector<s_vpi_time> da(static_cast<std::size_t>(n) + 1);
+    s_vpi_delay delay = {};
+    delay.da = da.data();
+    delay.no_of_delays = n;
+    delay.time_type = vpiScaledRealTime;
+    vpi_get_delays(VpiHandleOf(obj), &delay);
+    s_vpi_error_info info = {};
+    return vpi_chk_error(&info) == 0;
   }
 
   Arena arena_;

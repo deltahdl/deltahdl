@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstddef>
 #include <cstdint>
-#include <utility>
 #include <vector>
 
 #include "fixture_simulator.h"
@@ -293,20 +291,7 @@ TEST_F(VpiGetDelaysSim, NullArgumentsAreSafe) {
   SUCCEED();
 }
 
-class VpiDelayCountSim : public VpiDelaysSimBase {
- protected:
-  bool AcceptsDelays(int type, int n, std::vector<VpiDelayInfo> delays) {
-    VpiHandle obj = MakeDelayObject(type, std::move(delays));
-    std::vector<s_vpi_time> da(static_cast<size_t>(n));
-    s_vpi_delay delay = {};
-    delay.da = da.data();
-    delay.no_of_delays = n;
-    delay.time_type = vpiScaledRealTime;
-    vpi_get_delays(VpiHandleOf(obj), &delay);
-    s_vpi_error_info info = {};
-    return vpi_chk_error(&info) == 0;
-  }
-};
+using VpiDelayCountSim = VpiDelaysSimBase;
 
 TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
   const VpiDelayInfo kD;
