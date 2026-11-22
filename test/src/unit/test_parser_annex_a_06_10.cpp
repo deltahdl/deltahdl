@@ -788,4 +788,36 @@ TEST(AssertionStatementSyntaxParsing, ProceduralRestrictPropertyIsChecked) {
       ReportedError(r.diags, "restrict has no immediate form", 5, "16.2"));
 }
 
+TEST(AssertionStatementSyntaxParsing, ACheckerInstanceIsAProceduralStatement) {
+  EXPECT_TRUE(
+      ParseOk("checker c(logic x);\n"
+              "endchecker\n"
+              "module m;\n"
+              "  checker k(logic x);\n"
+              "  endchecker\n"
+              "  logic a;\n"
+              "  initial begin\n"
+              "    c ci(a);\n"
+              "    k ki(a);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(AssertionStatementSyntaxParsing,
+     ASimpleImmediateAssumeOrCoverIsNoModuleItem) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a;\n"
+      "  assume (a);\n"
+      "  cover (a);\n"
+      "  assume #0 (a);\n"
+      "  cover final (a);\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'property', got '('", 3, "16.14"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'property', got '('", 4, "16.14.3"));
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
 }  // namespace

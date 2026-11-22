@@ -559,4 +559,17 @@ TEST(StatementItemSyntaxParsing, CallsIncrementsAndDecrementsAreStatements) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(StatementSyntaxParsing, AnAttributeFollowsTheLabelAndNeverPrecedesIt) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    (* k *) l1: x = 1;\n"
+      "    l2: (* k *) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got ':'", 4, "12.3"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected ';', got ':'", 5, "12.3"));
+}
+
 }  // namespace

@@ -868,4 +868,40 @@ TEST(LoopSyntaxParsing, AForeachArraySelectsBitsBeforeAPeriod) {
   EXPECT_EQ(r.diags.size(), 2u);
 }
 
+TEST(LoopSyntaxParsing, EveryForVariableTakesAnInitialValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin\n"
+      "    for (int i = 0, j; i < 2; i++) ;\n"
+      "    for (int i = 0, j = 1; i < 2; i++, j--) ;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "a for loop's variable declaration is written "
+                            "'data_type variable_identifier = expression'; the "
+                            "initial value is not optional",
+                            3, "A.6.8"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(LoopSyntaxParsing, ADoWhileEndsInASemicolon) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial do ; while (0)\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "12.7.5"));
+}
+
+TEST(LoopSyntaxParsing, AForeachLoopVariableMayBeSkipped) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int a[2][3];\n"
+              "  initial begin\n"
+              "    foreach (a[, j]) $display(j);\n"
+              "    foreach (a[i, ]) $display(i);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

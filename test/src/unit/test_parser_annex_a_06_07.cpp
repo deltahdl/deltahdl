@@ -522,4 +522,17 @@ TEST(CaseStatementParsing, ACaseItemPatternIsNotFollowedByMatches) {
   EXPECT_EQ(r.diags.size(), 2u);
 }
 
+TEST(CaseStatementParsing, ARandcaseItemIsOneWeightWithNoDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial randcase default: x = 1; endcase\n"
+      "  initial randcase 1, 2: x = 1; endcase\n"
+      "  initial randcase 1: x = 1; 2: x = 2; endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ','", 4, "18.16"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected expression", 5, "11.2"));
+}
+
 }  // namespace

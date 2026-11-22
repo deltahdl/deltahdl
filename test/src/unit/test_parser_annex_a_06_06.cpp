@@ -415,4 +415,25 @@ TEST(ConditionalStmtBnf, APredicateInAConditionIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
+TEST(ConditionalStmtBnf, AConditionTakesOneUniquenessKeyword) {
+  auto r = Parse(
+      "module m;\n"
+      "  int a, x;\n"
+      "  initial begin\n"
+      "    unique unique if (a) x = 1;\n"
+      "    unique0 if (a) x = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an expression statement is a subroutine call or "
+                            "an increment or decrement; this expression is "
+                            "neither",
+                            4, "A.6.4"));
+  EXPECT_FALSE(ReportedError(r.diags,
+                             "an expression statement is a subroutine call or "
+                             "an increment or decrement; this expression is "
+                             "neither",
+                             5, "A.6.4"));
+}
+
 }  // namespace

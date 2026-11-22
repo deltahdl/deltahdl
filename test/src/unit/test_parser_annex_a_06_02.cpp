@@ -871,4 +871,115 @@ TEST(ProceduralBlockSyntaxParsing,
   EXPECT_EQ(r.diags.size(), 2u);
 }
 
+TEST(ProceduralBlockSyntaxParsing,
+     AnAlwaysFfBodyIsATimedNullStatementWhileABareNullIsNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic c;\n"
+      "  always_ff @(posedge c) ;\n"
+      "  always_latch ;\n"
+      "endmodule\n");
+  EXPECT_FALSE(ReportedError(
+      r.diags,
+      "an always procedure's body is a statement, which cannot be null", 3,
+      "A.6.2"));
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "an always procedure's body is a statement, which cannot be null", 4,
+      "A.6.2"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(ProceduralBlockSyntaxParsing,
+     DISABLED_ARestrictPropertyIsAnAlwaysCombOrAlwaysLatchBody) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, a;\n"
+              "  always_comb restrict property (@(posedge clk) a);\n"
+              "  always_latch restrict property (@(posedge clk) a);\n"
+              "  always_comb r1: restrict property (@(posedge clk) a);\n"
+              "  always_latch r2: restrict property (@(posedge clk) a);\n"
+              "endmodule\n"
+              "checker c(logic clk, logic a);\n"
+              "  always_comb restrict property (@(posedge clk) a);\n"
+              "  always_latch restrict property (@(posedge clk) a);\n"
+              "endchecker\n"));
+}
+
+TEST(ProceduralBlockSyntaxParsing,
+     OperatorsOutsideTheAssignmentSetAreRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x **= 2;\n"
+      "    x <<<<= 2;\n"
+      "    x <<<= 2;\n"
+      "  end\n"
+      "endmodule\n");
+  for (uint32_t line : {4u, 5u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "an expression statement is a subroutine call or "
+                              "an increment or decrement; this expression is "
+                              "neither",
+                              line, "A.6.4"));
+  }
+  EXPECT_FALSE(ReportedError(r.diags,
+                             "an expression statement is a subroutine call or "
+                             "an increment or decrement; this expression is "
+                             "neither",
+                             6, "A.6.4"));
+}
+
+TEST(ProceduralBlockSyntaxParsing, AnOperatorAssignmentTakesNoTimingControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial x += #1 2;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
+}
+
+TEST(ProceduralBlockSyntaxParsing, ARepeatEventControlTimesEitherAssignment) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic c, x, y;\n"
+              "  initial begin\n"
+              "    x = repeat (2) @(c) y;\n"
+              "    x <= repeat (2) @(posedge c) y;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ProceduralBlockSyntaxParsing,
+     AProceduralContinuousAssignTakesNoDelayOrOperator) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic v, a;\n"
+      "  initial begin\n"
+      "    assign #1 v = a;\n"
+      "    force v += a;\n"
+      "    assign v = a;\n"
+      "    force v = a;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '=', got integer literal", 4, "10.6.1"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected '=', got '+='", 5, "10.6.2"));
+  for (const auto& d : r.diags) {
+    EXPECT_LT(d.loc.line, 6u) << d.message;
+  }
+}
+
+TEST(ProceduralBlockSyntaxParsing, ADynamicArrayNewCopiesItsInitializer) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int d[];\n"
+              "  initial begin\n"
+              "    d = new[4];\n"
+              "    d = new[8](d);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
 }  // namespace

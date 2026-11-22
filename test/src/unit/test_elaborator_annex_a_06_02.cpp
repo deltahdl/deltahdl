@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -213,6 +216,32 @@ TEST(ProceduralBlockElaboration, IncDecExpressionCrossLinkInInitial) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+TEST(ProceduralBlockElaboration, AnAssignmentOfNewTakesNoTimingControl) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  class C; endclass\n"
+      "  C h;\n"
+      "  int d[];\n"
+      "  logic c;\n"
+      "  initial begin\n"
+      "    h = #1 new;\n"
+      "    d = #1 new[4];\n"
+      "    h = @(c) new;\n"
+      "    h = new;\n"
+      "    d = new[4];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {7u, 8u, 9u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "an assignment of 'new' takes no "
+                              "intra-assignment delay or event control",
+                              line, "10.4"));
+  }
+  EXPECT_EQ(f.diag.Diagnostics().size(), 3u);
 }
 
 }  // namespace

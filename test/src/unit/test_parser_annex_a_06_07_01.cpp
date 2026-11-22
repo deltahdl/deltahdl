@@ -555,4 +555,26 @@ TEST(PatternParsing, APatternFormInAReplicationIsReported) {
   EXPECT_EQ(r.diags.size(), 2u);
 }
 
+TEST(PatternParsing, AKeyedPatternKeysEveryElementAndEndsOnOne) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef struct { int a; int b; } s_t;\n"
+      "  s_t s;\n"
+      "  int q[2];\n"
+      "  initial begin\n"
+      "    s = '{a: 1, 2};\n"
+      "    q = '{1, 2,};\n"
+      "    s = '{a: 1, b: 2};\n"
+      "    q = '{1, 2};\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "assignment pattern element after a keyed element "
+                            "needs a key of its own",
+                            6, "10.9"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 7, "11.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected expression", 8, "11.2"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected expression", 9, "11.2"));
+}
+
 }  // namespace

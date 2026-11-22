@@ -82,4 +82,41 @@ TEST(ClockingDeclarationEventParsing, ExpressionsWithoutParenthesesRejected) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '('", 6, "14.3"));
 }
 
+TEST(ClockingDeclarationSyntaxParsing, AClockvarMayBeAssignedAnExpression) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic clk, a, b;\n"
+              "  clocking cb @(posedge clk);\n"
+              "    input x = a, y = b;\n"
+              "    output z = a;\n"
+              "  endclocking\n"
+              "endmodule\n"));
+}
+
+TEST(ClockingDeclarationSyntaxParsing, AGlobalClockingIsNeverTheDefault) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic clk;\n"
+      "  default global clocking g @(posedge clk); endclocking\n"
+      "endmodule\n"
+      "module n;\n"
+      "  logic clk;\n"
+      "  global default clocking g @(posedge clk); endclocking\n"
+      "endmodule\n"
+      "module k;\n"
+      "  logic clk;\n"
+      "  default clocking d @(posedge clk); endclocking\n"
+      "  global clocking g @(posedge clk); endclocking\n"
+      "endmodule\n");
+  for (uint32_t line : {3u, 7u}) {
+    EXPECT_TRUE(ReportedError(r.diags, "unexpected token in module body", line,
+                              "23.2.4"))
+        << "line " << line;
+  }
+  EXPECT_FALSE(
+      ReportedError(r.diags, "unexpected token in module body", 11, "23.2.4"));
+  EXPECT_FALSE(
+      ReportedError(r.diags, "unexpected token in module body", 12, "23.2.4"));
+}
+
 }  // namespace

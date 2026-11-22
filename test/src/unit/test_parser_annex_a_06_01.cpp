@@ -370,4 +370,59 @@ TEST(ContinuousAssignSyntaxParsing, NetAssignmentLiteralRhs) {
   EXPECT_NE(cas[0]->assign_rhs, nullptr);
 }
 
+TEST(ContinuousAssignSyntaxParsing, AssignIsAModuleItemInEveryDesignElement) {
+  EXPECT_TRUE(
+      ParseOk("interface i;\n"
+              "  wire w;\n"
+              "  logic a;\n"
+              "  assign w = a;\n"
+              "  alias w = a;\n"
+              "endinterface\n"
+              "program p;\n"
+              "  wire w;\n"
+              "  logic a;\n"
+              "  assign w = a;\n"
+              "endprogram\n"
+              "checker c(logic a);\n"
+              "  logic v;\n"
+              "  assign v = a;\n"
+              "endchecker\n"
+              "module m;\n"
+              "  wire w, x;\n"
+              "  logic a;\n"
+              "  if (1) begin : g\n"
+              "    assign w = a;\n"
+              "    alias x = w;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(ContinuousAssignSyntaxParsing, AVariableAssignTakesAMinTypMaxDelay) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic v, a;\n"
+              "  assign #(1:2:3) v = a;\n"
+              "endmodule\n"));
+}
+
+TEST(ContinuousAssignSyntaxParsing, FourDelaysOnANetAssignAreRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  wire w;\n"
+      "  logic a;\n"
+      "  assign #(1,2,3,4) w = a;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 4, "28.16"));
+}
+
+TEST(ContinuousAssignSyntaxParsing, AssignIsNoClassItem) {
+  auto r = Parse(
+      "class c;\n"
+      "  int v, a;\n"
+      "  assign v = a;\n"
+      "endclass\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got 'assign'", 3, "8.5"));
+}
+
 }  // namespace

@@ -179,4 +179,87 @@ TEST(TimingControlSyntaxParsing, AnEventTriggerNamesAnEvent) {
   EXPECT_EQ(r.diags.size(), 5u);
 }
 
+TEST(TimingControlSyntaxParsing, AnImplicitEventListMaySpaceItsStar) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, y;\n"
+              "  initial begin\n"
+              "    @( * ) y = a;\n"
+              "    @ (*) y = b;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(TimingControlSyntaxParsing, AProceduralDelayControlTakesOneValue) {
+  auto r = Parse(
+      "module m;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    #(1,2) x = 1;\n"
+      "    #(1:2:3) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 4, "9.4.1"));
+  for (const auto& d : r.diags) {
+    EXPECT_EQ(d.loc.line, 4u) << d.message;
+  }
+}
+
+TEST(TimingControlSyntaxParsing, AnIffGuardFollowsAnEdgeOrASequenceInstance) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic c, e, x;\n"
+              "  sequence s;\n"
+              "    @(posedge c) e;\n"
+              "  endsequence\n"
+              "  initial begin\n"
+              "    @(posedge c iff e) x = 1;\n"
+              "    @(s iff e) x = 0;\n"
+              "    @((posedge c) or (negedge e)) x = 1;\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+TEST(TimingControlSyntaxParsing, AWaitTakesANullBodyButWaitForkTakesNone) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic x;\n"
+      "  initial begin\n"
+      "    wait (x) ;\n"
+      "    wait fork x;\n"
+      "    wait fork;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected ';', got identifier", 5, "9.6.1"));
+  EXPECT_EQ(r.diags.size(), 1u);
+}
+
+TEST(TimingControlSyntaxParsing, OnlyANonblockingTriggerTakesATimingControl) {
+  auto r = Parse(
+      "module m;\n"
+      "  event e;\n"
+      "  initial begin\n"
+      "    -> #1 e;\n"
+      "    ->> #1 e;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "an event trigger names an event: a hierarchical "
+                            "identifier and its bit-selects",
+                            4, "A.6.5"));
+  EXPECT_FALSE(ReportedError(r.diags,
+                             "an event trigger names an event: a hierarchical "
+                             "identifier and its bit-selects",
+                             5, "A.6.5"));
+}
+
+TEST(TimingControlSyntaxParsing, DISABLED_AUnitScopedEventNeedsNoParentheses) {
+  EXPECT_TRUE(
+      ParseOk("event ev;\n"
+              "module m;\n"
+              "  initial @$unit::ev;\n"
+              "endmodule\n"));
+}
+
 }  // namespace

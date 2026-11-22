@@ -218,4 +218,49 @@ TEST(TimingControlSimulation, NamedEventTriggerResumesWaiter) {
   LowerRunAndCheck(f, design, {{"x", 3u}});
 }
 
+TEST(TimingControlSimulation, APackageScopedEventControlResumesOnItsName) {
+  SimFixture f;
+  auto out = RunCapture(
+      "package pkg;\n"
+      "  event ev;\n"
+      "  logic v = 0;\n"
+      "  task fire;\n"
+      "    -> ev;\n"
+      "  endtask\n"
+      "endpackage\n"
+      "module m;\n"
+      "  initial begin @pkg::ev $display(\"ev %0t\", $time); end\n"
+      "  initial begin @pkg::v $display(\"v %0t\", $time); end\n"
+      "  initial begin @(pkg::ev) $display(\"pev %0t\", $time); end\n"
+      "  initial begin @(posedge pkg::v) $display(\"pv %0t\", $time); end\n"
+      "  initial begin #1 pkg::fire(); #1 pkg::v = 1; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "ev 1\npev 1\npv 2\nv 2\n");
+}
+
+TEST(TimingControlSimulation, AParenthesizedUnitScopedEventResumes) {
+  SimFixture f;
+  auto out = RunCapture(
+      "event ev;\n"
+      "module m;\n"
+      "  initial begin @($unit::ev) $display(\"pu %0t\", $time); end\n"
+      "  initial begin #3 -> ev; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "pu 3\n");
+}
+
+TEST(TimingControlSimulation, DISABLED_AUnitScopedEventResumesUnparenthesized) {
+  SimFixture f;
+  auto out = RunCapture(
+      "event ev;\n"
+      "module m;\n"
+      "  initial begin @$unit::ev $display(\"u %0t\", $time); end\n"
+      "  initial begin #3 -> ev; end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "u 3\n");
+}
+
 }  // namespace

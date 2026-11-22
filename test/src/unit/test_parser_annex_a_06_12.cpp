@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -675,6 +676,50 @@ TEST(RandsequenceSyntaxParsing, ProductionItemDefaultArgumentRejected) {
       "endmodule\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got 'default'", 3, "18.17.7"));
+}
+
+TEST(RandsequenceSyntaxParsing, AnIfOrRepeatProductionTakesAProductionItem) {
+  for (const char* rule :
+       {"main : if (c) {} else b;", "main : repeat (2) { c++; };"}) {
+    auto r =
+        Parse(std::string(
+                  "module m;\n  int c;\n  initial randsequence (main)\n    ") +
+              rule + "\n    b : {};\n  endsequence\nendmodule\n");
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected identifier, got '{'", 4, "18.17"))
+        << rule;
+  }
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  int c;\n"
+              "  initial randsequence (main)\n"
+              "    main : if (c) a else b | repeat (2) a;\n"
+              "    a : {};\n"
+              "    b : {};\n"
+              "  endsequence\n"
+              "endmodule\n"));
+}
+
+TEST(RandsequenceSyntaxParsing, ARuleHoldsAProductionAndOneWeight) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial randsequence (main)\n"
+      "    main : a;\n"
+      "    a : ;\n"
+      "  endsequence\n"
+      "  initial randsequence (main)\n"
+      "    main : b := 1 := 2;\n"
+      "    b : {};\n"
+      "  endsequence\n"
+      "  initial randsequence (main)\n"
+      "    main : b := 1 | b := 2;\n"
+      "    b : {};\n"
+      "  endsequence\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected identifier, got ';'", 4, "18.17"));
+  EXPECT_TRUE(ReportedError(r.diags, "expected ';', got ':'", 7, "18.17"));
+  EXPECT_FALSE(ReportedError(r.diags, "expected ';', got ':'", 11, "18.17"));
 }
 
 }  // namespace

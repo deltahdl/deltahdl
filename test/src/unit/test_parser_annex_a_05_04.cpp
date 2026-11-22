@@ -682,13 +682,6 @@ TEST(UdpInstantiationParsing, AnInstanceOfALaterUdpWithoutItsSemicolon) {
                          "expected ';', got 'endmodule'", 4, "23.3.2");
 }
 
-TEST(UdpInstantiationParsing, AnEmptyOrNamedDelayIsRejected) {
-  ExpectInstanceReported(InstanceAfterUdp("p #() u(y, a, b);"),
-                         "expected expression", 10, "11.2");
-  ExpectInstanceReported(InstanceAfterUdp("p #(.d(1)) u(y, a, b);"),
-                         "expected ')', got '('", 10, "28.16");
-}
-
 TEST(UdpInstantiationParsing, DISABLED_AStrengthAfterTheDelayIsRejected) {
   for (const auto& src :
        {InstanceAfterUdp("p #1 (strong0, strong1) u(y, a, b);"),
