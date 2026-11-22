@@ -213,4 +213,57 @@ TEST(AlwaysRangeElaboration, AWeakAlwaysWithoutARangeIsAcceptedInEachPlace) {
   ExpectInEachPlace("always a", ExpectOperandAccepted);
 }
 
+TEST(AlwaysRangeElaboration,
+     DISABLED_ANestedUnboundedStrongRangeIsReportedInEachPlace) {
+  ForEachOperand(kOperandStatementPlaces, {"s_always"}, kUnboundedRanges,
+                 NestedStatement, ExpectUnboundedReported);
+}
+
+TEST(AlwaysRangeElaboration, ANestedUnboundedWeakRangeIsAcceptedInEachPlace) {
+  ForEachOperand(kOperandStatementPlaces, {"always"}, kUnboundedRanges,
+                 NestedStatement, ExpectOperandAccepted);
+}
+
+TEST(AlwaysRangeElaboration,
+     DISABLED_AnUnboundedParameterMaximumOfAStrongRangeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(DollarParameterSource("P = $", "s_always"), f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kBoundedReport, 4, "16.12.11"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kBoundedReport, 5, "16.12.11"));
+}
+
+TEST(AlwaysRangeElaboration, ABoundedOrWeakParameterMaximumIsAccepted) {
+  ExpectOperandAccepted(DollarParameterSource("int P = 4", "s_always"));
+  ExpectOperandAccepted(DollarParameterSource("P = $", "always"));
+}
+
+TEST(AlwaysRangeElaboration,
+     DISABLED_AModuleParameterOfDollarInAStrongRangeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m #(parameter N = $);\n"
+      "  bit clk, a;\n"
+      "  a1: assert property (@(posedge clk) s_always [1:N] a);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kBoundedReport, 3, "16.12.11"));
+}
+
+TEST(AlwaysRangeElaboration,
+     DISABLED_AParameterOverriddenToDollarInAStrongRangeIsReported) {
+  ElabFixture f;
+  ElaborateSrc(OverriddenParameterSource("s_always", "$"), f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kBoundedReport, 2, "16.12.11"));
+}
+
+TEST(AlwaysRangeElaboration,
+     AParameterOverriddenToAFiniteValueOrInAWeakRangeIsAccepted) {
+  ExpectOperandAccepted(OverriddenParameterSource("s_always", "5"));
+  ExpectOperandAccepted(OverriddenParameterSource("always", "$"));
+}
+
 }  // namespace

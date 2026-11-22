@@ -133,6 +133,41 @@ inline std::string FormalOperandSource(const std::string& formals,
          actuals + "));\nendmodule\n";
 }
 
+inline std::string NestedStatement(const std::string& op,
+                                   const std::string& range) {
+  return "a1: assert property (@(posedge clk) a |-> " + op + " [" + range +
+         "] a);";
+}
+
+inline std::string DollarParameterSource(const std::string& parameter,
+                                         const std::string& op) {
+  return "module m;\n"
+         "  bit clk, a;\n"
+         "  localparam " +
+         parameter +
+         ";\n"
+         "  a1: assert property (@(posedge clk) " +
+         op +
+         " [1:P] a);\n"
+         "  property q; @(posedge clk) " +
+         op + " [1:P] a; endproperty\n" + "endmodule\n";
+}
+
+inline std::string OverriddenParameterSource(const std::string& op,
+                                             const std::string& value) {
+  return "module c #(parameter P = 3) (input logic clk, a);\n"
+         "  a1: assert property (@(posedge clk) " +
+         op +
+         " [1:P] a);\n"
+         "endmodule\n"
+         "module m;\n"
+         "  bit clk, a;\n"
+         "  c #(.P(" +
+         value +
+         ")) u(clk, a);\n"
+         "endmodule\n";
+}
+
 using SourceExpectation = void (*)(const std::string&);
 
 inline void ExpectInEachPlace(const std::string& spec,

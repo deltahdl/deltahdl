@@ -371,7 +371,7 @@ TEST(AssertionDeclParsing, PropertyExpr_AlwaysRange) {
 TEST(AssertionDeclParsing, PropertyExpr_SAlways) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
-              "  assert property (@(posedge clk) s_always [0:$] a);\n"
+              "  assert property (@(posedge clk) s_always [0:5] a);\n"
               "endmodule\n"));
 }
 

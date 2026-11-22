@@ -1,11 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <initializer_list>
 #include <string>
 
 #include "common/diagnostic.h"
 #include "elaborator/sequence_repetition.h"
 #include "fixture_elaborator.h"
+#include "helpers_bracketed_operand_places.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -253,6 +255,139 @@ TEST(RepetitionCountRule, AZeroCountOnGotoAndNonconsecutiveIsAccepted) {
   for (const char* form : {"b[->0]", "b[=0]", "b[->0:2]", "b[=0:$]"}) {
     ExpectAllowedFormAccepted(
         {"", "sequence s; x ##1 @@ ##1 c; endsequence", "", form});
+  }
+}
+
+constexpr const char* kRepetitionDeclarations =
+    "bit b, c, e; function bit f(bit v); return v; endfunction "
+    "sequence s; a ##1 b; endsequence sequence s2(x); x ##1 b; endsequence ";
+
+std::string RepeatedInAStatement(const std::string& directive,
+                                 const std::string& operand) {
+  return kRepetitionDeclarations + ("a1: " + directive) + " (@(posedge clk) " +
+         operand + " |-> c);";
+}
+
+std::string RepeatedInASequence(const std::string& operand) {
+  return kRepetitionDeclarations + ("sequence q; int v; @(posedge clk) " +
+                                    operand + " ##1 c; endsequence");
+}
+
+std::string RepeatedInAProperty(const std::string& operand) {
+  return kRepetitionDeclarations + ("property q; int v; @(posedge clk) " +
+                                    operand + " |-> c; endproperty");
+}
+
+void ExpectRepetitionInEachPlace(std::initializer_list<const char*> statements,
+                                 std::initializer_list<const char*> bodies,
+                                 SourceExpectation expect) {
+  for (const char* place : kOperandStatementPlaces) {
+    for (const char* operand : statements) {
+      SCOPED_TRACE(std::string(place) + " statement " + operand);
+      expect(
+          OperandIn(place, RepeatedInAStatement("assert property", operand)));
+      expect(OperandIn(place, RepeatedInAStatement("cover property", operand)));
+    }
+  }
+  for (const char* place : kOperandDeclarationPlaces) {
+    for (const char* operand : bodies) {
+      SCOPED_TRACE(std::string(place) + " declaration " + operand);
+      expect(OperandIn(place, RepeatedInASequence(operand)));
+      expect(OperandIn(place, RepeatedInAProperty(operand)));
+    }
+  }
+}
+
+TEST(RepetitionOperand,
+     AParenthesisedSequenceUnderGotoOrNonconsecutiveIsReportedInEachPlace) {
+  ExpectRepetitionInEachPlace(
+      {"(a ##1 b)[->2]", "(a ##1 b)[=2]"},
+      {"(a ##1 b)[->2]", "(a ##1 b)[=2]", "(b, v = e)[->2]", "(b, v = e)[=2]",
+       "(b ##1 c, v = e)[=1]"},
+      ExpectGrammarReported);
+}
+
+TEST(RepetitionOperand,
+     DISABLED_ANamedSequenceUnderGotoOrNonconsecutiveIsReportedInEachPlace) {
+  ExpectRepetitionInEachPlace({"s[->2]", "s[=2]", "s2(a)[=2]", "s2(a)[->1]",
+                               "(b, f(a))[->2]", "(b, f(a))[=2]"},
+                              {"s[->2]", "s[=2]", "s2(a)[=2]", "s2(a)[->1]"},
+                              ExpectGrammarReported);
+}
+
+TEST(RepetitionOperand, TheNearestAllowedFormsAreAcceptedInEachPlace) {
+  ExpectRepetitionInEachPlace(
+      {"(a ##1 b)[*2]", "s[*2]", "s[+]", "s2(a)[*1:2]", "f(a)[=2]",
+       "(b[->2], f(a))", "(b || c)[->1]", "s.triggered[->1]", "s.matched[=1]"},
+      {"(a ##1 b)[*2]", "s[*2]", "s2(a)[*]", "f(a)[->1]", "(b[->2], v = e)",
+       "(b[=1], v = e)[*2]", "s.triggered[->1]"},
+      ExpectOperandAccepted);
+}
+
+std::string SequenceFormalSource(const std::string& formal,
+                                 const std::string& repetition) {
+  return "bit b; sequence s1(" + formal + "); @(posedge clk) q" + repetition +
+         " ##1 b; endsequence";
+}
+
+TEST(RepetitionOperand,
+     DISABLED_ASequenceFormalUnderNonconsecutiveIsReportedInEachPlace) {
+  for (const char* place : kOperandDeclarationPlaces) {
+    SCOPED_TRACE(place);
+    ExpectGrammarReported(
+        OperandIn(place, SequenceFormalSource("sequence q", "[=1]")));
+  }
+}
+
+TEST(RepetitionOperand, AnUntypedFormalUnderNonconsecutiveIsAccepted) {
+  for (const char* place : kOperandStatementPlaces) {
+    SCOPED_TRACE(place);
+    ExpectOperandAccepted(OperandIn(
+        place, SequenceFormalSource("q", "[=1]") +
+                   " a1: assert property (@(posedge clk) s1(a) |-> b);"));
+  }
+  ExpectOperandAccepted(
+      OperandIn("module", SequenceFormalSource("sequence q", "[*2]")));
+}
+
+std::string ScopedRepetitionSource(const std::string& operand) {
+  return "package pkg;\n"
+         "  parameter bit B = 1;\n"
+         "  sequence s(x, y); x ##1 y; endsequence\n"
+         "endpackage\n"
+         "module top;\n"
+         "  logic clk; bit a, b, c;\n"
+         "  sub u();\n"
+         "  a1: assert property (@(posedge clk) " +
+         operand +
+         " |-> c);\n"
+         "endmodule\n"
+         "module sub; bit v; sequence s; v ##1 v; endsequence endmodule\n";
+}
+
+TEST(RepetitionOperand,
+     DISABLED_AScopedOrHierarchicalSequenceUnderGotoIsReported) {
+  for (const char* operand :
+       {"pkg::s(a, b)[->1]", "pkg::s(a, b)[=2]", "u.s[->1]", "u.s[=1]"}) {
+    SCOPED_TRACE(operand);
+    ExpectOperandReported(ScopedRepetitionSource(operand), "the grammar admits",
+                          "A.2.10", 8);
+  }
+}
+
+TEST(RepetitionOperand, AScopedOrHierarchicalBooleanUnderGotoIsAccepted) {
+  for (const char* operand : {"pkg::B[->1]", "pkg::B[=2]", "u.v[->1]",
+                              "u.v[=1]", "pkg::s(a, b)[*2]", "u.s[*2]"}) {
+    SCOPED_TRACE(operand);
+    ExpectOperandAccepted(ScopedRepetitionSource(operand));
+  }
+}
+
+TEST(RepetitionOperand,
+     DISABLED_AVariableNamedFromTheEnclosingModuleUnderGotoIsAccepted) {
+  for (const char* operand : {"top.u.v[->1]", "top.u.v[=1]"}) {
+    SCOPED_TRACE(operand);
+    ExpectOperandAccepted(ScopedRepetitionSource(operand));
   }
 }
 

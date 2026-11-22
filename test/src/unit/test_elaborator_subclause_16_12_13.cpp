@@ -121,11 +121,6 @@ TEST(EventuallyRangeElaboration,
   }
 }
 
-std::string NestedStatement(const std::string& op, const std::string& range) {
-  return "a1: assert property (@(posedge clk) a |-> " + op + " [" + range +
-         "] a);";
-}
-
 TEST(EventuallyRangeElaboration,
      DISABLED_ANestedUnboundedWeakRangeIsReportedInEachPlace) {
   ForEachOperand(kOperandStatementPlaces, {"eventually"}, kUnboundedRanges,
@@ -176,20 +171,6 @@ TEST(EventuallyRangeElaboration,
       FormalOperandSource("lo, hi", "s_eventually [lo:hi]", "1, $"));
 }
 
-std::string DollarParameterSource(const std::string& parameter,
-                                  const std::string& op) {
-  return "module m;\n"
-         "  bit clk, a;\n"
-         "  localparam " +
-         parameter +
-         ";\n"
-         "  a1: assert property (@(posedge clk) " +
-         op +
-         " [1:P] a);\n"
-         "  property q; @(posedge clk) " +
-         op + " [1:P] a; endproperty\n" + "endmodule\n";
-}
-
 TEST(EventuallyRangeElaboration,
      DISABLED_AnUnboundedParameterMaximumOfAWeakRangeIsReported) {
   const std::string kSrc = DollarParameterSource("P = $", "eventually");
@@ -204,21 +185,6 @@ TEST(EventuallyRangeElaboration,
 TEST(EventuallyRangeElaboration, ABoundedOrStrongParameterMaximumIsAccepted) {
   ExpectOperandAccepted(DollarParameterSource("int P = 4", "eventually"));
   ExpectOperandAccepted(DollarParameterSource("P = $", "s_eventually"));
-}
-
-std::string OverriddenParameterSource(const std::string& op,
-                                      const std::string& value) {
-  return "module c #(parameter P = 3) (input logic clk, a);\n"
-         "  a1: assert property (@(posedge clk) " +
-         op +
-         " [1:P] a);\n"
-         "endmodule\n"
-         "module m;\n"
-         "  bit clk, a;\n"
-         "  c #(.P(" +
-         value +
-         ")) u(clk, a);\n"
-         "endmodule\n";
 }
 
 TEST(EventuallyRangeElaboration,
