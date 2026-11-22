@@ -1,0 +1,4 @@
+-sv_lib
+vpi_acceptance_32_get_vlog_info_options_file
+-f
+outer.f
