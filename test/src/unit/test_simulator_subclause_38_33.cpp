@@ -135,5 +135,20 @@ TEST_F(UserDataOfABuiltInCall, PuttingItIsAnError) {
   EXPECT_EQ(vpi_get_userdata(display), nullptr);
 }
 
+TEST_F(UserDataOfABuiltInCall, PuttingItOnAFunctionCallIsAnError) {
+  Run("module top; longint x;\n"
+      "  initial x = $time;\n"
+      "endmodule\n");
+  vpiHandle initial = ObjectsOf(vpiProcess, By("top")).at(0);
+  vpiHandle time = vpi_handle(vpiRhs, vpi_handle(vpiStmt, initial));
+  ASSERT_NE(time, nullptr);
+  ASSERT_EQ(vpi_get(vpiType, time), vpiSysFuncCall);
+  int value = 1;
+  EXPECT_EQ(vpi_put_userdata(time, &value), 0);
+  const PLI_INT32 kPutError = vpi_chk_error(nullptr);
+  EXPECT_EQ(kPutError, vpiError);
+  EXPECT_EQ(vpi_get_userdata(time), nullptr);
+}
+
 }  // namespace
 }  // namespace delta

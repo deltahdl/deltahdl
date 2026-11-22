@@ -46,6 +46,49 @@ class VpiGetUserDataSim : public ::testing::Test {
     return obj;
   }
 
+  using Dispatch = int (VpiContext::*)();
+
+  void ExpectClearedBy(int type, Dispatch dispatch) {
+    VpiHandle call = MakeCall(type);
+    int marker = 0;
+    ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
+    ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
+
+    (vpi_ctx_.*dispatch)();
+
+    EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
+  }
+
+  void ExpectReadDuringEndStartsFromNull(PLI_INT32 reason, Dispatch dispatch) {
+    VpiHandle call = MakeCall(vpiSysTaskCall);
+    int before = 0;
+    ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &before), 1);
+
+    g_reset_call = call;
+    s_cb_data cb = {};
+    cb.reason = reason;
+    cb.cb_rtn = ReadAndRestoreUserData;
+    ASSERT_NE(vpi_register_cb(&cb), nullptr);
+
+    (vpi_ctx_.*dispatch)();
+
+    ASSERT_TRUE(g_reset_routine_ran);
+    EXPECT_EQ(g_seen_during_reset, nullptr);
+    EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_value_set_during_reset);
+  }
+
+  void ExpectAPutAfterIsRead(Dispatch dispatch) {
+    VpiHandle call = MakeCall(vpiSysTaskCall);
+    int before = 0;
+    ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &before), 1);
+    (vpi_ctx_.*dispatch)();
+    int after = 0;
+
+    ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &after), 1);
+
+    EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &after);
+  }
+
   Arena arena_;
   Scheduler scheduler_{arena_};
   VpiContext vpi_ctx_;
@@ -79,44 +122,49 @@ TEST_F(VpiGetUserDataSim, ReturnsNullForNonCallHandle) {
 }
 
 TEST_F(VpiGetUserDataSim, ReturnsNullAfterRestart) {
-  VpiHandle call = MakeCall(vpiSysFuncCall);
-  int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
-  ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
+  ExpectClearedBy(vpiSysFuncCall, &VpiContext::DispatchRestart);
+}
 
-  vpi_ctx_.DispatchRestart();
-
-  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
+TEST_F(VpiGetUserDataSim, ATaskCallReadsNullAfterRestart) {
+  ExpectClearedBy(vpiSysTaskCall, &VpiContext::DispatchRestart);
 }
 
 TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
-  VpiHandle call = MakeCall(vpiSysFuncCall);
-  int marker = 0;
-  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &marker), 1);
-  ASSERT_EQ(vpi_get_userdata(VpiHandleOf(call)), &marker);
+  ExpectClearedBy(vpiSysFuncCall, &VpiContext::DispatchReset);
+}
 
-  vpi_ctx_.DispatchReset();
+TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
+  ExpectReadDuringEndStartsFromNull(cbEndOfReset, &VpiContext::DispatchReset);
+}
+
+TEST_F(VpiGetUserDataSim,
+       AReadDuringEndOfRestartStartsFromNullAndCanBeSetAgain) {
+  ExpectReadDuringEndStartsFromNull(cbEndOfRestart,
+                                    &VpiContext::DispatchRestart);
+}
+
+TEST_F(VpiGetUserDataSim, APutAfterTheRestartIsRead) {
+  ExpectAPutAfterIsRead(&VpiContext::DispatchRestart);
+}
+
+TEST_F(VpiGetUserDataSim, APutAfterTheResetIsRead) {
+  ExpectAPutAfterIsRead(&VpiContext::DispatchReset);
+}
+
+TEST_F(VpiGetUserDataSim, AFunctionCallNeverGivenDataReadsNull) {
+  VpiHandle call = MakeCall(vpiSysFuncCall);
 
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
+TEST_F(VpiGetUserDataSim, TheLatestPutIsRead) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
-  int before_reset = 0;
-  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &before_reset), 1);
+  int first = 0;
+  int second = 0;
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &first), 1);
+  ASSERT_EQ(vpi_put_userdata(VpiHandleOf(call), &second), 1);
 
-  g_reset_call = call;
-  s_cb_data cb = {};
-  cb.reason = cbEndOfReset;
-  cb.cb_rtn = ReadAndRestoreUserData;
-  ASSERT_NE(vpi_register_cb(&cb), nullptr);
-
-  vpi_ctx_.DispatchReset();
-
-  ASSERT_TRUE(g_reset_routine_ran);
-  EXPECT_EQ(g_seen_during_reset, nullptr);
-  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_value_set_during_reset);
-  EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_reset);
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &second);
 }
 
 std::vector<int> counts_read;
