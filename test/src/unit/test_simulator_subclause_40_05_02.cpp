@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -8,6 +9,7 @@
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_coverage.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
@@ -474,6 +476,273 @@ TEST_F(ItemCoverageRun, OnlyItemHandlesAnswerItemCoverage) {
   EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, fsm), 0);
   EXPECT_EQ(vpi_get(vpiCovered, By("top")), 0);
   EXPECT_EQ(vpi_handle(vpiFsmStateExpression, By("top")), nullptr);
+}
+
+TEST_F(ItemCoverageRun, AnInstanceWithNoFsmIteratesToNull) {
+  Run("module top;\n"
+      "  logic [1:0] st;\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_iterate(vpiFsm, By("top")), nullptr);
+}
+
+TEST_F(ItemCoverageRun, AnInstanceAnswersItsReachedFsmStateCount) {
+  Run(kFsmDesign);
+  EXPECT_EQ(vpi_get(vpiFsmStateCoverage, By("top")), 2);
+}
+
+TEST_F(ItemCoverageRun, AnInstanceAnswersItsToggledBitCount) {
+  Run("module top;\n"
+      "  logic [3:0] v;\n"
+      "  initial begin\n"
+      "    v = 4'b0000; #1 v = 4'b0011; #1 v = 4'b0001;\n"
+      "  end\n"
+      "endmodule\n");
+  EXPECT_EQ(vpi_get(vpiToggleCoverage, By("top")), 2);
+}
+
+TEST_F(ItemCoverageRun, ASimpleStatementHandleAnswersWhetherItRan) {
+  Run("module top;\n"
+      "  int x;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    if (x == 0) x = 2;\n"
+      "  end\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 1u);
+  const std::vector<vpiHandle> kStmts =
+      ObjectsOf(vpiStmt, vpi_handle(vpiStmt, kProcs.front()));
+  ASSERT_EQ(kStmts.size(), 2u);
+  EXPECT_EQ(vpi_get(vpiType, kStmts[0]), vpiAssignment);
+  EXPECT_EQ(vpi_get(vpiCovered, kStmts[0]), 1);
+  vpiHandle skipped = vpi_handle(vpiStmt, kStmts[1]);
+  ASSERT_NE(skipped, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, skipped), vpiAssignment);
+  EXPECT_EQ(vpi_get(vpiCovered, skipped), 0);
+}
+
+TEST_F(ItemCoverageRun, AStatementRunRepeatedlyCountsEachRun) {
+  Run("module top;\n"
+      "  int x;\n"
+      "  initial repeat (3) x = x + 1;\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 1u);
+  vpiHandle loop = vpi_handle(vpiStmt, kProcs.front());
+  ASSERT_NE(loop, nullptr);
+  vpiHandle body = vpi_handle(vpiStmt, loop);
+  ASSERT_NE(body, nullptr);
+  EXPECT_EQ(vpi_get(vpiCovered, body), 1);
+  EXPECT_EQ(vpi_get(vpiCoveredCount, body), 3);
+}
+
+int Concluded(vpiHandle assertion) {
+  return vpi_get(vpiAssertSuccessCovered, assertion) +
+         vpi_get(vpiAssertVacuousSuccessCovered, assertion) +
+         vpi_get(vpiAssertDisableCovered, assertion) +
+         vpi_get(vpiAssertKillCovered, assertion) +
+         vpi_get(vpiAssertFailureCovered, assertion);
+}
+
+TEST_F(ItemCoverageRun, AttemptsLessConclusionsAreTheAttemptsStillPending) {
+  Run("module top;\n"
+      "  logic clk = 0, a = 1, b = 1;\n"
+      "  p: assert property (@(posedge clk) a |=> b);\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0; #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle p = Named(vpiAssertion, By("top"), "p");
+  ASSERT_NE(p, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, p), 3);
+  EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, p) - Concluded(p), 1);
+}
+
+TEST_F(ItemCoverageRun, AnAttemptNeverConcludedIsStillCountedAsAnAttempt) {
+  Run("module top;\n"
+      "  bit on = 1, off = 0;\n"
+      "  logic clk = 0;\n"
+      "  aundf: assert property (@(posedge clk) on ##[1:$] off);\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0; #1 clk = 1;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle aundf = Named(vpiAssertion, By("top"), "aundf");
+  ASSERT_NE(aundf, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, aundf), 3);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, aundf), 0);
+  EXPECT_EQ(vpi_get(vpiAssertVacuousSuccessCovered, aundf), 0);
+  EXPECT_EQ(vpi_get(vpiAssertFailureCovered, aundf), 0);
+  EXPECT_EQ(vpi_get(vpiCovered, aundf), 0);
+}
+
+TEST_F(ItemCoverageRun, AnAssertionThatLaterFailsIsNotCovered) {
+  Run("module top;\n"
+      "  logic clk = 0, a = 1;\n"
+      "  sf: assert property (@(posedge clk) a) else $display(\"sf\");\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0; a = 0;\n"
+      "    #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle sf = Named(vpiAssertion, By("top"), "sf");
+  ASSERT_NE(sf, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, sf), 2);
+  EXPECT_EQ(vpi_get(vpiAssertFailureCovered, sf), 1);
+  EXPECT_EQ(vpi_get(vpiCovered, sf), 0);
+}
+
+TEST_F(ItemCoverageRun, TheCovtestAssertionsReadAsTheirTableGives) {
+  Run("module covtest;\n"
+      "  bit on = 1, off = 0;\n"
+      "  bit false = 0;\n"
+      "  logic clk;\n"
+      "  initial begin\n"
+      "    clk = 0;\n"
+      "    forever begin\n"
+      "      #10;\n"
+      "      clk = ~clk;\n"
+      "    end\n"
+      "  end\n"
+      "  initial #95 $finish;\n"
+      "  always @(posedge false) begin\n"
+      "    anvr: assert property (on ##1 on);\n"
+      "  end\n"
+      "  always @(posedge clk) begin\n"
+      "    aundf: assert property (on ##[1:$] off);\n"
+      "    afail: assert property (on ##1 off);\n"
+      "    apass: assert property (on ##1 on);\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle top = By("covtest");
+  ASSERT_NE(top, nullptr);
+  const std::vector<std::string> kNames = {"anvr", "aundf", "afail", "apass"};
+  const std::vector<std::vector<bool>> kTable = {{false, false, false, false},
+                                                 {false, true, false, false},
+                                                 {false, true, false, true},
+                                                 {true, true, true, false}};
+  for (std::size_t i = 0; i < kNames.size(); ++i) {
+    vpiHandle h = Named(vpiAssertion, top, kNames[i]);
+    ASSERT_NE(h, nullptr) << kNames[i];
+    EXPECT_EQ(vpi_get(vpiCovered, h) > 0, kTable[i][0]) << kNames[i];
+    EXPECT_EQ(vpi_get(vpiAssertAttemptCovered, h) > 0, kTable[i][1])
+        << kNames[i];
+    EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, h) > 0, kTable[i][2])
+        << kNames[i];
+    EXPECT_EQ(vpi_get(vpiAssertFailureCovered, h) > 0, kTable[i][3])
+        << kNames[i];
+  }
+}
+
+TEST_F(ItemCoverageRun, ACoverHandleCountsMatchesAndNonvacuousSuccesses) {
+  Run("module top;\n"
+      "  logic clk = 0, a = 1, b = 0, c = 1;\n"
+      "  cs: cover sequence (@(posedge clk) a ##[1:3] b);\n"
+      "  cp: cover property (@(posedge clk) c |-> a);\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; a = 0; b = 1; c = 0;\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0;\n"
+      "    #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle cs = Named(vpiAssertion, By("top"), "cs");
+  vpiHandle cp = Named(vpiAssertion, By("top"), "cp");
+  ASSERT_NE(cs, nullptr);
+  ASSERT_NE(cp, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, cs), 3);
+  EXPECT_EQ(vpi_get(vpiAssertSuccessCovered, cp), 1);
+}
+
+TEST_F(ItemCoverageRun, DISABLED_ADisableCountsEachAttemptItCutsShort) {
+  Run("module top;\n"
+      "  logic clk = 0, a = 1, b = 1, rst = 0;\n"
+      "  d: assert property (@(posedge clk) disable iff (rst)\n"
+      "                      a |=> b ##1 b ##1 b);\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1;\n"
+      "    #1 clk = 0; a = 0; rst = 1;\n"
+      "    #1 rst = 0;\n"
+      "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle d = Named(vpiAssertion, By("top"), "d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertDisableCovered, d), 2);
+}
+
+TEST_F(ItemCoverageRun, AnAttemptBegunWhileDisabledCountsOnce) {
+  Run("module top;\n"
+      "  logic clk = 0, a = 0, b = 1, rst = 1;\n"
+      "  d: assert property (@(posedge clk) disable iff (rst) a |=> b);\n"
+      "  initial begin\n"
+      "    #1 clk = 1; #1 clk = 0; rst = 0;\n"
+      "    #1 clk = 1; #1 clk = 0;\n"
+      "  end\n"
+      "endmodule\n");
+  vpiHandle d = Named(vpiAssertion, By("top"), "d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertDisableCovered, d), 1);
+}
+
+constexpr const char* kKillDesign =
+    "module top;\n"
+    "  logic clk = 0, a = 1, b = 1;\n"
+    "  k: assert property (@(posedge clk) a |=> b ##1 b);\n"
+    "  o: assert property (@(posedge clk) a |=> b ##1 b);\n"
+    "  initial begin\n"
+    "    #1 clk = 1; #1 clk = 0; a = 0; KILL;\n"
+    "    #1 clk = 1; #1 clk = 0; #1 clk = 1; #1 clk = 0;\n"
+    "  end\n"
+    "endmodule\n";
+
+std::string KillDesign(const std::string& kill) {
+  std::string src = kKillDesign;
+  src.replace(src.find("KILL"), 4, kill);
+  return src;
+}
+
+void ExpectOnlyKTookTheKill() {
+  vpiHandle top = vpi_handle_by_name(VpiText("top"), nullptr);
+  vpiHandle k = nullptr;
+  vpiHandle o = nullptr;
+  vpiHandle it = vpi_iterate(vpiAssertion, top);
+  while (vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it)) {
+    const std::string kName = vpi_get_str(vpiName, obj);
+    if (kName == "k") k = obj;
+    if (kName == "o") o = obj;
+  }
+  ASSERT_NE(k, nullptr);
+  ASSERT_NE(o, nullptr);
+  EXPECT_EQ(vpi_get(vpiAssertKillCovered, k), 1);
+  EXPECT_EQ(vpi_get(vpiAssertKillCovered, o), 0);
+}
+
+TEST_F(ItemCoverageRun, AnAssertkillCountsTheAttemptsItKills) {
+  Run(KillDesign("$assertkill(0, top.k)"));
+  ExpectOnlyKTookTheKill();
+}
+
+PLI_INT32 KillFirstAttemptCalltf(PLI_BYTE8*) {
+  vpiHandle top = vpi_handle_by_name(VpiText("top"), nullptr);
+  vpiHandle it = vpi_iterate(vpiAssertion, top);
+  while (vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it)) {
+    if (std::string(vpi_get_str(vpiName, obj)) != "k") continue;
+    s_vpi_time start = {};
+    start.type = vpiSimTime;
+    start.low = 1;
+    vpi_control(vpiAssertionKill, obj, &start);
+  }
+  return 0;
+}
+
+TEST_F(ItemCoverageRun, AVpiKillCountsTheAttemptItKills) {
+  s_vpi_systf_data data = {};
+  data.type = vpiSysTask;
+  data.tfname = VpiText("$kill_first_attempt");
+  data.calltf = &KillFirstAttemptCalltf;
+  ASSERT_NE(vpi_register_systf(&data), nullptr);
+  Run(KillDesign("$kill_first_attempt"));
+  ExpectOnlyKTookTheKill();
 }
 
 }  // namespace

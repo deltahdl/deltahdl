@@ -2,6 +2,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -28,6 +29,7 @@ class VpiCoverageControlSim : public ::testing::Test {
   static int Status(CoverageStatus s) { return static_cast<int>(s); }
 
   static constexpr int kSvCovAssertion = 20;
+  static constexpr int kSvCovFsm = 21;
   static constexpr int kSvCovStatement = 22;
   static constexpr int kSvCovToggle = 23;
 
@@ -266,6 +268,89 @@ TEST_F(VpiCoverageControlSim, AnAssertionInNoInstanceControlsNothing) {
 
   EXPECT_EQ(vpi_control(vpiCoverageStart, vpiAssertCoverage, assertion),
             Status(CoverageStatus::kError));
+}
+
+TEST_F(VpiCoverageControlSim, TheHandleFormRefusesAnOperationNamingNoControl) {
+  vpi_ctx_.GetCoverageControlState().SetAvailability(
+      "top.dut", kSvCovAssertion, CoverageAvailability::kFull);
+  VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
+  EXPECT_NE(vpi_control(vpiCoverageStart + 1000, vpiAssertCoverage, dut),
+            Status(CoverageStatus::kOk));
+  EXPECT_FALSE(vpi_ctx_.GetCoverageControlState().IsCollecting(
+      "top.dut", kSvCovAssertion));
+}
+
+TEST_F(VpiCoverageControlSim, TheHandleFormActsOnNoCoverageOfAnUnknownType) {
+  CoverageControlState& cov = vpi_ctx_.GetCoverageControlState();
+  for (const int kType :
+       {kSvCovAssertion, kSvCovFsm, kSvCovStatement, kSvCovToggle}) {
+    cov.SetAvailability("top.dut", kType, CoverageAvailability::kFull);
+  }
+  VpiHandle dut = vpi_ctx_.CreateModule("dut", "top.dut");
+  for (const int kUnknown : {vpiCovered, vpiCoveredCount}) {
+    const int kResult = vpi_control(vpiCoverageStart, kUnknown, dut);
+    EXPECT_TRUE(kResult == Status(CoverageStatus::kError) ||
+                kResult == Status(CoverageStatus::kNoCoverage))
+        << kResult;
+  }
+  for (const int kType :
+       {kSvCovAssertion, kSvCovFsm, kSvCovStatement, kSvCovToggle}) {
+    EXPECT_FALSE(cov.IsCollecting("top.dut", kType)) << kType;
+    EXPECT_EQ(cov.StartCount("top.dut", kType), 0u) << kType;
+  }
+}
+
+constexpr const char* kItemControlDesign =
+    "module top;\n"
+    "  parameter [1:0] /* tool enum fsm_e */ IDLE = 0, RUN = 1;\n"
+    "  /* tool state_vector st enum fsm_e */\n"
+    "  logic [1:0] st;\n"
+    "  int x;\n"
+    "  initial begin\n"
+    "    x = 1; st = IDLE; #1 st = RUN;\n"
+    "  end\n"
+    "endmodule\n";
+
+constexpr int kItemControls[] = {vpiCoverageStart, vpiCoverageStop,
+                                 vpiCoverageReset, vpiCoverageCheck};
+
+TEST_F(AssertionControlRun, AStatementHandleIsRefusedStatementCoverageControl) {
+  Run(kItemControlDesign);
+  vpiHandle top = vpi_handle_by_name(VpiText("top"), nullptr);
+  const int kBefore = vpi_get(vpiStatementCoverage, top);
+  ASSERT_GT(kBefore, 0);
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, top);
+  ASSERT_EQ(kProcs.size(), 1u);
+  vpiHandle block = vpi_handle(vpiStmt, kProcs.front());
+  ASSERT_NE(block, nullptr);
+  vpiHandle first = ObjectsOf(vpiStmt, block).front();
+  for (vpiHandle stmt : {block, first}) {
+    for (const int kControl : kItemControls) {
+      EXPECT_EQ(vpi_control(kControl, vpiStatementCoverage, stmt),
+                static_cast<int>(CoverageStatus::kError))
+          << kControl;
+    }
+  }
+  EXPECT_EQ(vpi_get(vpiStatementCoverage, top), kBefore);
+}
+
+TEST_F(AssertionControlRun, AnFsmHandleIsRefusedFsmStateCoverageControl) {
+  Run(kItemControlDesign);
+  vpiHandle top = vpi_handle_by_name(VpiText("top"), nullptr);
+  const int kBefore = vpi_get(vpiFsmStateCoverage, top);
+  ASSERT_GT(kBefore, 0);
+  vpiHandle fsm = Named(vpiFsm, top, "st");
+  ASSERT_NE(fsm, nullptr);
+  vpiHandle st = vpi_handle_by_name(VpiText("top.st"), nullptr);
+  ASSERT_NE(st, nullptr);
+  for (vpiHandle item : {fsm, st}) {
+    for (const int kControl : kItemControls) {
+      EXPECT_EQ(vpi_control(kControl, vpiFsmStateCoverage, item),
+                static_cast<int>(CoverageStatus::kError))
+          << kControl;
+    }
+  }
+  EXPECT_EQ(vpi_get(vpiFsmStateCoverage, top), kBefore);
 }
 
 }  // namespace
