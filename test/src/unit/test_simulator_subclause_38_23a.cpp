@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -93,6 +94,37 @@ TEST_F(VpiIterateSim, IterateProtectedObjectReturnsNull) {
   mod->is_protected = true;
 
   EXPECT_EQ(vpi_iterate(vpiPort, VpiHandleOf(mod)), nullptr);
+  EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
+}
+
+TEST_F(VpiIterateSim, AnUnprotectedObjectIsIteratedWithoutAnError) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+
+  EXPECT_NE(vpi_iterate(vpiPort, VpiHandleOf(mod)), nullptr);
+  EXPECT_EQ(vpi_ctx_.LastError().level, 0);
+}
+
+TEST_F(VpiIterateSim, OnlyChildrenOfTheAskedTypeAreWalked) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  vpi_ctx_.CreatePort("p0", kVpiInput, mod);
+  vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
+  for (const char* name : {"n0", "n1", "n2"}) {
+    auto* net = vpi_ctx_.CreateModule(name, name);
+    net->type = vpiNet;
+    mod->children.push_back(net);
+  }
+
+  for (const auto& [type, count] : {std::pair{vpiPort, 2}, {vpiNet, 3}}) {
+    vpiHandle iter = vpi_iterate(type, VpiHandleOf(mod));
+    ASSERT_NE(iter, nullptr);
+    int seen = 0;
+    while (vpiHandle obj = vpi_scan(iter)) {
+      EXPECT_EQ(vpi_get(vpiType, obj), type);
+      ++seen;
+    }
+    EXPECT_EQ(seen, count);
+  }
 }
 
 TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
