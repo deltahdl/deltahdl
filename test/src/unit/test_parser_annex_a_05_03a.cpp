@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "simulator/udp_eval.h"
@@ -232,6 +235,7 @@ TEST(UdpBodyGrammar, InitVal_1b1) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
@@ -244,6 +248,7 @@ TEST(UdpBodyGrammar, InitVal_1bx) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
@@ -268,6 +273,7 @@ TEST(UdpBodyGrammar, InitVal_1B0) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
@@ -292,6 +298,7 @@ TEST(UdpBodyGrammar, InitVal_1Bx) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
@@ -304,6 +311,7 @@ TEST(UdpBodyGrammar, InitVal_1BX) {
       "  endtable\n"
       "endprimitive\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
@@ -561,6 +569,108 @@ TEST(UdpBodyGrammar, InitialStatementInCombinationalBodyIsRejected) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->udps.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->table.size(), 2u);
+}
+
+std::string WithInitialStatement(const std::string& statement) {
+  return "primitive p(output reg q, input c, input d);\n"
+         "  " +
+         statement +
+         "\n"
+         "  table\n"
+         "    r 0 : ? : 0;\n"
+         "  endtable\n"
+         "endprimitive\n";
+}
+
+TEST(UdpBodyGrammar, AnInitialThatIsNoSingleBlockingAssignmentIsRejected) {
+  struct Case {
+    const char* statement;
+    const char* message;
+    const char* subclause;
+  };
+  for (const Case& c : std::initializer_list<Case>{
+           {"initial fork q = 1'b1; join", "expected identifier, got 'fork'",
+            "29.3.3"},
+           {"initial q <= 1'b1;", "expected '=', got '<='", "29.3.3"},
+           {"initial $display(1);", "expected '=', got '('", "29.3.3"},
+           {"initial @(c) q = 1'b1;", "expected identifier, got '@'", "29.3.3"},
+           {"initial q = #1 1'b1;",
+            "UDP initial statement RHS shall be 0, 1, or a single-bit literal",
+            "29.3.3"},
+           {"initial q = 1'b1; q = 0;", "expected 'table', got identifier",
+            "29.3.4"},
+           {"initial q = 1'b1",
+            "UDP initial statement RHS shall be 0, 1, or a single-bit literal",
+            "29.3.3"},
+           {"initial z = 1;",
+            "UDP initial statement shall target the output port", "29.3.3"},
+           {"initial q[0] = 1'b1;", "expected '=', got '['", "29.3.3"},
+       }) {
+    EXPECT_TRUE(ReportedError(Parse(WithInitialStatement(c.statement)).diags,
+                              c.message, 2, c.subclause))
+        << c.statement;
+  }
+}
+
+TEST(UdpBodyGrammar, AnInitialOnAnInputOfANonAnsiUdpIsRejected) {
+  auto r = Parse(
+      "primitive p(q, c, d);\n"
+      "  output q; reg q; input c; input d;\n"
+      "  initial d = 1;\n"
+      "  table\n"
+      "    r 0 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "UDP initial statement shall target the output port", 3,
+      "29.3.3"));
+}
+
+TEST(UdpBodyGrammar, AValueOutsideTheTenInitValSpellingsIsRejected) {
+  for (const char* value : {"1'bz", "1'bZ", "1'b?", "1'd1", "1'd0", "1'h1",
+                            "1'o1", "1'sb1", "'b1", "'1", "2"}) {
+    auto r =
+        Parse(WithInitialStatement(std::string("initial q = ") + value + ";"));
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "UDP initial statement RHS shall be 0, 1, or a single-bit literal", 2,
+        "29.3.3"))
+        << value;
+  }
+}
+
+TEST(UdpBodyGrammar, EachOfTheTenInitValSpellingsIsAccepted) {
+  for (const char* value : {"1'b0", "1'b1", "1'bx", "1'bX", "1'B0", "1'B1",
+                            "1'Bx", "1'BX", "1", "0"}) {
+    EXPECT_TRUE(ParseOk(
+        WithInitialStatement(std::string("initial q = ") + value + ";")))
+        << value;
+  }
+}
+
+TEST(UdpBodyGrammar, ASecondInitialStatementIsRejected) {
+  auto r = Parse(
+      "primitive p(output reg q, input c, input d);\n"
+      "  initial q = 0;\n"
+      "  initial q = 1;\n"
+      "  table\n"
+      "    r 0 : ? : 0;\n"
+      "  endtable\n"
+      "endprimitive\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'table', got 'initial'", 3, "29.3.4"));
+}
+
+TEST(UdpBodyGrammar, AnInitialStatementAfterTheTableIsRejected) {
+  auto r = Parse(
+      "primitive p(output reg q, input c, input d);\n"
+      "  table\n"
+      "    r 0 : ? : 0;\n"
+      "  endtable\n"
+      "  initial q = 0;\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'endprimitive', got 'initial'",
+                            5, "29.3"));
 }
 
 }  // namespace

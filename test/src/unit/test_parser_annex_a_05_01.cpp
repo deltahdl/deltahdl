@@ -418,4 +418,108 @@ TEST(UdpDeclGrammar, EscapedUdpIdentifier) {
   EXPECT_EQ(inst->inst_module, "inv-1");
 }
 
+constexpr const char* kInverterTable =
+    "  table\n"
+    "    0 : 1;\n"
+    "    1 : 0;\n"
+    "  endtable\n";
+
+TEST(UdpDeclGrammar, AnUnclosedNonAnsiOrWildcardUdpIsRejected) {
+  for (const char* header :
+       {"primitive inv(y, a);\n", "primitive inv(.*);\n"}) {
+    auto r = Parse(std::string(header) + "  output y;\n  input a;\n" +
+                   kInverterTable);
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected 'endprimitive', got EOF", 8, "29.3"))
+        << header;
+  }
+}
+
+TEST(UdpDeclGrammar, AnotherEndKeywordDoesNotCloseAUdp) {
+  for (const char* keyword : {"endmodule", "endinterface", "endprogram",
+                              "endchecker", "endpackage", "endconfig"}) {
+    auto r = Parse(std::string("primitive inv(output y, input a);\n") +
+                   kInverterTable + keyword + "\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected 'endprimitive', got '") + keyword + "'",
+        6, "29.3"))
+        << keyword;
+  }
+}
+
+TEST(UdpDeclGrammar, ASecondEndprimitiveWithNoUdpOpenIsRejected) {
+  auto r = Parse(std::string("primitive inv(output y, input a);\n") +
+                 kInverterTable + "endprimitive\nendprimitive\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 7, "3.12.1"));
+}
+
+TEST(UdpDeclGrammar, AnEndprimitiveClosesEachHeaderForm) {
+  for (const char* header : {"primitive inv(output y, input a);\n",
+                             "primitive inv(y, a);\n  output y;\n  input a;\n",
+                             "primitive inv(.*);\n  output y;\n  input a;\n"}) {
+    EXPECT_TRUE(
+        ParseOk(std::string(header) + kInverterTable + "endprimitive\n"))
+        << header;
+  }
+}
+
+TEST(UdpDeclGrammar, ANonAnsiDefinitionWithoutPortDeclarationsIsRejected) {
+  auto r = Parse(std::string("primitive p(y, a);\n") + kInverterTable +
+                 "endprimitive\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "port 'a' is listed in the UDP's port list but never declared",
+      1, "29.3.2"));
+}
+
+TEST(UdpDeclGrammar, PortDeclarationsWithoutABodyAreRejected) {
+  auto r = Parse(
+      "primitive p(y, a);\n"
+      "  output y;\n"
+      "  input a;\n"
+      "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected 'table', got 'endprimitive'", 4,
+                            "29.3.4"));
+}
+
+TEST(UdpDeclGrammar, AnEndLabelOnTheNonAnsiAndWildcardForms) {
+  for (const char* header : {"primitive p(y, a);\n", "primitive p(.*);\n"}) {
+    std::string body =
+        std::string(header) + "  output y;\n  input a;\n" + kInverterTable;
+    EXPECT_TRUE(ParseOk(body + "endprimitive : p\n")) << header;
+    EXPECT_TRUE(ReportedError(Parse(body + "endprimitive : z\n").diags,
+                              "end label 'z' does not match 'p'", 8, "9.3.4"))
+        << header;
+  }
+}
+
+TEST(UdpDeclGrammar, APortDeclarationAfterAnAnsiHeaderIsRejected) {
+  auto r = Parse(std::string("primitive p(output y, input a);\n  input a;\n") +
+                 kInverterTable + "endprimitive\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected 'table', got 'input'", 2, "29.3.4"));
+}
+
+TEST(UdpDeclGrammar, AnExternDeclarationCarryingABodyIsRejected) {
+  auto r = Parse(std::string("extern primitive p(output y, input a);\n") +
+                 kInverterTable + "endprimitive\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected top-level declaration", 2, "3.12.1"));
+}
+
+TEST(UdpDeclGrammar, AnExternDeclarationWithTheWildcardHeaderIsRejected) {
+  EXPECT_TRUE(ReportedError(Parse("extern primitive p(.*);\n").diags,
+                            "expected identifier, got '.*'", 1, "29.3.1"));
+}
+
+TEST(UdpDeclGrammar, AWildcardFormWithoutPortsFailsOnlyThePortCount) {
+  auto r = Parse(std::string("primitive p(.*);\n") + kInverterTable +
+                 "endprimitive\n");
+  EXPECT_TRUE(ReportedError(r.diags, "UDP shall have exactly one output port",
+                            1, "29.3.1"));
+  for (const auto& diag : r.diags) {
+    EXPECT_EQ(diag.subclause, "29.3.1") << diag.message;
+  }
+}
+
 }  // namespace

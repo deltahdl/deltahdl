@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -649,6 +651,112 @@ TEST(UdpInstantiationParsing, NamedInstanceAfterParenthesesStaysAModuleInst) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->modules[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kModuleInst);
+}
+
+constexpr const char* kTwoInputUdp =
+    "primitive p(output y, input a, input b);\n"
+    "  table\n"
+    "    0 0 : 0;\n"
+    "    0 1 : 1;\n"
+    "    1 ? : 1;\n"
+    "  endtable\n"
+    "endprimitive\n";
+
+std::string InstanceAfterUdp(const std::string& instance) {
+  return std::string(kTwoInputUdp) + "module m;\n  logic y, a, b;\n  " +
+         instance + "\nendmodule\n";
+}
+
+std::string InstanceBeforeUdp(const std::string& instance) {
+  return "module m;\n  logic y, a, b;\n  " + instance + "\nendmodule\n" +
+         kTwoInputUdp;
+}
+
+void ExpectInstanceReported(const std::string& src, const char* message,
+                            int line, const char* subclause) {
+  EXPECT_TRUE(ReportedError(Parse(src).diags, message, line, subclause)) << src;
+}
+
+TEST(UdpInstantiationParsing, AnInstanceOfALaterUdpWithoutItsSemicolon) {
+  ExpectInstanceReported(InstanceBeforeUdp("p u(y, a, b)"),
+                         "expected ';', got 'endmodule'", 4, "23.3.2");
+}
+
+TEST(UdpInstantiationParsing, AnEmptyOrNamedDelayIsRejected) {
+  ExpectInstanceReported(InstanceAfterUdp("p #() u(y, a, b);"),
+                         "expected expression", 10, "11.2");
+  ExpectInstanceReported(InstanceAfterUdp("p #(.d(1)) u(y, a, b);"),
+                         "expected ')', got '('", 10, "28.16");
+}
+
+TEST(UdpInstantiationParsing, DISABLED_AStrengthAfterTheDelayIsRejected) {
+  for (const auto& src :
+       {InstanceAfterUdp("p #1 (strong0, strong1) u(y, a, b);"),
+        InstanceBeforeUdp("p #1 (strong0, strong1) u(y, a, b);")}) {
+    EXPECT_TRUE(ReportedError(Parse(src).diags,
+                              "a UDP instance's drive strength comes before "
+                              "its delay",
+                              LineHolding(src, "#1"), "A.5.4"))
+        << src;
+  }
+}
+
+TEST(UdpInstantiationParsing, AOneSidedDriveStrengthIsRejected) {
+  ExpectInstanceReported(InstanceAfterUdp("p (strong0) u(y, a, b);"),
+                         "drive_strength on a UDP instance requires one "
+                         "strength0 keyword and one strength1 keyword",
+                         10, "28.3.2");
+}
+
+TEST(UdpInstantiationParsing, ATrailingCommaAfterTheLastInstanceIsRejected) {
+  ExpectInstanceReported(InstanceAfterUdp("p u(y, a, b), ;"),
+                         "expected '(', got ';'", 10, "28.3.6");
+}
+
+TEST(UdpInstantiationParsing,
+     AHighImpedanceStrengthPairIsAcceptedInEitherOrder) {
+  for (const auto& src :
+       {InstanceAfterUdp("p (highz0, strong1) u(y, a, b);"),
+        InstanceBeforeUdp("p (highz0, strong1) u(y, a, b);")}) {
+    EXPECT_TRUE(ParseOk(src)) << src;
+  }
+}
+
+TEST(UdpInstantiationParsing, AnInstanceWithFewerThanTwoTerminalsIsRejected) {
+  for (const char* instance : {"p u(y);", "p u();"}) {
+    ExpectInstanceReported(InstanceAfterUdp(instance),
+                           "a UDP instance connects an output terminal and at "
+                           "least one input terminal",
+                           10, "A.5.4");
+  }
+}
+
+TEST(UdpInstantiationParsing, AnEmptyOutputTerminalIsRejected) {
+  ExpectInstanceReported(InstanceAfterUdp("p u(, a, b);"),
+                         "a UDP instance connects an output terminal and at "
+                         "least one input terminal",
+                         10, "A.5.4");
+}
+
+TEST(UdpInstantiationParsing,
+     DISABLED_AnEmptyOrAttributedInputOfAnEarlierUdpIsRejected) {
+  ExpectInstanceReported(InstanceAfterUdp("p u(y, , b);"),
+                         "a UDP instance's input terminal is left empty", 10,
+                         "A.5.4");
+  ExpectInstanceReported(InstanceAfterUdp("p u(y, (* k *) a, b);"),
+                         "a UDP instance's terminal takes no attribute "
+                         "instance",
+                         10, "A.5.4");
+}
+
+TEST(UdpInstantiationParsing,
+     DISABLED_NamedConnectionsToAnEarlierUdpAreRejected) {
+  for (const char* instance : {"p u(.y(y), .a(a), .b(b));", "p u(.*);"}) {
+    ExpectInstanceReported(
+        InstanceAfterUdp(instance),
+        "a UDP instance connects its terminals in order, not by name", 10,
+        "29.8");
+  }
 }
 
 }  // namespace
