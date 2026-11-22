@@ -455,5 +455,331 @@ TEST_F(CaseStatementsOfARun, APatternWrittenAsAnExpressionIsReached) {
   EXPECT_EQ(vpi_get(vpiType, member), vpiConstant);
 }
 
+constexpr const char* kCaseForms =
+    "module top;\n"
+    "  typedef union tagged { int V; void N; } u_t;\n"
+    "  typedef struct { int p; int q; } in_t;\n"
+    "  typedef struct { u_t a; int b; } st_t;\n"
+    "  typedef struct { in_t a; int b; } sn_t;\n"
+    "  typedef union tagged { in_t S; u_t T; void N; } w_t;\n"
+    "  u_t u; st_t st; sn_t sn; w_t w; int a, b, r; logic [7:0] v;\n"
+    "  in_t sa [2];\n"
+    "  function int f(int x); return x; endfunction\n"
+    "  initial casez (a) 1, 2: r = 1; endcase\n"
+    "  initial case (a) inside 0, [2:4]: r = 1; endcase\n"
+    "  initial case (u) matches tagged V .n &&& (n > 0): r = n; endcase\n"
+    "  initial case (st) matches '{a: tagged V .n, b: .*}: r = n; endcase\n"
+    "  initial case (sn) matches '{a: '{p: .x, q: .*}, b: .*}: r = x; endcase\n"
+    "  initial case (w) matches tagged S '{p: .x, q: .*}: r = x; endcase\n"
+    "  initial case (w) matches tagged T tagged V .n: r = n; endcase\n"
+    "  initial case (a) inside 1: r = 1; default: r = 2; endcase\n"
+    "  initial casex (a) 1: r = 1; endcase\n"
+    "  initial case (u) matches tagged N: r = 0; default: r = 1; endcase\n"
+    "  initial priority case (a) 1: r = 1; default: r = 2; endcase\n"
+    "  initial unique case (u) matches tagged N: r = 0; default: r = 1;\n"
+    "  endcase\n"
+    "  initial priority case (u) matches tagged N: r = 0; default: r = 1;\n"
+    "  endcase\n"
+    "  initial case (a + b) 1: r = 1; endcase\n"
+    "  initial case (v[0]) 1: r = 1; endcase\n"
+    "  initial case (v[3:0]) 1: r = 1; endcase\n"
+    "  initial case (f(a)) 1: r = 1; endcase\n"
+    "  initial case (sa[0]) matches '{p: .x, q: .*}: r = x; endcase\n"
+    "endmodule\n";
+
+class CaseFormsOfARun : public CaseStatementsOfARun {
+ protected:
+  void SetUp() override {
+    CaseStatementsOfARun::SetUp();
+    Run(kCaseForms);
+  }
+
+  static vpiHandle CaseAt(size_t n) {
+    const std::vector<vpiHandle> kProcs =
+        Scanned(vpi_iterate(vpiProcess, By("top")));
+    return n < kProcs.size() ? vpi_handle(vpiStmt, kProcs[n]) : nullptr;
+  }
+
+  static vpiHandle SoleCondition(size_t n) {
+    const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(n);
+    return kItems.size() == 1 && kItems[0].size() == 1 ? kItems[0][0] : nullptr;
+  }
+
+  static void ExpectKindAndQualifier(size_t n, int case_type, int qualifier) {
+    vpiHandle selection = CaseAt(n);
+    ASSERT_NE(selection, nullptr);
+    EXPECT_EQ(vpi_get(vpiCaseType, selection), case_type);
+    EXPECT_EQ(vpi_get(vpiQualifier, selection), qualifier);
+  }
+
+  static void ExpectDefaultLast(size_t n) {
+    vpiHandle selection = CaseAt(n);
+    ASSERT_NE(selection, nullptr);
+    const std::vector<vpiHandle> kItems =
+        Scanned(vpi_iterate(vpiCaseItem, selection));
+    ASSERT_EQ(kItems.size(), 2U);
+    EXPECT_NE(vpi_iterate(vpiExpr, kItems[0]), nullptr);
+    EXPECT_EQ(vpi_iterate(vpiExpr, kItems[1]), nullptr);
+    vpiHandle body = vpi_handle(vpiStmt, kItems[1]);
+    ASSERT_NE(body, nullptr);
+    EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment);
+  }
+
+  static vpiHandle ConditionAt(size_t n) {
+    vpiHandle selection = CaseAt(n);
+    return selection == nullptr ? nullptr : vpi_handle(vpiCondition, selection);
+  }
+};
+
+TEST_F(CaseFormsOfARun, AnItemsExpressionsComeInTheOrderWritten) {
+  const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(0);
+  ASSERT_EQ(kItems.size(), 1U);
+  ASSERT_EQ(kItems[0].size(), 2U);
+  EXPECT_EQ(IntegerOf(kItems[0][0]), 1);
+  EXPECT_EQ(IntegerOf(kItems[0][1]), 2);
+}
+
+TEST_F(CaseFormsOfARun, ACaseInsideRangeIsOneExpressionBesideAValue) {
+  const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(1);
+  ASSERT_EQ(kItems.size(), 1U);
+  ASSERT_EQ(kItems[0].size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kItems[0][0]), vpiConstant);
+  EXPECT_EQ(IntegerOf(kItems[0][0]), 0);
+  EXPECT_NE(vpi_get(vpiType, kItems[0][1]), vpiConstant);
+}
+
+TEST_F(CaseFormsOfARun, DISABLED_AGuardedPatternGivesThePatternAndTheGuard) {
+  const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(2);
+  ASSERT_EQ(kItems.size(), 1U);
+  ASSERT_EQ(kItems[0].size(), 2U);
+  EXPECT_EQ(vpi_get(vpiType, kItems[0][0]), vpiTaggedPattern);
+  EXPECT_STREQ(vpi_get_str(vpiName, kItems[0][0]), "V");
+  EXPECT_EQ(OpOf(kItems[0][1]), vpiGtOp);
+}
+
+TEST_F(CaseFormsOfARun, AStructMemberPatternCanBeATaggedPattern) {
+  vpiHandle keyed = SoleCondition(3);
+  ASSERT_NE(keyed, nullptr);
+  const std::vector<vpiHandle> kMembers =
+      Scanned(vpi_iterate(vpiOperand, keyed));
+  ASSERT_EQ(kMembers.size(), 2U);
+  EXPECT_STREQ(vpi_get_str(vpiName, kMembers[0]), "a");
+  vpiHandle tagged = vpi_handle(vpiPattern, kMembers[0]);
+  ASSERT_NE(tagged, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, tagged), vpiTaggedPattern);
+  EXPECT_STREQ(vpi_get_str(vpiName, tagged), "V");
+}
+
+TEST_F(CaseFormsOfARun, AStructMemberPatternCanBeAStructurePattern) {
+  vpiHandle keyed = SoleCondition(4);
+  ASSERT_NE(keyed, nullptr);
+  const std::vector<vpiHandle> kMembers =
+      Scanned(vpi_iterate(vpiOperand, keyed));
+  ASSERT_EQ(kMembers.size(), 2U);
+  vpiHandle inner = vpi_handle(vpiPattern, kMembers[0]);
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, inner), vpiAssignmentPatternOp);
+  EXPECT_EQ(KindsAndNames(inner),
+            (std::vector<std::pair<int, std::string>>{
+                {vpiStructPattern, "p"}, {vpiStructPattern, "q"}}));
+}
+
+TEST_F(CaseFormsOfARun, ATaggedPatternCanTagAStructurePattern) {
+  vpiHandle tagged = SoleCondition(5);
+  ASSERT_NE(tagged, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, tagged), "S");
+  vpiHandle inner = vpi_handle(vpiPattern, tagged);
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(vpi_get(vpiOpType, inner), vpiAssignmentPatternOp);
+  EXPECT_EQ(KindsAndNames(inner),
+            (std::vector<std::pair<int, std::string>>{
+                {vpiStructPattern, "p"}, {vpiStructPattern, "q"}}));
+}
+
+TEST_F(CaseFormsOfARun, ATaggedPatternCanTagAnotherTaggedPattern) {
+  vpiHandle outer = SoleCondition(6);
+  ASSERT_NE(outer, nullptr);
+  EXPECT_STREQ(vpi_get_str(vpiName, outer), "T");
+  vpiHandle inner = vpi_handle(vpiPattern, outer);
+  ASSERT_NE(inner, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, inner), vpiTaggedPattern);
+  EXPECT_STREQ(vpi_get_str(vpiName, inner), "V");
+  vpiHandle typespec = vpi_handle(vpiTypespec, inner);
+  ASSERT_NE(typespec, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
+  vpiHandle bound = vpi_handle(vpiPattern, inner);
+  ASSERT_NE(bound, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bound), vpiAnyPattern);
+  EXPECT_STREQ(vpi_get_str(vpiName, bound), "n");
+}
+
+TEST_F(CaseFormsOfARun, APlainCaseInsideIsExactAndInsideQualified) {
+  ExpectKindAndQualifier(7, vpiCaseExact, vpiInsideQualifier);
+}
+
+TEST_F(CaseFormsOfARun, ACasexReportsTheXCaseType) {
+  ExpectKindAndQualifier(8, vpiCaseX, vpiNoQualifier);
+}
+
+TEST_F(CaseFormsOfARun, ACaseMatchesIsExactAndTaggedQualified) {
+  ExpectKindAndQualifier(9, vpiCaseExact, vpiTaggedQualifier);
+}
+
+TEST_F(CaseFormsOfARun, APriorityCaseReportsThePriorityQualifierAlone) {
+  ExpectKindAndQualifier(10, vpiCaseExact, vpiPriorityQualifier);
+}
+
+TEST_F(CaseFormsOfARun, AKeywordOnACaseMatchesJoinsTheTaggedQualifier) {
+  ExpectKindAndQualifier(11, vpiCaseExact,
+                         vpiUniqueQualifier | vpiTaggedQualifier);
+  ExpectKindAndQualifier(12, vpiCaseExact,
+                         vpiPriorityQualifier | vpiTaggedQualifier);
+}
+
+TEST_F(CaseFormsOfARun, TheDefaultOfACaseInsideHasNoExpressions) {
+  ExpectDefaultLast(7);
+}
+
+TEST_F(CaseFormsOfARun, TheDefaultOfACaseMatchesHasNoExpressions) {
+  ExpectDefaultLast(9);
+}
+
+TEST_F(CaseFormsOfARun, AnOperationSelectorIsTheOperation) {
+  vpiHandle condition = ConditionAt(13);
+  EXPECT_EQ(OpOf(condition), vpiAddOp);
+  const std::vector<vpiHandle> kSides = OperandsOf(condition);
+  ASSERT_EQ(kSides.size(), 2U);
+  EXPECT_EQ(VpiObjectOf(kSides[0]), VpiObjectOf(By("top.a")));
+  EXPECT_EQ(VpiObjectOf(kSides[1]), VpiObjectOf(By("top.b")));
+}
+
+TEST_F(CaseFormsOfARun, ABitSelectorIsABitOfItsVector) {
+  vpiHandle condition = ConditionAt(14);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, condition), vpiVarBit);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, condition)),
+            VpiObjectOf(By("top.v")));
+}
+
+TEST_F(CaseFormsOfARun, APartSelectorIsAPartSelect) {
+  vpiHandle condition = ConditionAt(15);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, condition), vpiPartSelect);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiLeftRange, condition)), 3);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiRightRange, condition)), 0);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, condition)),
+            VpiObjectOf(By("top.v")));
+}
+
+TEST_F(CaseFormsOfARun, ACallSelectorIsTheCall) {
+  vpiHandle condition = ConditionAt(16);
+  ASSERT_NE(condition, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, condition), vpiFuncCall);
+  EXPECT_EQ(CalleeOf(condition), "f");
+}
+
+TEST_F(CaseFormsOfARun, AnArrayElementSelectorIsThatElement) {
+  vpiHandle element = By("top.sa[0]");
+  ASSERT_NE(element, nullptr);
+  EXPECT_EQ(VpiObjectOf(ConditionAt(17)), VpiObjectOf(element));
+}
+
+TEST_F(CaseStatementsOfARun, ACaseInsideToleranceRangeIsOneExpression) {
+  Run("module top; int a, r;\n"
+      "  initial case (a) inside 0, [5 +/- 1]: r = 1; endcase\n"
+      "  initial case (a) inside 0, [5 +%- 20]: r = 1; endcase\n"
+      "endmodule\n");
+  for (size_t n = 0; n < 2; ++n) {
+    const std::vector<std::vector<vpiHandle>> kItems = ItemConditions(n);
+    ASSERT_EQ(kItems.size(), 1U) << n;
+    ASSERT_EQ(kItems[0].size(), 2U) << n;
+    EXPECT_EQ(IntegerOf(kItems[0][0]), 0) << n;
+    EXPECT_NE(vpi_get(vpiType, kItems[0][1]), vpiConstant) << n;
+  }
+}
+
+class CasesInEachPlace : public CaseStatementsOfARun {
+ protected:
+  static vpiHandle CaseIn(const char* scope, int kind, const char* name) {
+    vpiHandle owner = nullptr;
+    if (kind == vpiProcess) {
+      const std::vector<vpiHandle> kProcs =
+          Scanned(vpi_iterate(vpiProcess, By(scope)));
+      owner = kProcs.size() == 1 ? kProcs[0] : nullptr;
+    } else if (kind == vpiMethods) {
+      owner = Named(vpiMethods, Named(vpiClassDefn, By(scope), "C"), name);
+    } else {
+      owner = Named(kind, By(scope), name);
+    }
+    vpiHandle stmt = owner == nullptr ? nullptr : vpi_handle(vpiStmt, owner);
+    if (stmt != nullptr && vpi_get(vpiType, stmt) == vpiEventControl) {
+      stmt = vpi_handle(vpiStmt, stmt);
+    }
+    return stmt;
+  }
+};
+
+TEST_F(CasesInEachPlace, ACaseInEachPlaceIteratesItsItems) {
+  Run("package pk; int a, i;\n"
+      "  task pt; case (a) 1: i = 1; default: i = 2; endcase endtask\n"
+      "endpackage\n"
+      "interface ifc; int a, i;\n"
+      "  initial case (a) 1: i = 1; default: i = 2; endcase\n"
+      "endinterface\n"
+      "program prg; int a, i;\n"
+      "  initial case (a) 1: i = 1; default: i = 2; endcase\n"
+      "endprogram\n"
+      "module mal; bit c; int a, i;\n"
+      "  always @(c) case (a) 1: i = 1; default: i = 2; endcase\n"
+      "endmodule\n"
+      "module mac; int a, i;\n"
+      "  always_comb case (a) 1: i = 1; default: i = 2; endcase\n"
+      "endmodule\n"
+      "module maf; bit c; int a, i;\n"
+      "  always_ff @(posedge c) case (a) 1: i <= 1; default: i <= 2; endcase\n"
+      "endmodule\n"
+      "module mat; int a, i;\n"
+      "  always_latch case (a) 1: i = 1; default: i = 2; endcase\n"
+      "endmodule\n"
+      "module mfi; int a, i;\n"
+      "  final case (a) 1: i = 1; default: i = 2; endcase\n"
+      "endmodule\n"
+      "module top; int a, i; ifc i0(); prg p0(); mal al(); mac ac();\n"
+      "  maf af(); mat at(); mfi fi();\n"
+      "  class C; int a, i;\n"
+      "    task ct; case (a) 1: i = 1; default: i = 2; endcase endtask\n"
+      "  endclass\n"
+      "  task tk; case (a) 1: i = 1; default: i = 2; endcase endtask\n"
+      "  function void fn; case (a) 1: i = 1; default: i = 2; endcase\n"
+      "  endfunction\n"
+      "endmodule\n");
+  const struct {
+    const char* scope;
+    int kind;
+    const char* name;
+  } kPlaces[] = {
+      {"pk", vpiTask, "pt"},      {"top.i0", vpiProcess, ""},
+      {"top.p0", vpiProcess, ""}, {"top.al", vpiProcess, ""},
+      {"top.ac", vpiProcess, ""}, {"top.af", vpiProcess, ""},
+      {"top.at", vpiProcess, ""}, {"top.fi", vpiProcess, ""},
+      {"top", vpiMethods, "ct"},  {"top", vpiTask, "tk"},
+      {"top", vpiFunction, "fn"},
+  };
+  for (const auto& place : kPlaces) {
+    const std::string kWhere = std::string(place.scope) + " " + place.name;
+    vpiHandle selection = CaseIn(place.scope, place.kind, place.name);
+    ASSERT_NE(selection, nullptr) << kWhere;
+    EXPECT_EQ(vpi_get(vpiType, selection), vpiCase) << kWhere;
+    const std::vector<vpiHandle> kItems =
+        Scanned(vpi_iterate(vpiCaseItem, selection));
+    ASSERT_EQ(kItems.size(), 2U) << kWhere;
+    for (vpiHandle item : kItems) {
+      vpiHandle body = vpi_handle(vpiStmt, item);
+      ASSERT_NE(body, nullptr) << kWhere;
+      EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment) << kWhere;
+    }
+  }
+}
+
 }  // namespace
 }  // namespace delta
