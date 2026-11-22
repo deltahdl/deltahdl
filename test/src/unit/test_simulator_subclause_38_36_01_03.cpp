@@ -6,10 +6,14 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "fixture_simulator.h"
+#include "helpers_sealed_design_run.h"
+#include "helpers_stmt_callbacks.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -206,6 +210,45 @@ TEST_F(VpiModuleWideCallback, RegistrationOnOneStatementReachesNoSibling) {
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbStmt, named), 1);
   EXPECT_EQ(g_calls, 1);
   EXPECT_TRUE(Fired(named));
+}
+
+int& ModuleWideRemovals() {
+  static int removed = -1;
+  return removed;
+}
+
+PLI_INT32 RemoveModuleWideCalltf(PLI_BYTE8*) {
+  ModuleWideRemovals() = vpi_remove_cb(ModuleWideStmtCallback());
+  return 0;
+}
+
+TEST_F(StmtCallbacksOfARun, TheOneHandleRemovesItFromEveryStatement) {
+  ModuleWideRemovals() = -1;
+  s_vpi_systf_data task = {};
+  task.type = vpiSysTask;
+  task.tfname = VpiText("$unwatch");
+  task.calltf = &RemoveModuleWideCalltf;
+  ASSERT_NE(vpi_register_systf(&task), nullptr);
+  RunWatchingTop(
+      "module top; int a, b, c;\n"
+      "  initial begin a = 1; #1 $unwatch; b = 2; #1 c = 3; end\n"
+      "endmodule\n");
+  EXPECT_EQ(ModuleWideRemovals(), 1);
+  EXPECT_EQ(StmtTypesCalled(),
+            (std::vector<int>{vpiBegin, vpiAssignment, vpiDelayControl,
+                              vpiSysTaskCall}));
+}
+
+TEST(ModuleWideCallbackInASealedRun, AStatementInAnEnvelopeIsLeftOut) {
+  VpiContext ctx;
+  SetGlobalVpiContext(&ctx);
+  WatchStatementsOf("t");
+  SimFixture f;
+  RunUnderKey(SealedStatementsDesign(), kSealedStatementsKey, f);
+  SetGlobalVpiContext(nullptr);
+  EXPECT_NE(ModuleWideStmtCallback(), nullptr);
+  EXPECT_EQ(StmtTypesCalled(),
+            (std::vector<int>{vpiNamedBegin, vpiAssignment}));
 }
 
 }  // namespace
