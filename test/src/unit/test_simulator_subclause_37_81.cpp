@@ -117,5 +117,152 @@ TEST_F(TimeQueueOfARun, ARunsPendingSlotsAreItsTimeQueue) {
   EXPECT_LT(g_queued_times[0], g_queued_times[1]);
 }
 
+struct ScannedSlot {
+  uint64_t ticks;
+  int type;
+};
+
+struct QueueReading {
+  bool iterated = false;
+  bool iterator_is_null = false;
+  uint64_t now = 0;
+  std::vector<ScannedSlot> slots;
+};
+
+QueueReading g_reading;
+
+void ReadTheQueue() {
+  s_vpi_time now = {};
+  now.type = vpiSimTime;
+  vpi_get_time(nullptr, &now);
+  g_reading = {};
+  g_reading.iterated = true;
+  g_reading.now = TicksOf(now);
+  vpiHandle it = vpi_iterate(vpiTimeQueue, nullptr);
+  g_reading.iterator_is_null = it == nullptr;
+  while (vpiHandle slot = it == nullptr ? nullptr : vpi_scan(it)) {
+    s_vpi_time time = {};
+    time.type = vpiSimTime;
+    vpi_get_time(slot, &time);
+    g_reading.slots.push_back({TicksOf(time), vpi_get(vpiType, slot)});
+  }
+}
+
+PLI_INT32 ReadTheQueueCalltf(PLI_BYTE8*) {
+  ReadTheQueue();
+  return 0;
+}
+
+PLI_INT32 ReadTheQueueCallback(p_cb_data) {
+  ReadTheQueue();
+  return 0;
+}
+
+PLI_INT32 ReadTheQueueAtReadOnlySynchCalltf(PLI_BYTE8*) {
+  s_vpi_time delay = {};
+  delay.type = vpiSimTime;
+  s_cb_data cb = {};
+  cb.reason = cbReadOnlySynch;
+  cb.time = &delay;
+  cb.cb_rtn = &ReadTheQueueCallback;
+  vpi_register_cb(&cb);
+  return 0;
+}
+
+class TimeQueueReadInARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    g_reading = {};
+    Register("$readq", &ReadTheQueueCalltf);
+    Register("$readq_ros", &ReadTheQueueAtReadOnlySynchCalltf);
+  }
+
+  static void Register(const char* name, PLI_INT32 (*calltf)(PLI_BYTE8*)) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText(name);
+    data.calltf = calltf;
+    ASSERT_NE(vpi_register_systf(&data), nullptr);
+  }
+
+  static std::vector<uint64_t> TimesRead() {
+    std::vector<uint64_t> times;
+    times.reserve(g_reading.slots.size());
+    for (const ScannedSlot& slot : g_reading.slots) times.push_back(slot.ticks);
+    return times;
+  }
+};
+
+TEST_F(TimeQueueReadInARun, EachScannedObjectIsATimeQueueInIncreasingTime) {
+  Run("module top; logic x;\n"
+      "  initial #30 x = 1;\n"
+      "  initial #10 x = 0;\n"
+      "  initial #20 x = 1;\n"
+      "  initial #5 $readq;\n"
+      "endmodule\n");
+  ASSERT_TRUE(g_reading.iterated);
+  ASSERT_EQ(TimesRead(), (std::vector<uint64_t>{10, 20, 30}));
+  for (const ScannedSlot& slot : g_reading.slots) {
+    EXPECT_EQ(slot.type, vpiTimeQueue);
+  }
+}
+
+TEST_F(TimeQueueReadInARun, TheCurrentSlotIsReturnedWhileEventsPrecedeIt) {
+  Run("module top; logic x;\n"
+      "  initial begin #5 x <= 1; $readq; end\n"
+      "  initial #20 x = 0;\n"
+      "endmodule\n");
+  ASSERT_TRUE(g_reading.iterated);
+  EXPECT_EQ(g_reading.now, 5u);
+  EXPECT_EQ(TimesRead(), (std::vector<uint64_t>{5, 20}));
+}
+
+TEST_F(TimeQueueReadInARun, TheCurrentSlotIsLeftOutAtReadOnlySynch) {
+  Run("module top; logic x;\n"
+      "  initial begin #5 x <= 1; $readq_ros; end\n"
+      "  initial #20 x = 0;\n"
+      "endmodule\n");
+  ASSERT_TRUE(g_reading.iterated);
+  EXPECT_EQ(g_reading.now, 5u);
+  EXPECT_EQ(TimesRead(), (std::vector<uint64_t>{20}));
+}
+
+TEST_F(TimeQueueReadInARun, TheCurrentSlotIsLeftOutWhenNothingPrecedesIt) {
+  Run("module top; logic x;\n"
+      "  initial #5 $readq;\n"
+      "  initial #20 x = 0;\n"
+      "endmodule\n");
+  ASSERT_TRUE(g_reading.iterated);
+  EXPECT_EQ(TimesRead(), (std::vector<uint64_t>{20}));
+}
+
+TEST_F(TimeQueueReadInARun, NothingLeftInTheQueueGivesANullIterator) {
+  Run("module top; logic x;\n"
+      "  initial #5 $readq;\n"
+      "endmodule\n");
+  ASSERT_TRUE(g_reading.iterated);
+  EXPECT_TRUE(g_reading.iterator_is_null);
+}
+
+TEST_F(TimeQueueReadInARun, OnlyTheCurrentSlotAtReadOnlySynchGivesANull) {
+  Run("module top; logic x;\n"
+      "  initial begin #5 x <= 1; $readq_ros; end\n"
+      "endmodule\n");
+  ASSERT_TRUE(g_reading.iterated);
+  EXPECT_EQ(g_reading.now, 5u);
+  EXPECT_TRUE(g_reading.iterator_is_null);
+}
+
+TEST_F(TimeQueueReadInARun, ADrainedSchedulerAtTheEndGivesANullIterator) {
+  Run("module top; logic x;\n"
+      "  initial begin x = 0; #5 x = 1; end\n"
+      "  final $readq;\n"
+      "endmodule\n");
+  f_.scheduler.EndSimulation();
+  ASSERT_TRUE(g_reading.iterated);
+  EXPECT_TRUE(g_reading.iterator_is_null);
+}
+
 }  // namespace
 }  // namespace delta
