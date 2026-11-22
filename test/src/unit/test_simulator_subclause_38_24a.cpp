@@ -91,6 +91,19 @@ TEST_F(VpiMcdCloseSim, ReportsAllUnclosedChannelsWhileClosingTheRest) {
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("live.log"));
 }
 
+TEST_F(VpiMcdCloseSim, AnEmptyDescriptorLeavesNothingUnclosed) {
+  EXPECT_EQ(vpi_mcd_close(0u), 0u);
+}
+
+TEST_F(VpiMcdCloseSim, AChannelAlreadyClosedIsReportedBack) {
+  char name[] = "twice.log";
+  PLI_UINT32 mcd = vpi_mcd_open(name);
+  ASSERT_NE(mcd, 0u);
+  ASSERT_EQ(vpi_mcd_close(mcd), 0u);
+
+  EXPECT_EQ(vpi_mcd_close(mcd), mcd);
+}
+
 TEST_F(VpiMcdCloseSim, ClosesDescriptorOpenedByFopen) {
   PLI_UINT32 fopen_mcd = 0x00000004u;
   vpi_ctx_.RegisterFopenMcdFile("from_fopen.log", fopen_mcd);
