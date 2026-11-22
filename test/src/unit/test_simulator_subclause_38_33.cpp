@@ -8,6 +8,7 @@
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
@@ -148,6 +149,46 @@ TEST_F(UserDataOfABuiltInCall, PuttingItOnAFunctionCallIsAnError) {
   const PLI_INT32 kPutError = vpi_chk_error(nullptr);
   EXPECT_EQ(kPutError, vpiError);
   EXPECT_EQ(vpi_get_userdata(time), nullptr);
+}
+
+std::vector<void*> held_by_calls;
+std::vector<PLI_INT32> put_results;
+int call_slots[2] = {};
+int next_call_slot = 0;
+
+PLI_INT32 TagCalltf(PLI_BYTE8*) {
+  vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
+  void* held = vpi_get_userdata(call);
+  held_by_calls.push_back(held);
+  if (held == nullptr && next_call_slot < 2) {
+    put_results.push_back(
+        vpi_put_userdata(call, &call_slots[next_call_slot++]));
+  }
+  return 0;
+}
+
+class UserDataOfEachCall : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    held_by_calls.clear();
+    put_results.clear();
+    next_call_slot = 0;
+    s_vpi_systf_data task = {};
+    task.type = vpiSysTask;
+    task.tfname = VpiText("$tag");
+    task.calltf = &TagCalltf;
+    ASSERT_NE(vpi_register_systf(&task), nullptr);
+  }
+};
+
+TEST_F(UserDataOfEachCall, TwoCallsOfOneTaskInOneScopeKeepTheirOwn) {
+  Run("module top;\n"
+      "  initial repeat (2) begin $tag; $tag; end\n"
+      "endmodule\n");
+  EXPECT_EQ(put_results, (std::vector<PLI_INT32>{1, 1}));
+  EXPECT_EQ(held_by_calls, (std::vector<void*>{nullptr, nullptr, &call_slots[0],
+                                               &call_slots[1]}));
 }
 
 }  // namespace
