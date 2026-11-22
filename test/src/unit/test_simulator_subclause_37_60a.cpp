@@ -74,6 +74,18 @@ TEST_F(AtomicStatement, NonStatementKindsAreNotAtomicStatements) {
   EXPECT_FALSE(VpiIsAtomicStmtType(vpiBegin));
 }
 
+TEST_F(AtomicStatement, EveryKindOfWaitIsAnAtomicStatement) {
+  for (int type : {vpiWait, vpiOrderedWait, vpiWaitFork}) {
+    EXPECT_TRUE(VpiIsAtomicStmtType(type)) << type;
+  }
+}
+
+TEST_F(AtomicStatement, NoScopeStatementIsAnAtomicStatement) {
+  for (int type : {vpiBegin, vpiNamedBegin, vpiFork, vpiNamedFork}) {
+    EXPECT_FALSE(VpiIsAtomicStmtType(type)) << type;
+  }
+}
+
 TEST_F(AtomicStatement, LabeledStatementReportsItsLabel) {
   VpiObject stmt;
   stmt.type = vpiIf;
