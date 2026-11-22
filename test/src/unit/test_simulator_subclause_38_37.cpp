@@ -65,7 +65,7 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesEverySystfDataField) {
   int user_payload = 7;
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
-  data.sysfunctype = vpiSysFunc;
+  data.sysfunctype = vpiSizedFunc;
   data.tfname = VpiText("$measure");
   data.calltf = &SystfStubCall;
   data.compiletf = &SystfStubCompile;
@@ -77,7 +77,7 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesEverySystfDataField) {
   ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1);
   const auto& stored = vpi_ctx_.RegisteredSystfs()[0];
   EXPECT_EQ(stored.type, vpiSysFunc);
-  EXPECT_EQ(stored.sysfunctype, vpiSysFunc);
+  EXPECT_EQ(stored.sysfunctype, vpiSizedFunc);
   EXPECT_STREQ(stored.tfname, "$measure");
   EXPECT_EQ(stored.calltf, &SystfStubCall);
   EXPECT_EQ(stored.compiletf, &SystfStubCompile);

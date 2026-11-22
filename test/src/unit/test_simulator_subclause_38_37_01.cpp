@@ -93,6 +93,16 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsWellFormedName) {
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$good_name");
 }
 
+TEST_F(VpiSystfCallbacksRegistration, AcceptsDigitsAndDollarsAfterTheDollar) {
+  for (const char* name : {"$1st", "$$", "$9_$"}) {
+    s_vpi_systf_data data = {};
+    data.type = vpiSysTask;
+    data.tfname = VpiText(name);
+    EXPECT_NE(vpi_register_systf(&data), nullptr) << name;
+  }
+  EXPECT_EQ(vpi_ctx_.RegisteredSystfs().size(), 3u);
+}
+
 TEST_F(VpiSystfCallbacksRegistration, AcceptsANameAtTheIdentifierMaximum) {
   std::string name = "$" + std::string(kMaxIdentifierLength - 1, 'a');
   s_vpi_systf_data data = {};
@@ -302,6 +312,25 @@ TEST_F(SystemFunctionResultsOfARun, ATimeFunctionReturnsSixtyFourBits) {
   EXPECT_EQ(value.value.time->low, 5u);
 }
 
+TEST_F(SystemFunctionResultsOfARun, AnIntFunctionReturnsThirtyTwoSignedBits) {
+  RegisterFunction("$user_int", vpiIntFunc, &PutAllOnes);
+  RegisterFunction("$user_32", vpiSizedFunc, &PutAllOnes);
+  Run("module top; longint s, u;\n"
+      "  initial begin s = $user_int(); u = $user_32(); end\n"
+      "endmodule\n");
+  s_vpi_value value = {};
+  value.format = vpiVectorVal;
+  vpi_get_value(By("top.s"), &value);
+  ASSERT_NE(value.value.vector, nullptr);
+  EXPECT_EQ(value.value.vector[0].aval, 0xFFFFFFFFu);
+  EXPECT_EQ(value.value.vector[1].aval, 0xFFFFFFFFu);
+  value.format = vpiVectorVal;
+  vpi_get_value(By("top.u"), &value);
+  ASSERT_NE(value.value.vector, nullptr);
+  EXPECT_EQ(value.value.vector[0].aval, 0xFFFFFFFFu);
+  EXPECT_EQ(value.value.vector[1].aval, 0u);
+}
+
 TEST_F(SystemFunctionResultsOfARun, ASizedSignedFunctionReturnsASignedValue) {
   RegisterFunction("$user_s8", vpiSizedSignedFunc, &PutAllOnes, &EightBits);
   RegisterFunction("$user_u8", vpiSizedFunc, &PutAllOnes, &EightBits);
@@ -325,11 +354,14 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsAFunctionOfNoFunctionType) {
 }
 
 TEST_F(VpiSystfCallbacksRegistration, AcceptsATaskOfNoFunctionType) {
-  s_vpi_systf_data task = {};
-  task.type = vpiSysTask;
-  task.sysfunctype = 0;
-  task.tfname = VpiText("$untyped_task");
-  EXPECT_NE(vpi_register_systf(&task), nullptr);
+  for (const int kFuncType : {0, 99}) {
+    s_vpi_systf_data task = {};
+    task.type = vpiSysTask;
+    task.sysfunctype = kFuncType;
+    task.tfname = VpiText("$untyped_task");
+    EXPECT_NE(vpi_register_systf(&task), nullptr) << kFuncType;
+  }
+  EXPECT_EQ(vpi_ctx_.RegisteredSystfs().size(), 2u);
 }
 
 }  // namespace
