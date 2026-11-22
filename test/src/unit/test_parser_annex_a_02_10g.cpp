@@ -327,4 +327,20 @@ TEST(PropertyInstanceSpecParsing, APackageScopedInstanceStandsAlone) {
                        "pk::q", "pk::q0", "pk::q", "", ""}));
 }
 
+TEST(CoverStatementParsing, DISABLED_AnElseArmOnAModuleItemCoverIsReported) {
+  auto r = Parse(
+      "module m(input logic clk, a);\n"
+      "  cover property (@(posedge clk) a) $display(\"y\"); else $stop;\n"
+      "  cover sequence (@(posedge clk) a) $display(\"y\"); else $stop;\n"
+      "  assert property (@(posedge clk) a) $display(\"y\"); else $stop;\n"
+      "endmodule\n");
+  for (uint32_t line : {2u, 3u}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "cover has no fail statement; the else arm "
+                              "belongs to assert and assume",
+                              line, "16.14.3"));
+  }
+  EXPECT_EQ(r.diags.size(), 2u);
+}
+
 }  // namespace

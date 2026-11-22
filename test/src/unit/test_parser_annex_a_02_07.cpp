@@ -804,4 +804,35 @@ TEST(TaskDeclParsing, InterfacePrefixWithAClassScopeIsReported) {
   }
 }
 
+TEST(TfPortItemIdentifier, AClassMethodPortNeedsItsName) {
+  const char* const kSrc =
+      "class C;\n"
+      "  function void f(int); endfunction\n"
+      "  task t(int); endtask\n"
+      "  extern function void g(int);\n"
+      "endclass\n"
+      "function void C::g(int); endfunction\n";
+  auto r = Parse(kSrc);
+  for (uint32_t line : {2u, 3u, 6u}) {
+    EXPECT_TRUE(ReportedError(
+        r.diags, "tf_port_item shall include a port_identifier", line, "13.3"))
+        << line;
+  }
+  EXPECT_FALSE(ErrorOnLine(r.diags, 4));
+}
+
+TEST(TfPortItemIdentifier, EveryPrototypeMayOmitAPortName) {
+  for (const char* src :
+       {"virtual class C;\n  pure virtual task t(int);\n"
+        "  extern task u(int);\n  extern function void v(int);\nendclass\n"
+        "task C::u(int a); endtask\nfunction void C::v(int a); endfunction\n",
+        "interface i;\n  extern forkjoin task t(int);\nendinterface\n",
+        "module m;\n  import \"DPI-C\" task t(int);\n"
+        "  import \"DPI-C\" function void f(int);\nendmodule\n",
+        "interface i;\n  modport mp(import task t(int), import function void "
+        "f(int), export task u(int));\nendinterface\n"}) {
+    EXPECT_TRUE(Parse(src).diags.empty()) << src;
+  }
+}
+
 }  // namespace

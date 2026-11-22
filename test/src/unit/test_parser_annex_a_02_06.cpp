@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -516,6 +518,58 @@ TEST(FunctionDeclParsing, ClassPrototypeTypeReferenceResultIsAccepted) {
       "endclass\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+TEST(DpiExportForms, AnExportTakesOnlyItsOwnForm) {
+  struct Case {
+    const char* decl;
+    const char* message;
+  };
+  const Case kCases[] = {
+      {"export \"DPI-C\" context function f;",
+       "expected 'function', got 'context'"},
+      {"export \"DPI-C\" pure function f;", "expected 'function', got 'pure'"},
+      {"export \"DPI-C\" function void f();",
+       "expected identifier, got 'void'"},
+      {"export \"DPI-C\" f;", "expected 'function', got identifier"},
+      {"export \"DPI-C\" cf function f;",
+       "expected 'function', got identifier"},
+  };
+  for (const auto& c : kCases) {
+    auto r =
+        Parse(std::string("module m;\n  function void f; endfunction\n  ") +
+              c.decl + "\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, c.message, 3, "35.7")) << c.decl;
+  }
+  auto ok = Parse(
+      "module m;\n"
+      "  function void f; endfunction\n"
+      "  task t; endtask\n"
+      "  export \"DPI-C\" cf = function f;\n"
+      "  export \"DPI-C\" task t;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ok.diags.empty());
+}
+
+TEST(DpiExportForms, ADeprecatedDpiTaskExportIsWarned) {
+  auto r = Parse(
+      "module m;\n"
+      "  task t; endtask\n"
+      "  export \"DPI\" task t;\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  EXPECT_TRUE(ReportedWarning(r.diags, "\"DPI\" is deprecated", 3, "35.5.4"));
+}
+
+TEST(DpiExportForms, AFunctionEndLabelNamesItsOwnFunction) {
+  auto r = Parse(
+      "module m;\n"
+      "  function void f; endfunction : g\n"
+      "  function void h; endfunction : h\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "end label 'g' does not match 'f'", 2, "9.3.4"));
+  EXPECT_FALSE(ErrorOnLine(r.diags, 3));
 }
 
 }  // namespace

@@ -254,4 +254,16 @@ TEST(PropertySpecGrammar, AnOperandIsGroupedByPrecedence) {
   }
 }
 
+TEST(PropertySpecGrammar, APropertyCaseHoldsAtLeastOneItem) {
+  ExpectNotAdmitted("assert property", {{"case (s)\nendcase", 3}});
+}
+
+TEST(PropertySpecGrammar, EveryRepetitionTakesAnUnboundedMaximum) {
+  for (const char* rep : {"[*1:$]", "[=1:$]", "[->1:$]"}) {
+    auto r = ParseSpec("assert property",
+                       std::string("@(posedge clk) a") + rep + " ##1 b");
+    EXPECT_TRUE(r.diags.empty()) << rep;
+  }
+}
+
 }  // namespace

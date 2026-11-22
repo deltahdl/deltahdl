@@ -805,4 +805,32 @@ TEST(TypeDeclParsing, TypedefAndNettypeOfATypeReference) {
   EXPECT_NE(items[2]->typedef_type.type_ref_expr, nullptr);
 }
 
+TEST(TypeDeclParsing, ErrorAutomaticInEveryNonProceduralScope) {
+  const char* const kMsg =
+      "'automatic' is not allowed in a data_declaration outside a procedural "
+      "context";
+  for (const char* src :
+       {"interface i;\n  automatic int x;\nendinterface\n",
+        "program q;\n  automatic int x;\nendprogram\n",
+        "module m;\n  if (1) begin : g\n  automatic int x;\n  end\n"
+        "endmodule\n",
+        "module m;\n  for (genvar i = 0; i < 1; i++) begin : g\n"
+        "  automatic int x;\n  end\nendmodule\n"}) {
+    auto r = Parse(src);
+    EXPECT_TRUE(
+        ReportedError(r.diags, kMsg, LineHolding(src, "automatic"), "6.8"))
+        << src;
+  }
+}
+
+TEST(TypeDeclParsing, DISABLED_ErrorAutomaticInTheCompilationUnit) {
+  auto r = Parse(
+      "automatic int x;\n"
+      "module m; endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'automatic' is not allowed in a data_declaration "
+                            "outside a procedural context",
+                            1, "6.8"));
+}
+
 }  // namespace

@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <iterator>
+#include <string>
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
@@ -348,6 +352,60 @@ TEST(DeclarationListParsing, ListOfDefparamAssignmentsTrailingCommaErrors) {
       "  defparam u.A = 1, ;\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+}
+
+struct ParamScope {
+  const char* open;
+  const char* close;
+};
+
+constexpr ParamScope kParamScopes[] = {
+    {"module m;", "endmodule"},   {"class c;", "endclass"},
+    {"package p;", "endpackage"}, {"interface i;", "endinterface"},
+    {"program q;", "endprogram"}, {"module z; endmodule", ""},
+};
+
+constexpr ParamScope kBlockScopes[] = {
+    {"module m; function void f;", "endfunction endmodule"},
+    {"module m; if (1) begin : g", "end endmodule"},
+};
+
+ParseResult ParseInScope(const ParamScope& scope, const std::string& body) {
+  return Parse(std::string(scope.open) + "\n" + body + "\n" + scope.close +
+               "\n");
+}
+
+TEST(DeclarationListParsing, AParamAssignmentListIsCommaSeparatedEverywhere) {
+  for (const auto& scope : kParamScopes) {
+    EXPECT_TRUE(ParseInScope(scope, "  parameter A = 1, B = 2;").diags.empty())
+        << scope.open;
+    EXPECT_TRUE(
+        ReportedError(ParseInScope(scope, "  parameter A = 1 B = 2;").diags,
+                      "expected ';', got identifier", 2, "6.20.1"))
+        << scope.open;
+    for (const char* body :
+         {"  parameter ;", "  localparam ;", "  parameter A = 1, ;",
+          "  localparam int A = 1, ;"}) {
+      EXPECT_TRUE(ReportedError(ParseInScope(scope, body).diags,
+                                "expected identifier, got ';'", 2, "6.20.1"))
+          << scope.open << body;
+    }
+  }
+}
+
+TEST(DeclarationListParsing, AParameterDeclarationEndsInASemicolonEverywhere) {
+  std::vector<ParamScope> scopes(std::begin(kParamScopes),
+                                 std::end(kParamScopes));
+  scopes.insert(scopes.end(), std::begin(kBlockScopes), std::end(kBlockScopes));
+  for (const auto& scope : scopes) {
+    EXPECT_TRUE(
+        ParseInScope(scope, "  localparam int A = 1;\n  int x;").diags.empty())
+        << scope.open;
+    EXPECT_TRUE(ReportedError(
+        ParseInScope(scope, "  localparam int A = 1\n  int x;").diags,
+        "expected ';', got 'int'", 3, "6.20.1"))
+        << scope.open;
+  }
 }
 
 }  // namespace
