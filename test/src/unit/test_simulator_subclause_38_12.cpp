@@ -172,5 +172,66 @@ TEST_F(VpiGetSystfInfoSim, TheRegistrationIsReportedAsOftenAsItIsAsked) {
   EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
 }
 
+TEST_F(VpiGetSystfInfoSim, ATasksRoutinesAreReportedBack) {
+  s_vpi_systf_data registered = {};
+  registered.type = vpiSysTask;
+  registered.tfname = VpiText("$task");
+  registered.calltf = &InfoStubCall;
+  registered.compiletf = &InfoStubCompile;
+  vpiHandle h = vpi_register_systf(&registered);
+  ASSERT_NE(h, nullptr);
+
+  s_vpi_systf_data out = {};
+  vpi_get_systf_info(h, &out);
+  EXPECT_EQ(out.type, vpiSysTask);
+  EXPECT_EQ(out.calltf, &InfoStubCall);
+  EXPECT_EQ(out.compiletf, &InfoStubCompile);
+}
+
+TEST_F(VpiGetSystfInfoSim, EveryFunctionTypeIsReportedBack) {
+  const PLI_INT32 kTypes[] = {vpiTimeFunc, vpiSizedFunc, vpiSizedSignedFunc};
+  const char* const kNames[] = {"$time_f", "$sized_f", "$signed_f"};
+  for (int i = 0; i < 3; ++i) {
+    s_vpi_systf_data registered = {};
+    registered.type = vpiSysFunc;
+    registered.sysfunctype = kTypes[i];
+    registered.tfname = VpiText(kNames[i]);
+    registered.calltf = &InfoStubCall;
+    registered.sizetf = &InfoStubSize;
+    vpiHandle h = vpi_register_systf(&registered);
+    ASSERT_NE(h, nullptr) << kNames[i];
+
+    s_vpi_systf_data out = {};
+    vpi_get_systf_info(h, &out);
+    EXPECT_EQ(out.sysfunctype, kTypes[i]) << kNames[i];
+    EXPECT_STREQ(out.tfname, kNames[i]);
+  }
+}
+
+TEST_F(VpiGetSystfInfoSim, AnIteratedCallbackReportsItsRegistration) {
+  int payload = 7;
+  s_vpi_systf_data registered = {};
+  registered.type = vpiSysFunc;
+  registered.sysfunctype = vpiIntFunc;
+  registered.tfname = VpiText("$listed");
+  registered.calltf = &InfoStubCall;
+  registered.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
+  ASSERT_NE(vpi_register_systf(&registered), nullptr);
+
+  vpiHandle it = vpi_iterate(vpiUserSystf, nullptr);
+  ASSERT_NE(it, nullptr);
+  vpiHandle h = vpi_scan(it);
+  ASSERT_NE(h, nullptr);
+  EXPECT_EQ(vpi_scan(it), nullptr);
+
+  s_vpi_systf_data out = {};
+  vpi_get_systf_info(h, &out);
+  EXPECT_EQ(out.type, vpiSysFunc);
+  EXPECT_EQ(out.sysfunctype, vpiIntFunc);
+  EXPECT_STREQ(out.tfname, "$listed");
+  EXPECT_EQ(out.calltf, &InfoStubCall);
+  EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
+}
+
 }  // namespace
 }  // namespace delta
