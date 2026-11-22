@@ -106,5 +106,26 @@ TEST_F(VpiScanSim, ARefusedScanLeavesTheObjectInPlace) {
   EXPECT_EQ(count, 2);
 }
 
+TEST_F(VpiScanSim, TwoLiveIteratorsScannedInTurnEachKeepTheirOwnPlace) {
+  auto* mod = vpi_ctx_.CreateModule("top", "top");
+  const std::vector<VpiHandle> kPorts = {
+      vpi_ctx_.CreatePort("p0", kVpiInput, mod),
+      vpi_ctx_.CreatePort("p1", kVpiOutput, mod),
+      vpi_ctx_.CreatePort("p2", kVpiInout, mod),
+  };
+
+  vpiHandle first = vpi_iterate(vpiPort, VpiHandleOf(mod));
+  vpiHandle second = vpi_iterate(vpiPort, VpiHandleOf(mod));
+  ASSERT_NE(first, nullptr);
+  ASSERT_NE(second, nullptr);
+
+  for (VpiHandle port : kPorts) {
+    EXPECT_EQ(VpiObjectOf(vpi_scan(first)), port);
+    EXPECT_EQ(VpiObjectOf(vpi_scan(second)), port);
+  }
+  EXPECT_EQ(vpi_scan(first), nullptr);
+  EXPECT_EQ(vpi_scan(second), nullptr);
+}
+
 }  // namespace
 }  // namespace delta
