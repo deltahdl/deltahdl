@@ -87,6 +87,20 @@ TEST_F(VpiCallbackSim, RegisterCbNullDataReturnsNull) {
   EXPECT_EQ(vpi_register_cb(nullptr), nullptr);
 }
 
+TEST_F(VpiCallbackSim,
+       DISABLED_AReasonNoConstantNamesIsRefusedBesideAPredefinedOne) {
+  s_cb_data unknown = {};
+  unknown.reason = 9999;
+  unknown.cb_rtn = &RecordingCb;
+  vpiHandle refused = vpi_register_cb(&unknown);
+  const PLI_INT32 kLevel = vpi_chk_error(nullptr);
+  EXPECT_EQ(refused, nullptr);
+  EXPECT_EQ(kLevel, vpiError);
+  s_cb_data known = unknown;
+  known.reason = cbEndOfSimulation;
+  EXPECT_NE(vpi_register_cb(&known), nullptr);
+}
+
 TEST_F(VpiCallbackSim, RegisterCbStoresCbRtn) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;

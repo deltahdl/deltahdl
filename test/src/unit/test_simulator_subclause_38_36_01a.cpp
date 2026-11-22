@@ -6,6 +6,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "common/types.h"
 #include "helpers_event_callbacks.h"
 #include "parser/ast_stmt.h"
 #include "simulator/net.h"
@@ -147,6 +148,7 @@ int g_delivered_reason = 0;
 s_vpi_time* g_delivered_time = nullptr;
 s_vpi_value* g_delivered_value = nullptr;
 void* g_delivered_user_data = nullptr;
+PLI_INT32 g_delivered_integer = 0;
 VpiHandle g_delivered_obj = nullptr;
 
 int RecordDelivery(s_cb_data* data) {
@@ -157,6 +159,7 @@ int RecordDelivery(s_cb_data* data) {
     g_delivered_time = data->time;
     g_delivered_value = data->value;
     g_delivered_user_data = data->user_data;
+    if (data->value) g_delivered_integer = data->value->value.integer;
     g_delivered_obj = VpiObjectOf(data->obj);
   }
   return 0;
@@ -171,6 +174,7 @@ class VpiSimEventCbDelivery : public ::testing::Test {
     g_delivered_time = nullptr;
     g_delivered_value = nullptr;
     g_delivered_user_data = nullptr;
+    g_delivered_integer = 0;
     g_delivered_obj = nullptr;
     watched_.type = vpiReg;
     SetGlobalVpiContext(&vpi_ctx_);
@@ -271,22 +275,39 @@ TEST_F(VpiSimEventCbDelivery, ForceCallbackDeliversForceStatementHandle) {
   EXPECT_EQ(g_delivered_obj, &force_stmt);
 }
 
-TEST_F(VpiSimEventCbDelivery, AForceWithNoStatementObjectStillCallsBack) {
-  s_vpi_value value = {};
-  value.format = vpiIntVal;
-  value.value.integer = 7;
+void RegisterForceOnEveryForce(s_vpi_value* value) {
+  value->format = vpiIntVal;
+  value->value.integer = 7;
   s_cb_data cb = {};
   cb.reason = cbForce;
   cb.cb_rtn = &RecordDelivery;
-  cb.value = &value;
+  cb.value = value;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
+}
+
+TEST_F(VpiSimEventCbDelivery, AForceWithNoStatementObjectStillCallsBack) {
+  s_vpi_value value = {};
+  RegisterForceOnEveryForce(&value);
 
   Variable forced{};
   vpi_ctx_.NoteForce(cbForce, &forced, nullptr, "");
 
   EXPECT_EQ(g_deliver_calls, 1);
   EXPECT_EQ(g_delivered_obj, nullptr);
-  EXPECT_EQ(g_delivered_value, &value);
+}
+
+TEST_F(VpiSimEventCbDelivery,
+       DISABLED_AForceWithNoStatementObjectDeliversTheSimulatorsValue) {
+  s_vpi_value value = {};
+  RegisterForceOnEveryForce(&value);
+
+  Variable* forced = sim_ctx_.CreateVariable("forced", 8);
+  forced->value = MakeLogic4VecVal(arena_, 8, 42);
+  vpi_ctx_.NoteForce(cbForce, forced, nullptr, "");
+
+  EXPECT_EQ(g_deliver_calls, 1);
+  EXPECT_NE(g_delivered_value, &value);
+  EXPECT_EQ(g_delivered_integer, 42);
   EXPECT_EQ(value.value.integer, 7);
 }
 

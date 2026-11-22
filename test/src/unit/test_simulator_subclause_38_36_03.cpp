@@ -410,6 +410,51 @@ TEST_F(VpiLifetimeCallbacksInARun, TheEndOfSimulationActionOccursAfterAFinish) {
   EXPECT_EQ(g_action_order.back(), cbEndOfSimulation);
 }
 
+struct LifetimeRegistration {
+  s_cb_data data;
+  s_vpi_time time;
+  s_vpi_value value;
+};
+
+LifetimeRegistration g_lifetime[3];
+std::vector<bool> g_lifetime_borrowed;
+
+int RecordBorrowedStructures(s_cb_data* data) {
+  for (const LifetimeRegistration& kept : g_lifetime) {
+    if (kept.data.reason != data->reason) continue;
+    g_lifetime_borrowed.push_back(data == &kept.data ||
+                                  data->time == &kept.time ||
+                                  data->value == &kept.value);
+  }
+  return 0;
+}
+
+TEST_F(VpiLifetimeCallbacksInARun,
+       DISABLED_EachLifetimeActionIsPassedTheSimulatorsStructures) {
+  g_lifetime_borrowed.clear();
+  const int kReasons[] = {cbEndOfCompile, cbStartOfSimulation,
+                          cbEndOfSimulation};
+  for (int i = 0; i < 3; ++i) {
+    LifetimeRegistration& kept = g_lifetime[i];
+    kept = {};
+    kept.time.type = vpiSimTime;
+    kept.value.format = vpiIntVal;
+    kept.data.reason = kReasons[i];
+    kept.data.cb_rtn = &RecordBorrowedStructures;
+    kept.data.time = &kept.time;
+    kept.data.value = &kept.value;
+    ASSERT_NE(vpi_register_cb(&kept.data), nullptr);
+  }
+
+  SimFixture f;
+  auto* design = ElaborateSrc("module t; int r; initial r = 1; endmodule\n", f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.scheduler.EndSimulation();
+
+  EXPECT_EQ(g_lifetime_borrowed, (std::vector<bool>{false, false, false}));
+}
+
 std::vector<std::string>& UnresolvedNames() {
   static std::vector<std::string> names;
   return names;
