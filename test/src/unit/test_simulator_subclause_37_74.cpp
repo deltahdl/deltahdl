@@ -446,20 +446,10 @@ TEST_F(ForLoopsOfARun, AForInEachPlaceIsAForObject) {
       "  task tk; for (i = 0; i < 2; i++) ; endtask\n"
       "  function void fn; for (i = 0; i < 2; i++) ; endfunction\n"
       "endmodule\n");
-  vpiHandle top = By("top");
-  const std::vector<vpiHandle> kInterface = ObjectsOf(vpiProcess, By("top.i0"));
-  const std::vector<vpiHandle> kProgram = ObjectsOf(vpiProcess, By("top.p0"));
-  ASSERT_EQ(kInterface.size(), 1U);
-  ASSERT_EQ(kProgram.size(), 1U);
-  const std::vector<std::pair<const char*, vpiHandle>> kOwners{
-      {"package task", Named(vpiTask, By("pk"), "pt")},
-      {"interface initial", kInterface[0]},
-      {"program initial", kProgram[0]},
-      {"class method", Named(vpiMethods, Named(vpiClassDefn, top, "C"), "cm")},
-      {"module task", Named(vpiTask, top, "tk")},
-      {"module function", Named(vpiFunction, top, "fn")},
-  };
-  for (const auto& [where, owner] : kOwners) {
+  std::vector<std::pair<const char*, vpiHandle>> owners =
+      OwnersInEachPlace("cm");
+  owners.emplace_back("module function", Named(vpiFunction, By("top"), "fn"));
+  for (const auto& [where, owner] : owners) {
     ASSERT_NE(owner, nullptr) << where;
     vpiHandle loop = vpi_handle(vpiStmt, owner);
     ASSERT_NE(loop, nullptr) << where;

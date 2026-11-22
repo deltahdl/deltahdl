@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "elaborator/rtlir.h"
@@ -138,6 +139,24 @@ class VpiDesignRun : public ::testing::Test {
 
   static vpiHandle By(const std::string& name) {
     return vpi_handle_by_name(VpiText(name.c_str()), nullptr);
+  }
+
+  static vpiHandle SoleProcessOf(const std::string& instance) {
+    const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By(instance));
+    return kProcs.size() == 1 ? kProcs[0] : nullptr;
+  }
+
+  static std::vector<std::pair<const char*, vpiHandle>> OwnersInEachPlace(
+      std::string_view method) {
+    vpiHandle top = By("top");
+    return {
+        {"package task", Named(vpiTask, By("pk"), "pt")},
+        {"interface initial", SoleProcessOf("top.i0")},
+        {"program initial", SoleProcessOf("top.p0")},
+        {"class method",
+         Named(vpiMethods, Named(vpiClassDefn, top, "C"), method)},
+        {"module task", Named(vpiTask, top, "tk")},
+    };
   }
 
   static std::vector<int> KindsOf(int type, vpiHandle ref) {

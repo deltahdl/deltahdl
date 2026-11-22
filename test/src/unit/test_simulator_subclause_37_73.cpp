@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -285,19 +284,7 @@ TEST_F(ExpectsOfARun, AnExpectInEachPlaceReachesItsSpecAndActions) {
       "$write(\"f\");\n"
       "  endtask\n"
       "endmodule\n");
-  vpiHandle top = By("top");
-  const std::vector<vpiHandle> kInterface = ObjectsOf(vpiProcess, By("top.i0"));
-  const std::vector<vpiHandle> kProgram = ObjectsOf(vpiProcess, By("top.p0"));
-  ASSERT_EQ(kInterface.size(), 1U);
-  ASSERT_EQ(kProgram.size(), 1U);
-  const std::vector<std::pair<const char*, vpiHandle>> kOwners{
-      {"package task", Named(vpiTask, By("pk"), "pt")},
-      {"interface initial", kInterface[0]},
-      {"program initial", kProgram[0]},
-      {"class method", Named(vpiMethods, Named(vpiClassDefn, top, "C"), "ct")},
-      {"module task", Named(vpiTask, top, "tk")},
-  };
-  for (const auto& [where, owner] : kOwners) {
+  for (const auto& [where, owner] : OwnersInEachPlace("ct")) {
     ASSERT_NE(owner, nullptr) << where;
     vpiHandle expect = vpi_handle(vpiStmt, owner);
     ASSERT_NE(expect, nullptr) << where;
