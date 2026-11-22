@@ -73,8 +73,9 @@ inline RtlirDesign* Elaborate(const std::string& src, ElabFixture& f,
   return ElaborateSrc(src, f, top);
 }
 
-inline CompilationUnit* PreprocessAndParseCu(ElabFixture& f, uint32_t fid,
-                                             Preprocessor& preproc) {
+template <typename Fixture>
+CompilationUnit* PreprocessAndParseCu(Fixture& f, uint32_t fid,
+                                      Preprocessor& preproc) {
   auto pp = preproc.Preprocess(fid);
   auto pp_fid =
       f.mgr.AddPreprocessedFile("<preprocessed>", pp, preproc.LineOrigins());
