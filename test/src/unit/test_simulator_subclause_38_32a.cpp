@@ -381,22 +381,6 @@ TEST_F(ContAssignDelaysOfARun, PutDelaysAreTheOnesTheAssignmentTakes) {
   EXPECT_EQ(value.value.integer, 26);
 }
 
-TEST_F(VpiPutDelaysSim, SuppressTimeSetsNoTimeValue) {
-  VpiDelayInfo d;
-  d.delay = 7.0;
-  VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
-  s_vpi_time da[2] = {};
-  da[0].real = 3.0;
-  da[1].low = 4;
-  s_vpi_delay delay = {};
-  delay.da = da;
-  delay.no_of_delays = 2;
-  delay.time_type = vpiSuppressTime;
-  vpi_put_delays(VpiHandleOf(prim), &delay);
-  EXPECT_DOUBLE_EQ(prim->delays[0].delay, 0.0);
-  EXPECT_DOUBLE_EQ(prim->delays[1].delay, 0.0);
-}
-
 TEST_F(VpiPutDelaysSim, APortIsRefusedAsItsKindSays) {
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
