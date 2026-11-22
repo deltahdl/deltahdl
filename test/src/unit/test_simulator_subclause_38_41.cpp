@@ -3,10 +3,12 @@
 #include <cstdarg>
 #include <cstdio>
 #include <string>
+#include <type_traits>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_run_files.h"
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/vpi_context.h"
@@ -17,7 +19,7 @@ namespace delta {
 namespace {
 
 PLI_INT32 CallWithStartedVarargs(const char* format, ...) {
-  va_list ap;
+  va_list ap{};
   va_start(ap, format);
   PLI_INT32 written = vpi_vprintf(const_cast<PLI_BYTE8*>(format), ap);
   va_end(ap);
@@ -86,6 +88,50 @@ TEST_F(VpiVprintfSim, ReturnsTheLengthOfTheExpansionRatherThanOfTheFormat) {
   EXPECT_NE(written, static_cast<PLI_INT32>(std::string("n=%d").size()));
   EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
   EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
+}
+
+TEST(VpiVprintfSignature, TakesAFormatAndAStartedListAndReturnsAPliInt32) {
+  static_assert(
+      std::is_same_v<decltype(vpi_vprintf), PLI_INT32(PLI_BYTE8*, va_list)>);
+  EXPECT_EQ(CallWithStartedVarargs(nullptr), EOF);
+}
+
+TEST_F(VpiVprintfSim, EveryCPrintfConversionExpandsAsCPrintfWould) {
+  const char* const kFormat = "%x|%c|%.2f|%%|%5d|%-3s|%ld|%08.3e|%o|%u";
+  PLI_INT32 written = CallWithStartedVarargs(
+      kFormat, 255, 'A', 3.14159, 42, "ab", 123456789L, 1234.5, 8, 4000000000U);
+
+  char expected[128];
+  const int kLength =
+      std::snprintf(expected, sizeof(expected), kFormat, 255, 'A', 3.14159, 42,
+                    "ab", 123456789L, 1234.5, 8, 4000000000U);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), expected);
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), expected);
+  EXPECT_EQ(written, kLength);
+}
+
+class VprintfInARun : public RunFilesRun {
+ protected:
+  static PLI_INT32 WriteThroughAStartedList(PLI_BYTE8*) {
+    CallWithStartedVarargs("vprinted %d of %s\n", 3, "four");
+    return 0;
+  }
+};
+
+TEST_F(VprintfInARun, TheTextReachesTheOutputChannelAndTheCurrentLogFile) {
+  RegisterTask("$vprint", &WriteThroughAStartedList);
+  vpi_.ConnectOutputChannel(&f_.ctx.Log().Out());
+  testing::internal::CaptureStdout();
+  Run("module top; initial begin\n"
+      "  $log(\"vprintf.log\");\n"
+      "  $display(\"first\");\n"
+      "  $vprint;\n"
+      "  $display(\"last\");\n"
+      "end endmodule\n");
+  vpi_.ConnectOutputChannel(nullptr);
+  const std::string kExpected = "first\nvprinted 3 of four\nlast\n";
+  EXPECT_EQ(testing::internal::GetCapturedStdout(), kExpected);
+  EXPECT_EQ(FileText("vprintf.log"), kExpected);
 }
 
 }  // namespace
