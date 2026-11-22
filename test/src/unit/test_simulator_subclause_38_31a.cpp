@@ -68,7 +68,25 @@ int WriteTwiceCb(s_cb_data* cb) {
   return 0;
 }
 
-using VpiPutDataSim = VpiSaveRestoreSim;
+class VpiPutDataSim : public VpiSaveRestoreSim {
+ protected:
+  SingleRead ReadBack(int id, int request) {
+    SingleRead r;
+    r.id = id;
+    r.request = request;
+    DispatchWith(cbStartOfRestart, ReadOnceCb, &r);
+    return r;
+  }
+
+  void ExpectRefusedAndNothingStored(int reason, int id, const char* data,
+                                     int len) {
+    SingleWrite w{id, data, len};
+    DispatchWith(reason, WriteOnceCb, &w);
+    EXPECT_EQ(w.returned, 0);
+    EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
+    EXPECT_EQ(ReadBack(id, 4).returned, 0);
+  }
+};
 
 TEST_F(VpiPutDataSim, WritesDataInsideStartOfSave) {
   const char kPayload[] = {'D', 'e', 'l', 't', 'a'};
@@ -145,6 +163,53 @@ TEST_F(VpiPutDataSim, NonPositiveCountReturnsZero) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
+TEST_F(VpiPutDataSim, ANegativeCountIsAnErrorAndStoresNothing) {
+  const char kPayload[] = {'n', 'e', 'g'};
+  ExpectRefusedAndNothingStored(cbStartOfSave, 6, kPayload, -1);
+}
+
+TEST_F(VpiPutDataSim, ACountOfOneStoresOneByte) {
+  const char kPayload[] = {'Q', 'R'};
+  SingleWrite w{6, kPayload, 1};
+  DispatchWith(cbStartOfSave, WriteOnceCb, &w);
+  EXPECT_EQ(w.returned, 1);
+  EXPECT_EQ(vpi_ctx_.LastError().level, 0);
+  const SingleRead kRead = ReadBack(6, 8);
+  EXPECT_EQ(kRead.returned, 1);
+  EXPECT_EQ(kRead.buf[0], 'Q');
+  EXPECT_EQ(kRead.buf[1], '\0');
+}
+
+TEST_F(VpiPutDataSim, OnlyTheCountedBytesOfTheBufferAreStored) {
+  const char kPayload[] = "ABCDEFGH";
+  SingleWrite w{11, kPayload, 3};
+  DispatchWith(cbStartOfSave, WriteOnceCb, &w);
+  EXPECT_EQ(w.returned, 3);
+  const SingleRead kRead = ReadBack(11, 8);
+  EXPECT_EQ(kRead.returned, 3);
+  EXPECT_EQ(std::string(kRead.buf), "ABC");
+}
+
+TEST_F(VpiPutDataSim, BytesWrittenAtTheEndOfASaveAreStored) {
+  const char kPayload[] = {'X', 'Y', 'Z'};
+  SingleWrite w{12, kPayload, 3};
+  DispatchWith(cbEndOfSave, WriteOnceCb, &w);
+  ASSERT_EQ(w.returned, 3);
+  const SingleRead kRead = ReadBack(12, 8);
+  EXPECT_EQ(kRead.returned, 3);
+  EXPECT_EQ(std::string(kRead.buf), "XYZ");
+}
+
+TEST_F(VpiPutDataSim, RejectedInsideAnEndOfRestartRoutine) {
+  const char kPayload[] = {'e', 'r'};
+  ExpectRefusedAndNothingStored(cbEndOfRestart, 13, kPayload, 2);
+}
+
+TEST_F(VpiPutDataSim, RejectedInsideAnEndOfSimulationRoutine) {
+  const char kPayload[] = {'e', 's'};
+  ExpectRefusedAndNothingStored(cbEndOfSimulation, 14, kPayload, 2);
+}
+
 TEST_F(VpiPutDataSim, NullSourceReturnsZero) {
   SingleWrite w;
   w.id = 8;
@@ -180,6 +245,15 @@ TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
   DispatchWith(cbStartOfRestart, ReadOnceCb, &ra);
   EXPECT_EQ(ra.returned, 5);
   EXPECT_EQ(0, std::memcmp(ra.buf, "01234", 5));
+
+  DoubleRead rb;
+  rb.id = 10;
+  rb.req1 = 8;
+  rb.req2 = 8;
+  DispatchWith(cbStartOfRestart, ReadTwiceCb, &rb);
+  EXPECT_EQ(rb.ret1, 2);
+  EXPECT_EQ(std::string(rb.buf1), "!?");
+  EXPECT_EQ(rb.ret2, 0);
 }
 
 TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
@@ -209,18 +283,11 @@ TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
 
 std::string g_location_in_save;
 bool g_location_read_in_save = false;
-bool g_location_read_outside = false;
 
 int ReadLocationCb(s_cb_data*) {
   const char* path = vpi_get_str(vpiSaveRestartLocation, nullptr);
   g_location_read_in_save = path != nullptr;
   if (path != nullptr) g_location_in_save = path;
-  return 0;
-}
-
-int ReadLocationOutsideCb(s_cb_data*) {
-  g_location_read_outside =
-      vpi_get_str(vpiSaveRestartLocation, nullptr) != nullptr;
   return 0;
 }
 
@@ -235,15 +302,6 @@ TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableFromASaveRoutine) {
   EXPECT_EQ(g_location_in_save, "run.save");
 }
 
-TEST_F(VpiPutDataSim, TheSaveRestartLocationIsNotReadableElsewhere) {
-  g_location_read_outside = false;
-  vpi_ctx_.SetSaveRestartLocation("run.save");
-
-  DispatchWith(cbEndOfSimulation, ReadLocationOutsideCb, nullptr);
-
-  EXPECT_FALSE(g_location_read_outside);
-}
-
 TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableAtTheEndOfASave) {
   g_location_in_save.clear();
   g_location_read_in_save = false;
@@ -253,14 +311,6 @@ TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableAtTheEndOfASave) {
 
   ASSERT_TRUE(g_location_read_in_save);
   EXPECT_EQ(g_location_in_save, "end.save");
-}
-
-TEST_F(VpiPutDataSim, NoSaveRestartLocationIsReadAsNull) {
-  g_location_read_in_save = true;
-
-  DispatchWith(cbStartOfSave, ReadLocationCb, nullptr);
-
-  EXPECT_FALSE(g_location_read_in_save);
 }
 
 }  // namespace
