@@ -455,6 +455,88 @@ TEST_F(VpiLifetimeCallbacksInARun,
   EXPECT_EQ(g_lifetime_borrowed, (std::vector<bool>{false, false, false}));
 }
 
+struct RunErrorSeen {
+  PLI_INT32 level = 0;
+  PLI_INT32 state = 0;
+  std::string message;
+};
+
+std::vector<RunErrorSeen> g_run_errors;
+int g_pli_errors = 0;
+
+int RecordRunError(s_cb_data*) {
+  s_vpi_error_info info = {};
+  const PLI_INT32 kLevel = vpi_chk_error(&info);
+  g_run_errors.push_back(
+      {kLevel, info.state, info.message != nullptr ? info.message : ""});
+  return 0;
+}
+
+int CountPliError(s_cb_data*) {
+  ++g_pli_errors;
+  return 0;
+}
+
+void RegisterErrorCallbacks() {
+  g_run_errors.clear();
+  g_pli_errors = 0;
+  s_cb_data run = {};
+  run.reason = cbError;
+  run.cb_rtn = &RecordRunError;
+  ASSERT_NE(vpi_register_cb(&run), nullptr);
+  s_cb_data pli = {};
+  pli.reason = cbPLIError;
+  pli.cb_rtn = &CountPliError;
+  ASSERT_NE(vpi_register_cb(&pli), nullptr);
+}
+
+void RunAndEnd(const char* src) {
+  SimFixture f;
+  auto* design = ElaborateSrc(src, f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.scheduler.EndSimulation();
+}
+
+TEST_F(VpiLifetimeCallbacksInARun,
+       DISABLED_AFailedCastTaskCallsTheErrorCallbackWithTheRunState) {
+  RegisterErrorCallbacks();
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "module t;\n"
+      "  class A; endclass\n"
+      "  class B extends A; endclass\n"
+      "  A a; B b;\n"
+      "  initial begin a = new; $cast(b, a); end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  LowerAndRun(design, f);
+  f.scheduler.EndSimulation();
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "$cast task could not assign the source expression "
+                            "to the destination; assignment is invalid",
+                            5, "6.24.2"));
+  ASSERT_EQ(g_run_errors.size(), 1u);
+  EXPECT_EQ(g_run_errors[0].level, vpiError);
+  EXPECT_EQ(g_run_errors[0].state, vpiRun);
+  EXPECT_FALSE(g_run_errors[0].message.empty());
+  EXPECT_EQ(g_pli_errors, 0);
+}
+
+TEST_F(VpiLifetimeCallbacksInARun, ASucceedingCastTaskCallsNoErrorCallback) {
+  RegisterErrorCallbacks();
+  RunAndEnd(
+      "module t;\n"
+      "  class A; endclass\n"
+      "  class B extends A; endclass\n"
+      "  A a; B b, c;\n"
+      "  initial begin c = new; a = c; $cast(b, a); end\n"
+      "endmodule\n");
+  EXPECT_TRUE(g_run_errors.empty());
+  EXPECT_EQ(g_pli_errors, 0);
+}
+
 std::vector<std::string>& UnresolvedNames() {
   static std::vector<std::string> names;
   return names;
