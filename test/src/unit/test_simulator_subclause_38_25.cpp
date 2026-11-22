@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -78,6 +81,24 @@ TEST_F(VpiMcdFlushSim, OnlyChannelsNamedByDescriptorAreFlushed) {
   EXPECT_EQ(vpi_ctx_.McdChannelFlushed(mcd_b), "");
 }
 
+TEST_F(VpiMcdFlushSim, ChannelOneAndAUserChannelAreFlushedInOneCall) {
+  char name[] = "user.log";
+  PLI_UINT32 mcd = vpi_mcd_open(name);
+  ASSERT_NE(mcd, 0u);
+  char to_tool[] = "tool\n";
+  char to_user[] = "user\n";
+  ASSERT_EQ(vpi_mcd_printf(1, to_tool), 5);
+  ASSERT_EQ(vpi_mcd_printf(mcd, to_user), 5);
+
+  EXPECT_EQ(vpi_mcd_flush(1 | mcd), 0);
+  EXPECT_EQ(vpi_ctx_.OutputChannelFlushed(), "tool\n");
+  EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "tool\n");
+  EXPECT_EQ(vpi_ctx_.McdChannelFlushed(mcd), "user\n");
+  EXPECT_TRUE(vpi_ctx_.OutputChannelBuffer().empty());
+  EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
+}
+
 TEST_F(VpiMcdFlushSim, FlushingDescriptorWithNoPendingOutputSucceeds) {
   char name[] = "quiet.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -127,11 +148,37 @@ TEST_F(VpiMcdFlushSim, AToolFlushFailureIsReportedForChannelOne) {
 }
 
 PLI_INT32 run_flush_result = 1;
+std::string text_after_flush;
+std::string vpi_text_after_flush;
+
+std::string TextNow(const char* name) {
+  std::ifstream file(name);
+  std::stringstream text;
+  text << file.rdbuf();
+  return text.str();
+}
 
 class FlushOfAFopenedFile : public RunFilesRun {
  protected:
+  void SetUp() override {
+    RunFilesRun::SetUp();
+    run_flush_result = 1;
+    text_after_flush.clear();
+    vpi_text_after_flush.clear();
+  }
+
   static PLI_INT32 FlushIt(PLI_BYTE8*) {
     run_flush_result = vpi_mcd_flush(DescriptorIn("top.mcd"));
+    text_after_flush = TextNow("mcd.txt");
+    return 0;
+  }
+
+  static PLI_INT32 FlushWithChannelOne(PLI_BYTE8*) {
+    const PLI_UINT32 kMcd = vpi_mcd_open(VpiText("v.txt"));
+    vpi_mcd_printf(kMcd, VpiText("user"));
+    vpi_mcd_printf(1u, VpiText("tool\n"));
+    run_flush_result = vpi_mcd_flush(1u | kMcd);
+    vpi_text_after_flush = TextNow("v.txt");
     return 0;
   }
 };
@@ -146,7 +193,18 @@ TEST_F(FlushOfAFopenedFile, ItsTextIsInTheFile) {
       "  end\n"
       "endmodule\n");
   EXPECT_EQ(run_flush_result, 0);
+  EXPECT_EQ(text_after_flush, "before");
   EXPECT_EQ(FileText("mcd.txt"), "before");
+}
+
+TEST_F(FlushOfAFopenedFile, ChannelOneAndAUserChannelAreFlushedInOneCall) {
+  RegisterTask("$flush_both", &FlushWithChannelOne);
+  Run("module top; initial $flush_both; endmodule\n");
+  EXPECT_EQ(run_flush_result, 0);
+  EXPECT_EQ(vpi_text_after_flush, "user");
+  EXPECT_TRUE(vpi_.OutputChannelBuffer().empty());
+  EXPECT_TRUE(vpi_.LogFileBuffer().empty());
+  EXPECT_NE(vpi_.OutputChannelFlushed().find("tool"), std::string::npos);
 }
 
 PLI_INT32 unopened_flush_result = 1;
