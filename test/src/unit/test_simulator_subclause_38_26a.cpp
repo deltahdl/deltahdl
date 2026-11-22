@@ -55,6 +55,15 @@ TEST_F(VpiMcdNameSim, ReturnsNullOnError) {
   EXPECT_EQ(vpi_mcd_name(0x00000008u), nullptr);
 }
 
+TEST_F(VpiMcdNameSim, AFileClosedByVpiMcdCloseIsNamedNothing) {
+  char name[] = "closed.log";
+  const PLI_UINT32 kMcd = vpi_mcd_open(name);
+  ASSERT_NE(kMcd, 0u);
+  ASSERT_STREQ(vpi_mcd_name(kMcd), "closed.log");
+  ASSERT_EQ(vpi_mcd_close(kMcd), 0u);
+  EXPECT_EQ(vpi_mcd_name(kMcd), nullptr);
+}
+
 TEST_F(VpiMcdNameSim, OverwritesReturnedValueOnSubsequentCalls) {
   char a[] = "alpha.log";
   char b[] = "bravo.log";
