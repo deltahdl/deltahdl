@@ -57,6 +57,33 @@ TEST_F(VpiMcdPrintfSim, ChannelOneAndAFileEachReceiveTheTextOnce) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd), "once\n");
 }
 
+TEST_F(VpiMcdPrintfSim, OtherConversionsExpandLikeFprintf) {
+  const PLI_UINT32 kMcd = vpi_mcd_open(VpiText("conv.log"));
+  ASSERT_NE(kMcd, 0u);
+  EXPECT_EQ(vpi_mcd_printf(kMcd, VpiText("%f|%e|%g|%c|%x|%o|%%"), 2.5, 2.5,
+                           0.0001, 'z', 255, 8),
+            38);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd),
+            "2.500000|2.500000e+00|0.0001|z|ff|10|%");
+}
+
+TEST_F(VpiMcdPrintfSim, WidthPrecisionAndFlagsExpandLikeFprintf) {
+  const PLI_UINT32 kMcd = vpi_mcd_open(VpiText("spec.log"));
+  ASSERT_NE(kMcd, 0u);
+  EXPECT_EQ(vpi_mcd_printf(kMcd, VpiText("[%5d][%-5s][%.3f][%08x][%+d][%*d]"),
+                           42, "ab", 2.5, 0xbeef, -7, 4, 9),
+            41);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd),
+            "[   42][ab   ][2.500][0000beef][-7][   9]");
+}
+
+TEST_F(VpiMcdPrintfSim, AnEmptyFormatWritesNothingAndReturnsZero) {
+  const PLI_UINT32 kMcd = vpi_mcd_open(VpiText("empty.log"));
+  ASSERT_NE(kMcd, 0u);
+  EXPECT_EQ(vpi_mcd_printf(kMcd, VpiText("")), 0);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd), "");
+}
+
 TEST_F(VpiMcdPrintfSim, TheHighestChannelReceivesTheText) {
   PLI_UINT32 last = 0;
   for (int i = 0; i < 30; ++i) {

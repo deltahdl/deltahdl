@@ -16,8 +16,17 @@ namespace delta {
 namespace {
 
 PLI_INT32 CallWithStartedVarargs(PLI_UINT32 mcd, const char* format, ...) {
-  va_list ap;
+  va_list ap{};
   va_start(ap, format);
+  PLI_INT32 written = vpi_mcd_vprintf(mcd, const_cast<PLI_BYTE8*>(format), ap);
+  va_end(ap);
+  return written;
+}
+
+PLI_INT32 CallAfterTakingOneArgument(PLI_UINT32 mcd, const char* format, ...) {
+  va_list ap{};
+  va_start(ap, format);
+  static_cast<void>(va_arg(ap, int));
   PLI_INT32 written = vpi_mcd_vprintf(mcd, const_cast<PLI_BYTE8*>(format), ap);
   va_end(ap);
   return written;
@@ -47,6 +56,30 @@ TEST_F(VpiMcdVprintfSim,
 
   EXPECT_EQ(written, 5);
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "42-ok");
+}
+
+TEST_F(VpiMcdVprintfSim, ChannelOneReachesTheOutputChannelAndTheLog) {
+  EXPECT_EQ(CallWithStartedVarargs(1u, "one %d\n", 1), 6);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "one 1\n");
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), "one 1\n");
+}
+
+TEST_F(VpiMcdVprintfSim, ChannelOneAndAFileEachReceiveTheTextOnce) {
+  char name[] = "f.log";
+  const PLI_UINT32 kMcd = vpi_mcd_open(name);
+  ASSERT_NE(kMcd, 0u);
+  EXPECT_EQ(CallWithStartedVarargs(1u | kMcd, "both %d\n", 2), 7);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "both 2\n");
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), "both 2\n");
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd), "both 2\n");
+}
+
+TEST_F(VpiMcdVprintfSim, APartlyConsumedListFormatsFromItsCurrentPosition) {
+  char name[] = "p.log";
+  const PLI_UINT32 kMcd = vpi_mcd_open(name);
+  ASSERT_NE(kMcd, 0u);
+  EXPECT_EQ(CallAfterTakingOneArgument(kMcd, "%d-%d", 11, 22, 33), 5);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd), "22-33");
 }
 
 TEST_F(VpiMcdVprintfSim, WritesToEveryChannelNamedByTheDescriptor) {
