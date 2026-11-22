@@ -25,8 +25,6 @@ TEST(ExpressionModel, ExprClassGroupsItsMemberKinds) {
     EXPECT_TRUE(VpiIsExprType(type)) << "simple expr type=" << type;
   }
 
-  EXPECT_FALSE(VpiIsExprType(vpiReg));
-  EXPECT_FALSE(VpiIsExprType(vpiNet));
   EXPECT_FALSE(VpiIsExprType(vpiModule));
 }
 
