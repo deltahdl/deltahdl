@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <type_traits>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -25,6 +27,12 @@ class VpiReleaseHandleSim : public ::testing::Test {
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
 };
+
+TEST(VpiReleaseHandleSignature, TakesAHandleAndReturnsAPliInt32) {
+  static_assert(
+      std::is_same_v<decltype(vpi_release_handle), PLI_INT32(vpiHandle)>);
+  EXPECT_EQ(vpi_release_handle(nullptr), 0);
+}
 
 TEST_F(VpiReleaseHandleSim, ReleasesAValidHandleAndReportsSuccess) {
   VpiObject obj;
