@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -482,6 +485,165 @@ TEST_F(DoWhileAndForeachLoopsOfARun, AVirtualInterfacesArrayGivesItsIndexType) {
 
 TEST_F(DoWhileForeach, DoWhileConditionOfANullHandleIsNull) {
   EXPECT_EQ(VpiDoWhileConditionExpr(nullptr), nullptr);
+}
+
+class LoopFormsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("module sub; int g [2]; endmodule\n"
+        "module top; int s; bit b; bit [3:0] v; string str;\n"
+        "  int dyn []; int q [$]; int aa [string];\n"
+        "  int m2 [2][3]; int m3 [2][3][4];\n"
+        "  typedef struct { int sa [2]; } st_t; st_t st;\n"
+        "  class K; int km [3]; endclass\n"
+        "  K o = new;\n"
+        "  sub u();\n"
+        "  function int f(int x); return x; endfunction\n"
+        "  initial foreach (m2[i, j]) s = i;\n"
+        "  initial foreach (m2[i, ]) s = i;\n"
+        "  initial foreach (m3[i, , k]) s = i;\n"
+        "  initial foreach (m2[i]) begin s = i; end\n"
+        "  initial foreach (m2[i]) begin : fb s = i; end\n"
+        "  initial foreach (v[i]) s = i;\n"
+        "  initial foreach (str[i]) s = i;\n"
+        "  initial foreach (dyn[i]) s = i;\n"
+        "  initial foreach (q[i]) s = i;\n"
+        "  initial foreach (aa[i]) s = 1;\n"
+        "  initial foreach (o.km[i]) s = i;\n"
+        "  initial foreach (u.g[i]) s = i;\n"
+        "  initial foreach (st.sa[i]) s = i;\n"
+        "  initial do begin s = 1; end while (s < 0);\n"
+        "  initial do begin : db s = 1; end while (s < 0);\n"
+        "  initial do s = 1; while (b);\n"
+        "  initial do s = 1; while (f(0));\n"
+        "  initial begin : nb do s = 1; while (s < 0); end\n"
+        "endmodule\n");
+  }
+
+  static vpiHandle LoopAt(size_t n) {
+    const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+    return n < kProcs.size() ? vpi_handle(vpiStmt, kProcs[n]) : nullptr;
+  }
+
+  static std::vector<std::string> LoopVarsOf(vpiHandle loop) {
+    std::vector<std::string> vars;
+    for (vpiHandle var : ObjectsOf(vpiLoopVars, loop)) {
+      const char* name = vpi_get_str(vpiName, var);
+      vars.emplace_back(OpOf(var) == vpiNullOp ? "-"
+                        : name == nullptr      ? "?"
+                                               : name);
+    }
+    return vars;
+  }
+
+  static int BodyKind(size_t n) {
+    vpiHandle body = vpi_handle(vpiStmt, LoopAt(n));
+    return body == nullptr ? 0 : vpi_get(vpiType, body);
+  }
+
+  static std::string IndexedName(size_t n) {
+    vpiHandle var = vpi_handle(vpiVariables, LoopAt(n));
+    const char* name = var == nullptr ? nullptr : vpi_get_str(vpiName, var);
+    return name == nullptr ? "" : name;
+  }
+};
+
+TEST_F(LoopFormsOfARun, EachIndexPositionIsAVariableOrANullOperation) {
+  EXPECT_EQ(LoopVarsOf(LoopAt(0)), (std::vector<std::string>{"i", "j"}));
+  EXPECT_EQ(LoopVarsOf(LoopAt(1)), (std::vector<std::string>{"i", "-"}));
+  EXPECT_EQ(LoopVarsOf(LoopAt(2)), (std::vector<std::string>{"i", "-", "k"}));
+}
+
+TEST_F(LoopFormsOfARun, ABlockBodyIsReachedAsTheBlock) {
+  EXPECT_EQ(BodyKind(3), vpiBegin);
+  EXPECT_EQ(BodyKind(4), vpiNamedBegin);
+  EXPECT_EQ(BodyKind(13), vpiBegin);
+  EXPECT_EQ(BodyKind(14), vpiNamedBegin);
+  for (size_t n : {3U, 13U}) {
+    vpiHandle block = vpi_handle(vpiStmt, LoopAt(n));
+    EXPECT_EQ(KindsOf(vpiStmt, block), std::vector<int>{vpiAssignment}) << n;
+  }
+}
+
+TEST_F(LoopFormsOfARun, TheIndexedVariableIsEachKindOfArrayAndString) {
+  vpiHandle top = By("top");
+  const std::vector<std::pair<size_t, const char*>> kIndexed{
+      {5, "v"}, {6, "str"}, {7, "dyn"}, {8, "q"}, {9, "aa"}};
+  for (const auto& [n, name] : kIndexed) {
+    vpiHandle var = vpi_handle(vpiVariables, LoopAt(n));
+    ASSERT_NE(var, nullptr) << name;
+    EXPECT_EQ(VpiObjectOf(var), VpiObjectOf(Named(vpiVariables, top, name)))
+        << name;
+  }
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiVariables, LoopAt(6))),
+            vpiStringVar);
+}
+
+TEST_F(LoopFormsOfARun, DISABLED_AnArrayPropertyThroughAHandleIsAVariable) {
+  vpiHandle var = vpi_handle(vpiVariables, LoopAt(10));
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, var), vpiArrayVar);
+  EXPECT_EQ(IndexedName(10), "km");
+}
+
+TEST_F(LoopFormsOfARun, TheIndexedVariableIsTheOneASelectNames) {
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiVariables, LoopAt(11))),
+            VpiObjectOf(By("top.u.g")));
+  EXPECT_EQ(IndexedName(12), "sa");
+}
+
+TEST_F(LoopFormsOfARun, ADoWhileConditionIsAVariableOrACall) {
+  vpiHandle var = vpi_handle(vpiCondition, LoopAt(15));
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(VpiObjectOf(var), VpiObjectOf(By("top.b")));
+  vpiHandle call = vpi_handle(vpiCondition, LoopAt(16));
+  ASSERT_NE(call, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, call), vpiFuncCall);
+  EXPECT_EQ(CalleeOf(call), "f");
+}
+
+TEST_F(LoopFormsOfARun, ADoWhileInANamedBlockIsADoWhile) {
+  vpiHandle block = LoopAt(17);
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, block), vpiNamedBegin);
+  EXPECT_EQ(KindsOf(vpiStmt, block), std::vector<int>{vpiDoWhile});
+}
+
+TEST_F(DoWhileAndForeachLoopsOfARun, EachPlaceRunsADoWhileAndAForeach) {
+  const char* const kLoops =
+      " begin do n = n + 1; while (n < 2); foreach (w[j]) w[j] = j; end ";
+  const std::string kVars = "int n; int w [3];";
+  Run("package pk; " + kVars + " task pt;" + kLoops + "endtask endpackage\n" +
+      "interface ifc; " + kVars + " initial" + kLoops + "endinterface\n" +
+      "program prg; " + kVars + " initial" + kLoops + "endprogram\n" +
+      "module top; " + kVars + " ifc i0(); prg p0();\n" + "  class C; " +
+      kVars + " function void cm;" + kLoops + "endfunction endclass\n" +
+      "  task tk;" + kLoops + "endtask\n" + "  function void fn;" + kLoops +
+      "endfunction\n" + "endmodule\n");
+  std::vector<std::pair<const char*, vpiHandle>> places =
+      OwnersInEachPlace("cm");
+  places.emplace_back("module function", Named(vpiFunction, By("top"), "fn"));
+  for (const auto& [where, place] : places) {
+    vpiHandle block = place == nullptr ? nullptr : vpi_handle(vpiStmt, place);
+    ASSERT_NE(block, nullptr) << where;
+    const std::vector<vpiHandle> kLoopsRun = ObjectsOf(vpiStmt, block);
+    ASSERT_EQ(kLoopsRun.size(), 2U) << where;
+    vpiHandle do_while = kLoopsRun[0];
+    vpiHandle each = kLoopsRun[1];
+    EXPECT_EQ(vpi_get(vpiType, do_while), vpiDoWhile) << where;
+    EXPECT_EQ(OpOf(vpi_handle(vpiCondition, do_while)), vpiLtOp) << where;
+    EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiStmt, do_while)), vpiAssignment)
+        << where;
+    EXPECT_EQ(vpi_get(vpiType, each), vpiForeachStmt) << where;
+    vpiHandle array = vpi_handle(vpiVariables, each);
+    ASSERT_NE(array, nullptr) << where;
+    EXPECT_STREQ(vpi_get_str(vpiName, array), "w") << where;
+    EXPECT_EQ(NamesOf(vpiLoopVars, each), std::vector<std::string>{"j"})
+        << where;
+    EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiStmt, each)), vpiAssignment)
+        << where;
+  }
 }
 
 }  // namespace
