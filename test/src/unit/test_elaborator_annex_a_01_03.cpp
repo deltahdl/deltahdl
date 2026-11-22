@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -128,6 +130,32 @@ TEST(ModuleParametersAndPorts, AVariablePortsUnfoldableDimensionIsReported) {
                             "unpacked dimension of port 'a' is not a constant "
                             "expression",
                             1, "7.4.2"));
+}
+
+TEST(ModuleParametersAndPorts, KeywordlessAssignmentsMayPrecedeALocalparam) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module child #(n = 3, localparam m = 1 << n);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  child #(4) u1();\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  const auto& children = design->top_modules[0]->children;
+  ASSERT_EQ(children.size(), 2u);
+  const int64_t kExpected[][2] = {{3, 8}, {4, 16}};
+  for (size_t i = 0; i < 2; ++i) {
+    const auto* inst = children[i].resolved;
+    ASSERT_NE(inst, nullptr);
+    ASSERT_EQ(inst->params.size(), 2u);
+    EXPECT_EQ(inst->params[0].name, "n");
+    EXPECT_EQ(inst->params[0].resolved_value, kExpected[i][0]) << i;
+    EXPECT_EQ(inst->params[1].name, "m");
+    EXPECT_EQ(inst->params[1].resolved_value, kExpected[i][1]) << i;
+  }
 }
 
 }  // namespace

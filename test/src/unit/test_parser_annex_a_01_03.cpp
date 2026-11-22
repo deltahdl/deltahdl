@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_reported_error.h"
@@ -587,6 +588,37 @@ TEST(ModuleParametersAndPorts, NonAnsiRefPortDeclaration) {
   EXPECT_TRUE(mod->is_non_ansi_ports);
   ASSERT_EQ(mod->ports.size(), 1u);
   EXPECT_EQ(mod->ports[0].direction, Direction::kRef);
+}
+
+TEST(ModuleParametersAndPorts, AnAnsiPortTakesOneDirection) {
+  struct Case {
+    const char* src;
+    const char* second;
+  };
+  const Case kCases[] = {
+      {"module m(input input wire a); endmodule\n", "input"},
+      {"module m(output input logic b); endmodule\n", "input"},
+      {"module m(input output var int c); endmodule\n", "output"},
+      {"module m(ref ref logic r); endmodule\n", "ref"},
+      {"module m(input wire a, output output logic b); endmodule\n", "output"},
+      {"interface i(input output wire a); endinterface\n", "output"},
+      {"program p(input input wire a); endprogram\n", "input"},
+  };
+  for (const auto& c : kCases) {
+    auto r = Parse(c.src);
+    EXPECT_TRUE(ReportedError(
+        r.diags, std::string("expected identifier, got '") + c.second + "'", 1,
+        "23.2.2.2"))
+        << c.src;
+  }
+}
+
+TEST(ModuleParametersAndPorts, ARefPortOfOneDirectionIsAccepted) {
+  auto r = Parse("module m(ref logic r); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.diags.empty());
+  ASSERT_EQ(r.cu->modules[0]->ports.size(), 1u);
+  EXPECT_EQ(r.cu->modules[0]->ports[0].direction, Direction::kRef);
 }
 
 }  // namespace

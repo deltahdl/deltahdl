@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_parser.h"
@@ -391,6 +392,87 @@ TEST(ProgramGenerateItem, AdmitsProgramItemsOnly) {
       "endprogram\n");
   EXPECT_TRUE(ReportedError(
       r.diags, "a defparam statement is not an item of a program", 3, "A.1.7"));
+}
+
+TEST(ProgramGenerateItem, AnAlwaysInACaseGenerateIsRefused) {
+  auto r = Parse(
+      "program p;\n"
+      "  logic clk, q;\n"
+      "  case (1)\n"
+      "    1: always @(posedge clk) q <= 1;\n"
+      "  endcase\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "always procedures not allowed in programs", 4, "24.3"));
+}
+
+TEST(ProgramGenerateItem, EveryAlwaysKindInAGenerateBlockIsRefused) {
+  for (const char* proc :
+       {"always_comb q = 1;", "always_ff @(posedge clk) q <= 1;",
+        "always_latch if (clk) q = 1;"}) {
+    auto r = Parse(std::string("program p;\n"
+                               "  logic clk, q;\n"
+                               "  if (1) begin : g\n"
+                               "    ") +
+                   proc +
+                   "\n"
+                   "  end\n"
+                   "endprogram\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags, "always procedures not allowed in programs", 4, "24.3"))
+        << proc;
+  }
+}
+
+TEST(ProgramGenerateItem, AGateInstanceInAGenerateBlockIsRefused) {
+  auto r = Parse(
+      "program p;\n"
+      "  wire a, b;\n"
+      "  if (1) begin : g\n"
+      "    not n1(a, b);\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "primitive instances not allowed in programs", 4, "24.3"));
+}
+
+TEST(ProgramGenerateItem, InterfaceAndProgramInstancesInAGenerateAreRefused) {
+  auto r = Parse(
+      "interface bus; endinterface\n"
+      "program q; endprogram\n"
+      "program p;\n"
+      "  if (1) begin : g\n"
+      "    bus b();\n"
+      "  end\n"
+      "  for (genvar i = 0; i < 1; i++) begin : h\n"
+      "    q u();\n"
+      "  end\n"
+      "endprogram\n");
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            5, "24.3"));
+  EXPECT_TRUE(ReportedError(r.diags, "instantiations not allowed in programs",
+                            8, "24.3"));
+}
+
+TEST(ProgramGenerateItem, ProgramItemsInAGenerateBlockAreAccepted) {
+  auto r = Parse(
+      "program p;\n"
+      "  if (1) begin : g\n"
+      "    logic v;\n"
+      "    wire w;\n"
+      "    assign w = 1;\n"
+      "    final v = 0;\n"
+      "  end\n"
+      "endprogram\n");
+  ASSERT_NE(r.cu, nullptr);
+  EXPECT_TRUE(r.diags.empty());
+  ASSERT_EQ(ProgItems(r).size(), 1u);
+  const auto* gen = ProgItems(r)[0];
+  ASSERT_EQ(gen->kind, ModuleItemKind::kGenerateIf);
+  EXPECT_TRUE(HasItemOfKind(gen->gen_body, ModuleItemKind::kVarDecl));
+  EXPECT_TRUE(HasItemOfKind(gen->gen_body, ModuleItemKind::kNetDecl));
+  EXPECT_TRUE(HasItemOfKind(gen->gen_body, ModuleItemKind::kContAssign));
+  EXPECT_TRUE(HasItemOfKind(gen->gen_body, ModuleItemKind::kFinalBlock));
 }
 
 }  // namespace

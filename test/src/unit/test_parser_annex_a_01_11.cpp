@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -512,6 +513,83 @@ TEST(PackageItemsParsing, ErrorBindGenerateRegionAndPortDeclInPackage) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
   EXPECT_TRUE(
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
+}
+
+TEST(PackageItemsParsing, ADpiExportDeclarationIsAPackageItem) {
+  auto r = Parse(
+      "package p;\n"
+      "  function void f; endfunction\n"
+      "  export \"DPI-C\" function f;\n"
+      "endpackage\n");
+  EXPECT_TRUE(r.diags.empty());
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->packages.size(), 1u);
+  EXPECT_TRUE(
+      HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kDpiExport));
+}
+
+TEST(PackageItemsParsing, AnInterfaceDeclarationIsNoPackageItem) {
+  auto r = Parse(
+      "package p;\n"
+      "  interface i; endinterface\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags,
+      "a module, interface or program declaration is not an item of a package",
+      2, "A.1.11"));
+}
+
+TEST(PackageItemsParsing, DISABLED_APrimitiveDeclarationIsNoPackageItem) {
+  auto r = Parse(
+      "package p;\n"
+      "  primitive u(output o, input a);\n"
+      "    table 0 : 1; 1 : 0; endtable\n"
+      "  endprimitive\n"
+      "endpackage\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a primitive declaration is not an item of a package", 2,
+      "A.1.11"));
+}
+
+TEST(PackageItemsParsing, AParameterDeclarationWithoutItsSemicolonIsRefused) {
+  for (const char* keyword : {"localparam", "parameter"}) {
+    auto r = Parse(std::string("package p;\n  ") + keyword +
+                   " int A = 1\n"
+                   "  int x;\n"
+                   "endpackage\n");
+    EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'int'", 3, "6.20.1"))
+        << keyword;
+  }
+}
+
+TEST(PackageItemsParsing, DISABLED_AnAnonymousProgramTakesNoEndLabel) {
+  auto bare = Parse(
+      "package p;\n"
+      "  program;\n"
+      "  endprogram\n"
+      "endpackage\n");
+  EXPECT_TRUE(bare.diags.empty());
+  auto labelled = Parse(
+      "package p;\n"
+      "  program;\n"
+      "  endprogram : x\n"
+      "endpackage\n");
+  EXPECT_TRUE(
+      ReportedError(labelled.diags, "an anonymous program", 3, "A.1.11"));
+}
+
+TEST(PackageItemsParsing, AnAnonymousProgramIsNoModuleOrInterfaceItem) {
+  for (const char* unit : {"module", "interface"}) {
+    auto r = Parse(std::string(unit) +
+                   " m;\n"
+                   "  program;\n"
+                   "  endprogram\n"
+                   "end" +
+                   unit + "\n");
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected identifier, got ';'", 2, "24.3"))
+        << unit;
+  }
 }
 
 TEST(PackageItemsParsing, NestedBodiesAreNotThePackageBody) {

@@ -587,22 +587,31 @@ TEST(SourceText, AWildcardHeaderWritesNoParameterPortList) {
       "module m #(parameter int W = 1) (.*);\n"
       "endmodule\n"
       "program q #(parameter int N = 2) (.*);\n"
-      "endprogram\n");
-  EXPECT_TRUE(ReportedError(
-      r.diags, "a ( .* ) header writes no parameter port list", 1, "A.1.2"));
-  EXPECT_TRUE(ReportedError(
-      r.diags, "a ( .* ) header writes no parameter port list", 3, "A.1.2"));
+      "endprogram\n"
+      "interface i #(parameter int N = 2) (.*);\n"
+      "endinterface\n");
+  for (int line : {1, 3, 5}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a ( .* ) header writes no parameter port list",
+                              line, "A.1.2"));
+  }
 }
 
 TEST(SourceText, AWildcardHeaderWritesNoPackageImport) {
   auto r = Parse(
       "package p; endpackage\n"
       "interface i import p::*; (.*);\n"
-      "endinterface\n");
-  EXPECT_TRUE(ReportedError(r.diags,
-                            "a ( .* ) header writes no package import "
-                            "declaration",
-                            2, "A.1.2"));
+      "endinterface\n"
+      "module m import p::*; (.*);\n"
+      "endmodule\n"
+      "program q import p::*; (.*);\n"
+      "endprogram\n");
+  for (int line : {2, 4, 6}) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a ( .* ) header writes no package import "
+                              "declaration",
+                              line, "A.1.2"));
+  }
 }
 
 TEST(SourceText, AWildcardHeaderAloneIsAccepted) {
@@ -722,15 +731,40 @@ TEST(SourceText, AttributesAfterExternOpenTheHeader) {
 TEST(SourceText, AttributesBeforeExternAreRejected) {
   auto r = Parse(
       "(* keep *) extern module m(input a);\n"
-      "(* keep *) extern primitive p(output y, input a);\n");
+      "(* keep *) extern primitive p(output y, input a);\n"
+      "(* keep *) extern interface i(input a);\n"
+      "(* keep *) extern program q(input a);\n");
   const char* const kMsg =
       "an extern declaration's attribute instances are written after "
       "'extern', not before it";
-  EXPECT_TRUE(ReportedError(r.diags, kMsg, 1, "A.1.2"));
-  EXPECT_TRUE(ReportedError(r.diags, kMsg, 2, "A.1.2"));
+  for (int line : {1, 2, 3, 4}) {
+    EXPECT_TRUE(ReportedError(r.diags, kMsg, line, "A.1.2"));
+  }
   ASSERT_NE(r.cu, nullptr);
   EXPECT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->udps.size(), 1u);
+  EXPECT_EQ(r.cu->interfaces.size(), 1u);
+  EXPECT_EQ(r.cu->programs.size(), 1u);
+}
+
+TEST(SourceText, AttributesBeforeACompilationUnitPackageItemAreAccepted) {
+  auto r = Parse(
+      "(* a *) function void f; endfunction\n"
+      "(* b *) logic x;\n"
+      "(* c *) typedef int t;\n"
+      "(* d *) parameter int P = 1;\n"
+      "(* e *) task tk; endtask\n"
+      "module top; endmodule\n");
+  EXPECT_TRUE(r.diags.empty());
+  ASSERT_NE(r.cu, nullptr);
+  ASSERT_EQ(r.cu->cu_items.size(), 5u);
+  const ModuleItemKind kKinds[] = {
+      ModuleItemKind::kFunctionDecl, ModuleItemKind::kVarDecl,
+      ModuleItemKind::kTypedef, ModuleItemKind::kParamDecl,
+      ModuleItemKind::kTaskDecl};
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_EQ(r.cu->cu_items[i]->kind, kKinds[i]) << i;
+  }
 }
 
 TEST(SourceText, ExternOpeningNoHeaderIsRejected) {
