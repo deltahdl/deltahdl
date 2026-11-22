@@ -213,5 +213,134 @@ TEST_F(VpiGetDataSim, TheSaveRestartLocationIsReadableFromARestartRoutine) {
   }
 }
 
+struct CarriedId {
+  int restart_reason = 0;
+  int id = 0;
+  int returned = -1;
+  char buf[8] = {};
+};
+
+CarriedId* carried = nullptr;
+
+int ReadUnderTheCarriedIdCb(s_cb_data* cb) {
+  const int kId = *reinterpret_cast<int*>(cb->user_data);
+  carried->returned = vpi_get_data(kId, carried->buf, 3);
+  return 0;
+}
+
+int SaveAndArmTheRestartCb(s_cb_data*) {
+  const int kId = vpi_get(vpiSaveRestartID, nullptr);
+  char data[] = {'s', 'a', 'v'};
+  vpi_put_data(kId, data, 3);
+  carried->id = kId;
+  s_cb_data reg = {};
+  reg.reason = carried->restart_reason;
+  reg.cb_rtn = ReadUnderTheCarriedIdCb;
+  reg.user_data = reinterpret_cast<PLI_BYTE8*>(&carried->id);
+  vpi_register_cb(&reg);
+  return 0;
+}
+
+class SaveRoutineCarriesItsId : public VpiGetDataSim {
+ protected:
+  void ExpectTheRestartReadsTheSave(int save_reason, int restart_reason) {
+    CarriedId probe;
+    probe.restart_reason = restart_reason;
+    carried = &probe;
+    DispatchWith(save_reason, SaveAndArmTheRestartCb, nullptr);
+    vpi_ctx_.DispatchRestart();
+    EXPECT_EQ(probe.returned, 3);
+    EXPECT_EQ(0, std::memcmp(probe.buf, "sav", 3));
+    carried = nullptr;
+  }
+};
+
+TEST_F(SaveRoutineCarriesItsId, FromStartOfSaveToStartOfRestart) {
+  ExpectTheRestartReadsTheSave(cbStartOfSave, cbStartOfRestart);
+}
+
+TEST_F(SaveRoutineCarriesItsId, FromEndOfSaveToEndOfRestart) {
+  ExpectTheRestartReadsTheSave(cbEndOfSave, cbEndOfRestart);
+}
+
+TEST_F(VpiGetDataSim, RefusedFromARoutineOfAnyOtherReason) {
+  const char kSaved[] = {'o', 'k'};
+  for (const int kReason :
+       {cbStartOfSave, cbEndOfSave, cbStartOfSimulation, cbEndOfSimulation}) {
+    vpi_ctx_.SeedSaveData(11, kSaved, 2);
+    SingleRead probe;
+    probe.id = 11;
+    probe.request = 2;
+    DispatchWith(kReason, ReadOnceCb, &probe);
+    EXPECT_EQ(probe.returned, 0) << kReason;
+    EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError) << kReason;
+  }
+}
+
+TEST_F(VpiGetDataSim, AnOverReadFromPartwayDeliversWhatIsLeft) {
+  const char kSaved[] = {'a', 'b', 'c', 'd', 'e'};
+  vpi_ctx_.SeedSaveData(4, kSaved, 5);
+
+  DoubleRead probe;
+  probe.id = 4;
+  probe.req1 = 2;
+  probe.req2 = 6;
+  std::memset(probe.buf2, '?', sizeof(probe.buf2));
+  DispatchWith(cbStartOfRestart, ReadTwiceCb, &probe);
+
+  EXPECT_EQ(probe.ret1, 2);
+  EXPECT_EQ(probe.ret2, 3);
+  EXPECT_EQ(0, std::memcmp(probe.buf2, "cde\0\0\0", 6));
+  EXPECT_EQ(vpi_ctx_.LastError().level, kVpiWarning);
+}
+
+TEST_F(VpiGetDataSim, AnOverReadOfWhatASaveRoutinePutWarnsAndZeroFills) {
+  const int kId = vpi_get(vpiSaveRestartID, nullptr);
+  char saved[] = {'p', 'u'};
+  SingleWrite write;
+  write.id = kId;
+  write.data = saved;
+  write.len = 2;
+  DispatchWith(cbEndOfSave, WriteOnceCb, &write);
+
+  SingleRead probe;
+  probe.id = kId;
+  probe.request = 5;
+  std::memset(probe.buf, '?', sizeof(probe.buf));
+  DispatchWith(cbStartOfRestart, ReadOnceCb, &probe);
+
+  EXPECT_EQ(probe.returned, 2);
+  EXPECT_EQ(0, std::memcmp(probe.buf, "pu\0\0\0", 5));
+  EXPECT_EQ(vpi_ctx_.LastError().level, kVpiWarning);
+}
+
+struct InterleavedReads {
+  int returned[4] = {-1, -1, -1, -1};
+  char buf[4][4] = {};
+};
+
+int ReadTwoIdsInTurnCb(s_cb_data* cb) {
+  auto* p = reinterpret_cast<InterleavedReads*>(cb->user_data);
+  const int kIds[] = {21, 22, 21, 22};
+  for (int i = 0; i < 4; ++i) {
+    p->returned[i] = vpi_get_data(kIds[i], p->buf[i], 2);
+  }
+  return 0;
+}
+
+TEST_F(VpiGetDataSim, InterleavedIdsEachResumeFromTheirOwnPosition) {
+  vpi_ctx_.SeedSaveData(21, "ABCD", 4);
+  vpi_ctx_.SeedSaveData(22, "wxyz", 4);
+
+  InterleavedReads probe;
+  DispatchWith(cbStartOfRestart, ReadTwoIdsInTurnCb, &probe);
+
+  for (const int kReturned : probe.returned) EXPECT_EQ(kReturned, 2);
+  EXPECT_EQ(0, std::memcmp(probe.buf[0], "AB", 2));
+  EXPECT_EQ(0, std::memcmp(probe.buf[1], "wx", 2));
+  EXPECT_EQ(0, std::memcmp(probe.buf[2], "CD", 2));
+  EXPECT_EQ(0, std::memcmp(probe.buf[3], "yz", 2));
+}
+
 }  // namespace
 }  // namespace delta
