@@ -288,4 +288,18 @@ TEST(NetAndVariableTypeElaboration, APackedDimensionAfterAnAnsiPortsNettype) {
                              "a net of nettype 'P::pnt' takes", 5, "A.2.2.1"));
 }
 
+TEST(NetAndVariableTypeElaboration,
+     DISABLED_EnumBaseTypedefOfAClassTypeElaborates) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C; typedef bit [3:0] t; endclass\n"
+      "module m;\n"
+      "  typedef C::t ct;\n"
+      "  enum ct {A} e;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
 }  // namespace
