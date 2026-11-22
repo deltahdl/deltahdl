@@ -147,4 +147,31 @@ TEST(CoverageGet, ResettingTheCurrentValueLeavesTheMaximumStanding) {
   EXPECT_EQ(Cov(f).CoverageMax(std::string(kScope), kToggle), 48);
 }
 
+TEST(CoverageGet, AnInstancePathSumsItsSubtreeOnlyUnderHier) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module sub;\n"
+      "  logic [1:0] s = 0;\n"
+      "endmodule\n"
+      "module mid;\n"
+      "  logic m = 0;\n"
+      "  sub u();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  mid dut();\n"
+      "  mid other();\n"
+      "  initial begin\n"
+      "    dut.m = 1; dut.u.s = 3; other.m = 1; other.u.s = 3;\n"
+      "    #1 dut.m = 0; dut.u.s = 0; other.m = 0; other.u.s = 0;\n"
+      "    #1 $display(\"%0d %0d %0d %0d\", $coverage_get(23, 11, top.dut),\n"
+      "        $coverage_get(23, 10, top.dut),\n"
+      "        $coverage_get(23, 11, $root.top.other.u),\n"
+      "        $coverage_get(23, 10, dut.u));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "3 1 2 2\n");
+}
+
 }  // namespace

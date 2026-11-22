@@ -179,4 +179,48 @@ TEST(CoverageMerge, AMissingNameIsAnError) {
             kError);
 }
 
+TEST(CoverageMerge, AStringVariableNamesTheDatabaseToMerge) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module mid;\n"
+      "  logic [1:0] m = 0;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  mid dut();\n"
+      "  string db;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    dut.m = 3;\n"
+      "    #1 dut.m = 0;\n"
+      "    #1 r1 = $coverage_save(23, \"lit.cov\");\n"
+      "    r2 = $coverage_control(2, 23, 11, $root);\n"
+      "    db = \"lit.cov\";\n"
+      "    r3 = $coverage_merge(23, db);\n"
+      "    r4 = $coverage_get(23, 10, dut);\n"
+      "    db = {\"no\", \"such.cov\"};\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", r1, r2, r3, r4,\n"
+      "             $coverage_merge(23, db),\n"
+      "             $coverage_merge(21, $sformatf(\"%s\", \"lit.cov\")));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 1 1 2 -1 0\n");
+}
+
+TEST(CoverageMerge, AFailedMergeUsedDirectlyIsNegative) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", $coverage_merge(23, \"absent.cov\"),\n"
+      "             $coverage_merge(23, \"absent.cov\") < 0);\n"
+      "    if ($coverage_merge(23, \"absent.cov\") < 0) $display(\"below\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "-1 1\nbelow\n");
+}
+
 }  // namespace

@@ -199,4 +199,59 @@ TEST(CoverageGetMax, ADefinitionNameOfTheDesignReachesItsInstances) {
   EXPECT_EQ(kOut, "0\n");
 }
 
+std::string MaximaOf(const std::string& src) {
+  SimFixture f;
+  std::string out = RunCapture(src, f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return out;
+}
+
+TEST(CoverageGetMax, AStringNamingAnInstanceAndADefinitionIsTheDefinition) {
+  EXPECT_EQ(MaximaOf("module a;\n"
+                     "  logic x;\n"
+                     "endmodule\n"
+                     "module b;\n"
+                     "  logic [2:0] y;\n"
+                     "endmodule\n"
+                     "module top;\n"
+                     "  a b();\n"
+                     "  b other();\n"
+                     "  initial $display(\"%0d %0d\",\n"
+                     "      $coverage_get_max(23, 10, \"b\"),\n"
+                     "      $coverage_get_max(23, 10, b));\n"
+                     "endmodule\n"),
+            "3 1\n");
+}
+
+TEST(CoverageGetMax, ANestedModuleIsNamedByItsDefinitionName) {
+  EXPECT_EQ(MaximaOf("module top;\n"
+                     "  module inner;\n"
+                     "    logic [1:0] q;\n"
+                     "  endmodule\n"
+                     "  inner i1();\n"
+                     "  inner i2();\n"
+                     "  initial $display(\"%0d %0d\",\n"
+                     "      $coverage_get_max(23, 10, \"inner\"),\n"
+                     "      $coverage_get_max(23, 10, i1));\n"
+                     "endmodule\n"),
+            "4 2\n");
+}
+
+TEST(CoverageGetMax, IndependentRunsOfOneDesignGiveOneMaximum) {
+  const std::string kSrc =
+      "module leaf;\n"
+      "  logic [4:0] v;\n"
+      "  initial v = 3;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf u1();\n"
+      "  leaf u2();\n"
+      "  initial #1 $display(\"%0d %0d\", $coverage_get_max(23, 11, top),\n"
+      "                      $coverage_get_max(22, 11, top));\n"
+      "endmodule\n";
+  const std::string kFirst = MaximaOf(kSrc);
+  EXPECT_EQ(MaximaOf(kSrc), kFirst);
+  EXPECT_EQ(kFirst, "10 4\n");
+}
+
 }  // namespace

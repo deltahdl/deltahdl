@@ -228,4 +228,52 @@ TEST(CoverageSave, AFailedSaveRemovesTheDatabaseFile) {
   EXPECT_FALSE(std::filesystem::exists(scratch.dir / std::string(kName)));
 }
 
+TEST(CoverageSave, ASecondSaveToANameReplacesTheFirst) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module leaf;\n"
+      "  logic x = 0;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  leaf a();\n"
+      "  leaf b();\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    a.x = 1;\n"
+      "    #1 a.x = 0;\n"
+      "    #1 r1 = $coverage_save(23, \"ow.cov\");\n"
+      "    void'($coverage_control(2, 23, 11, $root));\n"
+      "    b.x = 1;\n"
+      "    #1 b.x = 0;\n"
+      "    #1 r2 = $coverage_save(23, \"ow.cov\");\n"
+      "    void'($coverage_control(2, 23, 11, $root));\n"
+      "    r3 = $coverage_merge(23, \"ow.cov\");\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", r1, r2, r3,\n"
+      "             $coverage_get(23, 10, a), $coverage_get(23, 10, b));\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "1 1 1 0 1\n");
+}
+
+TEST(CoverageSave, AFailedSaveUsedDirectlyIsNegative) {
+  ScratchDir scratch;
+  SimFixture f;
+  Cov(f).SetDatabaseDirectory((scratch.dir / "absent").string());
+  const std::string kOut = RunCapture(
+      "module top;\n"
+      "  logic x = 0;\n"
+      "  initial begin\n"
+      "    x = 1;\n"
+      "    $display(\"%0d %0d\", $coverage_save(23, \"d.cov\"),\n"
+      "             $coverage_save(23, \"d.cov\") < 0);\n"
+      "    if ($coverage_save(23, \"d.cov\") < 0) $display(\"below\");\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "-1 1\nbelow\n");
+}
+
 }  // namespace

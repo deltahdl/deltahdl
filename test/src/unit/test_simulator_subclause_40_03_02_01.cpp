@@ -348,4 +348,165 @@ TEST(CoverageControl, ARootedPathNamingNoInstanceIsABadArgument) {
   EXPECT_EQ(run(nullptr), kError);
 }
 
+TEST(CoverageControl, StopAndResetReportOkWhereCheckWouldNot) {
+  SimFixture f;
+  Cov(f).SetAvailability("top.none", kToggle, CoverageAvailability::kNone);
+  Cov(f).SetAvailability("top.dut", kToggle, CoverageAvailability::kFull);
+  Cov(f).SetAvailability("top.dut.u1", kToggle, CoverageAvailability::kNone);
+
+  EXPECT_EQ(RunControlWithScopeDef(f, kCheck, kSvCovHier, "top.none"), kNoCov);
+  EXPECT_EQ(RunControlWithScopeDef(f, kStop, kSvCovHier, "top.none"), kOk);
+  EXPECT_EQ(RunControlWithScopeDef(f, kCheck, kSvCovHier, "top.dut"), kPartial);
+  EXPECT_EQ(RunControlWithScopeDef(f, kStop, kSvCovHier, "top.dut"), kOk);
+  EXPECT_EQ(RunControlWithScopeDef(f, kReset, kSvCovHier, "top.dut"), kOk);
+}
+
+std::string TwoMidDesign(const std::string& body) {
+  return "module sub;\n"
+         "  logic s = 0;\n"
+         "endmodule\n"
+         "module mid;\n"
+         "  logic m = 0;\n"
+         "  sub u();\n"
+         "endmodule\n"
+         "module top;\n"
+         "  mid dut();\n"
+         "  mid other();\n"
+         "  int r1, r2;\n"
+         "  task automatic flip_all();\n"
+         "    #1 dut.m = 1; dut.u.s = 1; other.m = 1; other.u.s = 1;\n"
+         "    #1 dut.m = 0; dut.u.s = 0; other.m = 0; other.u.s = 0;\n"
+         "  endtask\n"
+         "  initial begin\n" +
+         body +
+         "    #1 $display(\"%0d %0d | %0d %0d %0d %0d\", r1, r2,\n"
+         "        $coverage_get(23, 10, dut), $coverage_get(23, 10, dut.u),\n"
+         "        $coverage_get(23, 10, other),\n"
+         "        $coverage_get(23, 10, other.u));\n"
+         "  end\n"
+         "endmodule\n";
+}
+
+std::string RunTwoMid(const std::string& body) {
+  SimFixture f;
+  std::string out = RunCapture(TwoMidDesign(body), f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return out;
+}
+
+TEST(CoverageControl, AStartUnderHierOverAnInstancePathStartsItsSubtree) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(1, 23, 11, $root);\n"
+                      "    r2 = $coverage_control(0, 23, 11, top.dut);\n"
+                      "    flip_all();\n"),
+            "1 1 | 1 1 0 0\n");
+}
+
+TEST(CoverageControl, AStartUnderModuleOverAnInstancePathStartsItAlone) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(1, 23, 11, $root);\n"
+                      "    r2 = $coverage_control(0, 23, 10, dut);\n"
+                      "    flip_all();\n"),
+            "1 1 | 1 0 0 0\n");
+}
+
+TEST(CoverageControl, AStopUnderHierOverAnInstancePathKeepsWhatItCollected) {
+  EXPECT_EQ(RunTwoMid("    dut.u.s = 1; other.u.s = 1;\n"
+                      "    #1 dut.u.s = 0; other.u.s = 0;\n"
+                      "    r1 = $coverage_control(1, 23, 11, dut);\n"
+                      "    r2 = $coverage_control(1, 23, 11, dut);\n"
+                      "    flip_all();\n"),
+            "1 1 | 0 1 1 1\n");
+}
+
+TEST(CoverageControl, ACheckOfAStoppedScopeStillFindsItsCoverage) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(1, 23, 11, $root);\n"
+                      "    r2 = $coverage_control(3, 23, 11, dut);\n"
+                      "    flip_all();\n"),
+            "1 1 | 0 0 0 0\n");
+}
+
+TEST(CoverageControl, ADefinitionNameUnderHierStartsBelowEveryInstance) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(1, 23, 11, $root);\n"
+                      "    r2 = $coverage_control(0, 23, 11, \"mid\");\n"
+                      "    flip_all();\n"),
+            "1 1 | 1 1 1 1\n");
+}
+
+TEST(CoverageControl, ADefinitionNameUnderModuleStartsEveryInstanceAlone) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(1, 23, 11, $root);\n"
+                      "    r2 = $coverage_control(0, 23, 10, \"mid\");\n"
+                      "    flip_all();\n"),
+            "1 1 | 1 0 1 0\n");
+}
+
+TEST(CoverageControl, ADefinitionNameUnderHierStopsBelowEveryInstance) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(1, 23, 11, \"mid\");\n"
+                      "    r2 = $coverage_control(3, 23, 11, \"mid\");\n"
+                      "    flip_all();\n"),
+            "1 1 | 0 0 0 0\n");
+}
+
+TEST(CoverageControl, ADefinitionNameUnderHierResetsBelowEveryInstance) {
+  EXPECT_EQ(RunTwoMid("    flip_all();\n"
+                      "    r1 = $coverage_control(2, 23, 11, \"mid\");\n"
+                      "    r2 = $coverage_get(23, 11, \"mid\");\n"),
+            "1 0 | 0 0 0 0\n");
+}
+
+TEST(CoverageControl, ADefinitionNameUnderModuleResetsEveryInstanceAlone) {
+  EXPECT_EQ(RunTwoMid("    flip_all();\n"
+                      "    r1 = $coverage_control(2, 23, 10, \"mid\");\n"
+                      "    r2 = 1;\n"),
+            "1 1 | 0 1 0 1\n");
+}
+
+TEST(CoverageControl, DISABLED_AStringHoldingADottedPathIsADefinitionName) {
+  EXPECT_EQ(
+      RunTwoMid("    r1 = $coverage_control(3, 23, 11, \"top.dut\");\n"
+                "    r2 = $coverage_control(1, 23, 11, \"$root.top.dut\");\n"
+                "    flip_all();\n"),
+      "-1 -1 | 1 1 1 1\n");
+}
+
+TEST(CoverageControl, TheSamePathUnquotedNamesTheInstance) {
+  EXPECT_EQ(RunTwoMid("    r1 = $coverage_control(3, 23, 11, top.dut);\n"
+                      "    r2 = $coverage_control(1, 23, 11, $root.top.dut);\n"
+                      "    flip_all();\n"),
+            "1 1 | 0 0 1 1\n");
+}
+
+TEST(CoverageControl, ARelativePathIsResolvedFromTheCallingScope) {
+  SimFixture f;
+  const std::string kOut = RunCapture(
+      "module mid;\n"
+      "  logic m;\n"
+      "endmodule\n"
+      "program p;\n"
+      "  initial #1 $display(\"p %0d\", $coverage_control(3, 23, 10, "
+      "top.dut));\n"
+      "endprogram\n"
+      "module top;\n"
+      "  mid dut();\n"
+      "  p pp();\n"
+      "  class C;\n"
+      "    function int ask();\n"
+      "      return $coverage_get_max(23, 10, dut);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  function int ask();\n"
+      "    return $coverage_get_max(23, 10, dut);\n"
+      "  endfunction\n"
+      "  task automatic tell();\n"
+      "    $display(\"t %0d\", $coverage_control(3, 23, 10, dut));\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    automatic C c = new;\n"
+      "    $display(\"f %0d c %0d\", ask(), c.ask());\n"
+      "    tell();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(kOut, "f 1 c 1\nt 1\np 1\n");
+}
+
 }  // namespace
