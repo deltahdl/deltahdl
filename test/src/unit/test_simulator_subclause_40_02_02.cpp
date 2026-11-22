@@ -382,4 +382,190 @@ TEST(CoverageNomenclature, AStoppedScopeCountsNoFurtherToggles) {
   EXPECT_EQ(kOut, "1 0\n");
 }
 
+std::string CoverageOf(const std::string& src) {
+  SimFixture f;
+  std::string out = RunCapture(src.c_str(), f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  return out;
+}
+
+constexpr const char* kCoverageLine =
+    "  initial begin #20 $display(\"%0d %0d\", $coverage_get_max(20, 10, "
+    "\"top\"),\n"
+    "                      $coverage_get(20, 10, \"top\")); $finish; end\n"
+    "endmodule\n";
+
+constexpr const char* kTwoConcurrent =
+    "module top;\n"
+    "  logic clk = 0, a = 0, b = 1;\n"
+    "  always #5 clk = ~clk;\n"
+    "  p1: assert property (@(posedge clk) b);\n"
+    "  p2: assert property (@(posedge clk) a) else begin end\n";
+
+TEST(CoverageNomenclature, AConcurrentAssertionIsCoveredOnceItSucceeds) {
+  EXPECT_EQ(CoverageOf(std::string(kTwoConcurrent) + kCoverageLine),
+            "2 1\n$finish at time 20\n");
+}
+
+TEST(CoverageNomenclature, AVacuousSuccessLeavesAConcurrentAssertionUncovered) {
+  EXPECT_EQ(CoverageOf(std::string(kTwoConcurrent) +
+                       "  p3: assert property (@(posedge clk) a |-> b);\n" +
+                       kCoverageLine),
+            "3 1\n$finish at time 20\n");
+}
+
+TEST(CoverageNomenclature, AnInterfaceOrProgramInstanceCountsItsAssertions) {
+  EXPECT_EQ(
+      CoverageOf("interface bus(input logic clk);\n"
+                 "  logic a = 0, b = 1;\n"
+                 "  i1: assert property (@(posedge clk) b);\n"
+                 "  i2: assert property (@(posedge clk) a) else begin end\n"
+                 "endinterface\n"
+                 "program prg(input logic clk);\n"
+                 "  logic b = 1;\n"
+                 "  r1: assert property (@(posedge clk) b);\n"
+                 "endprogram\n"
+                 "module top;\n"
+                 "  logic clk = 0;\n"
+                 "  always #5 clk = ~clk;\n"
+                 "  bus i(clk);\n"
+                 "  prg p(clk);\n"
+                 "  initial begin #20 $display(\"%0d %0d %0d %0d\",\n"
+                 "      $coverage_get_max(20, 10, \"top.i\"),\n"
+                 "      $coverage_get(20, 10, \"top.i\"),\n"
+                 "      $coverage_get_max(20, 10, \"top.p\"),\n"
+                 "      $coverage_get(20, 10, \"top.p\")); $finish; end\n"
+                 "endmodule\n"),
+      "2 1 1 1\n$finish at time 20\n");
+}
+
+TEST(CoverageNomenclature, AnInstanceCountsTheBitsOfItsNetsAndScalars) {
+  EXPECT_EQ(CoverageOf("module leaf;\n"
+                       "  logic s;\n"
+                       "  logic [1:0] v;\n"
+                       "  wire [1:0] w = v;\n"
+                       "  initial begin\n"
+                       "    s = 0; v = 2'b00;\n"
+                       "    #1 s = 1; v = 2'b01;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  leaf u();\n"
+                       "  initial #5 $display(\"%0d %0d\",\n"
+                       "      $coverage_get_max(23, 10, u),\n"
+                       "      $coverage_get(23, 10, u));\n"
+                       "endmodule\n"),
+            "5 3\n");
+}
+
+TEST(CoverageNomenclature, AnInterfaceInstanceCountsTheBitsOfItsSignals) {
+  EXPECT_EQ(CoverageOf("interface bus;\n"
+                       "  logic [1:0] d;\n"
+                       "endinterface\n"
+                       "module top;\n"
+                       "  bus i();\n"
+                       "  initial begin\n"
+                       "    i.d = 2'b00; #1 i.d = 2'b01;\n"
+                       "    #1 $display(\"%0d %0d\",\n"
+                       "        $coverage_get_max(23, 10, \"top.i\"),\n"
+                       "        $coverage_get(23, 10, \"top.i\"));\n"
+                       "  end\n"
+                       "endmodule\n"),
+            "2 1\n");
+}
+
+TEST(CoverageNomenclature, AnAlwaysProcedureCountsTheStatementsThatRan) {
+  EXPECT_EQ(CoverageOf("module leaf;\n"
+                       "  int a, b;\n"
+                       "  always_comb begin\n"
+                       "    a = b;\n"
+                       "    if (b) a = 2;\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  leaf u();\n"
+                       "  initial #1 $display(\"%0d %0d\",\n"
+                       "      $coverage_get_max(22, 10, u),\n"
+                       "      $coverage_get(22, 10, u));\n"
+                       "endmodule\n"),
+            "4 3\n");
+}
+
+TEST(CoverageNomenclature, DISABLED_ATimingControlStatementCountsOfItsOwn) {
+  EXPECT_EQ(CoverageOf("module leaf(input logic clk);\n"
+                       "  int x, y;\n"
+                       "  initial #1 x = 1;\n"
+                       "  always @(posedge clk) y = 1;\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic clk = 0;\n"
+                       "  leaf u(clk);\n"
+                       "  initial begin\n"
+                       "    #2 clk = 1;\n"
+                       "    #1 $display(\"%0d %0d\",\n"
+                       "        $coverage_get_max(22, 10, u),\n"
+                       "        $coverage_get(22, 10, u));\n"
+                       "  end\n"
+                       "endmodule\n"),
+            "4 4\n");
+}
+
+TEST(CoverageNomenclature, AFinalProcedureCountsTheStatementsThatRan) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCaptureThroughFinals(
+          ElaborateSrc,
+          "module top;\n"
+          "  int a;\n"
+          "  final begin\n"
+          "    a = 1;\n"
+          "    $display(\"%0d %0d\", $coverage_get_max(22, 10, \"top\"),\n"
+          "             $coverage_get(22, 10, \"top\"));\n"
+          "  end\n"
+          "endmodule\n",
+          f),
+      "3 3\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(CoverageNomenclature,
+     ToggleCoverageIsSummedOverTheHierarchyOnlyUnderHier) {
+  EXPECT_EQ(CoverageOf("module leaf;\n"
+                       "  logic [1:0] v;\n"
+                       "  initial begin v = 2'b00; #1 v = 2'b01; end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  logic t;\n"
+                       "  leaf u();\n"
+                       "  initial begin\n"
+                       "    t = 0; #1 t = 1;\n"
+                       "    #1 $display(\"%0d %0d %0d %0d\",\n"
+                       "        $coverage_get_max(23, 10, \"top\"),\n"
+                       "        $coverage_get(23, 10, \"top\"),\n"
+                       "        $coverage_get_max(23, 11, \"top\"),\n"
+                       "        $coverage_get(23, 11, \"top\"));\n"
+                       "  end\n"
+                       "endmodule\n"),
+            "1 1 3 2\n");
+}
+
+TEST(CoverageNomenclature,
+     StatementCoverageIsSummedOverTheHierarchyOnlyUnderHier) {
+  EXPECT_EQ(CoverageOf("module leaf;\n"
+                       "  int x;\n"
+                       "  initial begin x = 1; if (x == 0) x = 2; end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  leaf u();\n"
+                       "  initial begin\n"
+                       "    #1 $display(\"%0d %0d %0d %0d\",\n"
+                       "        $coverage_get_max(22, 10, \"top\"),\n"
+                       "        $coverage_get(22, 10, \"top\"),\n"
+                       "        $coverage_get_max(22, 11, \"top\"),\n"
+                       "        $coverage_get(22, 11, \"top\"));\n"
+                       "  end\n"
+                       "endmodule\n"),
+            "3 3 7 6\n");
+}
+
 }  // namespace
