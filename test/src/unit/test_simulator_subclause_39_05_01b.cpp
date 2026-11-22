@@ -1,13 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <string>
-#include <utility>
 #include <vector>
 
+#include "helpers_assertion_control_table.h"
 #include "helpers_assertion_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
@@ -17,131 +15,19 @@ using namespace delta;
 
 namespace {
 
-constexpr const char* kActionsDesign =
-    "module m(input logic clk);\n"
-    "  logic a = 1, v = 0;\n"
-    "  int pn = 0, pv = 0, fl = 0, mf = 0, mn = 0, mv = 0;\n"
-    "  an: assert property (@(posedge clk) a) pn += $time;\n"
-    "  av: assert property (@(posedge clk) v |-> a) pv += $time;\n"
-    "  af: assert property (@(posedge clk) v) else fl += $time;\n"
-    "  amf: assert property (@(posedge clk) 1 ##1 v) else mf += $time;\n"
-    "  amn: assert property (@(posedge clk) 1 ##2 a) mn += $time;\n"
-    "  amv: assert property (@(posedge clk) 1 ##2 v |-> a) mv += $time;\n"
-    "endmodule\n"
-    "module top;\n"
-    "  logic clk = 0;\n"
-    "  always #5 clk = ~clk;\n"
-    "  m u1(clk);\n"
-    "  m u2(clk);\n"
-    "  initial begin #10 $arm; #10 $arm; #10 $arm; #10 $finish; end\n"
-    "endmodule\n";
-
-constexpr const char* kU1 = "top.u1";
-constexpr const char* kU2 = "top.u2";
-
-struct Counts {
-  int pn = 0;
-  int pv = 0;
-  int fl = 0;
-  int mf = 0;
-  int mn = 0;
-  int mv = 0;
-};
-
-constexpr Counts kUncontrolled = {80, 80, 80, 75, 60, 60};
-constexpr Counts kOffFromTheFirstArm = {5, 5, 5, 15, 25, 25};
-constexpr Counts kOffUntilTheSecondArm = {65, 65, 65, 50, 25, 25};
-constexpr Counts kKilledUntilTheSecondArm = {65, 65, 65, 35, 0, 0};
-constexpr Counts kEndedAtTheFirstArm = {5, 5, 5, 0, 0, 0};
-constexpr Counts kOffFromTheSecondArm = {20, 20, 20, 40, 60, 60};
-constexpr Counts kVacuousOffFromTheFirstArm = {80, 5, 80, 75, 60, 25};
-constexpr Counts kActionsOffUntilTheSecondArm = {65, 65, 65, 50, 25, 25};
-
-struct Op {
-  int arm = 0;
-  int operation = 0;
-  const char* target = nullptr;
-  int result = 1;
-};
-
-struct ControlRun {
-  const char* name;
-  std::vector<Op> ops;
-  Counts u1;
-  Counts u2;
-  std::vector<uint64_t> u1_failures;
-};
-
-ControlRun Everywhere(const char* name, std::vector<Op> ops, Counts counts,
-                      std::vector<uint64_t> u1_failures) {
-  return {name, std::move(ops), counts, counts, std::move(u1_failures)};
-}
-
-void Apply(const Op& op) {
-  vpiHandle handle = op.target == nullptr
-                         ? nullptr
-                         : vpi_handle_by_name(VpiText(op.target), nullptr);
-  EXPECT_EQ(vpi_control(op.operation, handle), op.result)
-      << "operation " << op.operation << " at arm " << op.arm;
-}
-
-Counts CountsOf(const std::string& instance) {
-  Counts counts;
-  for (auto [field, name] :
-       {std::pair{&Counts::pn, "pn"}, std::pair{&Counts::pv, "pv"},
-        std::pair{&Counts::fl, "fl"}, std::pair{&Counts::mf, "mf"},
-        std::pair{&Counts::mn, "mn"}, std::pair{&Counts::mv, "mv"}}) {
-    counts.*field = IntOf((instance + "." + name).c_str());
-  }
-  return counts;
-}
-
-std::array<int, 3> Settled(const Counts& c) { return {c.pn, c.pv, c.fl}; }
-
-std::array<int, 3> InFlight(const Counts& c) { return {c.mf, c.mn, c.mv}; }
-
-class SystemControlRun : public AssertionRun,
-                         public ::testing::WithParamInterface<ControlRun> {
- protected:
-  void RunRow() {
-    const ControlRun* row = &GetParam();
-    std::vector<std::function<void()>> steps;
-    steps.reserve(3);
-    for (int arm = 1; arm <= 3; ++arm) {
-      steps.emplace_back([row, arm] {
-        if (arm == 1) {
-          ASSERT_NE(WatchAssertion("top.u1.af", cbAssertionFailure), nullptr);
-        }
-        for (const Op& op : row->ops) {
-          if (op.arm == arm) Apply(op);
-        }
-      });
-    }
-    ArmInTurn(std::move(steps));
-    Run(kActionsDesign);
-  }
-};
+class SystemControlRun : public ControlTableRun {};
 
 TEST_P(SystemControlRun, ControlsActOnTheirScopeFromTheirTimeOn) {
   RunRow();
-  EXPECT_EQ(Settled(CountsOf(kU1)), Settled(GetParam().u1));
-  EXPECT_EQ(Settled(CountsOf(kU2)), Settled(GetParam().u2));
-  std::vector<uint64_t> failures;
-  for (const AssertionCall& call : CallsOf(cbAssertionFailure)) {
-    failures.push_back(call.cb_time);
-  }
-  EXPECT_EQ(failures, GetParam().u1_failures);
+  ExpectSettled();
 }
 
-class InFlightControlRun : public SystemControlRun {};
+class InFlightControlRun : public ControlTableRun {};
 
 TEST_P(InFlightControlRun, AnAttemptInFlightMeetsOnlyTheControlsThatDiscard) {
   RunRow();
-  EXPECT_EQ(InFlight(CountsOf(kU1)), InFlight(GetParam().u1));
-  EXPECT_EQ(InFlight(CountsOf(kU2)), InFlight(GetParam().u2));
+  ExpectInFlight();
 }
-
-std::vector<uint64_t> EveryFailure() { return {15, 25, 35}; }
 
 std::vector<ControlRun> StateControls() {
   return {
@@ -162,20 +48,20 @@ std::vector<ControlRun> StateControls() {
       Everywhere("End", {{1, vpiAssertionSysEnd}}, kEndedAtTheFirstArm, {}),
       Everywhere("LockRefusesKillResetAndEnd",
                  {{1, vpiAssertionSysLock},
-                  {1, vpiAssertionSysKill, nullptr, 0},
-                  {1, vpiAssertionSysReset, nullptr, 0},
-                  {1, vpiAssertionSysEnd, nullptr, 0}},
+                  {1, vpiAssertionSysKill, "", 0},
+                  {1, vpiAssertionSysReset, "", 0},
+                  {1, vpiAssertionSysEnd, "", 0}},
                  kUncontrolled, EveryFailure()),
       Everywhere("LockRefusesOnUntilUnlock",
                  {{1, vpiAssertionSysOff},
                   {2, vpiAssertionSysLock},
-                  {2, vpiAssertionSysOn, nullptr, 0},
+                  {2, vpiAssertionSysOn, "", 0},
                   {3, vpiAssertionSysUnlock},
                   {3, vpiAssertionSysOn}},
                  {40, 40, 40, 15, 25, 25}, {35}),
       Everywhere("LockRefusesOffUntilUnlock",
                  {{1, vpiAssertionSysLock},
-                  {1, vpiAssertionSysOff, nullptr, 0},
+                  {1, vpiAssertionSysOff, "", 0},
                   {2, vpiAssertionSysUnlock},
                   {2, vpiAssertionSysOff}},
                  kOffFromTheSecondArm, {15}),
@@ -250,7 +136,7 @@ std::vector<ControlRun> ActionControls() {
                  {40, 40, 55, 40, 25, 25}, EveryFailure()),
       Everywhere("LockRefusesFailActionAndDisableUntilUnlock",
                  {{1, vpiAssertionSysLock},
-                  {1, vpiAssertionSysDisableFailAction, nullptr, 0},
+                  {1, vpiAssertionSysDisableFailAction, "", 0},
                   {1, vpiAssertionDisable, "top.u1.af", 0},
                   {2, vpiAssertionSysUnlock},
                   {2, vpiAssertionSysDisableFailAction}},
@@ -282,10 +168,6 @@ ControlRun ScopedLock() {
                     kOffFromTheSecondArm,
                     kOffFromTheFirstArm,
                     {15}};
-}
-
-std::string RowName(const ::testing::TestParamInfo<ControlRun>& info) {
-  return info.param.name;
 }
 
 INSTANTIATE_TEST_SUITE_P(StateControls, SystemControlRun,
