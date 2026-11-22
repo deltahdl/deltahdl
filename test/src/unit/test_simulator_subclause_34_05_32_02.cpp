@@ -44,7 +44,7 @@ void PutInt(vpiHandle obj, int value) {
 }
 
 PLI_INT32 ReadViewportsCalltf(PLI_BYTE8*) {
-  vpiHandle read = vpi_handle_by_name(VpiText("u.open_r"), nullptr);
+  vpiHandle read = vpi_handle_by_name(VpiText("t.u.open_r"), nullptr);
   g_seen.read_reached = read != nullptr;
   if (read != nullptr) {
     g_seen.read_size = vpi_get(vpiSize, read);
@@ -52,7 +52,7 @@ PLI_INT32 ReadViewportsCalltf(PLI_BYTE8*) {
     PutInt(read, 3);
     g_seen.read_put_refused = ErrorRecorded();
   }
-  vpiHandle read_write = vpi_handle_by_name(VpiText("u.open_rw"), nullptr);
+  vpiHandle read_write = vpi_handle_by_name(VpiText("t.u.open_rw"), nullptr);
   g_seen.read_write_reached = read_write != nullptr;
   if (read_write != nullptr) {
     PutInt(read_write, 9);
@@ -62,7 +62,7 @@ PLI_INT32 ReadViewportsCalltf(PLI_BYTE8*) {
     g_seen.read_write_value = v.value.integer;
   }
   g_seen.shut_reached =
-      vpi_handle_by_name(VpiText("u.shut"), nullptr) != nullptr;
+      vpi_handle_by_name(VpiText("t.u.shut"), nullptr) != nullptr;
   g_seen.shut_refused = ErrorRecorded();
   return 0;
 }
@@ -178,9 +178,9 @@ PartialGrantSeen g_partial;
 
 PLI_INT32 ReadPartialGrantsCalltf(PLI_BYTE8*) {
   g_partial.undefined_reached =
-      vpi_handle_by_name(VpiText("u1.undefined"), nullptr) != nullptr;
+      vpi_handle_by_name(VpiText("t.u1.undefined"), nullptr) != nullptr;
   g_partial.generated_reached =
-      vpi_handle_by_name(VpiText("u1.g.q"), nullptr) != nullptr;
+      vpi_handle_by_name(VpiText("t.u1.g.q"), nullptr) != nullptr;
   return 0;
 }
 
