@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -36,6 +37,31 @@ TEST_F(VpiPrintfSim,
   EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
   EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
   EXPECT_EQ(written, static_cast<int>(kExpected.size()));
+}
+
+TEST_F(VpiPrintfSim, ConversionsFlagsAndPrecisionExpandLikePrintf) {
+  const std::string kExpected = "%|z|ff|-5   |00042|+3| 4|0x1f|3.14|ab";
+  PLI_BYTE8 format[] = "%%|%c|%x|%-5d|%05d|%+d|% d|%#x|%.2f|%.2s";
+  EXPECT_EQ(vpi_printf(format, 'z', 255, -5, 42, 3, 4, 31, 3.14159, "abc"),
+            static_cast<int>(kExpected.size()));
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
+}
+
+TEST_F(VpiPrintfSim, ALongExpansionIsWrittenWholeAndCounted) {
+  const std::string kLong(8192, 'q');
+  PLI_BYTE8 format[] = "%s|%5000d";
+  EXPECT_EQ(vpi_printf(format, kLong.c_str(), 7), 8192 + 1 + 5000);
+  const std::string kExpected = kLong + "|" + std::string(4999, ' ') + "7";
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), kExpected);
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), kExpected);
+}
+
+TEST_F(VpiPrintfSim, AnExpansionThatFailsReturnsEofAndWritesNothing) {
+  PLI_BYTE8 format[] = "%ls";
+  EXPECT_EQ(vpi_printf(format, L"\u4e2d"), EOF);
+  EXPECT_TRUE(vpi_ctx_.OutputChannelBuffer().empty());
+  EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
 }
 
 TEST_F(VpiPrintfSim, ReturnsEofWhenFormatStringIsMissing) {
