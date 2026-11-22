@@ -106,6 +106,40 @@ TEST_F(VpiGetStringSim, ValueStringUsesADifferentBufferFromGetStr) {
   EXPECT_STREQ(name, "v");
 }
 
+TEST_F(VpiGetStringSim, EveryValueStringFormatAndGetStrKeepEachOther) {
+  auto* var = sim_ctx_.CreateVariable("v", 16);
+  var->value = MakeLogic4VecVal(arena_, 16, 0x4869);
+  vpi_ctx_.Attach(sim_ctx_);
+  vpiHandle h = vpi_handle_by_name(VpiText("v"), nullptr);
+  ASSERT_NE(h, nullptr);
+
+  for (const int kFormat :
+       {vpiStringVal, vpiBinStrVal, vpiOctStrVal, vpiDecStrVal, vpiHexStrVal}) {
+    const char* name = vpi_get_str(vpiName, h);
+    ASSERT_NE(name, nullptr) << kFormat;
+    s_vpi_value after = {};
+    after.format = kFormat;
+    vpi_get_value(h, &after);
+    ASSERT_NE(after.value.str, nullptr) << kFormat;
+    EXPECT_STREQ(name, "v") << kFormat;
+    EXPECT_NE(static_cast<const void*>(after.value.str),
+              static_cast<const void*>(name))
+        << kFormat;
+
+    s_vpi_value before = {};
+    before.format = kFormat;
+    vpi_get_value(h, &before);
+    ASSERT_NE(before.value.str, nullptr) << kFormat;
+    const std::string kHeld = before.value.str;
+    const char* later = vpi_get_str(vpiName, h);
+    ASSERT_NE(later, nullptr) << kFormat;
+    EXPECT_EQ(std::string(before.value.str), kHeld) << kFormat;
+    EXPECT_NE(static_cast<const void*>(before.value.str),
+              static_cast<const void*>(later))
+        << kFormat;
+  }
+}
+
 TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
   VpiObject mod;
   mod.type = vpiModule;
