@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <utility>
 #include <vector>
 
 #include "fixture_vpi_run.h"
@@ -135,6 +137,23 @@ class DisablesOfARun : public VpiDesignRun {
     for (int i = 0; i <= n && it != nullptr; ++i) proc = vpi_scan(it);
     return proc == nullptr ? nullptr : vpi_handle(vpiStmt, proc);
   }
+
+  static vpiHandle BlockOf(vpiHandle place) {
+    vpiHandle stmt = place == nullptr ? nullptr : vpi_handle(vpiStmt, place);
+    while (stmt != nullptr && vpi_get(vpiType, stmt) == vpiEventControl) {
+      stmt = vpi_handle(vpiStmt, stmt);
+    }
+    return stmt;
+  }
+
+  static void ExpectDisablesItself(vpiHandle block, const char* where) {
+    EXPECT_EQ(vpi_get(vpiType, block), vpiNamedBegin) << where;
+    vpiHandle it = vpi_iterate(vpiDisable, block);
+    ASSERT_NE(it, nullptr) << where;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, vpi_scan(it))),
+              VpiObjectOf(block))
+        << where;
+  }
 };
 
 TEST_F(DisablesOfARun, ABlockDisablingItselfIsReached) {
@@ -233,6 +252,85 @@ TEST_F(DisablesOfARun, ADisableForkReachesNothing) {
 
 TEST(DisableModel, NoObjectHasNoDisableExpression) {
   EXPECT_EQ(VpiDisableExpr(nullptr), nullptr);
+}
+
+TEST_F(DisablesOfARun, ADisableOfAChildInstancesTaskIsReached) {
+  Run("module child; task t; #5; endtask endmodule\n"
+      "module top; child c(); initial #1 disable c.t; endmodule\n");
+  vpiHandle delay = NthBody(0);
+  ASSERT_NE(delay, nullptr);
+  vpiHandle disable = vpi_handle(vpiStmt, delay);
+  ASSERT_NE(disable, nullptr);
+  vpiHandle task = Named(vpiTask, By("top.c"), "t");
+  ASSERT_NE(task, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, disable)), VpiObjectOf(task));
+}
+
+TEST_F(DisablesOfARun, ATaskDisablingItselfIsReached) {
+  Run("module top; task t; disable t; endtask initial t; endmodule\n");
+  vpiHandle task = Named(vpiTask, By("top"), "t");
+  ASSERT_NE(task, nullptr);
+  vpiHandle disable = vpi_handle(vpiStmt, task);
+  ASSERT_NE(disable, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, disable), vpiDisable);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, disable)), VpiObjectOf(task));
+}
+
+TEST_F(DisablesOfARun, ADisableOfANamedForkReachesTheFork) {
+  Run("module top; initial begin fork : f #2; join_none disable f; end\n"
+      "endmodule\n");
+  vpiHandle block = NthBody(0);
+  ASSERT_NE(block, nullptr);
+  EXPECT_EQ(KindsOf(vpiStmt, block),
+            (std::vector<int>{vpiNamedFork, vpiDisable}));
+  vpiHandle it = vpi_iterate(vpiDisable, block);
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, vpi_scan(it))),
+            VpiObjectOf(By("top.f")));
+}
+
+TEST_F(DisablesOfARun, EachPlaceBuildsItsDisablesAndReachesTheTarget) {
+  const auto kBoth = [](const std::string& b) {
+    return " begin : " + b + " disable fork; disable " + b + "; end ";
+  };
+  const auto kOne = [](const std::string& b) {
+    return " begin : " + b + " disable " + b + "; end ";
+  };
+  Run("package pk; task pt;" + kBoth("b") + "endtask endpackage\n" +
+      "interface ifc; initial" + kBoth("b") + "endinterface\n" +
+      "program prg; initial" + kBoth("b") + "endprogram\n" +
+      "module top; event e; logic clk; ifc i0(); prg p0();\n" +
+      "  class C; task cm;" + kBoth("b") + "endtask endclass\n" + "  task tk;" +
+      kBoth("b") + "endtask\n" + "  function void fn;" + kOne("b") +
+      "endfunction\n" + "  always @(e)" + kBoth("b0") + "\n" + "  always_comb" +
+      kOne("b1") + "\n" + "  always_ff @(posedge clk)" + kBoth("b2") + "\n" +
+      "  always_latch" + kOne("b3") + "\n" + "  final" + kBoth("b4") + "\n" +
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 5U);
+  std::vector<std::pair<const char*, vpiHandle>> places =
+      OwnersInEachPlace("cm");
+  places.emplace_back("always", kProcs[0]);
+  places.emplace_back("always_ff", kProcs[2]);
+  places.emplace_back("final", kProcs[4]);
+  const std::vector<std::pair<const char*, vpiHandle>> kSingle{
+      {"function", Named(vpiFunction, By("top"), "fn")},
+      {"always_comb", kProcs[1]},
+      {"always_latch", kProcs[3]}};
+  for (const auto& [where, place] : places) {
+    vpiHandle block = BlockOf(place);
+    ASSERT_NE(block, nullptr) << where;
+    EXPECT_EQ(KindsOf(vpiStmt, block),
+              (std::vector<int>{vpiDisableFork, vpiDisable}))
+        << where;
+    ExpectDisablesItself(block, where);
+  }
+  for (const auto& [where, place] : kSingle) {
+    vpiHandle block = BlockOf(place);
+    ASSERT_NE(block, nullptr) << where;
+    EXPECT_EQ(KindsOf(vpiStmt, block), std::vector<int>{vpiDisable}) << where;
+    ExpectDisablesItself(block, where);
+  }
 }
 
 }  // namespace
