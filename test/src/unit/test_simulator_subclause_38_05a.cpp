@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <cstdarg>
+
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
@@ -91,6 +93,29 @@ TEST_F(VpiFlushSim, WhatAPrintLeftPendingIsWhatTheFlushCommits) {
   EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
   EXPECT_EQ(vpi_ctx_.OutputChannelFlushed(), "count=3\n");
   EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "count=3\n");
+}
+
+PLI_INT32 VprintfThrough(PLI_BYTE8* format, ...) {
+  va_list args{};
+  va_start(args, format);
+  const PLI_INT32 kWritten = vpi_vprintf(format, args);
+  va_end(args);
+  return kWritten;
+}
+
+TEST_F(VpiFlushSim, WhatAVprintfLeftPendingIsWhatTheFlushCommits) {
+  char format[] = "%s=%d\n";
+  char name[] = "total";
+  ASSERT_EQ(VprintfThrough(format, name, 7), 8);
+  ASSERT_EQ(vpi_ctx_.OutputChannelBuffer(), "total=7\n");
+  ASSERT_EQ(vpi_ctx_.LogFileBuffer(), "total=7\n");
+
+  EXPECT_EQ(vpi_flush(), 0);
+
+  EXPECT_TRUE(vpi_ctx_.OutputChannelBuffer().empty());
+  EXPECT_TRUE(vpi_ctx_.LogFileBuffer().empty());
+  EXPECT_EQ(vpi_ctx_.OutputChannelFlushed(), "total=7\n");
+  EXPECT_EQ(vpi_ctx_.LogFileFlushed(), "total=7\n");
 }
 
 TEST_F(VpiFlushSim, AFlushResetsThePendingErrorStatus) {
