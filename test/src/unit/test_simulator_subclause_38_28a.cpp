@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdio>
+#include <string>
 
 #include "common/arena.h"
 #include "common/diagnostic.h"
@@ -43,6 +44,30 @@ TEST_F(VpiMcdPrintfSim, WritesToSeveralChannelsSimultaneouslyAndReturnsCount) {
   EXPECT_EQ(written, 5);
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd_a), "hello");
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd_b), "hello");
+}
+
+TEST_F(VpiMcdPrintfSim, ChannelOneAndAFileEachReceiveTheTextOnce) {
+  char name[] = "f.log";
+  const PLI_UINT32 kMcd = vpi_mcd_open(name);
+  ASSERT_NE(kMcd, 0u);
+  char fmt[] = "once\n";
+  EXPECT_EQ(vpi_mcd_printf(1u | kMcd, fmt), 5);
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "once\n");
+  EXPECT_EQ(vpi_ctx_.LogFileBuffer(), "once\n");
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(kMcd), "once\n");
+}
+
+TEST_F(VpiMcdPrintfSim, TheHighestChannelReceivesTheText) {
+  PLI_UINT32 last = 0;
+  for (int i = 0; i < 30; ++i) {
+    const std::string kName = "c" + std::to_string(i) + ".log";
+    last = vpi_mcd_open(VpiText(kName.c_str()));
+  }
+  ASSERT_EQ(last, PLI_UINT32{1} << 30);
+  char fmt[] = "top";
+  EXPECT_EQ(vpi_mcd_printf(last, fmt), 3);
+  EXPECT_EQ(vpi_ctx_.McdChannelBuffer(last), "top");
+  EXPECT_EQ(vpi_ctx_.OutputChannelBuffer(), "");
 }
 
 TEST_F(VpiMcdPrintfSim, FormatStringControlsTheTextLikeCFprintf) {
