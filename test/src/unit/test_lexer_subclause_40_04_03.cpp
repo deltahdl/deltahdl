@@ -114,12 +114,14 @@ TEST(FsmConcatPragmaLexing, RecognizedWithinModuleBody) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
+void ExpectSelectReported(const std::string& member, bool one_line) {
+  std::string pragma =
+      "tool state_vector {" + member + ", lo} my_fsm enum state_e";
   const std::string kSrc =
       "module fsm;\n"
       "  logic [3:0] hi;\n"
-      "  logic lo;\n"
-      "  /* tool state_vector {hi[3:0], lo} my_fsm enum state_e */\n"
+      "  logic lo;\n" +
+      (one_line ? "  // " + pragma + "\n" : "  /* " + pragma + " */\n") +
       "endmodule\n";
 
   SourceManager mgr;
@@ -133,7 +135,16 @@ TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
       diag.Diagnostics(),
       "bit-select or part-select cannot be used in an FSM state_vector "
       "concatenation",
-      LineHolding(kSrc, "/* tool state_vector"), "40.4.3"));
+      LineHolding(kSrc, "tool state_vector"), "40.4.3"));
+}
+
+TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
+  ExpectSelectReported("hi[3:0]", false);
+}
+
+TEST(FsmConcatPragmaLexing, BitSelectMemberIsReportedInEitherCommentForm) {
+  ExpectSelectReported("hi[0]", false);
+  ExpectSelectReported("hi[0]", true);
 }
 
 TEST(FsmConcatPragmaLexing, NothingIsReportedWhereNoSelectWasWritten) {
