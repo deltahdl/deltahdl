@@ -1,12 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <cstring>
-#include <functional>
 #include <string>
 #include <vector>
 
 #include "fixture_vpi_run.h"
+#include "helpers_vpi_put_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_user.h"
@@ -14,43 +13,7 @@
 namespace delta {
 namespace {
 
-std::function<void()>& Putter() {
-  static std::function<void()> putter;
-  return putter;
-}
-
-class PutsOfARun : public VpiDesignRun {
- protected:
-  void SetUp() override {
-    VpiDesignRun::SetUp();
-    s_vpi_systf_data data = {};
-    data.type = vpiSysTask;
-    data.tfname = VpiText("$put");
-    data.calltf = [](PLI_BYTE8*) -> PLI_INT32 {
-      Putter()();
-      return 0;
-    };
-    ASSERT_NE(vpi_register_systf(&data), nullptr);
-  }
-
-  static int IntOf(const char* name) {
-    s_vpi_value value = {};
-    value.format = vpiIntVal;
-    vpi_get_value(By(name), &value);
-    return value.value.integer;
-  }
-};
-
-vpiHandle PutInt(const char* name, int value, int flags, uint32_t delay = 0) {
-  s_vpi_value val = {};
-  val.format = vpiIntVal;
-  val.value.integer = value;
-  s_vpi_time time = {};
-  time.type = vpiSimTime;
-  time.low = delay;
-  return vpi_put_value(vpi_handle_by_name(VpiText(name), nullptr), &val, &time,
-                       flags);
-}
+using PutsOfARun = VpiPutRun;
 
 TEST_F(PutsOfARun, APutWakesAnEventControlOnItsObject) {
   Putter() = [] { PutInt("top.v", 5, vpiNoDelay); };

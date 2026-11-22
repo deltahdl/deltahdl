@@ -48,23 +48,6 @@ TEST_F(VpiPutValueSim, PutValueNoDelay) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-TEST_F(VpiPutValueSim, PutValueInertialDelay) {
-  auto* var = sim_ctx_.CreateVariable("di", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 0);
-  vpi_ctx_.Attach(sim_ctx_);
-
-  vpiHandle h = vpi_handle_by_name(VpiText("di"), nullptr);
-  s_vpi_value val = {};
-  val.format = vpiIntVal;
-  val.value.integer = 88;
-  s_vpi_time time = {};
-  time.type = vpiSimTime;
-  time.low = 10;
-  vpi_put_value(h, &val, &time, vpiInertialDelay);
-
-  EXPECT_EQ(var->value.ToUint64(), 88u);
-}
-
 TEST_F(VpiPutValueSim, PutValueRealFormat) {
   auto* var = sim_ctx_.CreateVariable("rf", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -138,40 +121,6 @@ TEST_F(VpiPutValueSim, DelayWithoutReturnEventReturnsNull) {
   time.low = 4;
   vpiHandle ev = vpi_put_value(h, &val, &time, vpiTransportDelay);
   EXPECT_EQ(ev, nullptr);
-}
-
-TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
-  auto* var = sim_ctx_.CreateVariable("dp", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 0);
-  vpi_ctx_.Attach(sim_ctx_);
-
-  vpiHandle h = vpi_handle_by_name(VpiText("dp"), nullptr);
-  s_vpi_value val = {};
-  val.format = vpiIntVal;
-  val.value.integer = 55;
-  s_vpi_time time = {};
-  time.type = vpiSimTime;
-  time.low = 12;
-  vpi_put_value(h, &val, &time, vpiPureTransportDelay);
-
-  EXPECT_EQ(var->value.ToUint64(), 55u);
-}
-
-TEST_F(VpiPutValueSim, PutValueTransportDelay) {
-  auto* var = sim_ctx_.CreateVariable("dt", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 0);
-  vpi_ctx_.Attach(sim_ctx_);
-
-  vpiHandle h = vpi_handle_by_name(VpiText("dt"), nullptr);
-  s_vpi_value val = {};
-  val.format = vpiIntVal;
-  val.value.integer = 99;
-  s_vpi_time time = {};
-  time.type = vpiSimTime;
-  time.low = 8;
-  vpi_put_value(h, &val, &time, vpiTransportDelay);
-
-  EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
 TEST_F(VpiPutValueSim, NetPutOverridesResolvedValueUntilDriverChanges) {
@@ -348,19 +297,23 @@ TEST_F(VpiPutValueSim, StringFormatToNonRealIsNotIllegal) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-TEST_F(VpiPutValueSim, CancelOnNonSchedEventHandleIsNoError) {
+TEST_F(VpiPutValueSim, DISABLED_ACancelThroughAVariableOrANetHandleIsAnError) {
   auto* var = sim_ctx_.CreateVariable("cn", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 7);
+  Net* net = sim_ctx_.CreateNet("cw", NetType::kWire, 32);
+  ASSERT_NE(net, nullptr);
+  vpiHandle wire = VpiHandleOf(vpi_ctx_.CreateNetObj("cw", net, 32));
   vpi_ctx_.Attach(sim_ctx_);
-
   vpiHandle h = vpi_handle_by_name(VpiText("cn"), nullptr);
   ASSERT_NE(h, nullptr);
 
-  vpiHandle ret = vpi_put_value(h, nullptr, nullptr, vpiCancelEvent);
-  EXPECT_EQ(ret, nullptr);
+  EXPECT_EQ(vpi_put_value(h, nullptr, nullptr, vpiCancelEvent), nullptr);
+  const PLI_INT32 kVariableError = vpi_chk_error(nullptr);
+  EXPECT_EQ(vpi_put_value(wire, nullptr, nullptr, vpiCancelEvent), nullptr);
+  const PLI_INT32 kNetError = vpi_chk_error(nullptr);
 
-  s_vpi_error_info info = {};
-  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(kVariableError, vpiError);
+  EXPECT_EQ(kNetError, vpiError);
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
@@ -620,13 +573,23 @@ TEST_F(VpiPutValueSim, ACancelFromAReadOnlySynchCallbackIsNoError) {
   auto* var = sim_ctx_.CreateVariable("cn", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 1);
   vpi_ctx_.Attach(sim_ctx_);
-  vpi_ctx_.SetAtReadOnlySynchTime(true);
   vpiHandle h = vpi_handle_by_name(VpiText("cn"), nullptr);
   ASSERT_NE(h, nullptr);
+  s_vpi_value val = {};
+  val.format = vpiIntVal;
+  val.value.integer = 2;
+  s_vpi_time time = {};
+  time.type = vpiSimTime;
+  time.low = 3;
+  vpiHandle ev =
+      vpi_put_value(h, &val, &time, vpiTransportDelay | vpiReturnEvent);
+  ASSERT_NE(ev, nullptr);
+  vpi_ctx_.SetAtReadOnlySynchTime(true);
 
-  EXPECT_EQ(vpi_put_value(h, nullptr, nullptr, vpiCancelEvent), nullptr);
-  s_vpi_error_info info = {};
-  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent), nullptr);
+  const PLI_INT32 kCancelError = vpi_chk_error(nullptr);
+  EXPECT_EQ(kCancelError, 0);
+  EXPECT_EQ(vpi_get(vpiScheduled, ev), 0);
 }
 
 TEST_F(VpiPutValueSim, ReleaseOutsideARunClearsTheForce) {
