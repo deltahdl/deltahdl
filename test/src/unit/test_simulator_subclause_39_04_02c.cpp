@@ -119,7 +119,7 @@ void Control(int operation) {
 constexpr const char* kOneAssertion =
     "module top; logic clk = 0, a = 1;\n"
     "  always #1 clk = ~clk;\n"
-    "  af: assert property (@(posedge clk) a);\n"
+    "  af: assert property (@(posedge clk) a ##2 a);\n"
     "  initial begin $arm; #4 $arm; #2 $arm; #2 $arm; #2 $finish; end\n"
     "endmodule\n";
 
@@ -134,7 +134,11 @@ TEST_F(AssertionRun, AControlCallbackCarriesTheTimeOfTheControl) {
                Control(vpiAssertionDisable);
                Control(vpiAssertionEnable);
              },
-             [] { Control(vpiAssertionKill); },
+             [] {
+               s_vpi_time start = {vpiSimTime, 0, 5, 0.0};
+               EXPECT_EQ(vpi_control(vpiAssertionKill, By("top.af"), &start),
+                         1);
+             },
              [] { Control(vpiAssertionReset); }});
   Run(kOneAssertion);
   std::vector<std::pair<int, uint64_t>> got;
