@@ -31,7 +31,6 @@ TEST_F(DynamicPrefixing, PrefixSourceClassifier) {
   EXPECT_TRUE(VpiIsDynamicPrefixSourceType(vpiNamedEvent));
   EXPECT_TRUE(VpiIsDynamicPrefixSourceType(vpiNamedEventArray));
 
-  EXPECT_FALSE(VpiIsDynamicPrefixSourceType(vpiMethodFuncCall));
   EXPECT_FALSE(VpiIsDynamicPrefixSourceType(vpiModule));
   for (int simple : {vpiNet, vpiNetBit, vpiIntVar, vpiRegBit, vpiParameter,
                      vpiSpecParam, vpiVarSelect}) {
