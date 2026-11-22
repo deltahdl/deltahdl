@@ -501,6 +501,12 @@ TEST_F(InstanceObjectsOfARun, NoObjectHasTheSmallestPrecision) {
   EXPECT_EQ(vpi_get(vpiTimePrecision, nullptr), -12);
 }
 
+TEST_F(InstanceObjectsOfARun, NoObjectsTimeUnitIsTheSmallestPrecision) {
+  Run(kTwoTimescales);
+  EXPECT_EQ(vpi_get(vpiTimeUnit, nullptr), -12);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+}
+
 TEST_F(InstanceObjectsOfARun, AnInstanceHasItsDefinitionsLine) {
   Run(kTwoTimescales);
   EXPECT_EQ(
