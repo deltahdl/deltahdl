@@ -116,7 +116,17 @@ TEST_F(VpiHandleByIndexSim, AQueueElementNeedsARun) {
   EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&array), 0), nullptr);
 }
 
-class HandleByIndexOfARun : public VpiDesignRun {};
+class HandleByIndexOfARun : public VpiDesignRun {
+ protected:
+  static int ValueAt(vpiHandle ref, PLI_INT32 index) {
+    vpiHandle obj = vpi_handle_by_index(ref, index);
+    if (obj == nullptr) return -1;
+    s_vpi_value value = {};
+    value.format = vpiIntVal;
+    vpi_get_value(obj, &value);
+    return value.value.integer;
+  }
+};
 
 TEST_F(HandleByIndexOfARun, AScalarNetsLoadPortIsNoIndexedSubobject) {
   Run("module ram(input a, input b); endmodule\n"
@@ -174,6 +184,96 @@ TEST_F(HandleByIndexOfARun, APackedStructVarIndexesItsBits) {
   vpiHandle us = By("top.us");
   ASSERT_NE(us, nullptr);
   EXPECT_EQ(vpi_handle_by_index(us, 0), nullptr);
+}
+
+TEST_F(HandleByIndexOfARun, ANetIsIndexedThroughItsDeclaredRange) {
+  Run("module top; wire [7:4] n = 4'b0001; wire [0:3] m = 4'b0001;\n"
+      "  initial $noop; endmodule\n");
+  vpiHandle n = By("top.n");
+  vpiHandle m = By("top.m");
+  ASSERT_NE(n, nullptr);
+  ASSERT_NE(m, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(n, 4)), vpiNetBit);
+  EXPECT_EQ(ValueAt(n, 4), 1);
+  EXPECT_EQ(ValueAt(n, 7), 0);
+  EXPECT_EQ(vpi_handle_by_index(n, 0), nullptr);
+  EXPECT_EQ(ValueAt(m, 3), 1);
+  EXPECT_EQ(ValueAt(m, 0), 0);
+  EXPECT_EQ(vpi_handle_by_index(m, 4), nullptr);
+}
+
+TEST_F(HandleByIndexOfARun,
+       DISABLED_APackedMultidimensionalVectorYieldsItsSubvector) {
+  Run("module top; logic [1:0][3:0] v = 8'hA6;\n"
+      "  wire [1:0][2:0] w = 6'b101_011; initial $noop; endmodule\n");
+  vpiHandle v = By("top.v");
+  ASSERT_NE(v, nullptr);
+  vpiHandle upper = vpi_handle_by_index(v, 1);
+  ASSERT_NE(upper, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, upper), 4);
+  EXPECT_EQ(ValueAt(v, 1), 0xA);
+  EXPECT_EQ(ValueAt(v, 0), 0x6);
+  EXPECT_EQ(ValueAt(upper, 3), 1);
+  EXPECT_EQ(ValueAt(upper, 0), 0);
+  vpiHandle w = By("top.w");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(vpi_get(vpiSize, vpi_handle_by_index(w, 1)), 3);
+  EXPECT_EQ(ValueAt(w, 1), 5);
+  EXPECT_EQ(ValueAt(w, 0), 3);
+}
+
+TEST_F(HandleByIndexOfARun, AVariableRangeBelowZeroIsIndexedByItsBounds) {
+  Run("module top; logic [-1:-4] v = 4'b0001; initial $noop; endmodule\n");
+  vpiHandle v = By("top.v");
+  ASSERT_NE(v, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(v, -4)), vpiVarBit);
+  EXPECT_EQ(ValueAt(v, -4), 1);
+  EXPECT_EQ(ValueAt(v, -1), 0);
+  EXPECT_EQ(vpi_handle_by_index(v, 0), nullptr);
+}
+
+TEST_F(HandleByIndexOfARun, DISABLED_ANetArrayBelowZeroIsIndexedByItsBounds) {
+  Run("module top; wire n [-1:0]; assign n[-1] = 1'b1; assign n[0] = 1'b0;\n"
+      "  initial $noop; endmodule\n");
+  vpiHandle n = By("top.n");
+  ASSERT_NE(n, nullptr);
+  EXPECT_EQ(ValueAt(n, -1), 1);
+  EXPECT_EQ(ValueAt(n, 0), 0);
+  EXPECT_EQ(vpi_handle_by_index(n, 1), nullptr);
+}
+
+TEST_F(HandleByIndexOfARun, AVectorPortIsIndexedIntoItsPortBits) {
+  Run("module sub(input logic [5:2] a); endmodule\n"
+      "module top; logic [5:2] x; sub u(x); endmodule\n");
+  vpiHandle port = Named(vpiPort, By("top.u"), "a");
+  ASSERT_NE(port, nullptr);
+  vpiHandle bit = vpi_handle_by_index(port, 3);
+  ASSERT_NE(bit, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, bit), vpiPortBit);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, bit)), VpiObjectOf(port));
+  EXPECT_EQ(vpi_handle_by_index(port, 1), nullptr);
+}
+
+TEST_F(HandleByIndexOfARun, ADynamicArrayIsIndexedUpToItsSize) {
+  Run("module top; int d[];\n"
+      "  initial begin d = new[3]; d = '{7, 8, 9}; $noop; end endmodule\n");
+  vpiHandle d = By("top.d");
+  ASSERT_NE(d, nullptr);
+  EXPECT_EQ(ValueAt(d, 0), 7);
+  EXPECT_EQ(ValueAt(d, 2), 9);
+  EXPECT_EQ(vpi_handle_by_index(d, 3), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(d, -1), nullptr);
+}
+
+TEST_F(HandleByIndexOfARun, AnAssociativeArrayIsIndexedOnlyByItsKeys) {
+  Run("module top; int aa[int];\n"
+      "  initial begin aa[5] = 50; aa[-2] = 20; $noop; end endmodule\n");
+  vpiHandle aa = By("top.aa");
+  ASSERT_NE(aa, nullptr);
+  EXPECT_EQ(ValueAt(aa, 5), 50);
+  EXPECT_EQ(ValueAt(aa, -2), 20);
+  EXPECT_EQ(vpi_handle_by_index(aa, 4), nullptr);
+  EXPECT_EQ(vpi_handle_by_index(aa, 0), nullptr);
 }
 
 }  // namespace
