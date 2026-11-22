@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <initializer_list>
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -775,6 +778,126 @@ TEST(GateInstantiationParsing, QualifierBeforeAGateOrAGenerateCase) {
   EXPECT_TRUE(ReportedError(
       r.diags, "a generate construct takes no const or lifetime", 4, "A.4.2"));
   EXPECT_FALSE(ReportedError(r.diags, kGate, 5, "A.3.1"));
+}
+
+std::string GateModule(const std::string& item) {
+  return "module m;\n  " + item + "\nendmodule\n";
+}
+
+void ExpectEachGateReported(std::initializer_list<const char*> items,
+                            const char* message, const char* subclause) {
+  for (const char* item : items) {
+    SCOPED_TRACE(item);
+    auto r = Parse(GateModule(item));
+    EXPECT_TRUE(ReportedError(r.diags, message, 2, subclause));
+  }
+}
+
+void ExpectEachGateAccepted(std::initializer_list<const char*> items) {
+  for (const char* item : items) {
+    SCOPED_TRACE(item);
+    EXPECT_TRUE(ParseOk(GateModule(item)));
+  }
+}
+
+TEST(GateDelayCount, FourValuesAreReportedOnEveryDelay3Gate) {
+  ExpectEachGateReported(
+      {"bufif0 #(1, 2, 3, 4) (o, d, c);", "bufif1 #(1, 2, 3, 4) (o, d, c);",
+       "notif0 #(1, 2, 3, 4) (o, d, c);", "notif1 #(1, 2, 3, 4) (o, d, c);",
+       "nmos #(1, 2, 3, 4) (o, d, c);", "pmos #(1, 2, 3, 4) (o, d, c);",
+       "rnmos #(1, 2, 3, 4) (o, d, c);", "rpmos #(1, 2, 3, 4) (o, d, c);",
+       "cmos #(1, 2, 3, 4) (o, d, n, p);", "rcmos #(1, 2, 3, 4) (o, d, n, p);"},
+      "expected ')', got ','", "28.16");
+}
+
+TEST(GateDelayCount, ThreeValuesAreAcceptedOnEveryDelay3Gate) {
+  ExpectEachGateAccepted(
+      {"bufif0 #(1, 2, 3) (o, d, c);", "bufif1 #(1, 2, 3) (o, d, c);",
+       "notif0 #(1, 2, 3) (o, d, c);", "notif1 #(1, 2, 3) (o, d, c);",
+       "nmos #(1, 2, 3) (o, d, c);", "pmos #(1, 2, 3) (o, d, c);",
+       "rnmos #(1, 2, 3) (o, d, c);", "rpmos #(1, 2, 3) (o, d, c);",
+       "cmos #(1, 2, 3) (o, d, n, p);", "rcmos #(1:2:3, 2, 3) (o, d, n, p);"});
+}
+
+TEST(GateDelayCount, ThreeValuesAreReportedOnEveryDelay2Gate) {
+  ExpectEachGateReported(
+      {"and #(1, 2, 3) (y, a, b);", "nand #(1, 2, 3) (y, a, b);",
+       "or #(1, 2, 3) (y, a, b);", "nor #(1, 2, 3) (y, a, b);",
+       "xor #(1, 2, 3) (y, a, b);", "xnor #(1, 2, 3) (y, a, b);",
+       "buf #(1, 2, 3) (y, a);", "not #(1, 2, 3) (y, z, a);",
+       "tranif0 #(1, 2, 3) (p, q, en);", "tranif1 #(1, 2, 3) (p, q, en);",
+       "rtranif0 #(1, 2, 3) (p, q, en);", "rtranif1 #(1, 2, 3) (p, q, en);"},
+      "this gate type allows at most 2 delay values", "28.3.3");
+}
+
+TEST(GateDelayCount, TwoValuesAreAcceptedOnEveryDelay2Gate) {
+  ExpectEachGateAccepted(
+      {"and #(1, 2) (y, a, b);", "nand #(1, 2) (y, a, b);",
+       "or #(1, 2) (y, a, b);", "nor #(1, 2) (y, a, b);",
+       "xor #(1, 2) (y, a, b);", "xnor #(1:2:3, 4) (y, a, b);",
+       "buf #(1, 2) (y, a);", "not #(1, 2) (y, z, a);",
+       "tranif0 #(1, 2) (p, q, en);", "tranif1 #(1, 2) (p, q, en);",
+       "rtranif0 #(1, 2) (p, q, en);", "rtranif1 #(1, 2) (p, q, en);"});
+}
+
+TEST(GateDelayCount, AnyDelayIsReportedOnAPassSwitchOrPullGate) {
+  ExpectEachGateReported(
+      {"tran #1 (p, q);", "rtran #(1, 2) t(p, q);", "pullup #1 (y);",
+       "pulldown #1 (y);", "pulldown #(1, 2) p(y);",
+       "pullup (strong1) #1 p(y);", "pulldown (strong0) #(1, 2) (y);"},
+      "delay not allowed on this gate type", "28.3.3");
+}
+
+TEST(GateDelayCount, APassSwitchOrPullGateWithoutADelayIsAccepted) {
+  ExpectEachGateAccepted({"tran (p, q);", "rtran t(p, q);", "pullup (y);",
+                          "pulldown p(y);", "pullup (strong1) p(y);",
+                          "pulldown (strong0) (y);"});
+}
+
+TEST(GateTerminalCount, EveryWrongCountOfEachClassIsReported) {
+  ExpectEachGateReported(
+      {"pmos (o, d);", "rnmos (o, d);", "rpmos (o, d);", "nmos (o, d, c, e);",
+       "rnmos (o, d, c, e);", "rpmos (o, d, c, e);", "nand (y);", "or (y);",
+       "nor (y);", "xor (y);", "xnor (y);", "tranif0 (p, q);",
+       "rtranif1 (p, q);", "tranif1 (p, q, en, e);", "rtranif0 (p, q, en, e);",
+       "pulldown (y, z);"},
+      "incorrect number of terminals for gate instance", "28.3");
+}
+
+TEST(GateTerminalCount, TheCountOfEachClassIsAccepted) {
+  ExpectEachGateAccepted(
+      {"pmos (o, d, c);", "rnmos (o, d, c);", "rpmos (o, d, c);",
+       "nand (y, a);", "or (y, a);", "nor (y, a);", "xor (y, a);",
+       "xnor (y, a);", "tranif0 (p, q, en);", "rtranif1 (p, q, en);",
+       "tranif1 (p, q, en);", "rtranif0 (p, q, en);", "pulldown (y), (z);"});
+}
+
+TEST(GateDriveStrength, ADriveStrengthIsReportedOnEverySwitch) {
+  ExpectEachGateReported(
+      {"cmos (strong0, strong1) (o, d, n, p);",
+       "rcmos (strong0, strong1) (o, d, n, p);",
+       "nmos (strong0, strong1) (o, d, c);",
+       "pmos (strong0, strong1) (o, d, c);",
+       "rnmos (strong0, strong1) (o, d, c);",
+       "rpmos (strong0, strong1) (o, d, c);", "tran (strong0, strong1) (p, q);",
+       "rtran (strong0, strong1) (p, q);",
+       "tranif0 (strong0, strong1) (p, q, en);",
+       "tranif1 (strong0, strong1) (p, q, en);",
+       "rtranif0 (strong0, strong1) (p, q, en);",
+       "rtranif1 (strong0, strong1) (p, q, en);"},
+      "drive strength not allowed on this gate type", "28.3.2");
+}
+
+TEST(GateDriveStrength, ADriveStrengthIsAcceptedOnEveryGate) {
+  ExpectEachGateAccepted(
+      {"and (strong0, strong1) (y, a, b);", "nand (weak1, pull0) (y, a, b);",
+       "or (supply0, weak1) (y, a, b);", "nor (strong0, strong1) (y, a, b);",
+       "xor (strong0, strong1) (y, a, b);",
+       "xnor (strong0, strong1) (y, a, b);", "buf (strong0, strong1) (y, a);",
+       "not (strong0, strong1) (y, a);", "bufif0 (strong0, strong1) (o, d, c);",
+       "bufif1 (strong0, strong1) (o, d, c);",
+       "notif0 (strong0, strong1) (o, d, c);",
+       "notif1 (strong0, strong1) (o, d, c);"});
 }
 
 }  // namespace

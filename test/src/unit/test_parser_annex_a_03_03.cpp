@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -504,6 +506,29 @@ TEST(PrimitiveTerminalParsing, Error_ParenthesizedDrivenTerminal) {
                              "28.3"));
   EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 7,
                             "28.3"));
+}
+
+TEST(PrimitiveTerminalParsing,
+     ASecondInoutTerminalThatIsNoNetLvalueIsReported) {
+  for (const char* item :
+       {"tran (p, 1'b1);", "rtran (p, q + r);", "tranif0 (p, 1'b0, en);",
+        "tranif1 (p, q | r, en);", "rtranif0 (p, 2, en);",
+        "rtranif1 (p, en ? q : r, en);"}) {
+    SCOPED_TRACE(item);
+    auto r = Parse(std::string("module m;\n  ") + item + "\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, "inout terminal must be a net lvalue", 2,
+                              "28.3"));
+  }
+}
+
+TEST(PrimitiveTerminalParsing, ASecondInoutTerminalThatIsANetLvalueIsAccepted) {
+  for (const char* item :
+       {"tran (p, q);", "rtran (p, w[0]);", "tranif0 (p, w[1:0], en);",
+        "tranif1 (p, {q, r}, en);", "rtranif0 (p, q, en);",
+        "rtranif1 (p, w[2], en);"}) {
+    SCOPED_TRACE(item);
+    EXPECT_TRUE(ParseOk(std::string("module m;\n  ") + item + "\nendmodule\n"));
+  }
 }
 
 }  // namespace
