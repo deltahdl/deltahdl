@@ -110,21 +110,21 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
 }
 
 TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
-  VpiObject child;
-  child.type = vpiNet;
+  VpiObject outer;
+  outer.type = vpiModule;
 
   VpiObject open_mod;
   open_mod.type = vpiModule;
-  open_mod.children.push_back(&child);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiNet, VpiHandleOf(&open_mod))), &child);
+  open_mod.parent = &outer;
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(&open_mod))), &outer);
   s_vpi_error_info ok = {};
   EXPECT_EQ(vpi_chk_error(&ok), 0);
 
   VpiObject locked_mod;
   locked_mod.type = vpiModule;
-  locked_mod.children.push_back(&child);
+  locked_mod.parent = &outer;
   locked_mod.is_protected = true;
-  EXPECT_EQ(vpi_handle(vpiNet, VpiHandleOf(&locked_mod)), nullptr);
+  EXPECT_EQ(vpi_handle(vpiModule, VpiHandleOf(&locked_mod)), nullptr);
 
   s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
