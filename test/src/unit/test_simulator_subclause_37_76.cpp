@@ -1,5 +1,11 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <tuple>
+#include <vector>
+
+#include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
@@ -131,6 +137,126 @@ TEST_F(AliasStatement, InstanceWithNoAliasStatementIteratesNone) {
   module.children = {&net};
 
   EXPECT_EQ(vpi_iterate(vpiAliasStmt, VpiHandleOf(&module)), nullptr);
+}
+
+class AliasesOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("interface ifc; wire a, b; alias a = b; endinterface\n"
+        "module top; wire [7:0] w, v, u, k; wire [3:0] p, r, s, t, r2, s2;\n"
+        "  wire x, y, a, b; ifc i0();\n"
+        "  alias w[0] = x;\n"
+        "  alias w[7:4] = p;\n"
+        "  alias {r, s} = v;\n"
+        "  alias y = w[1];\n"
+        "  alias t = u[3:0];\n"
+        "  alias k = {r2, s2};\n"
+        "  if (1) begin : g wire a, b; alias a = b; end\n"
+        "  for (genvar n = 0; n < 2; n++) begin : gl wire a, b; alias a = b; "
+        "end\n"
+        "endmodule\n");
+  }
+
+  static vpiHandle AliasAt(size_t n) {
+    const std::vector<vpiHandle> kAliases = ObjectsOf(vpiAliasStmt, By("top"));
+    return n < kAliases.size() ? kAliases[n] : nullptr;
+  }
+
+  static vpiHandle SideOf(int side, size_t n) {
+    vpiHandle alias = AliasAt(n);
+    return alias == nullptr ? nullptr : vpi_handle(side, alias);
+  }
+
+  static void ExpectSelectOf(vpiHandle select, int kind, const char* net) {
+    ASSERT_NE(select, nullptr) << net;
+    EXPECT_EQ(vpi_get(vpiType, select), kind) << net;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, select)),
+              VpiObjectOf(By(std::string("top.") + net)))
+        << net;
+  }
+
+  static vpiHandle AliasJoining(const std::string& lhs) {
+    for (const char* owner : {"top", "top.g", "top.gl[0]", "top.gl[1]"}) {
+      for (vpiHandle alias : ObjectsOf(vpiAliasStmt, By(owner))) {
+        if (VpiObjectOf(vpi_handle(vpiLhs, alias)) == VpiObjectOf(By(lhs))) {
+          return alias;
+        }
+      }
+    }
+    return nullptr;
+  }
+};
+
+TEST_F(AliasesOfARun, EachStatementOfAModuleIsAnAliasStatement) {
+  const std::vector<vpiHandle> kAliases = ObjectsOf(vpiAliasStmt, By("top"));
+  ASSERT_GE(kAliases.size(), 6U);
+  for (vpiHandle alias : kAliases) {
+    EXPECT_EQ(vpi_get(vpiType, alias), vpiAliasStmt);
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, alias)),
+              VpiObjectOf(By("top")));
+  }
+}
+
+TEST_F(AliasesOfARun, ABitSelectSideIsABitOfItsNet) {
+  ExpectSelectOf(SideOf(vpiLhs, 0), vpiNetBit, "w");
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiIndex, SideOf(vpiLhs, 0))), 0);
+  EXPECT_EQ(VpiObjectOf(SideOf(vpiRhs, 0)), VpiObjectOf(By("top.x")));
+  ExpectSelectOf(SideOf(vpiRhs, 3), vpiNetBit, "w");
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiIndex, SideOf(vpiRhs, 3))), 1);
+  EXPECT_EQ(VpiObjectOf(SideOf(vpiLhs, 3)), VpiObjectOf(By("top.y")));
+}
+
+TEST_F(AliasesOfARun, APartSelectSideIsAPartSelectOfItsNet) {
+  ExpectSelectOf(SideOf(vpiLhs, 1), vpiPartSelect, "w");
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiLeftRange, SideOf(vpiLhs, 1))), 7);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiRightRange, SideOf(vpiLhs, 1))), 4);
+  ExpectSelectOf(SideOf(vpiRhs, 4), vpiPartSelect, "u");
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiLeftRange, SideOf(vpiRhs, 4))), 3);
+  EXPECT_EQ(IntegerOf(vpi_handle(vpiRightRange, SideOf(vpiRhs, 4))), 0);
+}
+
+TEST_F(AliasesOfARun, AConcatenationSideIsAConcatenationOfItsNets) {
+  for (const auto& [side, n, first, second] :
+       std::vector<std::tuple<int, size_t, const char*, const char*>>{
+           {vpiLhs, 2, "top.r", "top.s"}, {vpiRhs, 5, "top.r2", "top.s2"}}) {
+    vpiHandle concat = SideOf(side, n);
+    EXPECT_EQ(OpOf(concat), vpiConcatOp) << n;
+    const std::vector<vpiHandle> kParts = OperandsOf(concat);
+    ASSERT_EQ(kParts.size(), 2U) << n;
+    EXPECT_EQ(VpiObjectOf(kParts[0]), VpiObjectOf(By(first))) << n;
+    EXPECT_EQ(VpiObjectOf(kParts[1]), VpiObjectOf(By(second))) << n;
+  }
+}
+
+TEST_F(AliasesOfARun, AnInterfaceAliasReachesItsSidesAndItsInstance) {
+  vpiHandle ifc = By("top.i0");
+  const std::vector<vpiHandle> kAliases = ObjectsOf(vpiAliasStmt, ifc);
+  ASSERT_EQ(kAliases.size(), 1U);
+  EXPECT_EQ(vpi_get(vpiType, kAliases[0]), vpiAliasStmt);
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, kAliases[0])),
+            VpiObjectOf(ifc));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, kAliases[0])),
+            VpiObjectOf(By("top.i0.a")));
+  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, kAliases[0])),
+            VpiObjectOf(By("top.i0.b")));
+}
+
+TEST_F(AliasesOfARun, AGenerateBlockAliasJoinsTheBlocksOwnNets) {
+  for (const char* block : {"top.g", "top.gl[0]", "top.gl[1]"}) {
+    const std::string kScope(block);
+    vpiHandle alias = AliasJoining(kScope + ".a");
+    ASSERT_NE(alias, nullptr) << block;
+    EXPECT_EQ(vpi_get(vpiType, alias), vpiAliasStmt) << block;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, alias)),
+              VpiObjectOf(By(kScope + ".b")))
+        << block;
+    EXPECT_NE(VpiObjectOf(vpi_handle(vpiRhs, alias)), VpiObjectOf(By("top.b")))
+        << block;
+    EXPECT_EQ(VpiObjectOf(vpi_handle(vpiInstance, alias)),
+              VpiObjectOf(By("top")))
+        << block;
+  }
 }
 
 }  // namespace
