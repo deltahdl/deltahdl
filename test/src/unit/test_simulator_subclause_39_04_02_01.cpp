@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -280,6 +281,150 @@ TEST_F(AssertionRun, AControlCallbackOfAFutureGclkAssertionWaitsForTheTick) {
   }
   EXPECT_EQ(a1[0].reason, cbAssertionReset);
   EXPECT_EQ(a1[1].reason, cbAssertionDisable);
+}
+
+struct Timed {
+  int reason = 0;
+  uint64_t cb_time = 0;
+  uint64_t now = 0;
+  uint64_t attempt_start = 0;
+  bool has_info = false;
+  auto operator<=>(const Timed&) const = default;
+};
+
+std::vector<Timed> SortedCallsOf(const char* assertion) {
+  std::vector<Timed> calls;
+  for (const AssertionCall& call : AssertionCalls()) {
+    if (call.assertion == assertion) {
+      calls.push_back({call.reason, call.cb_time, call.now, call.attempt_start,
+                       call.has_info});
+    }
+  }
+  std::ranges::sort(calls);
+  return calls;
+}
+
+std::vector<Timed> Sorted(std::vector<Timed> calls) {
+  std::ranges::sort(calls);
+  return calls;
+}
+
+void WatchEveryReasonOf(const char* assertion) {
+  for (int reason : {cbAssertionStart, cbAssertionSuccess, cbAssertionFailure,
+                     cbAssertionReset, cbAssertionDisable}) {
+    ASSERT_NE(WatchAssertion(assertion, reason), nullptr);
+  }
+}
+
+std::string GclkDesign(const std::string& assertions, const char* stimulus) {
+  std::string src =
+      "module top;\n"
+      "  logic clk = 0, gclk = 0, a = 1, b = 1;\n"
+      "  global clocking @(posedge gclk); endclocking\n"
+      "  always #2 gclk = ~gclk;\n"
+      "  always #4 clk = ~clk;\n";
+  src += assertions;
+  src += "  initial begin $arm; ";
+  src += stimulus;
+  src +=
+      " end\n"
+      "endmodule\n";
+  return src;
+}
+
+struct FutureFunction {
+  const char* name;
+  bool holds_on_a_steady_one;
+};
+
+class GclkFutureRun : public AssertionRun,
+                      public ::testing::WithParamInterface<FutureFunction> {
+ protected:
+  std::string Assertion() const {
+    std::string assertion = "  af: assert property (@(posedge clk) ";
+    assertion += GetParam().name;
+    assertion += "(a)) else begin end\n";
+    return assertion;
+  }
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    EachFutureFunction, GclkFutureRun,
+    ::testing::Values(FutureFunction{"$future_gclk", true},
+                      FutureFunction{"$rising_gclk", false},
+                      FutureFunction{"$falling_gclk", false},
+                      FutureFunction{"$steady_gclk", true},
+                      FutureFunction{"$changing_gclk", false}),
+    [](const ::testing::TestParamInfo<FutureFunction>& info) {
+      std::string name = info.param.name + 1;
+      name.erase(name.size() - 5);
+      return name;
+    });
+
+TEST_P(GclkFutureRun,
+       DISABLED_AttemptCallbacksRunAtTheNextGlobalTickWithTheEventTime) {
+  ArmInTurn({[] { WatchEveryReasonOf("top.af"); }});
+  Run(GclkDesign(Assertion(), "#16 $finish;"));
+  const int kVerdict = GetParam().holds_on_a_steady_one ? cbAssertionSuccess
+                                                        : cbAssertionFailure;
+  EXPECT_EQ(SortedCallsOf("top.af"),
+            Sorted({{cbAssertionStart, 4, 6, 4, true},
+                    {kVerdict, 4, 6, 4, true},
+                    {cbAssertionStart, 12, 14, 12, true},
+                    {kVerdict, 12, 14, 12, true}}));
+}
+
+TEST_P(GclkFutureRun, ControlCallbacksRunAtTheNextGlobalTickWithTheEventTime) {
+  ArmInTurn({[] {
+    for (int reason : {cbAssertionReset, cbAssertionDisable}) {
+      ASSERT_NE(WatchAssertion("top.af", reason), nullptr);
+    }
+  }});
+  Run(GclkDesign(Assertion(), "#5 $assertkill(0, top.af); #11 $finish;"));
+  EXPECT_EQ(SortedCallsOf("top.af"),
+            Sorted({{cbAssertionReset, 5, 6, 0, false},
+                    {cbAssertionDisable, 5, 6, 0, false}}));
+}
+
+constexpr const char* kFigureAssertions =
+    "  a1: assert property (@(posedge clk) $falling_gclk(a) |=> b)\n"
+    "      else begin end\n"
+    "  a2: assert property (@(posedge clk) a |=> $falling_gclk(b))\n"
+    "      else begin end\n";
+
+TEST_F(AssertionRun,
+       DISABLED_AFutureFunctionInAnImplicationDefersItsAttemptCallbacks) {
+  ArmInTurn({[] {
+    WatchEveryReasonOf("top.a1");
+    WatchEveryReasonOf("top.a2");
+  }});
+  Run(GclkDesign(kFigureAssertions, "#5 a = 0; #11 $finish;"));
+  EXPECT_EQ(SortedCallsOf("top.a1"),
+            Sorted({{cbAssertionStart, 4, 6, 4, true},
+                    {cbAssertionSuccess, 12, 14, 4, true},
+                    {cbAssertionStart, 12, 14, 12, true}}));
+  EXPECT_EQ(SortedCallsOf("top.a2"),
+            Sorted({{cbAssertionStart, 4, 6, 4, true},
+                    {cbAssertionFailure, 12, 14, 4, true},
+                    {cbAssertionStart, 12, 14, 12, true}}));
+}
+
+TEST_F(AssertionRun, AKillOfAFutureFunctionImplicationWaitsForTheTick) {
+  ArmInTurn({[] {
+    for (const char* assertion : {"top.a1", "top.a2"}) {
+      for (int reason : {cbAssertionReset, cbAssertionDisable}) {
+        ASSERT_NE(WatchAssertion(assertion, reason), nullptr);
+      }
+    }
+  }});
+  Run(GclkDesign(kFigureAssertions,
+                 "#5 a = 0; #8 $assertkill(0, top.a1, top.a2); #3 $finish;"));
+  for (const char* assertion : {"top.a1", "top.a2"}) {
+    EXPECT_EQ(SortedCallsOf(assertion),
+              Sorted({{cbAssertionReset, 13, 14, 0, false},
+                      {cbAssertionDisable, 13, 14, 0, false}}))
+        << assertion;
+  }
 }
 
 }  // namespace
