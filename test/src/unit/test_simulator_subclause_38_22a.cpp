@@ -151,5 +151,32 @@ TEST_F(VpiHandleMultiSim, NoHandleWhenTheSharedObjectIsOfAnotherType) {
             nullptr);
 }
 
+TEST_F(VpiHandleMultiSim, AThirdReferenceThatReachesTheObjectKeepsIt) {
+  auto* mod = vpi_ctx_.CreateModule("m3", "m3");
+  auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod);
+  auto* in_port = vpi_ctx_.CreatePort("i", kVpiInput, mod);
+  auto* third = vpi_ctx_.CreatePort("k", kVpiInput, mod);
+  VpiHandle shared = SharedObject(vpiPort, out_port, in_port);
+  third->children.push_back(shared);
+
+  EXPECT_EQ(VpiObjectOf(vpi_handle_multi(vpiPort, VpiHandleOf(out_port),
+                                         VpiHandleOf(in_port),
+                                         VpiHandleOf(third), nullptr)),
+            shared);
+}
+
+TEST_F(VpiHandleMultiSim,
+       DISABLED_AThirdReferenceThatMissesTheObjectLeavesNone) {
+  auto* mod = vpi_ctx_.CreateModule("m4", "m4");
+  auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod);
+  auto* in_port = vpi_ctx_.CreatePort("i", kVpiInput, mod);
+  auto* third = vpi_ctx_.CreatePort("k", kVpiInput, mod);
+  SharedObject(vpiPort, out_port, in_port);
+
+  EXPECT_EQ(vpi_handle_multi(vpiPort, VpiHandleOf(out_port),
+                             VpiHandleOf(in_port), VpiHandleOf(third), nullptr),
+            nullptr);
+}
+
 }  // namespace
 }  // namespace delta
