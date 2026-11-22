@@ -82,5 +82,23 @@ TEST_F(VpiGet64Sim, AProtectedNonExpressionRefusesItsSize) {
   EXPECT_EQ(vpi_get64(vpiSize, VpiHandleOf(&locked)), vpiUndefined);
 }
 
+TEST_F(VpiGet64Sim, DISABLED_AnObjectWithoutTheIdPropertyIsAnError) {
+  for (const int kType : {vpiModule, vpiNet}) {
+    VpiObject plain;
+    plain.type = kType;
+    EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&plain)), vpiUndefined) << kType;
+    const PLI_INT32 kLevel = vpi_chk_error(nullptr);
+    EXPECT_NE(kLevel, 0) << kType;
+  }
+}
+
+TEST_F(VpiGet64Sim, DISABLED_AnUnknownPropertyNumberIsAnError) {
+  VpiObject module;
+  module.type = vpiModule;
+  EXPECT_EQ(vpi_get64(987654, VpiHandleOf(&module)), vpiUndefined);
+  const PLI_INT32 kLevel = vpi_chk_error(nullptr);
+  EXPECT_NE(kLevel, 0);
+}
+
 }  // namespace
 }  // namespace delta
