@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_user.h"
 
 namespace delta {
