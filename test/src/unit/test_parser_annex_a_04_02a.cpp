@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -579,6 +584,96 @@ TEST(GenerateInstantiationGrammar, PortSpecparamAndSpecifyInARegion) {
   EXPECT_TRUE(ReportedError(
       r.diags, "specify block not allowed inside a generate block or region", 6,
       "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateIterationRemainingOperators) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  genvar a, b, c, d, e, g, h, k, l, n;\n"
+              "  for (a = 64; a > 0; a -= 8) begin end\n"
+              "  for (b = 64; b > 1; b /= 2) begin end\n"
+              "  for (c = 13; c > 1; c %= 4) begin end\n"
+              "  for (d = 7; d > 1; d &= 1) begin end\n"
+              "  for (e = 1; e < 8; e |= e << 1) begin end\n"
+              "  for (g = 1; g < 16; g ^= g << 1) begin end\n"
+              "  for (h = 1; h < 16; h <<= 1) begin end\n"
+              "  for (k = 16; k > 0; k >>= 1) begin end\n"
+              "  for (l = 1; l < 40; l <<<= 2) begin end\n"
+              "  for (n = 48; n > 0; n >>>= 2) begin end\n"
+              "endmodule\n"));
+}
+
+std::string LoopGenerateWithHeader(const std::string& header) {
+  return "module m;\n"
+         "  genvar i;\n"
+         "  for (" +
+         header +
+         ") begin : g end\n"
+         "endmodule\n";
+}
+
+size_t ErrorCount(const std::vector<Diagnostic>& diags) {
+  size_t count = 0;
+  for (const auto& diag : diags) {
+    if (diag.severity == DiagSeverity::kError) ++count;
+  }
+  return count;
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateOmittedInitializationRejected) {
+  auto r = Parse(LoopGenerateWithHeader("; i < 4; i++"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "a loop generate's initialization", 3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar,
+     DISABLED_LoopGenerateOmittedConditionRejected) {
+  auto r = Parse(LoopGenerateWithHeader("i = 0; ; i++"));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "a loop generate's condition", 3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateOmittedIterationRejected) {
+  auto r = Parse(LoopGenerateWithHeader("i = 0; i < 4; "));
+  EXPECT_TRUE(
+      ReportedError(r.diags, "a loop generate's iteration", 3, "A.4.2"));
+}
+
+TEST(GenerateInstantiationGrammar,
+     DISABLED_LoopGenerateOmittedPartIsReportedOnce) {
+  for (const char* header :
+       {"; i < 4; i++", "i = 0; ; i++", "i = 0; i < 4; "}) {
+    EXPECT_EQ(ErrorCount(Parse(LoopGenerateWithHeader(header)).diags), 1u)
+        << header;
+  }
+}
+
+TEST(GenerateInstantiationGrammar, LoopGenerateFullHeaderAccepted) {
+  EXPECT_TRUE(ParseOk(LoopGenerateWithHeader("i = 0; i < 4; i++")));
+}
+
+TEST(GenerateInstantiationGrammar, CaseGenerateSelectorWithoutParensRejected) {
+  auto r = Parse(
+      "module m;\n"
+      "  localparam int P = 1;\n"
+      "  case P\n"
+      "    1: begin : b end\n"
+      "    default: begin end\n"
+      "  endcase\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(r.diags, "expected '(', got identifier", 3, "27.5"));
+}
+
+TEST(GenerateInstantiationGrammar, CaseGenerateParenthesizedSelectorAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  localparam int P = 1;\n"
+              "  case (P)\n"
+              "    1: begin : b end\n"
+              "    default: begin end\n"
+              "  endcase\n"
+              "endmodule\n"));
 }
 
 }  // namespace

@@ -2,9 +2,11 @@
 
 #include <cstdint>
 #include <initializer_list>
+#include <string>
 #include <string_view>
 
 #include "fixture_elaborator.h"
+#include "helpers_generate_forms.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -447,6 +449,52 @@ TEST(BnfClarificationElaboration, TypeRefOperatorAnywhereError) {
                               "equality/inequality operators",
                               line, "6.23"))
         << line;
+  }
+}
+
+std::string InCheckerGenerateOfTop(const std::string& form,
+                                   const std::string& item) {
+  return "interface ifc; endinterface\n"
+         "program prg; endprogram\n"
+         "checker inner; endchecker\n"
+         "checker c;\n" +
+         InGenerateForm(form, item) +
+         "endchecker\n"
+         "module top; c k(); endmodule\n";
+}
+
+TEST(GenerateItemSetElaboration, ANetInACheckerGenerateIsReported) {
+  for (const char* form : kGenerateForms) {
+    ElabFixture f;
+    ElaborateSrc(InCheckerGenerateOfTop(form, "wire w;"), f, "top");
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "a net cannot be declared inside checker 'c'", 6,
+                              "17.7"))
+        << form;
+  }
+}
+
+TEST(GenerateItemSetElaboration, AnInterfaceOrProgramInACheckerGenerate) {
+  for (const char* form : kGenerateForms) {
+    for (const char* item : {"ifc u();", "prg q();"}) {
+      ElabFixture f;
+      ElaborateSrc(InCheckerGenerateOfTop(form, item), f, "top");
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "only checkers can be instantiated inside "
+                                "checker 'c'",
+                                6, "17.2"))
+          << form << " " << item;
+    }
+  }
+}
+
+TEST(GenerateItemSetElaboration, ACheckerOrVariableInACheckerGenerateIsFine) {
+  for (const char* form : kGenerateForms) {
+    for (const char* item : {"inner u();", "logic w;"}) {
+      ElabFixture f;
+      EXPECT_TRUE(ElabOk(InCheckerGenerateOfTop(form, item), f))
+          << form << " " << item;
+    }
   }
 }
 

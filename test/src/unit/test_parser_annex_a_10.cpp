@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
+#include "helpers_generate_forms.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -244,6 +247,127 @@ TEST(BnfClarificationParsing, ErrorRefFormalInDpiImport) {
   EXPECT_TRUE(ReportedError(
       r.diags, "ref qualifier cannot be used in a DPI import declaration", 2,
       "35.5.4"));
+}
+
+std::string WildcardTwiceIn(const std::string& instance) {
+  return "interface ifc(input logic clk); endinterface\n"
+         "program p(input logic clk); endprogram\n"
+         "module m(input logic clk); endmodule\n"
+         "module t;\n"
+         "  logic clk;\n" +
+         instance + "\nendmodule\n";
+}
+
+TEST(BnfClarificationParsing, WildcardTwiceInAnInterfaceOrProgramInstance) {
+  for (const char* instance : {"  ifc i0(.*, .*);", "  p p0(.*, .*);"}) {
+    auto r = Parse(WildcardTwiceIn(instance));
+    EXPECT_TRUE(ReportedError(
+        r.diags, ".* already appears earlier in this port connection list", 6,
+        "23.3.2"))
+        << instance;
+  }
+}
+
+TEST(BnfClarificationParsing, WildcardOnceInAnInterfaceOrProgramInstance) {
+  for (const char* instance : {"  ifc i0(.*);", "  p p0(.*);"}) {
+    EXPECT_TRUE(ParseOk(WildcardTwiceIn(instance))) << instance;
+  }
+}
+
+TEST(BnfClarificationParsing, WildcardTwiceInABindInstantiation) {
+  auto r = Parse(
+      "module m(input logic clk); endmodule\n"
+      "module t; logic clk; endmodule\n"
+      "bind t m b0(.*, .*);\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, ".* already appears earlier in this port connection list", 3,
+      "23.3.2"));
+}
+
+TEST(BnfClarificationParsing, WildcardOnceInABindInstantiation) {
+  EXPECT_TRUE(
+      ParseOk("module m(input logic clk); endmodule\n"
+              "module t; logic clk; endmodule\n"
+              "bind t m b0(.*);\n"));
+}
+
+TEST(GenerateItemSetParsing, AnExternPrototypeInAModuleGenerateIsReported) {
+  for (const char* form : {"if", "case"}) {
+    auto r = Parse("module m;\n" + InGenerateForm(form, "extern task t();") +
+                   "endmodule\n");
+    EXPECT_TRUE(
+        ReportedError(r.diags,
+                      "an extern task or function prototype is an item of an "
+                      "interface",
+                      3, "A.1.6"))
+        << form;
+  }
+}
+
+TEST(GenerateItemSetParsing, AnExternPrototypeInAnInterfaceGenerateIsAccepted) {
+  for (const char* form : {"if", "case"}) {
+    EXPECT_TRUE(ParseOk("interface m;\n" +
+                        InGenerateForm(form, "extern task t();") +
+                        "endinterface\n"))
+        << form;
+  }
+}
+
+TEST(GenerateItemSetParsing, AGateInAnInterfaceNestedInAModuleIsReported) {
+  auto r = Parse(
+      "module m;\n"
+      "  logic a, b, c;\n"
+      "  interface ii;\n"
+      "    if (1) begin\n"
+      "      and g(a, b, c);\n"
+      "    end\n"
+      "  endinterface\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(
+      r.diags, "a gate instantiation is not an item of an interface", 5,
+      "A.1.6"));
+}
+
+TEST(GenerateItemSetParsing, AGateInTheGenerateOfTheEnclosingModuleIsAccepted) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic a, b, c;\n"
+              "  interface ii;\n"
+              "  endinterface\n"
+              "  if (1) begin\n"
+              "    and g(a, b, c);\n"
+              "  end\n"
+              "endmodule\n"));
+}
+
+std::string InCheckerGenerate(const std::string& form,
+                              const std::string& item) {
+  return "checker c(logic a, logic b, logic x);\n" +
+         InGenerateForm(form, item) + "endchecker\n";
+}
+
+TEST(GenerateItemSetParsing, AnExternPrototypeOrGateInACheckerGenerate) {
+  for (const char* form : kGenerateForms) {
+    auto r = Parse(InCheckerGenerate(form, "extern task t();"));
+    EXPECT_TRUE(
+        ReportedError(r.diags,
+                      "an extern task or function prototype is an item of an "
+                      "interface",
+                      3, "A.1.6"))
+        << form;
+    r = Parse(InCheckerGenerate(form, "and g(a, b, x);"));
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a gate instantiation is not an item of a "
+                              "checker",
+                              3, "A.1.8"))
+        << form;
+  }
+}
+
+TEST(GenerateItemSetParsing, ACheckerVariableInACheckerGenerateIsAccepted) {
+  for (const char* form : kGenerateForms) {
+    EXPECT_TRUE(ParseOk(InCheckerGenerate(form, "logic w;"))) << form;
+  }
 }
 
 }  // namespace
