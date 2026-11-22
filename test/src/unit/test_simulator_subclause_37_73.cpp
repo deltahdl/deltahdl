@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "fixture_vpi_run.h"
 #include "simulator/sv_vpi_user.h"
@@ -189,6 +192,120 @@ TEST(ExpectModel, OnlyAnExpectStatementHasAnElse) {
   VpiObject wait;
   wait.type = vpiWait;
   EXPECT_EQ(VpiExpectElseStmt(&wait), nullptr);
+}
+
+class ExpectFormsOfARun : public VpiDesignRun {
+ protected:
+  void SetUp() override {
+    VpiDesignRun::SetUp();
+    Run("module top; logic clk, a; int i;\n"
+        "  property p; @(posedge clk) a; endproperty\n"
+        "  task t; endtask\n"
+        "  initial expect (p) $display(\"p\");\n"
+        "  initial expect (p);\n"
+        "  initial expect (p) begin i = 1; end else i = 2;\n"
+        "  initial expect (p) i = 1; else begin i = 2; end\n"
+        "  initial expect (p) t(); else t();\n"
+        "endmodule\n");
+  }
+
+  static vpiHandle ExpectAt(size_t n) {
+    const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+    return n < kProcs.size() ? vpi_handle(vpiStmt, kProcs[n]) : nullptr;
+  }
+
+  static int KindReached(int relation, size_t n) {
+    vpiHandle expect = ExpectAt(n);
+    vpiHandle action =
+        expect == nullptr ? nullptr : vpi_handle(relation, expect);
+    return action == nullptr ? 0 : vpi_get(vpiType, action);
+  }
+};
+
+TEST_F(ExpectFormsOfARun, APassActionAloneIsTheStatementWithNoElse) {
+  vpiHandle expect = ExpectAt(0);
+  ASSERT_NE(expect, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, expect), vpiExpectStmt);
+  EXPECT_EQ(ActionReached(vpiStmt, expect), "$display");
+  EXPECT_EQ(vpi_handle(vpiElseStmt, expect), nullptr);
+}
+
+TEST_F(ExpectFormsOfARun, AnExpectWithNoActionReachesNeitherStatement) {
+  vpiHandle expect = ExpectAt(1);
+  ASSERT_NE(expect, nullptr);
+  EXPECT_NE(vpi_handle(vpiPropertySpec, expect), nullptr);
+  EXPECT_EQ(vpi_handle(vpiStmt, expect), nullptr);
+  EXPECT_EQ(vpi_handle(vpiElseStmt, expect), nullptr);
+}
+
+TEST_F(ExpectFormsOfARun, EachActionIsReachedAsItsOwnKind) {
+  EXPECT_EQ(KindReached(vpiStmt, 2), vpiBegin);
+  EXPECT_EQ(KindReached(vpiElseStmt, 2), vpiAssignment);
+  EXPECT_EQ(KindReached(vpiStmt, 3), vpiAssignment);
+  EXPECT_EQ(KindReached(vpiElseStmt, 3), vpiBegin);
+  EXPECT_EQ(KindReached(vpiStmt, 4), vpiTaskCall);
+  EXPECT_EQ(KindReached(vpiElseStmt, 4), vpiTaskCall);
+}
+
+TEST_F(ExpectsOfARun, AnExpectClockedByTheDefaultClockingReachesItsSpec) {
+  Run("module top; logic clk, a;\n"
+      "  default clocking cb @(posedge clk); endclocking\n"
+      "  initial expect (a) $display(\"p\");\n"
+      "endmodule\n");
+  const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
+  ASSERT_EQ(kProcs.size(), 1U);
+  vpiHandle expect = vpi_handle(vpiStmt, kProcs[0]);
+  ASSERT_NE(expect, nullptr);
+  EXPECT_EQ(vpi_get(vpiType, expect), vpiExpectStmt);
+  vpiHandle spec = vpi_handle(vpiPropertySpec, expect);
+  ASSERT_NE(spec, nullptr);
+  EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
+}
+
+TEST_F(ExpectsOfARun, AnExpectInEachPlaceReachesItsSpecAndActions) {
+  Run("package pk; logic clk, a;\n"
+      "  task pt; expect (@(posedge clk) a) $display(\"p\"); else "
+      "$write(\"f\");\n"
+      "  endtask\n"
+      "endpackage\n"
+      "interface ifc; logic clk, a;\n"
+      "  initial expect (@(posedge clk) a) $display(\"p\"); else "
+      "$write(\"f\");\n"
+      "endinterface\n"
+      "program prg; logic clk, a;\n"
+      "  initial expect (@(posedge clk) a) $display(\"p\"); else "
+      "$write(\"f\");\n"
+      "endprogram\n"
+      "module top; logic clk, a; ifc i0(); prg p0();\n"
+      "  class C; logic clk, a;\n"
+      "    task ct; expect (@(posedge clk) a) $display(\"p\");\n"
+      "      else $write(\"f\"); endtask\n"
+      "  endclass\n"
+      "  task tk; expect (@(posedge clk) a) $display(\"p\"); else "
+      "$write(\"f\");\n"
+      "  endtask\n"
+      "endmodule\n");
+  vpiHandle top = By("top");
+  const std::vector<vpiHandle> kInterface = ObjectsOf(vpiProcess, By("top.i0"));
+  const std::vector<vpiHandle> kProgram = ObjectsOf(vpiProcess, By("top.p0"));
+  ASSERT_EQ(kInterface.size(), 1U);
+  ASSERT_EQ(kProgram.size(), 1U);
+  const std::vector<std::pair<const char*, vpiHandle>> kOwners{
+      {"package task", Named(vpiTask, By("pk"), "pt")},
+      {"interface initial", kInterface[0]},
+      {"program initial", kProgram[0]},
+      {"class method", Named(vpiMethods, Named(vpiClassDefn, top, "C"), "ct")},
+      {"module task", Named(vpiTask, top, "tk")},
+  };
+  for (const auto& [where, owner] : kOwners) {
+    ASSERT_NE(owner, nullptr) << where;
+    vpiHandle expect = vpi_handle(vpiStmt, owner);
+    ASSERT_NE(expect, nullptr) << where;
+    EXPECT_EQ(vpi_get(vpiType, expect), vpiExpectStmt) << where;
+    EXPECT_NE(vpi_handle(vpiPropertySpec, expect), nullptr) << where;
+    EXPECT_EQ(ActionReached(vpiStmt, expect), "$display") << where;
+    EXPECT_EQ(ActionReached(vpiElseStmt, expect), "$write") << where;
+  }
 }
 
 }  // namespace
