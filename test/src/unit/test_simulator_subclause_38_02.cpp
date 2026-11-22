@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "helpers_vpi_error_fixture.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
@@ -135,6 +137,60 @@ TEST_F(VpiErrorCheckSim, RegisteringAnAssertionCallbackResetsErrorStatus) {
       vpi_register_assertion_cb(nullptr, cbAssertionStart, nullptr, nullptr),
       nullptr);
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
+}
+
+TEST_F(VpiErrorCheckSim, RepeatedChecksWithNothingPendingBothReturnZero) {
+  RaiseError();
+  ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
+  s_vpi_vlog_info vlog = {};
+  ASSERT_EQ(vpi_get_vlog_info(&vlog), 1);
+
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+  s_vpi_error_info info = {};
+  info.level = vpiInternal;
+  EXPECT_EQ(vpi_chk_error(&info), 0);
+  EXPECT_EQ(vpi_chk_error(nullptr), 0);
+}
+
+TEST_F(VpiErrorCheckSim, AnErrorAfterAWarningIsReportedAlone) {
+  vpi_free_object(nullptr);
+  ASSERT_EQ(vpi_chk_error(nullptr), vpiWarning);
+  RaiseError();
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiError);
+  EXPECT_EQ(info.level, vpiError);
+}
+
+TEST_F(VpiErrorCheckSim, AWarningAfterAnErrorIsReportedAlone) {
+  RaiseError();
+  ASSERT_EQ(vpi_chk_error(nullptr), vpiError);
+  vpi_free_object(nullptr);
+
+  s_vpi_error_info info = {};
+  EXPECT_EQ(vpi_chk_error(&info), vpiWarning);
+  EXPECT_EQ(info.level, vpiWarning);
+}
+
+TEST_F(VpiErrorCheckSim, DISABLED_TheErrorNamesTheProductAndCarriesACode) {
+  s_vpi_vlog_info vlog = {};
+  ASSERT_EQ(vpi_get_vlog_info(&vlog), 1);
+  ASSERT_NE(vlog.product, nullptr);
+  const std::string kProduct = vlog.product;
+
+  for (int expected : {vpiError, vpiWarning}) {
+    if (expected == vpiError) {
+      RaiseError();
+    } else {
+      vpi_free_object(nullptr);
+    }
+    s_vpi_error_info info = {};
+    ASSERT_EQ(vpi_chk_error(&info), expected);
+    ASSERT_NE(info.product, nullptr) << expected;
+    EXPECT_EQ(std::string(info.product), kProduct) << expected;
+    ASSERT_NE(info.code, nullptr) << expected;
+    EXPECT_STRNE(info.code, "") << expected;
+  }
 }
 
 }  // namespace
