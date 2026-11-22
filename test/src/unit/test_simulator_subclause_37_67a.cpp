@@ -36,7 +36,7 @@ TEST_F(Waits, WaitReachesExpressionCondition) {
             &condition);
 }
 
-TEST_F(Waits, OrderedWaitReachesSequenceInstanceCondition) {
+TEST_F(Waits, OrderedWaitIteratesSequenceInstanceCondition) {
   VpiObject condition;
   condition.type = vpiSequenceInst;
 
@@ -45,8 +45,10 @@ TEST_F(Waits, OrderedWaitReachesSequenceInstanceCondition) {
   ordered_wait.children = {&condition};
 
   EXPECT_EQ(VpiWaitConditionExpr(&ordered_wait), &condition);
-  EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, VpiHandleOf(&ordered_wait))),
-            &condition);
+  vpiHandle it = vpi_iterate(vpiCondition, VpiHandleOf(&ordered_wait));
+  ASSERT_NE(it, nullptr);
+  EXPECT_EQ(VpiObjectOf(vpi_scan(it)), &condition);
+  EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
 TEST_F(Waits, ConditionFoundAfterPrecedingBodyChild) {
