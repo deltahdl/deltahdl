@@ -120,4 +120,52 @@ TEST(OptionalSystemTasksGeneral, ANameOutsideAnnexDKeepsTheCatalogueReport) {
                             2, "20.1"));
 }
 
+struct UnavailableCall {
+  const char* statement;
+  const char* name;
+  const char* subclause;
+};
+
+const UnavailableCall kUnavailableCalls[] = {
+    {"$key", "$key", "D.5"},
+    {"$nokey", "$nokey", "D.5"},
+    {"$input(\"cmds.txt\")", "$input", "D.4"},
+    {"$save(\"state.dat\")", "$save", "D.9"},
+    {"$restart(\"state.dat\")", "$restart", "D.9"},
+    {"$incsave(\"inc1.dat\")", "$incsave", "D.9"},
+    {"$reset", "$reset", "D.8"},
+    {"$reset(0)", "$reset", "D.8"},
+    {"$reset(1, 42, 3)", "$reset", "D.8"},
+    {"v = $reset_count", "$reset_count", "D.8"},
+    {"v = $reset_value", "$reset_value", "D.8"},
+};
+
+TEST(OptionalSystemTasksGeneral, AnUnavailableCallIsReportedWhereverItRuns) {
+  const char* const kPlaces[] = {
+      "module t;\n  int v;\n  initial begin\n    %;\n  end\nendmodule\n",
+      "module t;\n  int v;\n  task automatic tk;\n    %;\n  endtask\n"
+      "  initial tk();\nendmodule\n",
+      "module t;\n  int v;\n  function automatic void fn;\n    %;\n"
+      "  endfunction\n  initial fn();\nendmodule\n",
+      "program t;\n  int v;\n  initial begin\n    %;\n  end\nendprogram\n",
+      "class c;\n  int v;\n  function void m();\n    %;\n  endfunction\n"
+      "endclass\nmodule t;\n  initial begin\n    c o = new;\n    o.m();\n"
+      "  end\nendmodule\n",
+      "package pk;\n  int v;\n  function automatic void f();\n    %;\n"
+      "  endfunction\nendpackage\nmodule t;\n  initial pk::f();\nendmodule\n",
+  };
+  for (const char* place : kPlaces) {
+    for (const auto& call : kUnavailableCalls) {
+      std::string src = place;
+      src.replace(src.find('%'), 1, call.statement);
+      SimFixture f;
+      ASSERT_TRUE(RunAnnexDSource(f, src)) << src;
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                NotAvailable(call.name, call.subclause),
+                                LineHolding(src, call.statement), "D.1"))
+          << src;
+    }
+  }
+}
+
 }  // namespace
