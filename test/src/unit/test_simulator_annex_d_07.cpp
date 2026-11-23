@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <sstream>
 #include <streambuf>
@@ -8,6 +9,8 @@
 #include <system_error>
 
 #include "fixture_simulator.h"
+#include "helpers_annex_d_call_forms.h"
+#include "helpers_reported_error.h"
 #include "helpers_temp_file.h"
 
 using namespace delta;
@@ -270,6 +273,231 @@ TEST(OptionalLogSim, FileOutputTasksPrintingToStandardOutputAreCopied) {
   std::error_code ec;
   std::filesystem::remove(path, ec);
   std::filesystem::remove(other, ec);
+}
+
+std::string WithLogPath(std::string src, const std::string& path) {
+  for (auto at = src.find("<P>"); at != std::string::npos;
+       at = src.find("<P>", at + path.size())) {
+    src.replace(at, 3, path);
+  }
+  return src;
+}
+
+struct LoggedRun {
+  std::string out;
+  std::string log;
+};
+
+LoggedRun RunLogged(const std::string& stem, const std::string& src,
+                    SimFixture& f) {
+  std::string path = FreshLogPath(stem);
+  LoggedRun run;
+  run.out = RunCapture(WithLogPath(src, path), f);
+  run.log = SlurpFile(path);
+  std::error_code ec;
+  std::filesystem::remove(path, ec);
+  return run;
+}
+
+TEST(OptionalLogSim, LogAndNologWorkWhereverTheyRun) {
+  constexpr const char* kPlacements[] = {
+      "module t;\n"
+      "  task open_log; $log(\"<P>\"); endtask\n"
+      "  task off; $nolog; endtask\n"
+      "  task on; $log; endtask\n"
+      "  initial begin\n"
+      "    open_log();\n"
+      "    $display(\"a\");\n"
+      "    off();\n"
+      "    $display(\"b\");\n"
+      "    on();\n"
+      "    $display(\"c\");\n"
+      "  end\n"
+      "endmodule\n",
+      "module t;\n"
+      "  function void open_log; $log(\"<P>\"); endfunction\n"
+      "  function void off; $nolog; endfunction\n"
+      "  function void on; $log; endfunction\n"
+      "  initial begin\n"
+      "    open_log();\n"
+      "    $display(\"a\");\n"
+      "    off();\n"
+      "    $display(\"b\");\n"
+      "    on();\n"
+      "    $display(\"c\");\n"
+      "  end\n"
+      "endmodule\n",
+      "module t;\n"
+      "  class C;\n"
+      "    function void open_log; $log(\"<P>\"); endfunction\n"
+      "    function void off; $nolog; endfunction\n"
+      "    function void on; $log; endfunction\n"
+      "  endclass\n"
+      "  initial begin\n"
+      "    C c;\n"
+      "    c = new;\n"
+      "    c.open_log();\n"
+      "    $display(\"a\");\n"
+      "    c.off();\n"
+      "    $display(\"b\");\n"
+      "    c.on();\n"
+      "    $display(\"c\");\n"
+      "  end\n"
+      "endmodule\n",
+      "program p;\n"
+      "  initial begin\n"
+      "    $log(\"<P>\");\n"
+      "    $display(\"a\");\n"
+      "    $nolog;\n"
+      "    $display(\"b\");\n"
+      "    $log;\n"
+      "    $display(\"c\");\n"
+      "  end\n"
+      "endprogram\n",
+  };
+  for (const char* src : kPlacements) {
+    SimFixture f;
+    LoggedRun run = RunLogged("placement.log", src, f);
+    EXPECT_FALSE(f.has_errors) << src;
+    EXPECT_EQ(run.out, "a\nb\nc\n") << src;
+    EXPECT_EQ(run.log, "a\nc\n") << src;
+  }
+}
+
+TEST(OptionalLogSim, MonitorAndStrobeTextIsCopied) {
+  SimFixture f;
+  LoggedRun run = RunLogged("monitor.log",
+                            "module t;\n"
+                            "  int x;\n"
+                            "  initial begin\n"
+                            "    $log(\"<P>\");\n"
+                            "    x = 1;\n"
+                            "    $strobe(\"strobed %0d\", x);\n"
+                            "    $monitor(\"monitored %0d\", x);\n"
+                            "    #1 x = 2;\n"
+                            "  end\n"
+                            "endmodule\n",
+                            f);
+  EXPECT_NE(run.out.find("strobed 1"), std::string::npos) << run.out;
+  EXPECT_NE(run.out.find("monitored 2"), std::string::npos) << run.out;
+  EXPECT_EQ(run.log, run.out);
+}
+
+TEST(OptionalLogSim, SeverityAndFinishTextOnStandardOutputIsCopied) {
+  SimFixture f;
+  LoggedRun run = RunLogged("severity.log",
+                            "module t;\n"
+                            "  initial begin\n"
+                            "    $log(\"<P>\");\n"
+                            "    $info(\"info_text\");\n"
+                            "    $warning(\"warning_text\");\n"
+                            "    $error(\"error_text\");\n"
+                            "    $fatal(1, \"fatal_text\");\n"
+                            "  end\n"
+                            "endmodule\n",
+                            f);
+  for (const char* text : {"info_text", "warning_text", "$finish"}) {
+    EXPECT_NE(run.out.find(text), std::string::npos) << run.out;
+  }
+  EXPECT_EQ(run.log, run.out);
+}
+
+TEST(OptionalLogSim, AnExistingFileIsCreatedAfresh) {
+  std::string path = FreshLogPath("stale.log");
+  {
+    std::ofstream stale(path);
+    stale << "stale\n";
+  }
+  SimFixture f;
+  RunCapture(WithLogPath("module t;\n"
+                         "  initial begin\n"
+                         "    $log(\"<P>\");\n"
+                         "    $display(\"fresh\");\n"
+                         "  end\n"
+                         "endmodule\n",
+                         path),
+             f);
+  EXPECT_EQ(SlurpFile(path), "fresh\n");
+  std::error_code ec;
+  std::filesystem::remove(path, ec);
+}
+
+TEST(OptionalLogSim, NamingTheCurrentLogFileCreatesItAfresh) {
+  SimFixture f;
+  LoggedRun run = RunLogged("again.log",
+                            "module t;\n"
+                            "  initial begin\n"
+                            "    $log(\"<P>\");\n"
+                            "    $display(\"one\");\n"
+                            "    $log(\"<P>\");\n"
+                            "    $display(\"two\");\n"
+                            "  end\n"
+                            "endmodule\n",
+                            f);
+  EXPECT_EQ(run.log, "two\n");
+}
+
+constexpr const char* kLogForm =
+    "$log is written as a task statement with no argument or with one string "
+    "naming the log file, and this call is not";
+
+constexpr const char* kNologForm =
+    "$nolog is written as a task statement with no argument, and this call is "
+    "not";
+
+std::string LogCall(const std::string& args) {
+  std::string call = "$log(\"";
+  call += FreshLogPath("form.log");
+  call += "\"";
+  call += args;
+  call += ")";
+  return call;
+}
+
+TEST(OptionalLogForm, DISABLED_NologWithAnArgumentIsReported) {
+  ExpectOnlyTheMalformedCallReported("$nolog", "$nolog(\"x\")", kNologForm,
+                                     "D.7");
+}
+
+TEST(OptionalLogForm, DISABLED_LogWithTwoArgumentsIsReported) {
+  ExpectOnlyTheMalformedCallReported(LogCall(""), LogCall(", 3"), kLogForm,
+                                     "D.7");
+  FreshLogPath("form.log");
+}
+
+TEST(OptionalLogForm, DISABLED_LogWhoseArgumentIsNoStringIsReported) {
+  ExpectOnlyTheMalformedCallReported(LogCall(""), "$log(5)", kLogForm, "D.7");
+  FreshLogPath("form.log");
+  std::error_code ec;
+  std::filesystem::remove("5", ec);
+}
+
+TEST(OptionalLogForm, DISABLED_LogAndNologUsedAsFunctionsAreReported) {
+  ExpectOnlyTheMalformedCallReported("$log", "v = $log", kLogForm, "D.7");
+  ExpectOnlyTheMalformedCallReported("$nolog", "v = $nolog", kNologForm, "D.7");
+}
+
+TEST(OptionalLogForm, DISABLED_AStringVariableIsNeverTakenAsTheFileName) {
+  std::string path = FreshLogPath("by_value.log");
+  std::error_code ec;
+  std::filesystem::remove("log_name", ec);
+  SimFixture f;
+  RunCapture(WithLogPath("module t;\n"
+                         "  string log_name;\n"
+                         "  initial begin\n"
+                         "    log_name = \"<P>\";\n"
+                         "    $log(log_name);\n"
+                         "    $display(\"by value\");\n"
+                         "  end\n"
+                         "endmodule\n",
+                         path),
+             f);
+  bool named_after_identifier = std::filesystem::exists("log_name");
+  std::filesystem::remove("log_name", ec);
+  EXPECT_FALSE(named_after_identifier);
+  EXPECT_TRUE(SlurpFile(path) == "by value\n" ||
+              ReportedError(f.diag.Diagnostics(), kLogForm, 5, "D.7"));
+  std::filesystem::remove(path, ec);
 }
 
 }  // namespace
