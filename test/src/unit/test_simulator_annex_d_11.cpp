@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <vector>
 
 #include "fixture_simulator.h"
+#include "helpers_annex_d_call_forms.h"
 #include "helpers_event_callbacks.h"
 #include "helpers_reported_error.h"
 #include "simulator/vpi_user.h"
@@ -188,6 +190,178 @@ TEST_F(EventCallbacksOfARun, ScopeOnALabelledAssertionNotesItsBegin) {
   ASSERT_EQ(kChanges.size(), 1u);
   EXPECT_EQ(kChanges[0].obj_type, vpiNamedBegin);
   EXPECT_EQ(kChanges[0].obj, "i1");
+}
+
+std::string ScopeAfterRun(const std::string& src, SimFixture& f) {
+  auto* design = ElaborateSrc(src, f);
+  if (design != nullptr) LowerAndRun(design, f);
+  return f.ctx.InteractiveScope();
+}
+
+std::string NoneOfTheKinds(const std::string& arg) {
+  std::string message =
+      "$scope takes the complete hierarchical name of a module, task, "
+      "function, or named block, and '";
+  message += arg;
+  message += "' is none";
+  return message;
+}
+
+TEST(OptionalScopeSim, DISABLED_ManyTopsStartAtTheFirstTop) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module b;\n  initial begin end\nendmodule\n"
+                          "module a;\n  initial begin end\nendmodule\n",
+                          f),
+            "b");
+}
+
+TEST(OptionalScopeSim, AModuleDeclaredBeforeTheTopIsNotTheStart) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module sub;\n  initial begin end\nendmodule\n"
+                          "module t;\n  sub u1();\nendmodule\n",
+                          f),
+            "t");
+}
+
+TEST(OptionalScopeSim, TheTopModuleNameReturnsTheScopeToIt) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module t;\n"
+                          "  initial begin : blk\n"
+                          "    $scope(t.blk);\n"
+                          "    $scope(t);\n"
+                          "  end\n"
+                          "endmodule\n",
+                          f),
+            "t");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OptionalScopeSim, ATaskNameMakesTheTaskTheScope) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module t;\n"
+                          "  task tk; endtask\n"
+                          "  initial $scope(t.tk);\n"
+                          "endmodule\n",
+                          f),
+            "t.tk");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(OptionalScopeSim, ACallInATaskFunctionOrInstanceSetsTheScope) {
+  struct Caller {
+    const char* leaf_body;
+    const char* top_body;
+  };
+  const Caller kCallers[] = {
+      {"", "  task automatic tk; $scope(t.u1); endtask\n  initial tk();\n"},
+      {"",
+       "  function automatic void fn; $scope(t.u1); endfunction\n"
+       "  initial fn();\n"},
+      {"  initial $scope(t.u1);\n", ""},
+  };
+  for (const auto& caller : kCallers) {
+    std::string src = "module sub;\nendmodule\nmodule leaf;\n";
+    src += caller.leaf_body;
+    src += "endmodule\nmodule t;\n  sub u1();\n  leaf l1();\n";
+    src += caller.top_body;
+    src += "endmodule\n";
+    SimFixture f;
+    EXPECT_EQ(ScopeAfterRun(src, f), "t.u1") << src;
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+  }
+}
+
+TEST(OptionalScopeSim, AnIncompleteNameIsRejectedBesideTheCompleteOne) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module t;\n"
+                          "  initial begin : blk\n"
+                          "    $scope(t.blk);\n"
+                          "    $scope(blk);\n"
+                          "  end\n"
+                          "endmodule\n",
+                          f),
+            "t.blk");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), NoneOfTheKinds("blk"), 4, "D.11"));
+  EXPECT_FALSE(
+      ReportedError(f.diag.Diagnostics(), NoneOfTheKinds("t.blk"), 3, "D.11"));
+}
+
+TEST(OptionalScopeSim, AStringArgumentIsRejected) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module t;\n"
+                          "  initial $scope(\"t\");\n"
+                          "endmodule\n",
+                          f),
+            "t");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), NoneOfTheKinds("\"t\""), 2, "D.11"));
+}
+
+TEST(OptionalScopeSim, AGenerateBlockIsRejected) {
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun("module t;\n"
+                          "  if (1) begin : g\n"
+                          "    int gv;\n"
+                          "  end\n"
+                          "  initial $scope(t.g);\n"
+                          "endmodule\n",
+                          f),
+            "t");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), NoneOfTheKinds("t.g"), 5, "D.11"));
+}
+
+void ExpectScopeOfNoAllowedKindRejected(const std::string& decls,
+                                        const std::string& instance,
+                                        const std::string& arg) {
+  std::string src = decls;
+  src += "module sub;\nendmodule\nmodule t;\n  sub s1();\n";
+  src += instance;
+  src += "  initial begin\n    $scope(t.s1);\n    $scope(";
+  src += arg;
+  src += ");\n  end\nendmodule\n";
+  SimFixture f;
+  EXPECT_EQ(ScopeAfterRun(src, f), "t.s1") << src;
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), NoneOfTheKinds(arg),
+                            LineHolding(src, "$scope(" + arg + ")"), "D.11"))
+      << src;
+  EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), NoneOfTheKinds("t.s1"),
+                             LineHolding(src, "$scope(t.s1)"), "D.11"))
+      << src;
+}
+
+TEST(OptionalScopeSim, DISABLED_AnInterfaceInstanceIsRejected) {
+  ExpectScopeOfNoAllowedKindRejected(
+      "interface ifc;\n  int iv;\nendinterface\n", "  ifc u();\n", "t.u");
+}
+
+TEST(OptionalScopeSim, AProgramIsRejected) {
+  ExpectScopeOfNoAllowedKindRejected(
+      "program p;\n  initial begin end\nendprogram\n", "", "p");
+}
+
+TEST(OptionalScopeSim, DISABLED_ACheckerInstanceIsRejected) {
+  ExpectScopeOfNoAllowedKindRejected("checker chk;\nendchecker\n",
+                                     "  chk c1();\n", "t.c1");
+}
+
+constexpr const char* kScopeForm =
+    "$scope is written as a task statement with one hierarchical name, and "
+    "this call is not";
+
+TEST(OptionalScopeForm, DISABLED_NoArgumentListIsReported) {
+  ExpectOnlyTheMalformedCallReported("$scope(t)", "$scope", kScopeForm, "D.11");
+}
+
+TEST(OptionalScopeForm, DISABLED_AnEmptyArgumentListIsReported) {
+  ExpectOnlyTheMalformedCallReported("$scope(t)", "$scope()", kScopeForm,
+                                     "D.11");
+}
+
+TEST(OptionalScopeForm, DISABLED_TwoArgumentsAreReported) {
+  ExpectOnlyTheMalformedCallReported("$scope(t)", "$scope(t, t)", kScopeForm,
+                                     "D.11");
 }
 
 }  // namespace

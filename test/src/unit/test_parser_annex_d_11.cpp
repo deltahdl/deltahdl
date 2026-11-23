@@ -12,6 +12,7 @@ TEST(OptionalSystemTaskParserParsing, Scope) {
       "  initial $scope(m);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OptionalSystemTaskParserParsing, ScopeHierarchicalArgument) {
@@ -20,6 +21,7 @@ TEST(OptionalSystemTaskParserParsing, ScopeHierarchicalArgument) {
       "  initial $scope(m.blk);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
