@@ -156,6 +156,10 @@ TEST(OptionalSystemTasksGeneral, AnUnavailableCallIsReportedWhereverItRuns) {
       "  end\nendmodule\n",
       "package pk;\n  int v;\n  function automatic void f();\n    %;\n"
       "  endfunction\nendpackage\nmodule t;\n  initial pk::f();\nendmodule\n",
+      "interface ifc;\n  int v;\n  initial begin\n    %;\n  end\nendinterface\n"
+      "module t;\n  ifc i();\nendmodule\n",
+      "int v;\nfunction automatic void f();\n    %;\nendfunction\nmodule t;\n"
+      "  initial f();\nendmodule\n",
   };
   for (const char* place : kPlaces) {
     for (const auto& call : kUnavailableCalls) {
