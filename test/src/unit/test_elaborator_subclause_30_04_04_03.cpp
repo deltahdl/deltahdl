@@ -11,7 +11,7 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
      FullPathWithDataSourceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m(input en, clk, d, output q);\n"
       "  specify\n"
       "    if (en) (posedge clk *> (q : d)) = 5;\n"
       "  endspecify\n"
@@ -25,7 +25,7 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
      CoexistingUniqueByEdgeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m;\n"
+      "module m(input c, clk, output q);\n"
       "  specify\n"
       "    if (c) (posedge clk => q) = 1;\n"
       "    if (c) (negedge clk => q) = 2;\n"

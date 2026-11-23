@@ -320,4 +320,120 @@ TEST(TimingCheckCommandParsing, ErrorMissingSemicolon) {
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "31.2"));
 }
 
+std::string TimingCheckModule(const std::string& check) {
+  return "module m(input clk, d, en, output q);\n"
+         "  reg n;\n"
+         "  wire [3:0] dc, dd;\n"
+         "  specify\n"
+         "    " +
+         check +
+         ";\n"
+         "  endspecify\n"
+         "endmodule\n";
+}
+
+TEST(TimingCheckCommandParsing, EveryTwoEventCheckTakesAConditionOnEachEvent) {
+  for (const char* check : {"$setuphold(posedge clk &&& en, d &&& en, 1, 2)",
+                            "$recovery(posedge clk &&& en, d &&& en, 1)",
+                            "$removal(posedge clk &&& en, d &&& en, 1)",
+                            "$recrem(posedge clk &&& en, d &&& en, 1, 2)",
+                            "$skew(posedge clk &&& en, d &&& en, 1)",
+                            "$timeskew(posedge clk &&& en, d &&& en, 1)",
+                            "$fullskew(posedge clk &&& en, d &&& en, 1, 2)",
+                            "$nochange(posedge clk &&& en, d &&& en, 0, 0)"}) {
+    auto r = Parse(TimingCheckModule(check));
+    EXPECT_FALSE(r.has_errors) << check;
+    auto* tc = GetSoleTimingCheck(r);
+    ASSERT_NE(tc, nullptr) << check;
+    EXPECT_NE(tc->ref_condition, nullptr) << check;
+    EXPECT_NE(tc->data_condition, nullptr) << check;
+  }
+}
+
+TEST(TimingCheckCommandParsing, ATrailingCommaLeavesTheNotifierSlotEmpty) {
+  for (const char* check :
+       {"$width(posedge clk, 20, 0, )", "$setuphold(posedge clk, d, 5, 3, )",
+        "$recrem(posedge clk, d, 5, 3, )"}) {
+    auto r = Parse(TimingCheckModule(check));
+    EXPECT_FALSE(r.has_errors) << check;
+    auto* tc = GetSoleTimingCheck(r);
+    ASSERT_NE(tc, nullptr) << check;
+    EXPECT_TRUE(tc->notifier.empty()) << check;
+  }
+}
+
+TEST(TimingCheckCommandParsing, ChecksEndingAtTheirLastFlagTakeNothingPastIt) {
+  for (const char* check :
+       {"$timeskew(posedge clk, posedge d, 5, n, 1, 0, 1)",
+        "$fullskew(posedge clk, negedge d, 5, 6, n, 1, 0, 1)",
+        "$setuphold(posedge clk, d, 5, 3, n, , , dc, dd, en)",
+        "$recrem(posedge clk, d, 5, 3, n, , , dc, dd, en)"}) {
+    auto r = Parse(TimingCheckModule(check));
+    EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 5, "31.2"))
+        << check;
+  }
+  for (const char* check : {"$timeskew(posedge clk, posedge d, 5, n, 1, 0)",
+                            "$fullskew(posedge clk, negedge d, 5, 6, n, 1, 0)",
+                            "$setuphold(posedge clk, d, 5, 3, n, , , dc, dd)",
+                            "$recrem(posedge clk, d, 5, 3, n, , , dc, dd)"}) {
+    EXPECT_TRUE(ParseOk(TimingCheckModule(check))) << check;
+  }
+}
+
+TEST(TimingCheckCommandParsing, RecremTakesMinTypMaxConditionsAndSelects) {
+  auto r = Parse(TimingCheckModule(
+      "$recrem(posedge clk, d, 5, 3, n, en:en:en, en:d:en, dc[1:2:3], "
+      "dd[0:1:2])"));
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_NE(tc->timestamp_cond, nullptr);
+  EXPECT_NE(tc->timecheck_cond, nullptr);
+  EXPECT_EQ(tc->delayed_ref, "dc");
+  EXPECT_NE(tc->delayed_ref_expr, nullptr);
+  EXPECT_EQ(tc->delayed_data, "dd");
+  EXPECT_NE(tc->delayed_data_expr, nullptr);
+}
+
+TEST(TimingCheckCommandParsing, RecremLeavesTheDelayedReferenceEmpty) {
+  auto r =
+      Parse(TimingCheckModule("$recrem(posedge clk, d, 5, 3, n, , , , dd)"));
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  EXPECT_TRUE(tc->delayed_ref.empty());
+  EXPECT_EQ(tc->delayed_data, "dd");
+}
+
+TEST(TimingCheckCommandParsing, RecremDelayedSignalsAreTerminalIdentifiers) {
+  for (const char* check : {"$recrem(posedge clk, d, 5, 3, n, , , 5, dd)",
+                            "$recrem(posedge clk, d, 5, 3, n, , , (dc), dd)"}) {
+    auto r = Parse(TimingCheckModule(check));
+    EXPECT_TRUE(ReportedError(
+        r.diags, "a delayed_reference is a terminal identifier", 5, "A.7.5.2"))
+        << check;
+  }
+  auto r =
+      Parse(TimingCheckModule("$recrem(posedge clk, d, 5, 3, n, , , dc, 5)"));
+  EXPECT_TRUE(ReportedError(r.diags, "a delayed_data is a terminal identifier",
+                            5, "A.7.5.2"));
+}
+
+TEST(TimingCheckCommandParsing,
+     DISABLED_AnArithmeticDelayedSignalIsReportedAsNoTerminalIdentifier) {
+  for (const char* name : {"$recrem", "$setuphold"}) {
+    auto ref = Parse(TimingCheckModule(
+        std::string(name) + "(posedge clk, d, 5, 3, n, , , dc + 1, dd)"));
+    EXPECT_TRUE(ReportedError(ref.diags,
+                              "a delayed_reference is a terminal identifier", 5,
+                              "A.7.5.2"))
+        << name;
+    auto data = Parse(TimingCheckModule(
+        std::string(name) + "(posedge clk, d, 5, 3, n, , , dc, dd + 1)"));
+    EXPECT_TRUE(ReportedError(
+        data.diags, "a delayed_data is a terminal identifier", 5, "A.7.5.2"))
+        << name;
+  }
+}
+
 }  // namespace

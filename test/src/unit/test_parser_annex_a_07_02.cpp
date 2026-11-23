@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "fixture_specify.h"
+#include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
@@ -452,6 +455,72 @@ TEST(SpecifyPathParsing, ErrorPathWithoutOperatorIsRejected) {
       r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
       "30.4.2"));
   EXPECT_EQ(r.diags.size(), 1u);
+}
+
+std::string PathModule(const std::string& path) {
+  return "module m(input a, clk, d, en, output q);\n"
+         "  specify\n"
+         "    " +
+         path +
+         "\n"
+         "  endspecify\n"
+         "endmodule\n";
+}
+
+TEST(SpecifyPathParsing, EdgeSensitiveAndStateDependentPathsEndInASemicolon) {
+  for (const char* path :
+       {"(posedge clk => (q : d)) = 1", "if (en) (a => q) = 1",
+        "ifnone (a => q) = 1", "if (en) (posedge clk => (q : d)) = 1"}) {
+    auto r = Parse(PathModule(path));
+    EXPECT_TRUE(
+        ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.4"))
+        << path;
+    EXPECT_TRUE(ParseOk(PathModule(std::string(path) + ";"))) << path;
+  }
+}
+
+TEST(SpecifyPathParsing, AnIfnoneTakesOnlyASimplePath) {
+  for (const char* path :
+       {"ifnone (posedge clk *> q) = 5;", "ifnone (clk *> (q : d)) = 5;",
+        "ifnone (edge clk => q) = 5;",
+        "ifnone (posedge clk => (q : d)) = 5;"}) {
+    auto r = Parse(PathModule(path));
+    EXPECT_TRUE(ReportedError(
+        r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"))
+        << path;
+  }
+  EXPECT_TRUE(ParseOk(PathModule("ifnone (a *> q) = 5;")));
+  EXPECT_TRUE(ParseOk(PathModule("ifnone (a -=> q) = 5;")));
+}
+
+TEST(SpecifyPathParsing, AnIfTakesAnEdgeSensitiveFullPath) {
+  for (const char* path : {"if (en) (posedge clk *> (q : d)) = 5;",
+                           "if (en) (posedge clk *> q) = 5;",
+                           "if (en) (negedge clk *> (q -: d)) = 5;"}) {
+    auto r = Parse(PathModule(path));
+    EXPECT_FALSE(r.has_errors) << path;
+    auto* item = GetSolePathItem(r);
+    ASSERT_NE(item, nullptr) << path;
+    EXPECT_EQ(item->path.path_kind, SpecifyPathKind::kFull) << path;
+    EXPECT_NE(item->path.edge, SpecifyEdge::kNone) << path;
+    EXPECT_NE(item->path.condition, nullptr) << path;
+  }
+}
+
+TEST(SpecifyPathParsing, APolarityIsAPlusOrAMinusGluedToTheOperator) {
+  auto r = Parse(PathModule("(a +*> q) = 1;"));
+  EXPECT_FALSE(r.has_errors);
+  auto* item = GetSolePathItem(r);
+  ASSERT_NE(item, nullptr);
+  EXPECT_EQ(item->path.polarity, SpecifyPolarity::kPositive);
+  EXPECT_EQ(item->path.path_kind, SpecifyPathKind::kFull);
+  for (const char* path : {"(a * => q) = 1;", "(a * *> q) = 1;"}) {
+    auto bad = Parse(PathModule(path));
+    EXPECT_TRUE(ReportedError(
+        bad.diags, "path joins its source to its destination with '=>' or '*>'",
+        3, "30.4.2"))
+        << path;
+  }
 }
 
 }  // namespace

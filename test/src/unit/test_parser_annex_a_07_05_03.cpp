@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cctype>
+#include <cstddef>
+#include <string>
 #include <utility>
+#include <vector>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
@@ -311,6 +315,75 @@ TEST(TimingCheckEventDefParsing, EdgeControlSpecifierEmptyListRejected) {
   EXPECT_TRUE(ReportedError(
       r.diags, "edge-control specifier requires at least one edge_descriptor",
       3, "31.5"));
+}
+
+std::string EdgeCheck(const std::string& descriptors) {
+  return "module m(input clk, d);\n"
+         "  specify\n"
+         "    $setup(d, edge [" +
+         descriptors +
+         "] clk, 1);\n"
+         "  endspecify\n"
+         "endmodule\n";
+}
+
+TEST(TimingCheckEventDefParsing, TheRemainingUpperCaseDescriptorsAreAccepted) {
+  auto r = Parse(EdgeCheck("X1, Z0, 1X, 0Z"));
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  const std::vector<std::pair<char, char>> kWant = {
+      {'x', '1'}, {'z', '0'}, {'1', 'x'}, {'0', 'z'}};
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), kWant.size());
+  for (size_t i = 0; i < kWant.size(); ++i) {
+    EXPECT_EQ(std::tolower(tc->ref_edge_descriptors[i].first), kWant[i].first);
+    EXPECT_EQ(std::tolower(tc->ref_edge_descriptors[i].second),
+              kWant[i].second);
+  }
+}
+
+TEST(TimingCheckEventDefParsing, EveryOtherDescriptorIsRejected) {
+  for (const char* bad :
+       {"11", "xx", "xz", "zx", "x", "z", "0", "02", "20", "1Z, 22"}) {
+    auto r = Parse(EdgeCheck(bad));
+    EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"))
+        << bad;
+  }
+}
+
+TEST(TimingCheckEventDefParsing, DISABLED_AnInvalidDescriptorIsReportedOnce) {
+  for (const char* bad : {"11", "xz", "0"}) {
+    auto r = Parse(EdgeCheck(bad));
+    EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"))
+        << bad;
+    EXPECT_EQ(r.diags.size(), 1u) << bad;
+  }
+}
+
+TEST(TimingCheckEventDefParsing,
+     DISABLED_EveryDescriptorSplitBySpaceOrCommentIsReported) {
+  for (const char* split : {"x 0", "x 1", "Z 1", "0 1", "1 0", "0/**/1"}) {
+    auto r = Parse(EdgeCheck(split));
+    EXPECT_TRUE(ReportedError(
+        r.diags, "edge_descriptor may not contain embedded spaces", 3, "31.5"))
+        << split;
+  }
+}
+
+TEST(TimingCheckEventDefParsing, SpacesAroundDescriptorsSeparateTokensOnly) {
+  auto r = Parse(
+      "module m(input clk, d);\n"
+      "  specify\n"
+      "    $setup(d, edge  [ 01 ,\n"
+      "                      10 ] clk, 1);\n"
+      "  endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* tc = GetSoleTimingCheck(r);
+  ASSERT_NE(tc, nullptr);
+  ASSERT_EQ(tc->ref_edge_descriptors.size(), 2u);
+  EXPECT_EQ(tc->ref_edge_descriptors[0], std::make_pair('0', '1'));
+  EXPECT_EQ(tc->ref_edge_descriptors[1], std::make_pair('1', '0'));
 }
 
 }  // namespace

@@ -369,4 +369,64 @@ TEST(TimingCheckArgumentParsing, BareLimitAndThresholdTriplesRejected) {
   }
 }
 
+std::string CheckInModule(const std::string& check) {
+  return "module m(input clk, d, output q);\n"
+         "  specify\n"
+         "    " +
+         check +
+         ";\n"
+         "  endspecify\n"
+         "endmodule\n";
+}
+
+TEST(TimingCheckArgumentParsing, ALimitTakesAMinTypMaxTripleOnlyInParentheses) {
+  for (const char* check :
+       {"$hold(posedge clk, d, 1:2:3)", "$removal(posedge clk, d, 1:2:3)",
+        "$recovery(posedge clk, d, 1:2:3)",
+        "$setuphold(posedge clk, d, 1:2:3, 1)",
+        "$recrem(posedge clk, d, 1:2:3, 1)",
+        "$recrem(posedge clk, d, 1, 1:2:3)", "$width(posedge clk, 1:2:3)",
+        "$period(posedge clk, 1:2:3)", "$skew(posedge clk, d, 1:2:3)",
+        "$timeskew(posedge clk, d, 1:2:3)",
+        "$fullskew(posedge clk, d, 1:2:3, 1)",
+        "$fullskew(posedge clk, d, 1, 1:2:3)"}) {
+    auto r = Parse(CheckInModule(check));
+    EXPECT_TRUE(ReportedError(
+        r.diags, "a min:typ:max triple there is parenthesized", 3, "A.7.5.2"))
+        << check;
+  }
+  for (const char* check :
+       {"$hold(posedge clk, d, (1:2:3))", "$removal(posedge clk, d, (1:2:3))",
+        "$recovery(posedge clk, d, (1:2:3))",
+        "$recrem(posedge clk, d, (1:2:3), (1:2:3))",
+        "$width(posedge clk, (1:2:3))", "$period(posedge clk, (1:2:3))",
+        "$skew(posedge clk, d, (1:2:3))", "$timeskew(posedge clk, d, (1:2:3))",
+        "$fullskew(posedge clk, d, (1:2:3), (1:2:3))"}) {
+    EXPECT_TRUE(ParseOk(CheckInModule(check))) << check;
+  }
+}
+
+TEST(TimingCheckArgumentParsing, ALiteralIsNoNotifierOfAnyCheck) {
+  for (const char* check :
+       {"$removal(posedge clk, d, 3, 5)", "$recovery(posedge clk, d, 3, 5)",
+        "$setuphold(posedge clk, d, 3, 2, 5)",
+        "$recrem(posedge clk, d, 3, 2, 5)"}) {
+    auto r = Parse(CheckInModule(check));
+    EXPECT_TRUE(ReportedError(
+        r.diags, "a timing check's notifier is a variable identifier", 3,
+        "A.7.5.2"))
+        << check;
+  }
+  for (const char* check : {"$removal(posedge clk, d, 3, ntfr)",
+                            "$recovery(posedge clk, d, 3, ntfr)",
+                            "$setuphold(posedge clk, d, 3, 2, ntfr)",
+                            "$recrem(posedge clk, d, 3, 2, ntfr)"}) {
+    auto r = Parse(CheckInModule(check));
+    EXPECT_FALSE(r.has_errors) << check;
+    auto* tc = GetSoleTimingCheck(r);
+    ASSERT_NE(tc, nullptr) << check;
+    EXPECT_EQ(tc->notifier, "ntfr") << check;
+  }
+}
+
 }  // namespace

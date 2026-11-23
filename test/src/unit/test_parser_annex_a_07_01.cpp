@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -213,6 +218,93 @@ TEST(SpecifyBlockDeclParsing, SpecifyBlockMissingEndspecifyRejected) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endspecify', got EOF", 3, "30.3"));
+}
+
+struct SpecifyItemRejection {
+  const char* item;
+  const char* message;
+  const char* subclause;
+};
+
+void ExpectEachItemRejected(const std::vector<SpecifyItemRejection>& cases) {
+  for (const auto& c : cases) {
+    auto r = Parse(std::string("module m(input a, b, output q, y);\n"
+                               "  specify\n"
+                               "    ") +
+                   c.item +
+                   "\n"
+                   "  endspecify\n"
+                   "endmodule\n");
+    uint32_t line =
+        std::string_view(c.message).starts_with("expected ';'") ? 4 : 3;
+    EXPECT_TRUE(ReportedError(r.diags, c.message, line, c.subclause)) << c.item;
+  }
+}
+
+TEST(SpecifyBlockDeclParsing, APulsestyleOndetectNeedsAListAndASemicolon) {
+  ExpectEachItemRejected({
+      {"pulsestyle_ondetect ;", "expected identifier, got ';'", "30.4"},
+      {"pulsestyle_ondetect q", "expected ';', got 'endspecify'", "30.7.4.1"},
+      {"pulsestyle_ondetect {q, y};", "a concatenation is no specify terminal",
+       "A.7.3"},
+  });
+  EXPECT_TRUE(
+      ParseOk("module m(input a, output q, y);\n"
+              "  specify\n"
+              "    pulsestyle_ondetect q, y;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
+TEST(SpecifyBlockDeclParsing,
+     AShowcancelledDeclarationNeedsAListAndASemicolon) {
+  ExpectEachItemRejected({
+      {"showcancelled ;", "expected identifier, got ';'", "30.4"},
+      {"noshowcancelled ;", "expected identifier, got ';'", "30.4"},
+      {"showcancelled {q, y};", "a concatenation is no specify terminal",
+       "A.7.3"},
+      {"noshowcancelled {q, y};", "a concatenation is no specify terminal",
+       "A.7.3"},
+      {"noshowcancelled q", "expected ';', got 'endspecify'", "30.7.4.2"},
+  });
+  EXPECT_TRUE(
+      ParseOk("module m(input a, output q, y);\n"
+              "  specify\n"
+              "    showcancelled q, y;\n"
+              "    noshowcancelled q, y;\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
+TEST(SpecifyBlockDeclParsing, ASystemTaskOtherThanATimingCheckIsNoSpecifyItem) {
+  ExpectEachItemRejected({
+      {"$finish;", "system task cannot appear in specify block", "31.2"},
+      {"$foo(a, b);", "system task cannot appear in specify block", "31.2"},
+  });
+  EXPECT_TRUE(
+      ParseOk("module m(input a, b, output q);\n"
+              "  specify\n"
+              "    $setup(a, posedge b, 1);\n"
+              "  endspecify\n"
+              "endmodule\n"));
+}
+
+TEST(SpecifyBlockDeclParsing, AModuleItemThatIsNoSpecifyItemIsRejected) {
+  ExpectEachItemRejected({
+      {"wire w;", "unexpected token in specify block", "30.3"},
+      {"specify endspecify", "unexpected token in specify block", "30.3"},
+      {"assign q = a;", "unexpected token in specify block", "30.3"},
+      {"and g(q, a, b);", "unexpected token in specify block", "30.3"},
+  });
+  EXPECT_TRUE(
+      ParseOk("module m(input a, b, output q);\n"
+              "  wire w;\n"
+              "  specify\n"
+              "    specparam w_delay = 2;\n"
+              "  endspecify\n"
+              "  specify endspecify\n"
+              "  assign q = a;\n"
+              "endmodule\n"));
 }
 
 }  // namespace
