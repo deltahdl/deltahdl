@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
 
 #include "fixture_elaborator.h"
@@ -180,6 +181,43 @@ TEST(Elaborator, DefaultTriregStrength_AModuleBeforeTheDirectiveIsNotUnderIt) {
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(StrengthOfNet(design, "a", "cap"), 0u);
   EXPECT_EQ(StrengthOfNet(design, "b", "cap"), 50u);
+}
+
+TEST(Elaborator, DefaultTriregStrength_ReachesATriregOfEveryDesignElement) {
+  for (const char* element :
+       {"interface e;\n  trireg cap;\nendinterface\n",
+        "program e;\n  trireg cap;\nendprogram\n",
+        "module e;\n  if (1) begin : g\n    trireg cap;\n  end\nendmodule\n"}) {
+    ElabFixture f;
+    auto* design = ElaborateWithPreprocessor(
+        std::string("`default_trireg_strength 75\n") + element, f, "e");
+    ASSERT_NE(design, nullptr) << element;
+    EXPECT_FALSE(f.has_errors) << element;
+    uint32_t strength = 0;
+    for (const auto* mod : design->top_modules) {
+      for (const auto& net : mod->nets) {
+        if (net.name.ends_with("cap")) strength = net.trireg_capacitance;
+      }
+    }
+    EXPECT_EQ(strength, 75u) << element;
+  }
+}
+
+TEST(Elaborator,
+     DISABLED_DefaultTriregStrength_InsideAModuleReachesOnlyLaterNets) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`default_trireg_strength 50\n"
+      "module t;\n"
+      "  trireg early;\n"
+      "`default_trireg_strength 200\n"
+      "  trireg late;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(StrengthOfNet(design, "t", "early"), 50u);
+  EXPECT_EQ(StrengthOfNet(design, "t", "late"), 200u);
 }
 
 }  // namespace

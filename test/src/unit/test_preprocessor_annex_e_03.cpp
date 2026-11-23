@@ -180,4 +180,58 @@ TEST(Preprocessor, DefaultTriregStrength_MalformedBasedArgumentIsError) {
   }
 }
 
+TEST(Preprocessor,
+     DISABLED_DefaultTriregStrength_ADecimalWiderThan64BitsIsOutOfRange) {
+  for (const char* arg : {"99999999999999999999", "18446744073709551616",
+                          "18446744073709551716"}) {
+    PreprocFixture f;
+    EXPECT_EQ(StrengthSetBy(f, arg), std::nullopt) << arg;
+    EXPECT_TRUE(ReportedOutOfRange(f)) << arg;
+  }
+}
+
+TEST(Preprocessor,
+     DefaultTriregStrength_AnArgumentOfNoIntegerConstantIsAnError) {
+  for (const char* arg :
+       {"1.5", "1e2", "100.0", "-5", "100 extra", "100 200"}) {
+    PreprocFixture f;
+    EXPECT_EQ(StrengthSetBy(f, arg), std::nullopt) << arg;
+    EXPECT_TRUE(ReportedInvalid(f, arg)) << arg;
+  }
+}
+
+TEST(Preprocessor,
+     DISABLED_DefaultTriregStrength_ATrailingCommentIsNoPartOfIt) {
+  for (const char* arg : {"100 // c", "100 /* c */", "100// c"}) {
+    PreprocFixture f;
+    EXPECT_EQ(StrengthSetBy(f, arg), 100u) << arg;
+    EXPECT_TRUE(f.diag.Diagnostics().empty()) << arg;
+  }
+}
+
+TEST(Preprocessor,
+     DISABLED_DefaultTriregStrength_AMacroArgumentIsReadAsItsText) {
+  PreprocFixture f;
+  Preprocessor pp(f.mgr, f.diag, {});
+  pp.Preprocess(
+      f.mgr.AddFile("<test>", "`define S 100\n`default_trireg_strength `S\n"));
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_TRUE(pp.HasDefaultTriregStrength());
+  EXPECT_EQ(pp.DefaultTriregStrength(), 100u);
+}
+
+TEST(Preprocessor, DefaultTriregStrength_InsideEveryDesignElementIsAccepted) {
+  for (const char* element : {"interface", "program", "package"}) {
+    PreprocFixture f;
+    Preprocessor pp(f.mgr, f.diag, {});
+    pp.Preprocess(
+        f.mgr.AddFile("<test>", std::string(element) +
+                                    " e;\n`default_trireg_strength 30\nend" +
+                                    element + "\n"));
+    EXPECT_TRUE(f.diag.Diagnostics().empty()) << element;
+    EXPECT_TRUE(pp.HasDefaultTriregStrength()) << element;
+    EXPECT_EQ(pp.DefaultTriregStrength(), 30u) << element;
+  }
+}
+
 }  // namespace
