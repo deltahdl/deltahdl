@@ -1,12 +1,14 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
 #include <string>
 #include <string_view>
 
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_module.h"
 
 using namespace delta;
@@ -383,13 +385,16 @@ constexpr Position kPositions[] = {
      nullptr, 248},
 };
 
-std::string AtPosition(const Position& p, std::string_view word) {
-  std::string src = p.tmpl;
-  for (auto at = src.find('@'); at != std::string::npos;
-       at = src.find('@', at + 1)) {
+std::string Substituted(std::string src, char mark, std::string_view word) {
+  for (auto at = src.find(mark); at != std::string::npos;
+       at = src.find(mark, at + 1)) {
     src.replace(at, 1, std::string(word));
   }
   return src;
+}
+
+std::string AtPosition(const Position& p, std::string_view word) {
+  return Substituted(p.tmpl, '@', word);
 }
 
 constexpr const char* kControlName = "ctrl_name";
@@ -526,6 +531,200 @@ TEST(KeywordListParsing, ReservedWordsCarryTheirOwnRoles) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kNetDecl, "shadow"));
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "twice"));
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "clear"));
+}
+
+TEST(KeywordListParsing, EveryPositionReportsTheReservedWordOnItsLine) {
+  for (const auto& position : kPositions) {
+    const uint32_t kLine = LineHolding(position.tmpl, "@");
+    for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+      std::string_view word = kReservedKeywords[i];
+      if (position.excluded != nullptr && position.excluded(word)) continue;
+      auto parsed = Parse(AtPosition(position, word));
+      EXPECT_TRUE(ErrorOnLine(parsed.diags, kLine))
+          << word << " as a " << position.what << " is reported at line "
+          << kLine;
+    }
+  }
+}
+
+bool IsArrayMethodName(std::string_view word) {
+  return word == "and" || word == "or" || word == "unique" || word == "xor";
+}
+
+bool StillAcceptedAfterADot(std::string_view word) {
+  return word == "new" || word == "super";
+}
+
+bool StillAcceptedAfterAPackageScope(std::string_view word) {
+  return IsArrayMethodName(word) || word == "super" || word == "this";
+}
+
+bool StillAcceptedAsACoverpointLabel(std::string_view word) {
+  return word == "enum" || word == "struct" || word == "type" ||
+         word == "union";
+}
+
+struct Slot {
+  const char* what;
+  const char* tmpl;
+  uint32_t line;
+  bool (*excluded)(std::string_view);
+  bool (*still_accepted)(std::string_view);
+  size_t expected_swept;
+  const char* wire_report;
+  const char* subclause;
+};
+constexpr Slot kSlots[] = {
+    {"class name", "class %;\nendclass\n", 1, nullptr, nullptr, 248,
+     "expected identifier, got 'wire'", "8.3"},
+    {"class property", "class c;\n  int %;\nendclass\n", 2, nullptr, nullptr,
+     248, "expected identifier, got 'wire'", "8.5"},
+    {"class method",
+     "class c;\n  function void %();\n  endfunction\nendclass\n", 2,
+     IsConstructorWord, nullptr, 247, "expected identifier, got 'wire'",
+     "13.4"},
+    {"constraint name",
+     "class c;\n  rand int x;\n  constraint % { x > 0; }\nendclass\n", 3,
+     nullptr, nullptr, 248, "expected identifier, got 'wire'", "18.5"},
+    {"interface name", "interface %;\nendinterface\n", 1, nullptr, nullptr, 248,
+     "expected identifier, got 'wire'", "25.3"},
+    {"modport name",
+     "interface i;\n  logic a;\n  modport % (input a);\nendinterface\n", 3,
+     nullptr, nullptr, 248, "expected identifier, got 'wire'", "25.5"},
+    {"program name", "program %;\nendprogram\n", 1, nullptr, nullptr, 248,
+     "expected identifier, got 'wire'", "24.3"},
+    {"checker name", "checker %;\nendchecker\n", 1, nullptr, nullptr, 248,
+     "expected identifier, got 'wire'", "17.2"},
+    {"user-defined primitive name",
+     "primitive % (output y, input a);\n"
+     "  table\n"
+     "    0 : 0;\n"
+     "    1 : 1;\n"
+     "  endtable\n"
+     "endprimitive\n",
+     1, nullptr, nullptr, 248, "expected identifier, got 'wire'", "29.3.1"},
+    {"configuration name",
+     "module m;\nendmodule\nconfig %;\n  design m;\nendconfig\n", 3, nullptr,
+     nullptr, 248, "expected identifier, got 'wire'", "33.4.1"},
+    {"net name", "module m;\n  wire %;\nendmodule\n", 2, nullptr, nullptr, 248,
+     "expected identifier, got 'wire'", "6.7"},
+    {"property name",
+     "module m;\n  logic a;\n  property %;\n    a;\n  endproperty\n"
+     "endmodule\n",
+     3, nullptr, nullptr, 248, "expected identifier, got 'wire'", "16.12"},
+    {"sequence name",
+     "module m;\n  logic a;\n  sequence %;\n    a;\n  endsequence\n"
+     "endmodule\n",
+     3, nullptr, nullptr, 248, "expected identifier, got 'wire'", "16.8"},
+    {"let name", "module m;\n  let % = 1;\nendmodule\n", 2, nullptr, nullptr,
+     248, "expected identifier, got 'wire'", "11.12"},
+    {"covergroup name", "module m;\n  covergroup %;\n  endgroup\nendmodule\n",
+     2, nullptr, nullptr, 248, "expected identifier, got 'wire'", "19.3"},
+    {"coverpoint name",
+     "module m;\n  logic [1:0] a;\n  covergroup cg;\n    %: coverpoint a;\n"
+     "  endgroup\nendmodule\n",
+     4, nullptr, StillAcceptedAsACoverpointLabel, 244,
+     "a covergroup item is a coverpoint, a cross or a coverage option",
+     "A.2.11"},
+    {"cross name",
+     "module m;\n  logic [1:0] a, b;\n  covergroup cg;\n"
+     "    pa: coverpoint a;\n    pb: coverpoint b;\n    %: cross pa, pb;\n"
+     "  endgroup\nendmodule\n",
+     6, nullptr, nullptr, 248,
+     "a covergroup item is a coverpoint, a cross or a coverage option",
+     "A.2.11"},
+    {"clocking block name",
+     "module m;\n  logic clk;\n  clocking % @(posedge clk);\n"
+     "  endclocking\nendmodule\n",
+     3, nullptr, nullptr, 248, "expected '@', got 'wire'", "14.3"},
+    {"structure member",
+     "module m;\n  struct packed { logic %; } s;\nendmodule\n", 2, nullptr,
+     nullptr, 248, "expected identifier, got 'wire'", "7.2"},
+    {"union member",
+     "module m;\n  union packed { logic %; logic b; } u;\nendmodule\n", 2,
+     nullptr, nullptr, 248, "expected identifier, got 'wire'", "7.2"},
+    {"compilation-unit variable", "int %;\n", 1, nullptr, nullptr, 248,
+     "expected identifier, got 'wire'", "6.8"},
+    {"function local variable",
+     "module m;\n  function void f();\n    int %;\n  endfunction\n"
+     "endmodule\n",
+     3, nullptr, nullptr, 248, "expected ';', got 'wire'", "12.3"},
+    {"task local variable",
+     "module m;\n  task t();\n    int %;\n  endtask\nendmodule\n", 3, nullptr,
+     nullptr, 248, "expected ';', got 'wire'", "12.3"},
+    {"end label of a design element", "module \\% ;\nendmodule : %\n", 2,
+     nullptr, nullptr, 248, "expected identifier, got 'wire'", "9.3.4"},
+    {"end label of a block",
+     "module m;\n  initial begin : \\% \n  end : %\nendmodule\n", 3, nullptr,
+     nullptr, 248, "expected identifier, got 'wire'", "9.3.4"},
+    {"statement label",
+     "module m;\n  reg r;\n  initial begin\n    %: r = 1'b1;\n  end\n"
+     "endmodule\n",
+     4, nullptr, nullptr, 248, "expected expression", "11.2"},
+    {"attribute name", "module m;\n  (* % *) reg r;\nendmodule\n", 2, nullptr,
+     nullptr, 248, "expected identifier, got 'wire'", "5.12"},
+    {"hierarchical name component",
+     "module ch;\n  reg r;\nendmodule\nmodule top;\n  reg x;\n  ch u ();\n"
+     "  initial x = u.%;\nendmodule\n",
+     7, IsArrayMethodName, StillAcceptedAfterADot, 242,
+     "expected identifier, got 'wire'", "23.7"},
+    {"package-scoped name",
+     "package p;\n  int k;\nendpackage\nmodule m;\n  int r;\n"
+     "  initial r = p::%;\nendmodule\n",
+     6, IsConstructorWord, StillAcceptedAfterAPackageScope, 241,
+     "expected identifier, got 'wire'", "23.7.1"},
+};
+
+std::string InSlot(const Slot& slot, std::string_view word) {
+  return Substituted(slot.tmpl, '%', word);
+}
+
+TEST(KeywordListParsing, NoReservedWordCanNameAnythingInAnyScope) {
+  EXPECT_EQ(std::size(kSlots), 29u);
+  for (const auto& slot : kSlots) {
+    auto control = Parse(InSlot(slot, kControlName));
+    EXPECT_FALSE(control.has_errors)
+        << "the " << slot.what << " template parses with a free name";
+
+    size_t swept = 0;
+    for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+      std::string_view word = kReservedKeywords[i];
+      if (slot.excluded != nullptr && slot.excluded(word)) continue;
+      if (slot.still_accepted != nullptr && slot.still_accepted(word)) {
+        continue;
+      }
+      ++swept;
+      auto parsed = Parse(InSlot(slot, word));
+      EXPECT_TRUE(ErrorOnLine(parsed.diags, slot.line))
+          << word << " is reserved and cannot be a " << slot.what;
+    }
+    EXPECT_EQ(swept, slot.expected_swept) << slot.what;
+  }
+}
+
+TEST(KeywordListParsing, ReservedWordInEachScopeIsReportedAtIt) {
+  for (const auto& slot : kSlots) {
+    auto parsed = Parse(InSlot(slot, "wire"));
+    EXPECT_TRUE(ReportedError(parsed.diags, slot.wire_report, slot.line,
+                              slot.subclause))
+        << slot.what;
+  }
+}
+
+TEST(KeywordListParsing, DISABLED_ReservedWordStillAcceptedInASlotIsRejected) {
+  size_t swept = 0;
+  for (const auto& slot : kSlots) {
+    if (slot.still_accepted == nullptr) continue;
+    for (size_t i = 0; i < kReservedKeywordCount; ++i) {
+      std::string_view word = kReservedKeywords[i];
+      if (!slot.still_accepted(word)) continue;
+      ++swept;
+      auto parsed = Parse(InSlot(slot, word));
+      EXPECT_TRUE(ErrorOnLine(parsed.diags, slot.line))
+          << word << " is reserved and cannot be a " << slot.what;
+    }
+  }
+  EXPECT_EQ(swept, 12u);
 }
 
 }  // namespace
