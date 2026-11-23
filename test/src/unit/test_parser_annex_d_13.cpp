@@ -12,6 +12,7 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsNoArgument) {
       "  initial $showvars;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OptionalSystemTaskParserParsing, ShowVarsVariableList) {
@@ -21,6 +22,7 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsVariableList) {
       "  initial $showvars(a, b);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OptionalSystemTaskParserParsing, ShowVarsSelectArgument) {
@@ -30,6 +32,7 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsSelectArgument) {
       "  initial $showvars(v[3], v[5:2]);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OptionalSystemTaskParserParsing, ShowVarsSingleVariable) {
@@ -39,6 +42,7 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsSingleVariable) {
       "  initial $showvars(x);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OptionalSystemTaskParserParsing, ShowVarsIndexedPartSelect) {
@@ -48,6 +52,7 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsIndexedPartSelect) {
       "  initial $showvars(v[2+:3]);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace

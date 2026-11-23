@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_annex_d_call_forms.h"
 
 using namespace delta;
 
@@ -202,6 +203,107 @@ TEST(OptionalShowVarsSim, ANamedBlockScopeShowsWhatItIsAsked) {
   std::string out = RunCapture(
       StatusDesignWith("$scope(t.blk); $showvars; $showvars(a);"), f);
   EXPECT_EQ(out, "a = x\n");
+}
+
+std::string NetDesignWith(const std::string& calls) {
+  std::string src =
+      "module t;\n"
+      "  wire [3:0] n = 4'b1100;\n"
+      "  reg a;\n"
+      "  reg [7:0] v = 8'h5a;\n"
+      "  initial begin\n"
+      "    #1 ";
+  src += calls;
+  src += "\n  end\nendmodule\n";
+  return src;
+}
+
+TEST(OptionalShowVarsSim, AVectorNetDisplaysEveryBit) {
+  SimFixture all;
+  EXPECT_EQ(RunCapture(NetDesignWith("$showvars;"), all),
+            "n = 1100\na = x\nv = 01011010\n");
+  SimFixture listed;
+  EXPECT_EQ(RunCapture(NetDesignWith("$showvars(n);"), listed), "n = 1100\n");
+}
+
+TEST(OptionalShowVarsSim, EverySelectFormDisplaysTheWholeVector) {
+  struct SelectCase {
+    const char* call;
+    const char* shown;
+  };
+  const SelectCase kCases[] = {
+      {"$showvars(v[2+:3]);", "v = 01011010\n"},
+      {"$showvars(v[7-:2]);", "v = 01011010\n"},
+      {"$showvars(n[1]);", "n = 1100\n"},
+      {"$showvars(n[2:1]);", "n = 1100\n"},
+      {"$showvars(a, v[3], n[2:1]);", "a = x\nv = 01011010\nn = 1100\n"},
+  };
+  for (const auto& c : kCases) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(NetDesignWith(c.call), f), c.shown) << c.call;
+  }
+}
+
+TEST(OptionalShowVarsSim, ACallInAProgramTaskShowsTheProgramVariable) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "program p;\n"
+      "  reg [2:0] r = 3'b101;\n"
+      "  task show;\n"
+      "    $showvars(r);\n"
+      "  endtask\n"
+      "  initial show();\n"
+      "endprogram\n",
+      f);
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(out, "r = 101\n");
+}
+
+TEST(OptionalShowVarsSim, DISABLED_ANamedBlockScopeShowsItsOwnVariables) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg a;\n"
+      "  initial begin : blk\n"
+      "    reg [1:0] lr;\n"
+      "    lr = 2'b10;\n"
+      "    $scope(t.blk);\n"
+      "    $showvars;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "lr = 10\n");
+}
+
+TEST(OptionalShowVarsSim, DISABLED_ATaskScopeShowsItsOwnVariables) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  reg a;\n"
+      "  task tk;\n"
+      "    reg [2:0] tr;\n"
+      "    tr = 3'b110;\n"
+      "    $scope(t.tk);\n"
+      "    $showvars;\n"
+      "  endtask\n"
+      "  initial tk();\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "tr = 110\n");
+}
+
+constexpr const char* kShowVarsForm =
+    "$showvars is written as a task statement with no argument list or with a "
+    "list of variables, and this call is not";
+
+TEST(OptionalShowVarsForm, DISABLED_AnEmptyArgumentListIsReported) {
+  ExpectOnlyTheMalformedCallReported("$showvars", "$showvars()", kShowVarsForm,
+                                     "D.13");
+}
+
+TEST(OptionalShowVarsForm, DISABLED_AnEntryThatIsNoVariableIsReported) {
+  ExpectOnlyTheMalformedCallReported("$showvars(v, v[0])", "$showvars(v + 1)",
+                                     kShowVarsForm, "D.13");
 }
 
 }  // namespace
