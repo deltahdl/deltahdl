@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <string>
 #include <string_view>
 
 #include "common/types.h"
@@ -93,6 +94,32 @@ TEST(Elaborator, DelayModeDistributed_ControlsOnlyTheModulesAfterIt) {
   ASSERT_EQ(design->top_modules.size(), 2u);
   EXPECT_EQ(ModeOf(design, "p"), DelayModeDirective::kPath);
   EXPECT_EQ(ModeOf(design, "d"), DelayModeDirective::kDistributed);
+}
+
+TEST(Elaborator, DelayModeDistributed_PropagatedToAMacromodule) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "`delay_mode_distributed\n"
+      "macromodule t;\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_EQ(ModeOf(design, "t"), DelayModeDirective::kDistributed);
+}
+
+TEST(Elaborator,
+     DISABLED_DelayModeDistributed_SetInsideAnInterfaceProgramOrPackage) {
+  for (const char* element : {"interface", "program", "package"}) {
+    ElabFixture f;
+    auto* design = ElaborateWithPreprocessor(
+        std::string(element) + " e;\n`delay_mode_distributed\nend" + element +
+            "\nmodule m;\nendmodule\n",
+        f, "m");
+    ASSERT_NE(design, nullptr) << element;
+    EXPECT_FALSE(f.has_errors) << element;
+    EXPECT_EQ(ModeOf(design, "m"), DelayModeDirective::kDistributed) << element;
+  }
 }
 
 }  // namespace
