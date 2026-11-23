@@ -1,10 +1,17 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <vector>
 
+#include "driver/cli_options.h"
+#include "driver/protect_license_libraries.h"
+#include "driver/source_units.h"
+#include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "fixture_scratch_dir.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -141,6 +148,49 @@ TEST(DefparamSupport, DefparamInGenerateBlockCannotReachOutThroughTheTop) {
                     "defparam inside a generate block or an array of instances "
                     "reaches a parameter outside that hierarchy",
                     5, "23.10.1"));
+}
+
+const RtlirModule* TopNamed(const RtlirDesign* design, std::string_view name) {
+  for (const auto* mod : design->top_modules) {
+    if (mod->name == name) return mod;
+  }
+  return nullptr;
+}
+
+TEST(DefparamSupport, DefparamInAnotherSourceFileAppliesInEitherFileOrder) {
+  const char* const kDesign =
+      "module leaf #(parameter int P = 1)(); endmodule\n"
+      "module top;\n"
+      "  leaf u1();\n"
+      "endmodule\n";
+  const char* const kAnnotate =
+      "module annotate;\n"
+      "  defparam top.u1.P = 7;\n"
+      "endmodule\n";
+  for (const bool kAnnotateFirst : {false, true}) {
+    ScratchDir tmp;
+    const std::string kDesignPath = tmp.Write("design.sv", kDesign).string();
+    const std::string kAnnotatePath =
+        tmp.Write("annotate.sv", kAnnotate).string();
+    CliOptions opts;
+    opts.source_files =
+        kAnnotateFirst ? std::vector<std::string>{kAnnotatePath, kDesignPath}
+                       : std::vector<std::string>{kDesignPath, kAnnotatePath};
+    ElabFixture f;
+    ProtectLicenseLibraries licenses;
+    auto pp = PreprocessSources(opts, f.mgr, f.diag, licenses);
+    auto* cu = ParseSource(pp, f.mgr, f.diag, f.arena);
+    ASSERT_NE(cu, nullptr);
+    ApplyPreprocMetadata(cu, pp);
+    Elaborator elab(f.arena, f.diag, cu);
+    auto* design = elab.Elaborate("");
+    f.has_errors.Record(kAnnotateFirst ? "annotate.sv first"
+                                       : "design.sv first");
+    ASSERT_NE(design, nullptr);
+    EXPECT_FALSE(f.has_errors);
+    EXPECT_EQ(ParamValue(FirstChild(TopNamed(design, "top")), "P"), 7)
+        << (kAnnotateFirst ? "annotate.sv first" : "design.sv first");
+  }
 }
 
 }  // namespace
