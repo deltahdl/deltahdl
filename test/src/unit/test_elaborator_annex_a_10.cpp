@@ -685,4 +685,33 @@ TEST(BnfClarificationElaboration, PackedStructOnAParameterTypeOk) {
              "endmodule\n"));
 }
 
+TEST(BnfClarificationElaboration, StdScopeRandomizeNullAndWithListError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  int a;\n"
+      "  initial begin void'(std::randomize(null)); end\n"
+      "  initial begin void'(std::randomize(a) with (a) { a > 0; }); end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "'null' is not a legal argument to a scope randomize call", 3, "A.8.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "scope randomize call cannot use a parenthesized "
+                            "identifier list after 'with'",
+                            4, "A.8.2"));
+}
+
+TEST(BnfClarificationElaboration, MethodRandomizeNullArgumentOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  rand int a;\n"
+             "endclass\n"
+             "module m;\n"
+             "  C obj = new;\n"
+             "  initial begin void'(obj.randomize(null)); end\n"
+             "endmodule\n"));
+}
+
 }  // namespace

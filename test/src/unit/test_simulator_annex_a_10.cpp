@@ -48,4 +48,29 @@ TEST(PortInitializerSimulation, ChildOutputPortInitializerReachesTheParent) {
   EXPECT_EQ(r->value.ToUint64(), 3u);
 }
 
+TEST(ClassMethodImportSimulation,
+     DISABLED_AnImportInAMethodBindsThePackageVariable) {
+  SimFixture f;
+  auto* var = RunAndFindVar(
+      "package p; int x = 4; endpackage\n"
+      "module m;\n"
+      "  class c;\n"
+      "    function int f(); import p::x; return x; endfunction\n"
+      "    task t(output int v); import p::*; v = x + 1; endtask\n"
+      "  endclass\n"
+      "  int r, s;\n"
+      "  c o = new;\n"
+      "  initial begin\n"
+      "    r = o.f();\n"
+      "    o.t(s);\n"
+      "  end\n"
+      "endmodule\n",
+      f, "r");
+  ASSERT_NE(var, nullptr);
+  EXPECT_EQ(var->value.ToUint64(), 4u);
+  auto* s = f.ctx.FindVariable("s");
+  ASSERT_NE(s, nullptr);
+  EXPECT_EQ(s->value.ToUint64(), 5u);
+}
+
 }  // namespace

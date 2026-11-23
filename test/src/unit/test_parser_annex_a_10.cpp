@@ -407,4 +407,122 @@ TEST(BnfClarificationParsing, ErrorDuplicateDefaultInOutOfBlockConstructor) {
                             5, "8.17"));
 }
 
+TEST(BnfClarificationParsing, ErrorImportInEveryKindOfClassScope) {
+  const std::string kPkg = "package p; int x = 4; endpackage\n";
+  for (const std::string& body :
+       {std::string("module m;\n  class c;\n    import p::x;\n  endclass\n"
+                    "endmodule\n"),
+        std::string("package q;\n  class c;\n    import p::*;\n  endclass\n"
+                    "endpackage\n"),
+        std::string("program g;\n  class c;\n    import p::*;\n  endclass\n"
+                    "endprogram\n"),
+        std::string("interface i;\n  class c;\n    import p::x;\n  endclass\n"
+                    "endinterface\n"),
+        std::string("class o;\n  class c;\n    import p::x;\n  endclass\n"
+                    "endclass\n"),
+        std::string("interface class ic;\n\n  import p::*;\nendclass\n")}) {
+    SCOPED_TRACE(body);
+    auto r = Parse(kPkg + body);
+    EXPECT_TRUE(ReportedError(
+        r.diags, "package import declaration is not allowed in class scope", 4,
+        "26.3"));
+  }
+}
+
+TEST(BnfClarificationParsing, ImportInAClassMethodOk) {
+  EXPECT_TRUE(
+      ParseOk("package p; int x = 4; endpackage\n"
+              "class c;\n"
+              "  function int f(); import p::x; return x; endfunction\n"
+              "  task t(); import p::*; endtask\n"
+              "endclass\n"));
+}
+
+TEST(BnfClarificationParsing, ErrorWhiteSpaceInsideANumber) {
+  struct Case {
+    const char* decl;
+    const char* message;
+    const char* subclause;
+  };
+  const Case kCases[] = {
+      {"logic [7:0] a = 8' sh9;",
+       "the apostrophe, any 's', and the base format character of a based "
+       "number must be written together without white space",
+       "5.7.1"},
+      {"logic [7:0] a = 8'hF F;", "expected ';', got identifier", "6.8"},
+      {"real r = 1. 5;",
+       "real literal '1.' has no digit after its decimal "
+       "point",
+       "5.7.2"},
+      {"real r = 1.5 e3;", "expected ';', got identifier", "6.8"},
+      {"real r = 1.5e 3;", "expected ';', got identifier", "6.8"},
+  };
+  for (const Case& c : kCases) {
+    SCOPED_TRACE(c.decl);
+    auto r = Parse(std::string("module m;\n  ") + c.decl + "\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, c.message, 2, c.subclause));
+  }
+}
+
+TEST(BnfClarificationParsing, NumbersWithoutWhiteSpaceOk) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  logic [7:0] a = 8'sh9;\n"
+              "  logic [7:0] b = 8'hFF;\n"
+              "  real r = 1.5;\n"
+              "  real s = 1.5e3;\n"
+              "endmodule\n"));
+}
+
+TEST(BnfClarificationParsing, DISABLED_TwoUnsizedPackedDimsOnADpiImportFormal) {
+  for (const char* kind : {"function void f", "task t"}) {
+    SCOPED_TRACE(kind);
+    auto r = Parse(std::string("module m;\n  import \"DPI-C\" ") + kind +
+                   "(input bit [] [] a);\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a packed dimension left unspecified must be "
+                              "the only packed dimension of the argument",
+                              2, "35.5.6.1"));
+  }
+}
+
+TEST(BnfClarificationParsing, ErrorSizedBesideUnsizedOnADpiImportTask) {
+  for (const char* formal : {"input bit [7:0] [] a", "input bit [] [7:0] a"}) {
+    SCOPED_TRACE(formal);
+    auto r = Parse(std::string("module m;\n  import \"DPI-C\" task t(") +
+                   formal + ");\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a packed dimension left unspecified must be "
+                              "the only packed dimension of the argument",
+                              2, "35.5.6.1"));
+  }
+}
+
+TEST(BnfClarificationParsing, UnsizedPackedDimAloneOnADpiImportTaskOk) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  import \"DPI-C\" task t(input bit [] a, logic [] b [3:1]);\n"
+              "endmodule\n"));
+}
+
+TEST(BnfClarificationParsing, ErrorUnsizedPackedDimOutsideADpiImportFormal) {
+  for (const char* item :
+       {"function void f(input bit [] a); endfunction",
+        "task t(input bit [] a); endtask", "typedef bit [] t;",
+        "typedef struct packed { bit [] a; } s;", "wire [] w;",
+        "parameter bit [] P = 0;"}) {
+    SCOPED_TRACE(item);
+    auto r = Parse(std::string("module m;\n  ") + item + "\nendmodule\n");
+    EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+  }
+  auto exported = Parse(
+      "module m;\n"
+      "  export \"DPI-C\" function f;\n"
+      "  function void f(input bit [] a); endfunction\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(exported.diags, "expected expression", 3, "11.2"));
+  auto port = Parse("module m(input bit [] p);\nendmodule\n");
+  EXPECT_TRUE(ReportedError(port.diags, "expected expression", 1, "11.2"));
+}
+
 }  // namespace
