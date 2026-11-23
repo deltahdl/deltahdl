@@ -152,8 +152,8 @@ TEST(OptionalSystemTasksGeneral, AnUnavailableCallIsReportedWhereverItRuns) {
       "  endfunction\n  initial fn();\nendmodule\n",
       "program t;\n  int v;\n  initial begin\n    %;\n  end\nendprogram\n",
       "class c;\n  int v;\n  function void m();\n    %;\n  endfunction\n"
-      "endclass\nmodule t;\n  initial begin\n    c o = new;\n    o.m();\n"
-      "  end\nendmodule\n",
+      "endclass\nmodule t;\n  c o;\n  initial begin\n    o = new;\n"
+      "    o.m();\n  end\nendmodule\n",
       "package pk;\n  int v;\n  function automatic void f();\n    %;\n"
       "  endfunction\nendpackage\nmodule t;\n  initial pk::f();\nendmodule\n",
       "interface ifc;\n  int v;\n  initial begin\n    %;\n  end\nendinterface\n"
