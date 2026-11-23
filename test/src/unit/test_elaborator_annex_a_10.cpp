@@ -498,4 +498,191 @@ TEST(GenerateItemSetElaboration, ACheckerOrVariableInACheckerGenerateIsFine) {
   }
 }
 
+TEST(BnfClarificationElaboration, TypeRefInequalityComparisonOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int a;\n"
+             "  byte b;\n"
+             "  logic r;\n"
+             "  assign r = type(a) != type(b);\n"
+             "endmodule\n"));
+}
+
+void ExpectThisAndSuperReported(const std::string& src) {
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  for (uint32_t line : {3U, 4U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'this' has no object to refer to outside a non-static class method",
+        line, "8.11"));
+  }
+}
+
+TEST(BnfClarificationElaboration, ThisAndSuperInAnInterfaceError) {
+  ExpectThisAndSuperReported(
+      "interface i;\n"
+      "  int y;\n"
+      "  initial y = this.y;\n"
+      "  function int f(); return super.y; endfunction\n"
+      "endinterface\n"
+      "module m; i u(); endmodule\n");
+}
+
+TEST(BnfClarificationElaboration, ThisAndSuperInAProgramError) {
+  ExpectThisAndSuperReported(
+      "program p;\n"
+      "  int y;\n"
+      "  initial y = this.y;\n"
+      "  task t(); y = super.y; endtask\n"
+      "endprogram\n");
+}
+
+TEST(BnfClarificationElaboration, ThisAndSuperInACheckerError) {
+  ExpectThisAndSuperReported(
+      "checker c;\n"
+      "  int y;\n"
+      "  function int f(); return this.y; endfunction\n"
+      "  always_comb y = super.y;\n"
+      "endchecker\n"
+      "module m; c u(); endmodule\n");
+}
+
+TEST(BnfClarificationElaboration, InterfaceVariableOutputAndInputDefaultOk) {
+  EXPECT_TRUE(
+      ElabOk("interface i(output logic q = 1, input logic a = 1);\n"
+             "endinterface\n"
+             "module m; i u(); endmodule\n"));
+}
+
+TEST(BnfClarificationElaboration, ProgramVariableOutputAndInputDefaultOk) {
+  EXPECT_TRUE(
+      ElabOk("program p(output logic q = 1, input logic a = 1);\n"
+             "endprogram\n"));
+}
+
+void ExpectHeaderError(const std::string& src, std::string_view message) {
+  SCOPED_TRACE(src);
+  ElabFixture f;
+  ElaborateSrc(src, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(), message, 1,
+      message.starts_with("initializer") ? "23.2.2.2" : "23.2.2.4"));
+}
+
+constexpr std::string_view kNetInitializer =
+    "initializer on output port 'q', which is a net and no variable";
+
+TEST(BnfClarificationElaboration,
+     InterfaceHeaderNetInitializerAndDefaultsError) {
+  ExpectHeaderError(
+      "interface i(output wire q = 1); endinterface\n"
+      "module m; i u(); endmodule\n",
+      kNetInitializer);
+  ExpectHeaderError(
+      "interface i(inout wire a = 1); endinterface\n"
+      "module m; wire w; i u(w); endmodule\n",
+      "default value on inout port 'a'; defaults are only allowed on input "
+      "ports");
+  ExpectHeaderError(
+      "interface i(ref int a = 1); endinterface\n"
+      "module m; int w; i u(w); endmodule\n",
+      "default value on ref port 'a'; defaults are only allowed on input "
+      "ports");
+}
+
+TEST(BnfClarificationElaboration, ProgramHeaderNetInitializerAndDefaultsError) {
+  ExpectHeaderError("program p(output wire q = 1); endprogram\n",
+                    kNetInitializer);
+  ExpectHeaderError("program p(inout wire a = 1); endprogram\n",
+                    "default value on inout port 'a'; defaults are only "
+                    "allowed on input ports");
+  ExpectHeaderError("program p(ref int a = 1); endprogram\n",
+                    "default value on ref port 'a'; defaults are only allowed "
+                    "on input ports");
+}
+
+TEST(BnfClarificationElaboration,
+     DISABLED_UnparenthesizedEventListIsExcessActuals) {
+  struct Case {
+    const char* src;
+    const char* message;
+    const char* subclause;
+    uint32_t line;
+  };
+  const Case kCases[] = {
+      {"module m;\n"
+       "  logic a, b, c;\n"
+       "  sequence s(event e, logic v); @(e) v; endsequence\n"
+       "  assert property (s(posedge a, negedge b, c));\n"
+       "endmodule\n",
+       "sequence instance provides more actual arguments than the sequence "
+       "has formal arguments",
+       "16.8", 4U},
+      {"module m;\n"
+       "  logic a, b, c;\n"
+       "  property p(event e, logic v); @(e) v; endproperty\n"
+       "  assert property (p(posedge a, negedge b, c));\n"
+       "endmodule\n",
+       "property instance provides more actual arguments than the property "
+       "has formal arguments",
+       "16.12", 4U},
+      {"checker ck(event e, logic v);\n"
+       "endchecker\n"
+       "module m;\n"
+       "  logic a, b, c;\n"
+       "  ck u(posedge a, negedge b, c);\n"
+       "endmodule\n",
+       "checker instance provides more actual arguments than the checker has "
+       "formal arguments",
+       "17.3", 5U},
+  };
+  for (const Case& c : kCases) {
+    SCOPED_TRACE(c.src);
+    ElabFixture f;
+    ElaborateSrc(c.src, f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), c.message, c.line, c.subclause));
+  }
+}
+
+TEST(BnfClarificationElaboration, ParenthesizedEventListIsOneActualOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic a, b, c;\n"
+             "  sequence s(event e, logic v); @(e) v; endsequence\n"
+             "  property p(event e, logic v); @(e) v; endproperty\n"
+             "  assert property (s((posedge a, negedge b), c));\n"
+             "  assert property (p((posedge a, negedge b), c));\n"
+             "endmodule\n"));
+}
+
+TEST(BnfClarificationElaboration,
+     DISABLED_UnpackedStructOnAParameterTypeError) {
+  for (const char* src : {"module m;\n"
+                          "  parameter struct { int x; } [1:0] P = 0;\n"
+                          "endmodule\n",
+                          "module m;\n"
+                          "  localparam struct { int x; } [1:0] P = 0;\n"
+                          "endmodule\n",
+                          "module m;\n"
+                          "  parameter type T = struct { int x; } [1:0];\n"
+                          "endmodule\n"}) {
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "packed dimension on struct requires the packed keyword", 2, "7.2"));
+  }
+}
+
+TEST(BnfClarificationElaboration, PackedStructOnAParameterTypeOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  parameter struct packed { int x; } [1:0] P = 0;\n"
+             "  localparam struct packed { int x; } [1:0] L = 0;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

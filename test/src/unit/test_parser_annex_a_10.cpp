@@ -370,4 +370,41 @@ TEST(GenerateItemSetParsing, ACheckerVariableInACheckerGenerateIsAccepted) {
   }
 }
 
+TEST(BnfClarificationParsing, DefaultOnceInConstructorArgsOk) {
+  EXPECT_TRUE(
+      ParseOk("class B; function new(int a); endfunction endclass\n"
+              "class C extends B;\n"
+              "  function new(default, int x);\n"
+              "    super.new(default);\n"
+              "  endfunction\n"
+              "endclass\n"));
+}
+
+TEST(BnfClarificationParsing, ErrorDuplicateDefaultInExternConstructor) {
+  auto r = Parse(
+      "class B; function new(int a); endfunction endclass\n"
+      "class C extends B;\n"
+      "  extern function new(default, int x, default);\n"
+      "endclass\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'default' already appears earlier in this class "
+                            "constructor argument list",
+                            3, "8.17"));
+}
+
+TEST(BnfClarificationParsing, ErrorDuplicateDefaultInOutOfBlockConstructor) {
+  auto r = Parse(
+      "class B; function new(int a); endfunction endclass\n"
+      "class C extends B;\n"
+      "  extern function new(default, int x);\n"
+      "endclass\n"
+      "function C::new(default, int x, default);\n"
+      "  super.new(default);\n"
+      "endfunction\n");
+  EXPECT_TRUE(ReportedError(r.diags,
+                            "'default' already appears earlier in this class "
+                            "constructor argument list",
+                            5, "8.17"));
+}
+
 }  // namespace
