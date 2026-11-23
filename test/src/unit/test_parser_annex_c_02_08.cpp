@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_parser.h"
@@ -59,6 +60,42 @@ TEST(OperatorOverloadingDeprecated, BindDirectiveStillParses) {
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->modules.size(), 3u);
   EXPECT_EQ(r.cu->modules[2]->bind_directives.size(), 1u);
+}
+
+TEST(OperatorOverloadingDeprecated, BindOfAnOperatorInEveryOtherScope) {
+  const char* const kScopes[][2] = {
+      {"package pk;\n", "endpackage\n"},
+      {"interface ifc;\n", "endinterface\n"},
+      {"program p;\n", "endprogram\n"},
+      {"module m;\n  if (1) begin : g\n", "  end\nendmodule\n"},
+      {"checker chk;\n", "endchecker\n"},
+  };
+  for (const auto& scope : kScopes) {
+    std::string src = scope[0];
+    src += "  bind + function int add(int a, int b);\n";
+    src += scope[1];
+    auto r = Parse(src);
+    const uint32_t kLine = LineHolding(src, "bind");
+    EXPECT_TRUE(ReportedError(r.diags, "operator overloading has been removed",
+                              kLine, "C.2.8"))
+        << src;
+  }
+}
+
+TEST(OperatorOverloadingDeprecated,
+     BindDirectiveStillParsesInAnInterfaceAndAGenerateBlock) {
+  const char* const kScopes[][2] = {
+      {"interface ifc;\n", "endinterface\n"},
+      {"module m;\n  if (1) begin : g\n", "  end\nendmodule\n"},
+  };
+  for (const auto& scope : kScopes) {
+    std::string src = "module binder;\nendmodule\nmodule target;\nendmodule\n";
+    src += scope[0];
+    src += "  bind target binder b1 ();\n";
+    src += scope[1];
+    auto r = Parse(src);
+    EXPECT_FALSE(r.has_errors) << src;
+  }
 }
 
 }  // namespace

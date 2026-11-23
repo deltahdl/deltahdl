@@ -123,4 +123,137 @@ TEST(AlwaysProcedureInCheckers,
                             4, "17.5"));
 }
 
+constexpr const char* kGeneralAlwaysReport =
+    "a general 'always' procedure cannot be used inside checker 'chk'";
+
+TEST(AlwaysProcedureInCheckers, GeneralAlwaysInACheckerDeclaredInAModule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input logic clk);\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a, b;\n"
+      "    always_ff @(posedge clk) b <= 1'b1;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "  chk c1(clk);\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 5, "17.5"));
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 4));
+}
+
+TEST(AlwaysProcedureInCheckers, GeneralAlwaysInACheckerDeclaredInAPackage) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "endpackage\n"
+      "module m(input logic clk);\n"
+      "  import pk::*;\n"
+      "  chk c1(clk);\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 4, "17.5"));
+}
+
+TEST(AlwaysProcedureInCheckers, GeneralAlwaysInACheckerDeclaredInAnInterface) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc(input logic clk);\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "  chk c1(clk);\n"
+      "endinterface\n"
+      "module m(input logic clk);\n"
+      "  ifc i(clk);\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 4, "17.5"));
+}
+
+TEST(AlwaysProcedureInCheckers, GeneralAlwaysInACheckerDeclaredInAProgram) {
+  ElabFixture f;
+  ElaborateSrc(
+      "program p(input logic clk);\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "  chk c1(clk);\n"
+      "endprogram\n",
+      f, "p");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 4, "17.5"));
+}
+
+TEST(AlwaysProcedureInCheckers, GeneralAlwaysInACheckerNestedInAChecker) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker outer(input logic clk);\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "  chk c1(clk);\n"
+      "endchecker\n",
+      f, "outer");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 4, "17.5"));
+}
+
+TEST(AlwaysProcedureInCheckers,
+     DISABLED_GeneralAlwaysInAUnitCheckerNeverInstantiated) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker chk(input logic clk);\n"
+      "  logic a;\n"
+      "  always @(posedge clk) a <= 1'b1;\n"
+      "endchecker\n"
+      "module m;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 3, "17.5"));
+}
+
+TEST(AlwaysProcedureInCheckers,
+     DISABLED_GeneralAlwaysInAModuleCheckerNeverInstantiated) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 4, "17.5"));
+}
+
+TEST(AlwaysProcedureInCheckers,
+     DISABLED_GeneralAlwaysInAPackageCheckerNeverInstantiated) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  checker chk(input logic clk);\n"
+      "    logic a;\n"
+      "    always @(posedge clk) a <= 1'b1;\n"
+      "  endchecker\n"
+      "endpackage\n"
+      "module m;\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kGeneralAlwaysReport, 4, "17.5"));
+}
+
 }  // namespace
