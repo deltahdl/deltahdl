@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -271,6 +272,34 @@ TEST(ExpressionElaboration, MintypmaxParameterValueWithAVariableIsReported) {
     ElaborateSrc(source.src, f);
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), source.message, source.line,
                               source.subclause));
+  }
+}
+
+TEST(ExpressionElaboration, AnAttributeAfterAConstantOperatorLeavesItsValue) {
+  struct Folding {
+    const char* value;
+    int64_t expected;
+  };
+  const Folding kFoldings[] = {
+      {"- (* keep *) 3", -3},           {"7 - (* t *) 2", 5},
+      {"7 - (* t *) 2 - (* u *) 1", 4}, {"1 ? (* t *) 5 : 6", 5},
+      {"0 ? (* t *) 5 : 6", 6},
+  };
+  for (const char* keyword : {"parameter", "localparam"}) {
+    for (const Folding& folding : kFoldings) {
+      ElabFixture f;
+      auto* design =
+          ElaborateSrc(std::string("module m;\n  ") + keyword +
+                           " int P = " + folding.value + ";\nendmodule\n",
+                       f);
+      ASSERT_NE(design, nullptr) << folding.value;
+      EXPECT_FALSE(f.has_errors) << folding.value;
+      const auto* p = FindParam(design, "m", "P");
+      ASSERT_NE(p, nullptr) << folding.value;
+      EXPECT_TRUE(p->is_resolved) << folding.value;
+      EXPECT_EQ(p->resolved_value, folding.expected)
+          << keyword << " " << folding.value;
+    }
   }
 }
 

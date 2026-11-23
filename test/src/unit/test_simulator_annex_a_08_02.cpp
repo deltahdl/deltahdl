@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -101,6 +104,33 @@ TEST(SubroutineCallSim, ASystemCallSizesAndNamesADataType) {
                  "endmodule\n",
                  f),
       "32 9 int unsigned\n");
+}
+
+TEST(SubroutineCallSim,
+     AnEmptyPositionalSlotTakesItsDefaultBesideANamedArgument) {
+  struct Call {
+    const char* call;
+    uint64_t expected;
+  };
+  const Call kCalls[] = {{"f(, .c(7))", 127},
+                         {"f(, 5, .c(7))", 157},
+                         {"f(4, , .c(7))", 427},
+                         {"f(, , .c(7))", 127}};
+  for (const Call& call : kCalls) {
+    EXPECT_EQ(RunAndGet(std::string("module t;\n"
+                                    "  function int f(int a = 1, int b = 2, "
+                                    "int c = 3);\n"
+                                    "    return a * 100 + b * 10 + c;\n"
+                                    "  endfunction\n"
+                                    "  int r;\n"
+                                    "  initial r = ") +
+                            call.call +
+                            ";\n"
+                            "endmodule\n",
+                        "r"),
+              call.expected)
+        << call.call;
+  }
 }
 
 }  // namespace

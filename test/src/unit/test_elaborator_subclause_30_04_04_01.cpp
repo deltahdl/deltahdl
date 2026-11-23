@@ -722,4 +722,8 @@ TEST(OperatorElaboration, LessThanOperatorIsRejected) {
                           "state-dependent path conditional expression");
 }
 
+TEST(OperatorElaboration, ReductionOrOperatorElaborates) {
+  ExpectConditionAccepted("|a");
+}
+
 }  // namespace

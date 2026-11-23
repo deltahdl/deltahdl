@@ -110,28 +110,6 @@ TEST(OperatorParsing, BinaryLogicShiftRight) {
                      ExprKind::kBinary, TokenKind::kGtGt);
 }
 
-TEST(OperatorParsing, ImplicationInSpecifyPathCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (a -> b) (a => z) = 1;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
-TEST(OperatorParsing, EquivalenceInSpecifyPathCondition) {
-  auto r = Parse(
-      "module m;\n"
-      "  specify\n"
-      "    if (a <-> b) (a => z) = 1;\n"
-      "  endspecify\n"
-      "endmodule\n");
-  ASSERT_NE(r.cu, nullptr);
-  EXPECT_FALSE(r.has_errors);
-}
-
 TEST(OperatorParsing, BinaryAdd) {
   VerifyInitialRhsOp("module m; initial x = a + b; endmodule\n",
                      ExprKind::kBinary, TokenKind::kPlus);

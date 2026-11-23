@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <set>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -11,6 +12,7 @@
 #include "helpers_reported_error.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 
 using namespace delta;
@@ -745,6 +747,60 @@ TEST(ExpressionParsing, ClassTypeParameterValueTakesAnAggregate) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
+}
+
+const Expr* PathConditionOf(const ParseResult& r) {
+  const SpecifyItem* item = GetSolePathItem(r);
+  return item == nullptr ? nullptr : item->path.condition;
+}
+
+ParseResult ParsePathCondition(const char* condition) {
+  return Parse(std::string("module m(input a, b, output c);\n"
+                           "  specify\n"
+                           "    if (") +
+               condition +
+               ") (a => c) = 1;\n"
+               "  endspecify\n"
+               "endmodule\n");
+}
+
+TEST(ExpressionParsing, AModulePathUnaryOperatorTakesAnAttribute) {
+  auto r = ParsePathCondition("~ (* t *) a");
+  EXPECT_FALSE(r.has_errors);
+  const Expr* cond = PathConditionOf(r);
+  ASSERT_NE(cond, nullptr);
+  EXPECT_EQ(cond->kind, ExprKind::kUnary);
+  EXPECT_EQ(cond->op, TokenKind::kTilde);
+  ASSERT_EQ(cond->attrs.size(), 1u);
+  EXPECT_EQ(cond->attrs[0].name, "t");
+}
+
+TEST(ExpressionParsing, AModulePathBinaryOperatorTakesAnAttribute) {
+  auto r = ParsePathCondition("a & (* t *) b");
+  EXPECT_FALSE(r.has_errors);
+  const Expr* cond = PathConditionOf(r);
+  ASSERT_NE(cond, nullptr);
+  EXPECT_EQ(cond->kind, ExprKind::kBinary);
+  EXPECT_EQ(cond->op, TokenKind::kAmp);
+  ASSERT_NE(cond->lhs, nullptr);
+  ASSERT_NE(cond->rhs, nullptr);
+  EXPECT_EQ(cond->lhs->text, "a");
+  EXPECT_EQ(cond->rhs->text, "b");
+  ASSERT_EQ(cond->attrs.size(), 1u);
+  EXPECT_EQ(cond->attrs[0].name, "t");
+}
+
+TEST(ExpressionParsing,
+     AModulePathConditionalTakesAnAttributeAfterItsQuestionMark) {
+  auto r = ParsePathCondition("a ? (* t *) b : a");
+  EXPECT_FALSE(r.has_errors);
+  const Expr* cond = PathConditionOf(r);
+  ASSERT_NE(cond, nullptr);
+  EXPECT_EQ(cond->kind, ExprKind::kTernary);
+  ASSERT_NE(cond->true_expr, nullptr);
+  EXPECT_EQ(cond->true_expr->text, "b");
+  ASSERT_EQ(cond->attrs.size(), 1u);
+  EXPECT_EQ(cond->attrs[0].name, "t");
 }
 
 }  // namespace

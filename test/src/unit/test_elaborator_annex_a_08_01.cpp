@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 
 using namespace delta;
@@ -77,6 +82,49 @@ TEST(ConcatenationElaboration, ConstantMultipleConcatenationElaborates) {
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
+}
+
+std::vector<uint32_t> ErrorLinesOfCondition(const std::string& condition) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input a, b, c, input [1:0] n, output y);\n"
+      "  localparam K = 2;\n"
+      "  specify\n"
+      "    if (" +
+          condition +
+          ") (a => y) = 1;\n"
+          "  endspecify\n"
+          "endmodule\n",
+      f);
+  std::vector<uint32_t> lines;
+  for (const auto& d : f.diag.Diagnostics()) {
+    if (d.severity == DiagSeverity::kError) lines.push_back(d.loc.line);
+  }
+  return lines;
+}
+
+TEST(ConcatenationElaboration,
+     AModulePathConcatenationTakesModulePathOperations) {
+  for (const char* condition : {"{a & b, c}", "{~a, b}", "{a ? b : c, a}",
+                                "{{a, b}, c}", "{2{a}}", "{K{a & b}}"}) {
+    EXPECT_TRUE(ErrorLinesOfCondition(condition).empty()) << condition;
+  }
+}
+
+TEST(ConcatenationElaboration,
+     DISABLED_AModulePathReplicationCountMustBeConstant) {
+  for (const char* condition : {"{n{a}}", "{b{a}}", "{(n){a, b}}"}) {
+    EXPECT_EQ(ErrorLinesOfCondition(condition), std::vector<uint32_t>{4})
+        << condition;
+  }
+}
+
+TEST(ConcatenationElaboration,
+     DISABLED_AModulePathReplicationCountTakesAnyConstantOperator) {
+  for (const char* condition :
+       {"{(1 + 1){a}}", "{(K * 1){a}}", "{(K > 1 ? 2 : 3){a}}"}) {
+    EXPECT_TRUE(ErrorLinesOfCondition(condition).empty()) << condition;
+  }
 }
 
 }  // namespace

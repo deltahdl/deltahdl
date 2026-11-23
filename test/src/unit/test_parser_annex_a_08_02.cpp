@@ -875,4 +875,21 @@ TEST(SubroutineCallExprParsing, AnArrayMethodOnAnyPrimaryTakesAWithClause) {
               "endmodule\n"));
 }
 
+TEST(SubroutineCallExprParsing, AnEmptyPositionalSlotMayPrecedeANamedArgument) {
+  auto r = Parse(
+      "module m;\n"
+      "  initial begin foo(, .b(5)); end\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+  auto* expr = FirstInitialExpr(r);
+  ASSERT_NE(expr, nullptr);
+  ASSERT_EQ(expr->kind, ExprKind::kCall);
+  ASSERT_EQ(expr->args.size(), 2u);
+  EXPECT_EQ(expr->args[0], nullptr);
+  ASSERT_EQ(expr->arg_names.size(), 1u);
+  EXPECT_EQ(expr->arg_names[0], "b");
+  ASSERT_NE(expr->args[1], nullptr);
+  EXPECT_EQ(expr->args[1]->int_val, 5u);
+}
+
 }  // namespace
