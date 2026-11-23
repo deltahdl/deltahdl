@@ -1,11 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 #include <utility>
 
 #include "fixture_parser.h"
 #include "helpers_generate_forms.h"
 #include "helpers_reported_error.h"
+#include "parser/ast_covergroup.h"
+#include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 
 using namespace delta;
 
@@ -626,6 +630,140 @@ TEST(BnfClarificationParsing, ErrorUnsizedPackedDimOnAPackedUnionMember) {
       "  typedef union packed { bit [] a; bit [7:0] b; } u;\n"
       "endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
+}
+
+const SelectExpression* OnlyCrossBinSelect(const ParseResult& r) {
+  for (const ModuleItem* item : r.cu->modules[0]->items) {
+    if (item->kind != ModuleItemKind::kCovergroupDecl) continue;
+    return item->covergroup->items[2].cover_cross->body[0].bins.select;
+  }
+  return nullptr;
+}
+
+TEST(BnfClarificationParsing, CrossSelectMatchesBindsTighterThanAndOr) {
+  struct Case {
+    const char* select;
+    SelectExpressionKind op;
+    bool matches_on_left;
+    SelectExpressionKind counted;
+    bool dollar;
+  };
+  constexpr Case kCases[] = {
+      {"X with (a < b) matches 2 || binsof(a) intersect {3}",
+       SelectExpressionKind::kOr, true, SelectExpressionKind::kWith, false},
+      {"X with (a < b) matches 2 && binsof(a) intersect {3}",
+       SelectExpressionKind::kAnd, true, SelectExpressionKind::kWith, false},
+      {"binsof(a) intersect {3} || X with (a < b) matches 2",
+       SelectExpressionKind::kOr, false, SelectExpressionKind::kWith, false},
+      {"binsof(a) intersect {3} && X with (a < b) matches 2",
+       SelectExpressionKind::kAnd, false, SelectExpressionKind::kWith, false},
+      {"cs matches 2 || binsof(a) intersect {3}", SelectExpressionKind::kOr,
+       true, SelectExpressionKind::kCrossSet, false},
+      {"cs matches 2 && binsof(a) intersect {3}", SelectExpressionKind::kAnd,
+       true, SelectExpressionKind::kCrossSet, false},
+      {"X with (a < b) matches $ || binsof(a) intersect {3}",
+       SelectExpressionKind::kOr, true, SelectExpressionKind::kWith, true},
+      {"cs matches $ && binsof(a) intersect {3}", SelectExpressionKind::kAnd,
+       true, SelectExpressionKind::kCrossSet, true},
+  };
+  for (const auto& c : kCases) {
+    std::string src =
+        "module m;\n"
+        "  logic [3:0] a, b;\n"
+        "  covergroup cg;\n"
+        "    coverpoint a;\n"
+        "    coverpoint b;\n"
+        "    X: cross a, b {\n"
+        "      bins s = ";
+    src += c.select;
+    src +=
+        ";\n"
+        "    }\n"
+        "  endgroup\n"
+        "endmodule\n";
+    auto r = Parse(src);
+    ASSERT_FALSE(r.has_errors) << c.select;
+    const SelectExpression* top = OnlyCrossBinSelect(r);
+    ASSERT_NE(top, nullptr) << c.select;
+    ASSERT_EQ(top->kind, c.op) << c.select;
+    const SelectExpression* counted = c.matches_on_left ? top->lhs : top->rhs;
+    const SelectExpression* other = c.matches_on_left ? top->rhs : top->lhs;
+    EXPECT_EQ(counted->kind, c.counted) << c.select;
+    if (c.dollar) {
+      EXPECT_TRUE(counted->matches_dollar) << c.select;
+    } else {
+      ASSERT_NE(counted->matches, nullptr) << c.select;
+      EXPECT_EQ(counted->matches->kind, ExprKind::kIntegerLiteral) << c.select;
+    }
+    EXPECT_EQ(other->kind, SelectExpressionKind::kBinsOf) << c.select;
+    EXPECT_EQ(other->matches, nullptr) << c.select;
+    EXPECT_FALSE(other->matches_dollar) << c.select;
+  }
+}
+
+std::string DeclaredInEveryCheckerGenerateForm(const char* keyword,
+                                               const char* end) {
+  constexpr const char* kForms[] = {
+      "  if (1) begin : g1\n    @\n  end else begin : g2\n    @\n  end\n",
+      "  for (genvar i = 0; i < 1; i++) begin : g3\n    @\n  end\n",
+      "  case (1)\n    1: begin : g4\n      @\n    end\n  endcase\n",
+      "  generate\n    @\n  endgenerate\n",
+      "  if (1) @\n",
+      "  for (genvar j = 0; j < 1; j++) @\n"};
+  std::string src = "checker c;\n";
+  int n = 0;
+  for (const char* form : kForms) {
+    for (const char* p = form; *p != '\0'; ++p) {
+      if (*p != '@') {
+        src += *p;
+        continue;
+      }
+      src += keyword;
+      src += " inner";
+      src += std::to_string(++n);
+      src += "; ";
+      src += end;
+    }
+  }
+  src += "endchecker\n";
+  return src;
+}
+
+constexpr uint32_t kCheckerGenerateLines[] = {3, 5, 8, 12, 16, 18, 19};
+
+TEST(BnfClarificationParsing,
+     DISABLED_DesignElementInEveryCheckerGenerateFormRejected) {
+  const std::pair<const char*, const char*> kElements[] = {
+      {"module", "endmodule"},
+      {"interface", "endinterface"},
+      {"program", "endprogram"}};
+  for (const auto& [keyword, end] : kElements) {
+    auto r = Parse(DeclaredInEveryCheckerGenerateForm(keyword, end));
+    for (uint32_t line : kCheckerGenerateLines) {
+      EXPECT_TRUE(ReportedError(r.diags,
+                                "a module, interface, or program cannot be "
+                                "declared inside checker 'c'",
+                                line, "17.2"))
+          << keyword << " " << line;
+    }
+  }
+}
+
+TEST(BnfClarificationParsing,
+     DISABLED_PackageInEveryCheckerGenerateFormRejected) {
+  auto r = Parse(DeclaredInEveryCheckerGenerateForm("package", "endpackage"));
+  for (uint32_t line : kCheckerGenerateLines) {
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "a package cannot be declared inside checker 'c'",
+                              line, "17.2"))
+        << line;
+  }
+  EXPECT_FALSE(ReportedError(r.diags, "unexpected token", 3, "23.2.4"));
+}
+
+TEST(BnfClarificationParsing, CheckerInEveryCheckerGenerateFormAccepted) {
+  auto r = Parse(DeclaredInEveryCheckerGenerateForm("checker", "endchecker"));
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
