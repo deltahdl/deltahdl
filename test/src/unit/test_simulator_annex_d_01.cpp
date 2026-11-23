@@ -128,6 +128,7 @@ struct UnavailableCall {
 
 const UnavailableCall kUnavailableCalls[] = {
     {"$key", "$key", "D.5"},
+    {"$key(\"keys.txt\")", "$key", "D.5"},
     {"$nokey", "$nokey", "D.5"},
     {"$input(\"cmds.txt\")", "$input", "D.4"},
     {"$save(\"state.dat\")", "$save", "D.9"},
