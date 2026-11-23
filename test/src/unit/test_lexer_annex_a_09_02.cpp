@@ -2,9 +2,14 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
+#include "common/diagnostic.h"
+#include "common/source_mgr.h"
 #include "fixture_lexer.h"
+#include "fixture_preprocessor.h"
 #include "helpers_reported_error.h"
+#include "lexer/lexer.h"
 #include "lexer/token.h"
 
 using namespace delta;
@@ -162,6 +167,26 @@ TEST(CommentLexing, BlockCommentLoneAsteriskDoesNotClose) {
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].text, "a");
   EXPECT_EQ(tokens[1].text, "b");
+}
+
+TEST(CommentLexing,
+     DISABLED_ByteOneInEitherCommentFormPassesThePreprocessorAndLexer) {
+  for (const std::string& src :
+       {std::string("a // x\x01y\nb\n"), std::string("a /* x\x01y */ b\n")}) {
+    PreprocFixture f;
+    auto out = Preprocess(src, f);
+    EXPECT_FALSE(f.diag.HasErrors()) << src;
+    SourceManager mgr;
+    DiagEngine diag(mgr);
+    auto fid = mgr.AddFile("<preprocessed>", out);
+    Lexer lexer(mgr.FileContent(fid), fid, diag,
+                TextOrigin::kPreprocessorOutput);
+    std::vector<Token> tokens = lexer.LexAll();
+    EXPECT_FALSE(diag.HasErrors()) << src;
+    ASSERT_EQ(tokens.size(), 3u) << src;
+    EXPECT_EQ(tokens[0].text, "a");
+    EXPECT_EQ(tokens[1].text, "b");
+  }
 }
 
 }  // namespace

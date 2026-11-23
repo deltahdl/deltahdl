@@ -5,6 +5,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "lexer/lexer.h"
 #include "parser/ast_design.h"
 #include "parser/parser.h"
@@ -167,6 +168,52 @@ TEST(IdentifierSyntaxParsing, PsCovergroupIdentifierFromPackage) {
       f);
   ASSERT_NE(cu, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(IdentifierSyntaxParsing, ANonAsciiLetterInASimpleIdentifierIsReported) {
+  ParseFixture plain;
+  ASSERT_NE(ParseSrc("module m;\n  logic cafe;\nendmodule\n", plain), nullptr);
+  EXPECT_FALSE(plain.diag.HasErrors());
+
+  ParseFixture f;
+  ParseSrc("module m;\n  logic caf\xC3\xA9;\nendmodule\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "unexpected character 0xC3",
+                            2, "5.2"));
+}
+
+struct DpiNameCase {
+  const char* decl;
+  const char* message;
+  const char* subclause;
+};
+
+TEST(IdentifierSyntaxParsing, ADpiNameThatIsNoCIdentifierIsReported) {
+  const DpiNameCase kCases[] = {
+      {"export \"DPI-C\" 9bad = function f;",
+       "expected 'function', got integer literal", "35.7"},
+      {"import \"DPI-C\" $bad = function void g();",
+       "expected 'function', got system identifier", "35.5.4"},
+      {"export \"DPI-C\" $bad = function f;",
+       "expected 'function', got system identifier", "35.7"},
+      {"import \"DPI-C\" = function void g();", "expected 'function', got '='",
+       "35.5.4"},
+      {"export \"DPI-C\" = function f;", "expected 'function', got '='",
+       "35.7"},
+      {"import \"DPI-C\" foo bar = function void g();",
+       "expected 'function', got identifier", "35.5.4"},
+      {"export \"DPI-C\" foo bar = function f;",
+       "expected 'function', got identifier", "35.7"},
+  };
+  for (const DpiNameCase& c : kCases) {
+    ParseFixture f;
+    ParseSrc(
+        std::string("module m;\n  function int f(); return 1; endfunction\n"
+                    "  ") +
+            c.decl + "\nendmodule\n",
+        f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), c.message, 3, c.subclause))
+        << c.decl;
+  }
 }
 
 }  // namespace

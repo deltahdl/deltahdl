@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
 
 #include "fixture_elaborator.h"
@@ -249,6 +250,43 @@ TEST(IdentifierElaboration, PsIdentifierUnknownPackageIsError) {
                             "reference to unresolved package or scope "
                             "'no_such_pkg'",
                             3, "26.3"));
+}
+
+static void ExpectRangeWidth(const std::string& blocks, const std::string& msb,
+                             uint32_t width) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module m;\n" + blocks + "  logic [" + msb + ":0] x;\nendmodule\n", f);
+  ASSERT_NE(design, nullptr) << msb;
+  EXPECT_FALSE(f.has_errors) << msb;
+  ASSERT_EQ(design->top_modules.size(), 1u);
+  uint32_t seen = 0;
+  for (const auto& v : design->top_modules[0]->variables) {
+    if (v.name == "x") seen = v.width;
+  }
+  EXPECT_EQ(seen, width) << msb;
+}
+
+TEST(IdentifierElaboration,
+     DISABLED_AnUnindexedGenerateBlockParameterSizesARange) {
+  ExpectRangeWidth("  if (1) begin : blk\n    localparam P = 3;\n  end\n",
+                   "blk.P", 4u);
+}
+
+TEST(IdentifierElaboration, DISABLED_ANestedGenerateBlockParameterSizesARange) {
+  ExpectRangeWidth(
+      "  if (1) begin : blk\n    if (1) begin : inner\n"
+      "      localparam Q = 5;\n    end\n  end\n",
+      "blk.inner.Q", 6u);
+}
+
+TEST(IdentifierElaboration,
+     DISABLED_AnIndexedGenerateBlockParameterSizesARange) {
+  const std::string kLoop =
+      "  for (genvar i = 0; i < 3; i++) begin : g\n"
+      "    localparam R = i * 2 + 1;\n  end\n";
+  ExpectRangeWidth(kLoop, "g[1].R", 4u);
+  ExpectRangeWidth(kLoop, "g[2].R", 6u);
 }
 
 }  // namespace

@@ -104,4 +104,20 @@ TEST(IdentifierSimulation, ParameterIdentifierFromPackageResolvesAtRuntime) {
   EXPECT_EQ(val, 11u);
 }
 
+TEST(IdentifierSimulation,
+     DISABLED_APackageNetReadThroughItsScopeYieldsItsValue) {
+  auto val = RunAndGet(
+      "package pkg;\n"
+      "  supply1 s;\n"
+      "  supply0 z0;\n"
+      "  tri1 t1;\n"
+      "endpackage\n"
+      "module t;\n"
+      "  logic [2:0] y;\n"
+      "  initial #1 y = {pkg::s, pkg::z0, pkg::t1};\n"
+      "endmodule\n",
+      "y");
+  EXPECT_EQ(val, 5u);
+}
+
 }  // namespace
