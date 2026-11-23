@@ -136,6 +136,8 @@ const UnavailableCall kUnavailableCalls[] = {
     {"$incsave(\"inc1.dat\")", "$incsave", "D.9"},
     {"$reset", "$reset", "D.8"},
     {"$reset(0)", "$reset", "D.8"},
+    {"$reset(1, 42)", "$reset", "D.8"},
+    {"$reset(1, 42, )", "$reset", "D.8"},
     {"$reset(1, 42, 3)", "$reset", "D.8"},
     {"v = $reset_count", "$reset_count", "D.8"},
     {"v = $reset_value", "$reset_value", "D.8"},

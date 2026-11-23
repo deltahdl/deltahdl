@@ -58,4 +58,18 @@ TEST(OptionalSystemTaskExtendedParsing, ResetWithStopAndResetValue) {
   ASSERT_EQ(stmt->expr->args.size(), 2u);
 }
 
+TEST(OptionalSystemTaskExtendedParsing,
+     ResetWithAResetValueAndAnEmptyDiagnosticsValue) {
+  auto r = Parse("module m; initial $reset(1, 42, ); endmodule\n");
+  ASSERT_NE(r.cu, nullptr);
+  auto* stmt = FirstInitialStmt(r);
+  ASSERT_NE(stmt, nullptr);
+  EXPECT_EQ(stmt->kind, StmtKind::kExprStmt);
+  ASSERT_NE(stmt->expr, nullptr);
+  EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
+  EXPECT_EQ(stmt->expr->callee, "$reset");
+  ASSERT_EQ(stmt->expr->args.size(), 3u);
+  EXPECT_EQ(stmt->expr->args[2], nullptr);
+}
+
 }  // namespace
