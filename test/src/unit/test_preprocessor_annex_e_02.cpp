@@ -166,4 +166,62 @@ TEST(Preprocessor, DefaultDecayTime_MalformedRealArgumentIsError) {
   }
 }
 
+TEST(Preprocessor, DefaultDecayTime_ZeroIsAFiniteDecayTime) {
+  PreprocFixture f;
+  EXPECT_EQ(DecayTimeSetBy(f, "0"), 0.0);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(Preprocessor, DefaultDecayTime_OnlyTheLowerCaseKeywordMeansInfinite) {
+  for (const char* arg : {"INFINITE", "Infinite"}) {
+    PreprocFixture f;
+    EXPECT_EQ(DecayTimeSetBy(f, arg), std::nullopt) << arg;
+    EXPECT_TRUE(ReportedInvalid(f, arg)) << arg;
+  }
+}
+
+TEST(Preprocessor, DefaultDecayTime_AnArgumentOfNoAllowedFormIsAnError) {
+  for (const char* arg : {"10ns", "-5", "10 20", "infinite 5"}) {
+    PreprocFixture f;
+    EXPECT_EQ(DecayTimeSetBy(f, arg), std::nullopt) << arg;
+    EXPECT_TRUE(ReportedInvalid(f, arg)) << arg;
+  }
+}
+
+TEST(Preprocessor, DISABLED_DefaultDecayTime_ATrailingCommentIsNoPartOfIt) {
+  for (const char* arg : {"10 // ten units", "10 /* ten */", "10// ten"}) {
+    PreprocFixture f;
+    EXPECT_EQ(DecayTimeSetBy(f, arg), 10.0) << arg;
+    EXPECT_TRUE(f.diag.Diagnostics().empty()) << arg;
+  }
+}
+
+TEST(Preprocessor, DISABLED_DefaultDecayTime_ACommentAloneIsAMissingArgument) {
+  for (const char* arg : {"// nothing", "/* nothing */"}) {
+    PreprocFixture f;
+    EXPECT_EQ(DecayTimeSetBy(f, arg), std::nullopt) << arg;
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "`default_decay_time requires an argument", 1,
+                              "E.2"))
+        << arg;
+  }
+}
+
+TEST(Preprocessor, DISABLED_DefaultDecayTime_AMacroArgumentIsReadAsItsText) {
+  PreprocFixture finite;
+  Preprocessor pp(finite.mgr, finite.diag, {});
+  pp.Preprocess(
+      finite.mgr.AddFile("<test>", "`define D 10\n`default_decay_time `D\n"));
+  EXPECT_TRUE(finite.diag.Diagnostics().empty());
+  EXPECT_FALSE(pp.DefaultDecayTimeInfinite());
+  EXPECT_EQ(pp.DefaultDecayTime(), 10u);
+  PreprocFixture infinite;
+  Preprocessor after(infinite.mgr, infinite.diag, {});
+  after.Preprocess(infinite.mgr.AddFile(
+      "<test>",
+      "`default_decay_time 10\n`define K infinite\n`default_decay_time `K\n"));
+  EXPECT_TRUE(infinite.diag.Diagnostics().empty());
+  EXPECT_TRUE(after.DefaultDecayTimeInfinite());
+}
+
 }  // namespace
