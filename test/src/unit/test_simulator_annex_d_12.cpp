@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_annex_d_call_forms.h"
 
 using namespace delta;
 
@@ -123,6 +124,72 @@ TEST(OptionalShowScopesSim, AScopeDefiningNothingListsNothing) {
   std::string out =
       RunCapture(ListedDesignWith("$scope(t.blk.inner); $showscopes(1);"), f);
   EXPECT_EQ(out, "");
+}
+
+std::string FunctionDesignWith(const std::string& call) {
+  std::string src =
+      "module child;\n"
+      "  function int fc; return 0; endfunction\n"
+      "endmodule\n"
+      "module t;\n"
+      "  child c1();\n"
+      "  function int ft; return 0; endfunction\n"
+      "  initial begin : blk\n"
+      "    ";
+  src += call;
+  src += "\n  end\nendmodule\n";
+  return src;
+}
+
+TEST(OptionalShowScopesSim, FunctionsAreListedAtTheLevelAndBelow) {
+  SimFixture level;
+  EXPECT_EQ(RunCapture(FunctionDesignWith("$showscopes;"), level),
+            "t.blk\nt.c1\nt.ft\n");
+  SimFixture below;
+  EXPECT_EQ(RunCapture(FunctionDesignWith("$showscopes(1);"), below),
+            "t.blk\nt.c1\nt.c1.fc\nt.ft\n");
+}
+
+TEST(OptionalShowScopesSim, EveryNonzeroValueListsEveryScopeBelow) {
+  for (const char* call :
+       {"$showscopes(2);", "$showscopes(-1);", "$showscopes(3 - 2);"}) {
+    SimFixture f;
+    EXPECT_EQ(RunCapture(ListedDesignWith(call), f),
+              "t.blk\nt.blk.inner\nt.c1\nt.c1.tk\nt.tt\n")
+        << call;
+  }
+}
+
+std::string ListedDesignWithVariable(const std::string& value) {
+  std::string src = ListedDesignWith("$showscopes(m);");
+  std::string decl = "  int m = ";
+  decl += value;
+  decl += ";\n";
+  src.insert(src.find("  task tt;"), decl);
+  return src;
+}
+
+TEST(OptionalShowScopesSim, AVariableArgumentDecidesByItsValue) {
+  SimFixture nonzero;
+  EXPECT_EQ(RunCapture(ListedDesignWithVariable("1"), nonzero),
+            "t.blk\nt.blk.inner\nt.c1\nt.c1.tk\nt.tt\n");
+  SimFixture zero;
+  EXPECT_EQ(RunCapture(ListedDesignWithVariable("0"), zero),
+            "t.blk\nt.c1\nt.tt\n");
+}
+
+constexpr const char* kShowScopesForm =
+    "$showscopes is written as a task statement with no argument list or with "
+    "one integer argument, and this call is not";
+
+TEST(OptionalShowScopesForm, DISABLED_TwoArgumentsAreReported) {
+  ExpectOnlyTheMalformedCallReported("$showscopes(1)", "$showscopes(1, 2)",
+                                     kShowScopesForm, "D.12");
+}
+
+TEST(OptionalShowScopesForm, DISABLED_AnEmptyArgumentListIsReported) {
+  ExpectOnlyTheMalformedCallReported("$showscopes", "$showscopes()",
+                                     kShowScopesForm, "D.12");
 }
 
 }  // namespace

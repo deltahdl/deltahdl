@@ -12,6 +12,7 @@ TEST(OptionalSystemTaskParserParsing, ShowScopesNoArgument) {
       "  initial $showscopes;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 TEST(OptionalSystemTaskParserParsing, ShowScopesIntegerArgument) {
@@ -20,6 +21,7 @@ TEST(OptionalSystemTaskParserParsing, ShowScopesIntegerArgument) {
       "  initial $showscopes(1);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
+  EXPECT_FALSE(r.has_errors);
 }
 
 }  // namespace
