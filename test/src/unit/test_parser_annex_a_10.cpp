@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <utility>
 
 #include "fixture_parser.h"
 #include "helpers_generate_forms.h"
@@ -523,6 +524,108 @@ TEST(BnfClarificationParsing, ErrorUnsizedPackedDimOutsideADpiImportFormal) {
   EXPECT_TRUE(ReportedError(exported.diags, "expected expression", 3, "11.2"));
   auto port = Parse("module m(input bit [] p);\nendmodule\n");
   EXPECT_TRUE(ReportedError(port.diags, "expected expression", 1, "11.2"));
+}
+
+TEST(BnfClarificationParsing, ErrorRefAndConstRefFormalsInDpiImports) {
+  for (const char* proto :
+       {"task t(ref int x)", "function void f(const ref int x)",
+        "task t(const ref int x)"}) {
+    SCOPED_TRACE(proto);
+    auto r = Parse(std::string("module m;\n  import \"DPI-C\" ") + proto +
+                   ";\nendmodule\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags, "ref qualifier cannot be used in a DPI import declaration", 2,
+        "35.5.4"));
+  }
+}
+
+TEST(BnfClarificationParsing, DirectionFormalsInDpiImportsOk) {
+  EXPECT_TRUE(
+      ParseOk("module m;\n"
+              "  import \"DPI-C\" task t(input int x, inout int y);\n"
+              "  import \"DPI-C\" function void f(output int x);\n"
+              "endmodule\n"));
+}
+
+TEST(BnfClarificationParsing, ErrorParameterWithoutValueOutsideAPortList) {
+  for (const char* src :
+       {"package p; parameter int K; endpackage\n", "parameter int K;\n",
+        "class c; parameter int A; endclass\n"}) {
+    SCOPED_TRACE(src);
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "parameter declaration requires a default value",
+                              1, "6.20.1"));
+  }
+  for (const char* src :
+       {"package p; parameter type T; endpackage\n", "parameter type T;\n",
+        "class c; parameter type T; endclass\n"}) {
+    SCOPED_TRACE(src);
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(
+        r.diags,
+        "type parameter 'T' outside a parameter port list must have a default "
+        "type",
+        1, "6.20.1"));
+  }
+}
+
+TEST(BnfClarificationParsing, ParameterWithValueOutsideAPortListOk) {
+  EXPECT_TRUE(
+      ParseOk("parameter int K = 1;\n"
+              "parameter type U = int;\n"
+              "package p; parameter int K = 1; parameter type T = int; "
+              "endpackage\n"
+              "class c; parameter int A = 1; parameter type T = int; "
+              "endclass\n"));
+}
+
+std::string PortListHeader(const std::string& head, const char* item,
+                           const std::string& end) {
+  std::string src = head;
+  src += item;
+  src += "); ";
+  src += end;
+  src += "\n";
+  return src;
+}
+
+TEST(BnfClarificationParsing, ErrorPortListLocalparamWithoutValue) {
+  const std::pair<std::string, std::string> kHeads[] = {
+      {"interface ifc #(parameter int W = 1, ", "endinterface"},
+      {"program prg #(parameter int W = 1, ", "endprogram"},
+      {"class C #(int W = 1, ", "endclass"}};
+  for (const auto& [head, end] : kHeads) {
+    SCOPED_TRACE(head);
+    auto value = Parse(PortListHeader(head, "localparam int L", end));
+    EXPECT_TRUE(ReportedError(
+        value.diags,
+        "localparam 'L' in parameter port list must have a default value", 1,
+        "6.20.1"));
+    auto type = Parse(PortListHeader(head, "localparam type T", end));
+    EXPECT_TRUE(ReportedError(
+        type.diags,
+        "localparam type 'T' in parameter port list must have a default type",
+        1, "6.20.1"));
+  }
+}
+
+TEST(BnfClarificationParsing, PortListLocalparamWithValueOk) {
+  EXPECT_TRUE(
+      ParseOk("interface ifc #(parameter int W, localparam int L = 2);\n"
+              "endinterface\n"
+              "program prg #(parameter int W, localparam int L = 2);\n"
+              "endprogram\n"
+              "class C #(int W = 1, localparam int L = 2);\n"
+              "endclass\n"));
+}
+
+TEST(BnfClarificationParsing, ErrorUnsizedPackedDimOnAPackedUnionMember) {
+  auto r = Parse(
+      "module m;\n"
+      "  typedef union packed { bit [] a; bit [7:0] b; } u;\n"
+      "endmodule\n");
+  EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
 }  // namespace

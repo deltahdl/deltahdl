@@ -714,4 +714,166 @@ TEST(BnfClarificationElaboration, MethodRandomizeNullArgumentOk) {
              "endmodule\n"));
 }
 
+constexpr std::string_view kStaticOverride =
+    "static constraint 'c' shall not carry a dynamic override specifier";
+
+TEST(BnfClarificationElaboration,
+     StaticConstraintDeclarationWithOverrideError) {
+  for (const std::string& item :
+       {std::string("static constraint :initial c { x > 0; }"),
+        std::string("static constraint :extends c { x > 0; }"),
+        std::string("static constraint :final c { x > 0; }"),
+        std::string("extern static constraint :final c;")}) {
+    SCOPED_TRACE(item);
+    ElabFixture f;
+    ElaborateSrc("class C;\n  rand int x;\n  " + item + "\nendclass\n", f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kStaticOverride, 3, "18.5.10"));
+  }
+}
+
+TEST(BnfClarificationElaboration, PureStaticConstraintOverrideError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "virtual class C;\n"
+      "  rand int x;\n"
+      "  pure static constraint :initial c;\n"
+      "endclass\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kStaticOverride, 3, "18.5.10"));
+}
+
+TEST(BnfClarificationElaboration, StaticConstraintWithoutOverrideOk) {
+  EXPECT_TRUE(
+      ElabOk("virtual class V;\n"
+             "  rand int x;\n"
+             "  pure static constraint c;\n"
+             "endclass\n"
+             "class C;\n"
+             "  rand int x;\n"
+             "  extern static constraint c;\n"
+             "endclass\n"
+             "static constraint C::c { x > 0; }\n"));
+}
+
+TEST(BnfClarificationElaboration,
+     DISABLED_StaticOutOfBlockConstraintWithOverrideError) {
+  for (const char* spec : {":initial", ":extends", ":final"}) {
+    for (const std::string& proto_spec : {std::string(), std::string(spec)}) {
+      std::string src = "class C;\n  rand int x;\n  extern static constraint " +
+                        proto_spec + " c;\nendclass\nstatic constraint " +
+                        spec + " C::c { x > 0; }\n";
+      SCOPED_TRACE(src);
+      ElabFixture f;
+      ElaborateSrc(src, f);
+      EXPECT_TRUE(
+          ReportedError(f.diag.Diagnostics(), kStaticOverride, 5, "18.5.10"));
+    }
+  }
+}
+
+TEST(BnfClarificationElaboration, ClassTypedDpiImportTaskFormalError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class K; endclass\n"
+      "module m;\n"
+      "  import \"DPI-C\" task t(input K k);\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "formal argument 'k' has a class type, which "
+                            "cannot be passed through the DPI",
+                            3, "35.5.4"));
+}
+
+TEST(BnfClarificationElaboration, DpiImportTaskFormalOfAPlainTypeOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  import \"DPI-C\" task t(input int k, output bit [7:0] v);\n"
+             "endmodule\n"));
+}
+
+TEST(BnfClarificationElaboration, DISABLED_RootNameInATypeReferenceError) {
+  const std::string kSrc =
+      "module m;\n"
+      "  logic [7:0] x; int a;\n"
+      "  function int f(int v); return v; endfunction\n"
+      "  var type($root.x) y0;\n"
+      "  var type($root.x[0]) y1;\n"
+      "  var type($root.x[3:0]) y2;\n"
+      "  var type($root.x + a) y3;\n"
+      "  var type({$root.x, a}) y4;\n"
+      "  var type(f($root.x)) y5;\n"
+      "  initial if (type($root.x) == type(int)) $display(\"y\");\n"
+      "  if (type($root.x) == type(int)) begin : g end\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  for (uint32_t line = 4; line <= 11; ++line) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "type operator argument uses a hierarchical "
+                              "reference, which the type operator does not "
+                              "accept",
+                              line, "6.23"))
+        << line;
+  }
+}
+
+TEST(BnfClarificationElaboration, RootMemberInATypeReferenceError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t; int v; endmodule\n"
+      "module m;\n"
+      "  t t();\n"
+      "  string str;\n"
+      "  var type($root.t.v) y;\n"
+      "  var type($root.str.len()) z;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {5U, 6U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "type operator argument uses a hierarchical "
+                              "reference, which the type operator does not "
+                              "accept",
+                              line, "6.23"))
+        << line;
+  }
+}
+
+TEST(BnfClarificationElaboration, LocalNameInATypeReferenceOk) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  logic [7:0] x; int a;\n"
+             "  var type(x) y0;\n"
+             "  var type(x[3:0]) y1;\n"
+             "  var type(x + a) y2;\n"
+             "endmodule\n"));
+}
+
+TEST(BnfClarificationElaboration, RandomQualifierInASoftOrPackedUnionError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  union soft { rand bit [7:0] a; bit [3:0] b; } u1;\n"
+      "  union soft { randc bit [7:0] a; bit [3:0] b; } u2;\n"
+      "  union soft packed { rand bit [7:0] a; bit [7:0] b; } u3;\n"
+      "  union tagged packed { randc bit [7:0] a; bit [7:0] b; } u4;\n"
+      "endclass\n",
+      f);
+  for (uint32_t line : {2U, 3U, 4U, 5U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "random qualifier is only allowed in unpacked structures", line, "7.2"))
+        << line;
+  }
+}
+
+TEST(BnfClarificationElaboration, RandomQualifierInAnUnpackedStructOk) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  struct { rand bit [7:0] a; randc bit [3:0] b; } s;\n"
+             "endclass\n"));
+}
+
 }  // namespace
