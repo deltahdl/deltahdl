@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -197,6 +198,61 @@ TEST(ProcessStdPackageElaborator, CallsWithoutParenthesesAreChecked) {
                             "least 1 argument; 0 given",
                             5, "G.6"));
   EXPECT_EQ(f.diag.ErrorCount(), 2U);
+}
+
+TEST(ProcessStdPackageElaborator, FinalityHoldsForTheScopedBase) {
+  ElabFixture f;
+  ElabOk("class K extends std::process;\nendclass\nmodule m;\nendmodule\n", f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "cannot extend a class declared ':final'", 1,
+                            "8.13"));
+}
+
+std::string PackageExtending(const std::string& base) {
+  return "package p;\n  class K extends " + base +
+         ";\n  endclass\n  class H;\n    " + base +
+         " held;\n  endclass\nendpackage\nmodule m;\nendmodule\n";
+}
+
+TEST(ProcessStdPackageElaborator, FinalityHoldsInAPackage) {
+  for (const std::string kBase : {"process", "std::process"}) {
+    ElabFixture f;
+    ElabOk(PackageExtending(kBase), f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "cannot extend a class declared ':final'", 2,
+                              "8.13"))
+        << kBase;
+    EXPECT_EQ(f.diag.ErrorCount(), 1U) << kBase;
+  }
+}
+
+TEST(ProcessStdPackageElaborator, ActualsOfTheFormalsTypesAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  string s;\n"
+             "  initial begin\n"
+             "    static process p = process::self();\n"
+             "    p.srandom(7);\n"
+             "    s = p.get_randstate();\n"
+             "    p.set_randstate(s);\n"
+             "    p.set_randstate(\"ab\");\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(ProcessStdPackageElaborator, DISABLED_AnActualOfAnotherTypeIsRejected) {
+  for (const std::string kCall :
+       {"p.set_randstate(c);", "p.srandom(c);", "p.srandom(p);"}) {
+    ElabFixture f;
+    ElabOk(
+        "class C;\nendclass\nmodule m;\n  C c;\n  initial begin\n"
+        "    static process p = process::self();\n    " +
+            kCall + "\n  end\nendmodule\n",
+        f);
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), "assignment compatible", 7, "13.5"))
+        << kCall;
+  }
 }
 
 }  // namespace

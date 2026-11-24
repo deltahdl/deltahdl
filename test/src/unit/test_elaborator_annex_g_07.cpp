@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+#include <vector>
+
 #include "elaborator/std_package.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
@@ -171,6 +175,274 @@ TEST(WeakReferenceStdPackageElaborator,
     EXPECT_NE(d.loc.line, 15u);
     EXPECT_NE(d.loc.line, 16u);
   }
+}
+
+std::string WeakModule(const std::string& call) {
+  return "class C;\nendclass\nclass D extends C;\nendclass\nclass U;\nendclass"
+         "\nmodule m;\n  C c;\n  D d;\n  U u;\n  longint id;\n"
+         "  weak_reference #(C) wr;\n  initial begin\n    " +
+         call + "\n  end\nendmodule\n";
+}
+
+std::string WeakMethod(const std::string& call) {
+  return "class C;\nendclass\nclass D extends C;\nendclass\nclass U;\nendclass"
+         "\nclass K;\n  C c;\n  weak_reference #(C) wr;\n"
+         "  function void act(D d, U u);\n    longint id;\n    " +
+         call + "\n  endfunction\nendclass\nmodule m;\nendmodule\n";
+}
+
+std::string WeakPackageFunction(const std::string& call) {
+  return "package p;\n  class C;\n  endclass\n  class D extends C;\n  endclass"
+         "\n  class U;\n  endclass\n  function automatic void act(\n"
+         "      weak_reference #(C) wr, C c, D d, U u);\n    longint id;\n   "
+         " " +
+         call + "\n  endfunction\nendpackage\nmodule m;\nendmodule\n";
+}
+
+std::string WeakPackageTask(const std::string& call) {
+  return "package p;\n  class C;\n  endclass\n  task automatic act(C c);\n"
+         "    weak_reference #(C) wr;\n    longint id;\n    " +
+         call + "\n  endtask\nendpackage\nmodule m;\nendmodule\n";
+}
+
+std::vector<std::string> InEveryScope(const std::string& call) {
+  return {WeakModule(call), WeakMethod(call), WeakPackageFunction(call)};
+}
+
+void ExpectReport(const std::string& src, std::string_view at,
+                  std::string_view message, std::string_view subclause) {
+  ElabFixture f;
+  ElabOk(src, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, LineHolding(src, at),
+                            subclause))
+      << src;
+}
+
+void ExpectReports(const std::vector<std::string>& sources, std::string_view at,
+                   std::string_view message, std::string_view subclause) {
+  for (const auto& src : sources) ExpectReport(src, at, message, subclause);
+}
+
+TEST(WeakReferenceStdPackageElaborator, ClearTakesNoActual) {
+  EXPECT_TRUE(ElabOk(WeakModule("wr.clear();")));
+  ExpectReport(WeakModule("wr.clear(1);"), "wr.clear",
+               "method 'clear' of class 'weak_reference' takes at most 0 "
+               "arguments; 1 given",
+               "G.7");
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_ClearTakesNoActualInAClassOrAPackage) {
+  for (const auto& src :
+       {WeakMethod("wr.clear();"), WeakPackageFunction("wr.clear();")}) {
+    EXPECT_TRUE(ElabOk(src)) << src;
+  }
+  ExpectReports(
+      {WeakMethod("wr.clear(1);"), WeakPackageFunction("wr.clear(1);")},
+      "wr.clear",
+      "method 'clear' of class 'weak_reference' takes at most 0 "
+      "arguments; 1 given",
+      "G.7");
+}
+
+TEST(WeakReferenceStdPackageElaborator, DISABLED_ClearIsNoOperand) {
+  for (const std::string kUse : {"id = wr.clear();", "if (wr.clear()) ;",
+                                 "begin automatic int i = wr.clear(); end"}) {
+    ExpectReports(InEveryScope(kUse), "wr.clear",
+                  "void function 'clear' used as expression operand", "13.4.1");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator, AConstructionTakesOneReferent) {
+  EXPECT_TRUE(ElabOk(WeakModule("wr = new(c); wr = new(d); wr = new(null);")));
+  ExpectReport(WeakModule("wr = new(c, c);"), "new(c, c)",
+               "constructor of class 'weak_reference' takes at most 1 "
+               "argument; 2 given",
+               "G.7");
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_AReferentOfAnotherTypeIsRejected) {
+  for (const std::string kCall : {"new(u)", "new(5)", "new(\"s\")"}) {
+    ExpectReports(InEveryScope("wr = " + kCall + ";"), kCall,
+                  "assignment compatible", "13.5");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_ReferentsAreCountedInAClassAndAPackage) {
+  for (const auto& src :
+       {WeakMethod("wr = new(c);"), WeakPackageFunction("wr = new(c);"),
+        WeakPackageTask("wr = new(c);")}) {
+    EXPECT_TRUE(ElabOk(src)) << src;
+  }
+  ExpectReports({WeakMethod("wr = new;"), WeakPackageFunction("wr = new;"),
+                 WeakPackageTask("wr = new;")},
+                "wr = new",
+                "constructor of class 'weak_reference' takes at least 1 "
+                "argument; 0 given",
+                "G.7");
+  ExpectReports(
+      {WeakMethod("wr = new(c, c);"), WeakPackageTask("wr = new(c, c);")},
+      "new(c, c)",
+      "constructor of class 'weak_reference' takes at most 1 "
+      "argument; 2 given",
+      "G.7");
+}
+
+TEST(WeakReferenceStdPackageElaborator, ACastTakesTheResultOfGet) {
+  for (const auto& src : InEveryScope("c = wr.get(); $cast(d, wr.get());")) {
+    EXPECT_TRUE(ElabOk(src)) << src;
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_TheResultOfGetIsNoHandleOfAnotherClass) {
+  for (const std::string kUse : {"u = wr.get();", "d = wr.get();"}) {
+    ExpectReports(InEveryScope(kUse), kUse,
+                  "class handle assignment requires assignment compatible "
+                  "types",
+                  "8.4");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_GetTakesNoActualInAClassOrAPackage) {
+  for (const std::string kUse : {"void'(wr.get(c));", "c = wr.get(c);"}) {
+    ExpectReports({WeakMethod(kUse), WeakPackageFunction(kUse)}, "wr.get",
+                  "method 'get' of class 'weak_reference' takes at most 0 "
+                  "arguments; 1 given",
+                  "G.7");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_AMethodOutsideThePrototypeIsRejectedInAClassAndAPackage) {
+  ExpectReports({WeakMethod("wr.drop();"), WeakPackageFunction("wr.drop();"),
+                 WeakPackageTask("wr.drop();")},
+                "wr.drop", "class 'weak_reference' declares no method 'drop'",
+                "G.7");
+}
+
+std::vector<std::string> DeclarationsOf(const std::string& type) {
+  return {
+      "class C;\nendclass\nmodule m;\n  " + type + " w;\nendmodule\n",
+      "class C;\nendclass\nmodule m;\n  initial begin\n    " + type +
+          " w;\n  end\nendmodule\n",
+      "class C;\nendclass\nclass H;\n  " + type +
+          " w;\nendclass\nmodule m;\nendmodule\n",
+      "class C;\nendclass\nmodule m;\n  function void act(\n    " + type +
+          " w);\n  endfunction\nendmodule\n",
+      "class C;\nendclass\ntypedef " + type + " wt;\nmodule m;\nendmodule\n"};
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     ADeclarationGivesItsTypeParameterAClass) {
+  for (const std::string kType :
+       {"weak_reference #(C)", "std::weak_reference #(C)",
+        "weak_reference #(.T(C))"}) {
+    for (const auto& src : DeclarationsOf(kType)) {
+      EXPECT_TRUE(ElabOk(src)) << src;
+    }
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_ADeclarationWithoutParameterListIsRejected) {
+  for (const std::string kType : {"weak_reference", "std::weak_reference"}) {
+    ExpectReports(DeclarationsOf(kType), kType,
+                  "parameterized class 'weak_reference' has no default "
+                  "specialization",
+                  "8.25");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_ADeclarationWithAnEmptyParameterListIsRejected) {
+  for (const std::string kType :
+       {"weak_reference #()", "std::weak_reference #()"}) {
+    ExpectReports(DeclarationsOf(kType), kType,
+                  "specialization of parameterized class 'weak_reference' "
+                  "gives no value to parameter 'T'",
+                  "8.25");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator, GetIdTakesAHandleOfTheParameterClass) {
+  for (const std::string kActual : {"c", "d", "null"}) {
+    for (const auto& src :
+         InEveryScope("id = weak_reference#(C)::get_id(" + kActual + ");")) {
+      EXPECT_TRUE(ElabOk(src)) << src;
+    }
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator, DISABLED_GetIdTakesOneActual) {
+  ExpectReports(InEveryScope("id = weak_reference#(C)::get_id();"), "::get_id",
+                "method 'get_id' of class 'weak_reference' takes at least 1 "
+                "argument; 0 given",
+                "G.7");
+  ExpectReports(InEveryScope("id = weak_reference#(C)::get_id(c, c);"),
+                "::get_id",
+                "method 'get_id' of class 'weak_reference' takes at most 1 "
+                "argument; 2 given",
+                "G.7");
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_GetIdOfAnotherClassesHandleIsRejected) {
+  ExpectReports(InEveryScope("id = weak_reference#(C)::get_id(u);"), "::get_id",
+                "assignment compatible", "13.5");
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_OnlyGetIdIsCalledThroughTheClassScope) {
+  for (const std::string kMethod : {"get", "clear"}) {
+    ExpectReports(
+        InEveryScope("weak_reference#(C)::" + kMethod + "();"), "::" + kMethod,
+        "cannot reach non-static member '" + kMethod + "' through", "8.23");
+  }
+}
+
+TEST(WeakReferenceStdPackageElaborator, AClassExtendsASpecialization) {
+  EXPECT_TRUE(
+      ElabOk("class C;\nendclass\n"
+             "class W extends weak_reference#(C);\n"
+             "  function new(C o);\n"
+             "    super.new(o);\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module m;\n"
+             "  C c = new;\n"
+             "  W w = new(c);\n"
+             "  initial begin\n"
+             "    c = w.get();\n"
+             "    w.clear();\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(WeakReferenceStdPackageElaborator, ActualsAreBoundToTheirFormalsNames) {
+  for (const std::string kCall :
+       {"wr = new(.referent(c));",
+        "id = weak_reference#(C)::get_id(.obj(c));"}) {
+    for (const auto& src : InEveryScope(kCall)) {
+      EXPECT_TRUE(ElabOk(src)) << src;
+    }
+  }
+  EXPECT_TRUE(ElabOk(WeakModule(
+      "begin static weak_reference #(C) own = new(.referent(c)); end")));
+}
+
+TEST(WeakReferenceStdPackageElaborator,
+     DISABLED_ActualsBoundToOtherNamesAreRejected) {
+  ExpectReports(InEveryScope("wr = new(.obj(c));"), ".obj",
+                "no parameter 'obj' in", "G.7");
+  ExpectReport(
+      WeakModule("begin static weak_reference #(C) own = new(.obj(c)); end"),
+      ".obj", "no parameter 'obj' in", "G.7");
+  ExpectReports(InEveryScope("id = weak_reference#(C)::get_id(.referent(c));"),
+                ".referent", "no parameter 'referent' in", "G.7");
 }
 
 }  // namespace
