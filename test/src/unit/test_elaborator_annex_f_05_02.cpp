@@ -72,6 +72,14 @@ TEST(TightSatisfaction, FirstMatchRejectsWordWithMatchingEmptyPrefix) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"})}, *seq));
 }
 
+TEST(TightSatisfaction,
+     DISABLED_FirstMatchJudgesAShorterMatchOnTheComplementedPrefix) {
+  auto a = SeqBoolean(BoolAtom("a"));
+  auto seq = SeqFirstMatch(SeqOr(a, SeqConcat(a, SeqBoolean(BoolAtom("b")))));
+  EXPECT_TRUE(TightlySatisfies(Word{LetterTop(), A({"b"})}, *seq));
+  EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({"b"})}, *seq));
+}
+
 TEST(TightSatisfaction, NullRepetitionMatchesOnlyTheEmptyWord) {
   auto seq = SeqNullRepeat(SeqBoolean(BoolAtom("a")));
   EXPECT_TRUE(TightlySatisfies(Word{}, *seq));
@@ -90,6 +98,13 @@ TEST(TightSatisfaction, ClockedSequenceEvaluatesViaRewrite) {
   auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));
   EXPECT_TRUE(TightlySatisfies(Word{A({"clk", "a"})}, *clocked));
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"})}, *clocked));
+}
+
+TEST(TightSatisfaction, ClockedSequenceAbsorbsIdleLettersBeforeItsTick) {
+  auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));
+  EXPECT_TRUE(TightlySatisfies(Word{A({}), A({}), A({"clk", "a"})}, *clocked));
+  EXPECT_FALSE(TightlySatisfies(Word{A({"clk", "a"}), A({})}, *clocked));
+  EXPECT_FALSE(TightlySatisfies(Word{A({}), A({"a"})}, *clocked));
 }
 
 TEST(TightSatisfaction, NondegeneracyDetectsANonemptyWitness) {
@@ -112,6 +127,23 @@ TEST(TightSatisfaction, ContradictoryIntersectionIsDegenerate) {
 TEST(TightSatisfaction, ClockedSequenceNondegeneracyUsesRewrite) {
   auto clocked = SeqClock(BoolAtom("clk"), SeqBoolean(BoolAtom("a")));
   EXPECT_TRUE(IsNondegenerateSequence(*clocked));
+}
+
+TEST(TightSatisfaction, ClockedSequenceWhoseRewriteIsDegenerateIsDegenerate) {
+  auto a = SeqBoolean(BoolAtom("a"));
+  EXPECT_FALSE(
+      IsNondegenerateSequence(*SeqClock(BoolAtom("clk"), SeqNullRepeat(a))));
+  EXPECT_FALSE(IsNondegenerateSequence(
+      *SeqClock(BoolAtom("clk"), SeqIntersect(SeqNullRepeat(a), a))));
+}
+
+TEST(TightSatisfaction, ClockedLengthClashIsNondegenerateThroughTopLetters) {
+  auto a = SeqBoolean(BoolAtom("a"));
+  auto clocked = SeqClock(BoolAtom("clk"), SeqIntersect(SeqConcat(a, a), a));
+  EXPECT_TRUE(IsNondegenerateSequence(*clocked));
+  EXPECT_TRUE(TightlySatisfies(Word{LetterTop(), LetterTop()}, *clocked));
+  EXPECT_FALSE(
+      TightlySatisfies(Word{A({"clk", "a"}), A({"clk", "a"})}, *clocked));
 }
 
 TEST(TightSatisfaction, EmptyWordSatisfactionIsDecidable) {
