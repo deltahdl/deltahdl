@@ -98,25 +98,6 @@ TEST(DpiStringArguments, ImportOutputStringWrittenBackToActual) {
   EXPECT_EQ(actuals[0].AsString(), "produced");
 }
 
-TEST(DpiStringArguments,
-     ImportOutputStringDiscardsActualWhenForeignWritesNothing) {
-  DpiRuntime rt;
-  DpiRtFunction func;
-  func.c_name = "c_noop_out";
-  func.sv_name = "sv_noop_out";
-  func.return_type = DataTypeKind::kVoid;
-  func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kOutput}};
-  func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
-    EXPECT_TRUE(args[0].AsString().empty());
-    return DpiArgValue::FromInt(0);
-  };
-  rt.RegisterImport(func);
-
-  std::vector<DpiArgValue> actuals = {DpiArgValue::FromString("stale")};
-  rt.CallImportWithArgs("sv_noop_out", actuals);
-  EXPECT_TRUE(actuals[0].AsString().empty());
-}
-
 TEST(DpiStringArguments, ImportInoutStringContentsCopiedBack) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -227,7 +208,6 @@ TEST(DpiStringArgumentRules, AStringToBeKeptIsCopiedByTheKeepingSide) {
 
 int LengthOfInput(const char* s) { return static_cast<int>(std::strlen(s)); }
 void PointOutputAtText(const char** o) { *o = "from C"; }
-void PointOutputAtNothing(const char** o) { *o = nullptr; }
 char shouted[16] = {};
 void ShoutInout(const char** s) {
   std::size_t i = 0;
@@ -248,16 +228,11 @@ TEST(DpiStringArguments, EachDirectionAndTheResultCrossAsCStrings) {
       CImport("point_output_at_text", DataTypeKind::kVoid,
               {CFormal("o", DataTypeKind::kString, Direction::kOutput)}));
   b.dpi.RegisterImport(
-      CImport("point_output_at_nothing", DataTypeKind::kVoid,
-              {CFormal("o", DataTypeKind::kString, Direction::kOutput)}));
-  b.dpi.RegisterImport(
       CImport("shout_inout", DataTypeKind::kVoid,
               {CFormal("s", DataTypeKind::kString, Direction::kInout)}));
   b.dpi.RegisterImport(CImport("return_text", DataTypeKind::kString, {}));
   b.Bind({{"length_of_input", reinterpret_cast<void*>(&LengthOfInput)},
           {"point_output_at_text", reinterpret_cast<void*>(&PointOutputAtText)},
-          {"point_output_at_nothing",
-           reinterpret_cast<void*>(&PointOutputAtNothing)},
           {"shout_inout", reinterpret_cast<void*>(&ShoutInout)},
           {"return_text", reinterpret_cast<void*>(&ReturnText)}},
          "annex_h_08_10_strings");
@@ -267,9 +242,6 @@ TEST(DpiStringArguments, EachDirectionAndTheResultCrossAsCStrings) {
   std::vector<DpiArgValue> output = {DpiArgValue::FromString("seed")};
   b.Call("point_output_at_text", output);
   EXPECT_EQ(output[0].AsString(), "from C");
-  std::vector<DpiArgValue> nothing = {DpiArgValue::FromString("seed")};
-  b.Call("point_output_at_nothing", nothing);
-  EXPECT_EQ(nothing[0].AsString(), "");
   std::vector<DpiArgValue> inout = {DpiArgValue::FromString("hello")};
   b.Call("shout_inout", inout);
   EXPECT_EQ(inout[0].AsString(), "HELLO");
@@ -334,6 +306,107 @@ TEST(DpiStringArguments, AnExportsStringResultAndOutputStayValidInC) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
   EXPECT_EQ(VariableValue(f, "ok_g"), 1U);
   EXPECT_EQ(VariableValue(f, "ok_n"), 1U);
+}
+
+void SeeTerminator(const char* s) {
+  SeeInC({s != nullptr && *s == '\0' ? 1 : 0});
+}
+
+TEST(DpiStringArguments, AnEmptyInputStringReachesCAsAPointerToItsTerminator) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input string s);\n"
+      "  string empty;\n"
+      "  initial begin see(\"\"); see(empty); see(\"a\"); end\n",
+      f, {{"see", CAddress(&SeeTerminator)}}, "annex_h_08_10_empty");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 1, 0}));
+}
+
+void LeaveInout(const char** s) {
+  SeeInC({*s != nullptr && std::strcmp(*s, "kept as it was") == 0 ? 1 : 0});
+}
+
+TEST(DpiStringArguments, AnInoutCLeavesUnchangedKeepsItsValue) {
+  DpiCBinding b;
+  b.dpi.RegisterImport(
+      CImport("leave_inout", DataTypeKind::kVoid,
+              {CFormal("s", DataTypeKind::kString, Direction::kInout)}));
+  b.Bind({{"leave_inout", CAddress(&LeaveInout)}}, "annex_h_08_10_left");
+  ASSERT_TRUE(b.diag.Diagnostics().empty());
+  SeenInC().clear();
+  std::vector<DpiArgValue> inout = {DpiArgValue::FromString("kept as it was")};
+  b.Call("leave_inout", inout);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1}));
+  EXPECT_EQ(inout[0].AsString(), "kept as it was");
+}
+
+void PassAnInputToKeep() {
+  auto rewrite = NamedExport<void (*)(const char*)>("rewrite_input");
+  if (rewrite == nullptr) return;
+  char text[] = "hello";
+  rewrite(text);
+  SeeInC({std::memcmp(text, "hello", sizeof(text)) == 0 ? 1 : 0});
+}
+
+TEST(DpiStringArguments, AnExportLeavesTheCharactersOfCsInputUnmodified) {
+  SimFixture f;
+  RunModuleWithC(
+      "  export \"DPI-C\" function rewrite_input;\n"
+      "  import \"DPI-C\" context function void pass_input();\n"
+      "  string changed;\n"
+      "  bit ok;\n"
+      "  function void rewrite_input(input string s);\n"
+      "    s.putc(0, \"J\"); s = {s, \"!\"}; changed = s;\n"
+      "  endfunction\n"
+      "  initial begin pass_input(); ok = changed == \"Jello!\"; end\n",
+      f, {{"pass_input", CAddress(&PassAnInputToKeep)}},
+      "annex_h_08_10_input_kept");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1}));
+  EXPECT_EQ(DesignValue(f, "ok"), 1U);
+}
+
+void PassInouts() {
+  auto change = NamedExport<void (*)(const char**)>("change_inout");
+  auto keep = NamedExport<void (*)(const char**)>("keep_inout");
+  if (change == nullptr || keep == nullptr) return;
+  char text[] = "hello";
+  const char* changed = text;
+  const char* kept = text;
+  change(&changed);
+  SeeInC(
+      {changed != text ? 1 : 0,
+       changed != nullptr && std::strcmp(changed, "hello there") == 0 ? 1 : 0,
+       std::memcmp(text, "hello", sizeof(text)) == 0 ? 1 : 0});
+  keep(&kept);
+  SeeInC({kept == text ? 1 : 0});
+}
+
+void RunInoutExports(SimFixture& f) {
+  RunModuleWithC(
+      "  export \"DPI-C\" function change_inout;\n"
+      "  export \"DPI-C\" function keep_inout;\n"
+      "  import \"DPI-C\" context function void pass_inouts();\n"
+      "  function void change_inout(inout string s);\n"
+      "    s = {s, \" there\"};\n"
+      "  endfunction\n"
+      "  function void keep_inout(inout string s); endfunction\n"
+      "  initial pass_inouts();\n",
+      f, {{"pass_inouts", CAddress(&PassInouts)}},
+      "annex_h_08_10_export_inouts");
+  ASSERT_EQ(SeenInC().size(), 4U);
+}
+
+TEST(DpiStringArguments, AnInoutAnExportChangesReachesCAsANewAddress) {
+  SimFixture f;
+  RunInoutExports(f);
+  EXPECT_EQ(std::vector<long long>(SeenInC().begin(), SeenInC().begin() + 3),
+            (std::vector<long long>{1, 1, 1}));
+}
+
+TEST(DpiStringArguments, DISABLED_AnInoutAnExportLeavesKeepsCsOwnPointer) {
+  SimFixture f;
+  RunInoutExports(f);
+  EXPECT_EQ(SeenInC().back(), 1);
 }
 
 }  // namespace

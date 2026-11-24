@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string_view>
 #include <type_traits>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
@@ -193,6 +194,46 @@ TEST(DpiOpenArrayArguments, OpenOutputArraysAreCopiedBack) {
   EXPECT_EQ(VariableValue(f, "b[6]"), 0U);
   EXPECT_EQ(VariableValue(f, "v[4]"), 12U);
   EXPECT_EQ(VariableValue(f, "ii[8]"), 64U);
+}
+
+void ChangeOpen(svOpenArrayHandle ints, svOpenArrayHandle vecs) {
+  for (int i = svLow(ints, 1); i <= svHigh(ints, 1); ++i) {
+    int* element = static_cast<int*>(svGetArrElemPtr1(ints, i));
+    SeeInC({*element});
+    *element *= 10;
+  }
+  for (int i = svLow(vecs, 1); i <= svHigh(vecs, 1); ++i) {
+    svLogicVecVal v[2] = {{0, 0}, {0, 0}};
+    svGetLogicArrElem1VecVal(v, vecs, i);
+    SeeInC({v[0].aval, v[0].bval, v[1].aval & 0xFFU, v[1].bval & 0xFFU});
+    v[1].aval += 1;
+    svPutLogicArrElem1VecVal(vecs, v, i);
+  }
+}
+
+TEST(DpiOpenArrayArguments, AnInoutOpenArrayIsReadAndWrittenThroughItsHandle) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void change_open(inout int i [],\n"
+      "      inout logic [39:0] v []);\n"
+      "  int ia [5:3];\n"
+      "  logic [39:0] va [1:2];\n"
+      "  bit ok1, ok2;\n"
+      "  initial begin\n"
+      "    ia[3] = 7; ia[4] = -8; ia[5] = 9;\n"
+      "    va[1] = 40'h21_0000_000x; va[2] = 40'h43_0000_0006;\n"
+      "    change_open(ia, va);\n"
+      "    ok1 = va[1] === 40'h22_0000_000x;\n"
+      "    ok2 = va[2] === 40'h44_0000_0006;\n"
+      "  end\n",
+      f, {{"change_open", CAddress(&ChangeOpen)}}, "annex_h_08_06_inout");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{7, -8, 9, 0xF, 0xF, 0x21, 0, 6,
+                                               0, 0x43, 0}));
+  EXPECT_EQ(DesignValue(f, "ia[3]"), 70U);
+  EXPECT_EQ(DesignValue(f, "ia[4]"), 0xFFFFFFB0U);
+  EXPECT_EQ(DesignValue(f, "ia[5]"), 90U);
+  EXPECT_EQ(DesignValue(f, "ok1"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok2"), 1U);
 }
 
 }  // namespace

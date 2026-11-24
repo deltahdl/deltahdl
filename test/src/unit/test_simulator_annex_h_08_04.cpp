@@ -10,6 +10,7 @@
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -189,4 +190,46 @@ TEST(DpiPassingByReference, ATimeOutputKeepsTheUnknownBitsCWrote) {
   EXPECT_EQ(VariableValue(f, "unknown"), 1U);
   EXPECT_EQ(VariableValue(f, "low"), 1U);
 }
+int ForwardFormals(const svBitVecVal* a, svLogicVecVal* o, svLogicVecVal* io) {
+  auto take = NamedExport<void (*)(const svBitVecVal*)>("take_forwarded");
+  auto fill = NamedExport<void (*)(svLogicVecVal*, svLogicVecVal*)>("fill");
+  auto enable = NamedExport<int (*)(svLogicVecVal*)>("enabled_task");
+  if (take == nullptr || fill == nullptr || enable == nullptr) return 0;
+  take(a);
+  fill(o, io);
+  return enable(io);
+}
+
+TEST(DpiPassingByReference, CPassesItsOwnFormalsOnToExports) {
+  SimFixture f;
+  RunModuleWithC(
+      "  export \"DPI-C\" function take_forwarded;\n"
+      "  export \"DPI-C\" function fill;\n"
+      "  export \"DPI-C\" task enabled_task;\n"
+      "  import \"DPI-C\" context task forward(input bit [39:0] a,\n"
+      "      output logic [39:0] o, inout logic [39:0] io);\n"
+      "  bit [39:0] taken;\n"
+      "  logic [39:0] o, io;\n"
+      "  bit ok_o, ok_io;\n"
+      "  function void take_forwarded(input bit [39:0] b);\n"
+      "    taken = b;\n"
+      "  endfunction\n"
+      "  function void fill(output logic [39:0] w, inout logic [39:0] x);\n"
+      "    w = 40'h12_0000_00zx; x = x + 40'h1_0000_0000;\n"
+      "  endfunction\n"
+      "  task enabled_task(inout logic [39:0] y);\n"
+      "    y = y << 1;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    io = 40'h02_0000_0003;\n"
+      "    forward(40'hab_0000_0005, o, io);\n"
+      "    ok_o = o === 40'h12_0000_00zx;\n"
+      "    ok_io = io === 40'h06_0000_0006;\n"
+      "  end\n",
+      f, {{"forward", CAddress(&ForwardFormals)}}, "annex_h_08_04_forward");
+  EXPECT_EQ(DesignValue(f, "taken"), 0xAB00000005ULL);
+  EXPECT_EQ(DesignValue(f, "ok_o"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok_io"), 1U);
+}
+
 }  // namespace

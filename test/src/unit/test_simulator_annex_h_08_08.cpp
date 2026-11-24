@@ -4,11 +4,13 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -191,6 +193,155 @@ TEST(DpiInoutAndOutputArguments, PackedFormalsAreWrittenAsCanonicalArrays) {
   ASSERT_EQ(args[3].AsLogicVecWords().size(), 2U);
   EXPECT_EQ(args[3].AsLogicVecWords()[0].aval, 5U);
   EXPECT_EQ(args[3].AsLogicVecWords()[1].aval, 2U);
+}
+
+void ChangeVectors(svBitVecVal* b, svLogicVecVal* l, svLogicVecVal* i,
+                   svLogicVecVal* t) {
+  SeeInC({b[0], b[1] & 0xFFU, l[0].aval, l[0].bval, l[1].aval & 0xFFU,
+          l[1].bval & 0xFFU});
+  SeeInC({i->aval, i->bval, t[0].aval, t[0].bval, t[1].aval, t[1].bval});
+  b[0] += 1;
+  b[1] = 0xFFFFFF12U;
+  l[0] = {0xFU, 0xFFU};
+  l[1] = {0xFFFFFF81U, 0xFFFFFF80U};
+  *i = {0xF0U, 0x0FU};
+  t[0] = {1, 2};
+  t[1] = {9, 0};
+}
+
+TEST(DpiInoutAndOutputArguments, PackedInoutsArriveAndAreCarriedBack) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void change(inout bit [39:0] b,\n"
+      "      inout logic [39:0] l, inout integer i, inout time t);\n"
+      "  bit [39:0] b = 40'hab_0000_0005;\n"
+      "  logic [39:0] l = 40'h4x_0000_00z1;\n"
+      "  integer i = 32'h0000_x0z3;\n"
+      "  time t = 64'h0000_0003_0000_0004;\n"
+      "  bit ok_l, ok_i, ok_t;\n"
+      "  initial begin\n"
+      "    change(b, l, i, t);\n"
+      "    ok_l = l === {8'bx0000001, 24'h0, 8'hzx};\n"
+      "    ok_t = t === {32'd9, 30'b0, 2'bz1};\n"
+      "    ok_i = i === 32'h0000_00fz;\n"
+      "  end\n",
+      f, {{"change", CAddress(&ChangeVectors)}}, "annex_h_08_08_packed_inouts");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{5, 0xAB, 0x01, 0xF0, 0x4F, 0x0F,
+                                               0xF003, 0xF0F0, 4, 0, 3, 0}));
+  EXPECT_EQ(DesignValue(f, "b"), 0x1200000006ULL);
+  EXPECT_EQ(DesignValue(f, "ok_l"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok_i"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok_t"), 1U);
+}
+
+int& HandleCell(int which) {
+  static int cells[2] = {0, 0};
+  return cells[which];
+}
+
+void* FirstHandle() { return &HandleCell(0); }
+
+int HandleIsSecond(void* p) { return p == &HandleCell(1) ? 1 : 0; }
+
+void ChangeNumbers(double* r, float* s, char* b, long long* l) {
+  SeeInC({static_cast<long long>(*r * 4), static_cast<long long>(*s * 4),
+          static_cast<signed char>(*b), *l});
+  *r = -2.5;
+  *s = 0.5F;
+  *b = -7;
+  *l = -6000000000LL;
+}
+
+void ChangeScalars(svBit* b, svLogic* l, void** c) {
+  SeeInC({*b, *l, *c == &HandleCell(0) ? 1 : 0});
+  *b = 1;
+  *l = sv_z;
+  *c = &HandleCell(1);
+}
+
+TEST(DpiInoutAndOutputArguments, NumericInoutsArriveAndAreWrittenBack) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void change(inout real r,\n"
+      "      inout shortreal s, inout byte b, inout longint l);\n"
+      "  real r = 1.25;\n"
+      "  shortreal s = 0.75;\n"
+      "  byte b = -3;\n"
+      "  longint l = 64'sd5000000000;\n"
+      "  bit ok;\n"
+      "  initial begin\n"
+      "    change(r, s, b, l);\n"
+      "    ok = r == -2.5 && s == 0.5 && b == -7 && l == -64'sd6000000000;\n"
+      "  end\n",
+      f, {{"change", CAddress(&ChangeNumbers)}},
+      "annex_h_08_08_numeric_inouts");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{5, 3, -3, 5000000000LL}));
+  EXPECT_EQ(DesignValue(f, "ok"), 1U);
+}
+
+TEST(DpiInoutAndOutputArguments, ScalarAndHandleInoutsArriveAndAreWrittenBack) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void change(inout bit b, inout logic l,\n"
+      "      inout chandle c);\n"
+      "  import \"DPI-C\" function chandle first_handle();\n"
+      "  import \"DPI-C\" function int is_second(input chandle c);\n"
+      "  bit b = 0;\n"
+      "  logic l = 1'bx;\n"
+      "  chandle c;\n"
+      "  bit ok_l;\n"
+      "  int second;\n"
+      "  initial begin\n"
+      "    c = first_handle();\n"
+      "    change(b, l, c);\n"
+      "    ok_l = l === 1'bz;\n"
+      "    second = is_second(c);\n"
+      "  end\n",
+      f,
+      {{"change", CAddress(&ChangeScalars)},
+       {"first_handle", CAddress(&FirstHandle)},
+       {"is_second", CAddress(&HandleIsSecond)}},
+      "annex_h_08_08_scalar_inouts");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0, sv_x, 1}));
+  EXPECT_EQ(DesignValue(f, "b"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok_l"), 1U);
+  EXPECT_EQ(DesignValue(f, "second"), 1U);
+}
+
+struct SmallRecord {
+  int x;
+  short y;
+};
+
+void ChangeAggregates(SmallRecord* s, int* a) {
+  SeeInC({s->x, s->y, a[0], a[1], a[2]});
+  s->x = 11;
+  s->y = -12;
+  a[0] = 21;
+  a[2] = 23;
+}
+
+TEST(DpiInoutAndOutputArguments, AggregateInoutsArriveAndAreCopiedBack) {
+  SimFixture f;
+  RunModuleWithC(
+      "  typedef struct { int x; shortint y; } record;\n"
+      "  import \"DPI-C\" function void change(inout record s,\n"
+      "      inout int a[3]);\n"
+      "  record s;\n"
+      "  int a[3] = '{4, 5, 6};\n"
+      "  bit ok_s;\n"
+      "  initial begin\n"
+      "    s.x = 70000; s.y = -2;\n"
+      "    change(s, a);\n"
+      "    ok_s = s.x == 11 && s.y == -12;\n"
+      "  end\n",
+      f, {{"change", CAddress(&ChangeAggregates)}},
+      "annex_h_08_08_aggregate_inouts");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{70000, -2, 4, 5, 6}));
+  EXPECT_EQ(DesignValue(f, "ok_s"), 1U);
+  EXPECT_EQ(DesignValue(f, "a[0]"), 21U);
+  EXPECT_EQ(DesignValue(f, "a[1]"), 5U);
+  EXPECT_EQ(DesignValue(f, "a[2]"), 23U);
 }
 
 }  // namespace

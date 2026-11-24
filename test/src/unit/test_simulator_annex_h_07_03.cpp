@@ -352,9 +352,6 @@ void SeeTwoLogicChunks(const svLogicVecVal* v) {
 void GiveByte(signed char* v) { *v = -5; }
 void AddToShort(short* v) { *v = static_cast<short>(*v + 1); }
 void GiveFourBits(svLogicVecVal* v) { *v = {0xCU, 0x5U}; }
-signed char ByteResult() { return -5; }
-int IntResult() { return -70000; }
-
 void RunEnums(const std::string& items, SimFixture& f) {
   RunModuleWithC(items, f,
                  {{"see_byte", CAddress(&SeeByte)},
@@ -368,9 +365,7 @@ void RunEnums(const std::string& items, SimFixture& f) {
                   {"see_two_logic", CAddress(&SeeTwoLogicChunks)},
                   {"give_byte", CAddress(&GiveByte)},
                   {"add_to_short", CAddress(&AddToShort)},
-                  {"give_four", CAddress(&GiveFourBits)},
-                  {"byte_result", CAddress(&ByteResult)},
-                  {"int_result", CAddress(&IntResult)}},
+                  {"give_four", CAddress(&GiveFourBits)}},
                  "annex_h_07_03_enums");
 }
 
@@ -462,25 +457,6 @@ TEST(DpiEnumRepresentation, AnOutputOrAnInoutIsWrittenInTheBaseType) {
   EXPECT_EQ(DesignValue(f, "ob"), 1U);
   EXPECT_EQ(DesignValue(f, "os"), 1U);
   EXPECT_EQ(DesignValue(f, "ov"), 1U);
-}
-
-TEST(DpiEnumRepresentation, DISABLED_AResultIsReturnedInTheBaseType) {
-  SimFixture f;
-  RunEnums(
-      "  typedef enum byte {BA = -5, BB = 3} eb;\n"
-      "  typedef enum {IA = -70000, IB = 3} ei;\n"
-      "  import \"DPI-C\" function eb byte_result();\n"
-      "  import \"DPI-C\" function ei int_result();\n"
-      "  eb b;\n"
-      "  ei i;\n"
-      "  bit ob, oi;\n"
-      "  initial begin\n"
-      "    b = byte_result(); i = int_result();\n"
-      "    ob = b == BA; oi = i == IA;\n"
-      "  end\n",
-      f);
-  EXPECT_EQ(DesignValue(f, "ob"), 1U);
-  EXPECT_EQ(DesignValue(f, "oi"), 1U);
 }
 
 int& FirstCell() {
