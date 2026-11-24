@@ -3,6 +3,7 @@
 #include <string>
 
 #include "fixture_simulator.h"
+#include "helpers_counter_property_counts.h"
 #include "helpers_property_places.h"
 #include "simulator/sva_engine_properties.h"
 #include "simulator/sva_engine_sampling.h"
@@ -264,6 +265,22 @@ TEST(AbortProperty,
       ExpectPropertyCountsInPlace(place, property, kPlacedStimulus);
     }
   }
+}
+
+TEST(AbortProperty,
+     DISABLED_AcceptOnReadsTheSampledValueOfAConditionUpdatedAtTheTick) {
+  ExpectCounterPropertyCounts("accept_on (v == 5) (1 ##1 (v == 0))", 2, 7);
+}
+
+TEST(AbortProperty,
+     DISABLED_RejectOnReadsTheSampledValueOfAConditionUpdatedAtTheTick) {
+  ExpectCounterPropertyCounts("reject_on (v == 5) (1 ##1 (v > 0))", 7, 2);
+}
+
+TEST(AbortProperty,
+     ASynchronousAbortReadsTheSampledValueOfAConditionUpdatedAtTheTick) {
+  ExpectCounterPropertyCounts("sync_accept_on (v == 5) (1 ##1 (v == 0))", 2, 7);
+  ExpectCounterPropertyCounts("sync_reject_on (v == 5) (1 ##1 (v > 0))", 7, 2);
 }
 
 TEST(AbortProperty, DISABLED_AnAbortCountsInACompilationUnitProperty) {

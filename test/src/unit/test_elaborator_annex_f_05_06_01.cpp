@@ -374,4 +374,225 @@ TEST(NeutralSatisfactionLocals,
   }
 }
 
+std::string VerdictsNamed(bool passes, bool disabled, bool fails) {
+  std::string out;
+  if (passes) {
+    out += "pass ";
+  }
+  if (disabled) {
+    out += "disabled ";
+  }
+  if (fails) {
+    out += "fail ";
+  }
+  return out;
+}
+
+std::string Verdicts(const Word& word, const LvTopLevelProperty& top,
+                     const LocalContext& context) {
+  return VerdictsNamed(PassesTopLevelWithLocals(word, top, context),
+                       IsDisabledTopLevelWithLocals(word, top, context),
+                       FailsTopLevelWithLocals(word, top, context));
+}
+
+std::string ClockedVerdicts(const Word& word,
+                            const LvClockedTopLevelProperty& top,
+                            const LocalContext& context) {
+  return VerdictsNamed(PassesTopLevelClockedWithLocals(word, top, context),
+                       IsDisabledTopLevelClockedWithLocals(word, top, context),
+                       FailsTopLevelClockedWithLocals(word, top, context));
+}
+
+std::shared_ptr<const SequenceExpr> AThenSampledB() {
+  return SeqConcat(Bool("a"), SeqFusion(Bool("b"), Samp("v")));
+}
+
+std::vector<LocalContext> EmptyAndBound() {
+  return {LocalContext{}, LocalContext{{"v", A({"old"})}}};
+}
+
+TEST(NeutralSatisfactionLocals,
+     TopLevelDisableIffPassesOnlyByThePrefixAheadOfItsGuard) {
+  auto decided = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
+  auto open = LvTopLocalVarDecl(
+      "int", "v", LvTopDisableIff(BoolAtom("g"), LvStrong(AThenSampledB())));
+  for (const LocalContext& ctx : EmptyAndBound()) {
+    EXPECT_EQ(Verdicts(Word{A({"a"}), A({"g"})}, *decided, ctx), "pass ");
+    EXPECT_EQ(Verdicts(Word{A({"a"}), A({"b"})}, *open, ctx), "pass ");
+    EXPECT_EQ(Verdicts(Word{A({"a"}), A({"b", "g"})}, *open, ctx), "disabled ");
+    EXPECT_EQ(Verdicts(Word{A({"a"}), A({"b"}), A({"g"})}, *open, ctx),
+              "pass ");
+  }
+}
+
+TEST(NeutralSatisfactionLocals,
+     TopLevelDisableIffTakesATopLetterAsAGuardLetterAndABottomOneAsNone) {
+  auto top = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
+  EXPECT_EQ(Verdicts(Word{LetterTop()}, *top, LocalContext{}), "disabled ");
+  EXPECT_EQ(Verdicts(Word{LetterBottom()}, *top, LocalContext{}), "fail ");
+}
+
+TEST(NeutralSatisfactionLocals,
+     TopLevelDisableIffIsJudgedAtItsLeastGuardIndex) {
+  auto two_letters = LvTopLocalVarDecl(
+      "int", "v", LvTopDisableIff(BoolAtom("g"), LvStrong(AThenSampledB())));
+  auto one_letter = LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a")));
+  for (const LocalContext& ctx : EmptyAndBound()) {
+    EXPECT_EQ(Verdicts(Word{A({"a"}), A({"g"}), A({"g"})}, *two_letters, ctx),
+              "disabled ");
+    EXPECT_EQ(
+        Verdicts(Word{A({"a"}), A({"b", "g"}), A({"g"})}, *two_letters, ctx),
+        "disabled ");
+    EXPECT_EQ(Verdicts(Word{A({"g"}), A({"a", "g"})}, *one_letter, ctx),
+              "disabled ");
+    EXPECT_EQ(
+        Verdicts(Word{A({"x"}), A({"g"}), A({"a", "g"})}, *one_letter, ctx),
+        "fail ");
+  }
+}
+
+TEST(NeutralSatisfactionLocals,
+     ClockedTopLevelDisableIffIsJudgedAtItsLeastGuardIndex) {
+  auto u = LvClockedTopLocalVarDecl(
+      "int", "v",
+      LvClockedTopDisableIff(
+          BoolAtom("g"),
+          ClkClock(BoolAtom("clk"), ClkStrong(AThenSampledB()))));
+  for (const LocalContext& ctx : EmptyAndBound()) {
+    EXPECT_EQ(ClockedVerdicts(Word{A({"a", "clk"}), A({"x"}), A({"b", "clk"})},
+                              *u, ctx),
+              "pass ");
+    EXPECT_EQ(ClockedVerdicts(Word{A({"a", "clk"}), A({"g", "clk"}), A({"g"})},
+                              *u, ctx),
+              "disabled ");
+    EXPECT_EQ(
+        ClockedVerdicts(Word{A({"a", "clk"}), A({"b", "g", "clk"}), A({"g"})},
+                        *u, ctx),
+        "disabled ");
+    EXPECT_EQ(ClockedVerdicts(Word{A({"a", "clk"}), A({"g"}), A({"b", "clk"})},
+                              *u, ctx),
+              "disabled ");
+    EXPECT_EQ(ClockedVerdicts(Word{A({"x", "clk"}), A({"g", "clk"}), A({"g"})},
+                              *u, ctx),
+              "fail ");
+  }
+}
+
+TEST(NeutralSatisfactionLocals, ABareClockedTopLevelPropertyIsNeverDisabled) {
+  auto u =
+      LvClockedTopProperty(ClkClock(BoolAtom("clk"), ClkStrong(Samp("v"))));
+  for (const LocalContext& ctx : EmptyAndBound()) {
+    const Word kHolds{A({"x"}), A({"clk"})};
+    const Word kMisses{A({"x"})};
+    EXPECT_EQ(ClockedVerdicts(kHolds, *u, ctx), "pass ");
+    EXPECT_FALSE(DisablesTopLevelClockedWithLocals(kHolds, *u, ctx));
+    EXPECT_EQ(ClockedVerdicts(kMisses, *u, ctx), "fail ");
+    EXPECT_FALSE(DisablesTopLevelClockedWithLocals(kMisses, *u, ctx));
+  }
+}
+
+TEST(NeutralSatisfactionLocals, TopLevelParenKeepsEachVerdictOfItsOperand) {
+  auto bare = LvTopParen(LvTopProperty(LvStrong(Bool("a"))));
+  EXPECT_EQ(Verdicts(Word{A({"b"})}, *bare, LocalContext{}), "fail ");
+  auto guarded =
+      LvTopParen(LvTopDisableIff(BoolAtom("g"), LvStrong(Bool("a"))));
+  EXPECT_EQ(Verdicts(Word{A({"a"})}, *guarded, LocalContext{}), "pass ");
+  EXPECT_EQ(Verdicts(Word{A({"c"})}, *guarded, LocalContext{}), "fail ");
+  EXPECT_EQ(Verdicts(Word{A({"g"})}, *guarded, LocalContext{}), "disabled ");
+}
+
+TEST(NeutralSatisfactionLocals, ATopLevelPropertyHasExactlyOneVerdict) {
+  const auto kGuarded =
+      LvTopDisableIff(BoolAtom("g"), LvStrong(AThenSampledB()));
+  const std::vector<std::shared_ptr<const LvTopLevelProperty>> kTops{
+      LvTopProperty(LvStrong(AThenSampledB())), kGuarded, LvTopParen(kGuarded),
+      LvTopLocalVarDecl("int", "v", kGuarded)};
+  const std::vector<Word> kWords{Word{A({"a"})},
+                                 Word{A({"a"}), A({"b"})},
+                                 Word{A({"a"}), A({"g"})},
+                                 Word{A({"x"}), A({"g"})},
+                                 Word{A({"a"}), A({"x"}), A({"g"})},
+                                 Word{LetterTop()},
+                                 Word{LetterBottom(), A({"g"})}};
+  std::set<std::string> seen;
+  for (const auto& top : kTops) {
+    for (const Word& w : kWords) {
+      for (const LocalContext& ctx : EmptyAndBound()) {
+        const std::string kVerdicts = Verdicts(w, *top, ctx);
+        EXPECT_TRUE(kVerdicts == "pass " || kVerdicts == "disabled " ||
+                    kVerdicts == "fail ")
+            << kVerdicts;
+        seen.insert(kVerdicts);
+      }
+    }
+  }
+  EXPECT_EQ(seen.size(), 3U);
+}
+
+TEST(NeutralSatisfactionLocals, StrongNeedsAPrefixOfTheWordToMatch) {
+  auto prop = LvStrong(SeqConcat(Bool("a"), Samp("v")));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"x"}), A({"y"})},
+                                           *prop, LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"x"}), A({"a"}), A({"y"})},
+                                            *prop, LocalContext{}));
+}
+
+TEST(NeutralSatisfactionLocals, WeakHoldsWhileItsSequenceCanStillMatch) {
+  auto weak = LvWeak(AThenSampledB());
+  auto strong = LvStrong(AThenSampledB());
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{A({"a"})}, *weak, LocalContext{}));
+  EXPECT_FALSE(
+      NeutrallySatisfiesWithLocals(Word{A({"a"})}, *strong, LocalContext{}));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"b"})}, *weak,
+                                           LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"x"})}, *weak,
+                                            LocalContext{}));
+  EXPECT_FALSE(
+      NeutrallySatisfiesWithLocals(Word{A({"x"})}, *weak, LocalContext{}));
+}
+
+TEST(NeutralSatisfactionLocals,
+     ImplicationMatchesItsAntecedentOnTheComplementedPrefix) {
+  auto prop = LvImplication(SeqFusion(Bool("a"), Samp("v")),
+                            LvNexttime(LvStrong(Bool("z"))));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{LetterTop(), A({"x"})}, *prop,
+                                           LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{LetterBottom(), A({"x"})},
+                                            *prop, LocalContext{}));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{LetterBottom(), A({"z"})},
+                                           *prop, LocalContext{}));
+}
+
+TEST(NeutralSatisfactionLocals, ParenAndConjunctionKeepAFailingOperand) {
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
+      Word{A({"b"})}, *LvParen(LvStrong(Bool("a"))), LocalContext{}));
+  auto conj = LvAnd(LvStrong(Bool("a")), LvStrong(Bool("b")));
+  EXPECT_FALSE(
+      NeutrallySatisfiesWithLocals(Word{A({"b"})}, *conj, LocalContext{}));
+}
+
+TEST(NeutralSatisfactionLocals,
+     UntilNeedsItsFirstOperandAtEveryLetterAheadOfTheRelease) {
+  auto prop = LvUntil(LvStrong(Bool("a")), LvStrong(Bool("b")));
+  EXPECT_TRUE(
+      NeutrallySatisfiesWithLocals(Word{A({"b"})}, *prop, LocalContext{}));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"a"}), A({"b"})},
+                                           *prop, LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"x"}), A({"b"})},
+                                            *prop, LocalContext{}));
+}
+
+TEST(NeutralSatisfactionLocals, AcceptOnPassesAPendingOperandAtItsAbort) {
+  auto prop = LvAcceptOn(BoolAtom("g"), LvStrong(AThenSampledB()));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(
+      Word{A({"a"}), A({"x"})}, *LvStrong(AThenSampledB()), LocalContext{}));
+  EXPECT_TRUE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"g"})}, *prop,
+                                           LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"a"}), A({"x"})}, *prop,
+                                            LocalContext{}));
+  EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{A({"x"}), A({"g"})}, *prop,
+                                            LocalContext{}));
+}
+
 }  // namespace

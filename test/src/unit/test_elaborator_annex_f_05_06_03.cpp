@@ -376,4 +376,37 @@ TEST(NonVacuityLocals,
                                                        LocalContext{}));
 }
 
+TEST(NonVacuityLocals, ImplicationNeedsANonvacuousConsequentAtAMatch) {
+  auto prop = LvLocalVarDecl(
+      "int", "v", LvImplication(SeqFusion(Bs("a"), Samp("v")), Trig("b")));
+  for (const LocalContext& ctx : Contexts()) {
+    EXPECT_TRUE(
+        NonVacuouslyEvaluatesWithLocals(Word{L({"a", "b"})}, *prop, ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"a"})}, *prop, ctx));
+    EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{L({"b"})}, *prop, ctx));
+  }
+}
+
+TEST(NonVacuityLocals, ImplicationReadsItsAntecedentOnTheWordAsWritten) {
+  auto prop = LvImplication(SeqFusion(Bs("a"), Samp("v")), Strong("t"));
+  EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{LetterTop()}, *prop,
+                                              LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesWithLocals(Word{LetterBottom()}, *prop,
+                                               LocalContext{}));
+}
+
+TEST(NonVacuityLocals, NonvacuousSatisfactionNeedsTheWordToSatisfyToo) {
+  auto p = LvLocalVarDecl("int", "v", LvStrong(SeqFusion(Bs("s"), Samp("v"))));
+  for (const LocalContext& ctx : Contexts()) {
+    EXPECT_TRUE(NonVacuouslyEvaluatesWithLocals(Word{L({"x"})}, *p, ctx));
+    EXPECT_FALSE(NeutrallySatisfiesWithLocals(Word{L({"x"})}, *p, ctx));
+    EXPECT_FALSE(SatisfiesNonVacuouslyWithLocals(Word{L({"x"})}, *p, ctx));
+    EXPECT_TRUE(SatisfiesNonVacuouslyWithLocals(Word{L({"s"})}, *p, ctx));
+    EXPECT_FALSE(SatisfiesTopLevelNonVacuouslyWithLocals(
+        Word{L({"x"})}, *LvTopProperty(p), ctx));
+    EXPECT_TRUE(SatisfiesTopLevelNonVacuouslyWithLocals(
+        Word{L({"s"})}, *LvTopProperty(p), ctx));
+  }
+}
+
 }  // namespace
