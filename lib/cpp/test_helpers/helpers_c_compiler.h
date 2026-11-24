@@ -90,8 +90,11 @@ inline CompilerResult CompileAsCxx(const std::string& source) {
 inline std::string PreprocessedWithoutSpaces(const std::string& source,
                                              std::vector<std::string> flags) {
   std::filesystem::path stubs(CompilerWorkDir().string() + ".stubs");
-  std::filesystem::create_directories(stubs);
-  std::ofstream(stubs / "stdint.h") << "\n";
+  std::filesystem::create_directories(stubs / "sys");
+  for (const char* header :
+       {"stdint.h", "stdarg.h", "inttypes.h", "sys/types.h"}) {
+    std::ofstream(stubs / header) << "\n";
+  }
   flags.insert(flags.end(), {"-E", "-P", "-nostdinc", "-I", stubs.string()});
   CompilerResult run = CompileSource(source, flags);
   std::filesystem::remove_all(stubs);

@@ -102,11 +102,6 @@ TEST(VpiConstantAndStructSim, PropertyControlAndScalarConstants) {
   EXPECT_EQ(vpiDontCare, 6);
 }
 
-TEST(VpiConstantAndStructSim, VpiValueDefaultInit) {
-  s_vpi_value val = {};
-  EXPECT_EQ(val.format, 0);
-}
-
 TEST(VpiConstantAndStructSim, VpiCbDataDefaultInit) {
   s_cb_data cb = {};
   EXPECT_EQ(cb.reason, 0);
@@ -191,6 +186,7 @@ TEST(VpiUserHeader, ConstantsFromAlwaysThroughPathTerm) {
   EXPECT_EQ(vpiNullStmt, 38);
   EXPECT_EQ(vpiOperation, 39);
   EXPECT_EQ(vpiParamAssign, 40);
+  EXPECT_EQ(vpiParameter, 41);
   EXPECT_EQ(vpiPartSelect, 42);
   EXPECT_EQ(vpiPathTerm, 43);
 }
@@ -293,6 +289,10 @@ TEST(VpiUserHeader, ConstantsFromInstanceArrayThroughNetType) {
   EXPECT_EQ(vpiWidthExpr, 132);
   EXPECT_EQ(vpiAutomatics, 136);
   EXPECT_EQ(vpiUndefined, -1);
+  EXPECT_EQ(vpiType, 1);
+  EXPECT_EQ(vpiName, 2);
+  EXPECT_EQ(vpiFullName, 3);
+  EXPECT_EQ(vpiSize, 4);
   EXPECT_EQ(vpiFile, 5);
   EXPECT_EQ(vpiLineNo, 6);
   EXPECT_EQ(vpiTopModule, 7);
@@ -318,6 +318,9 @@ TEST(VpiUserHeader, ConstantsFromInstanceArrayThroughNetType) {
   EXPECT_EQ(vpiScalar, 17);
   EXPECT_EQ(vpiVector, 18);
   EXPECT_EQ(vpiExplicitName, 19);
+  EXPECT_EQ(vpiInput, 1);
+  EXPECT_EQ(vpiOutput, 2);
+  EXPECT_EQ(vpiInout, 3);
   EXPECT_EQ(vpiMixedIO, 4);
   EXPECT_EQ(vpiNoDirection, 5);
   EXPECT_EQ(vpiConnByName, 21);
@@ -545,6 +548,10 @@ TEST(VpiUserHeader, ConstantsFromShortIntValThroughCbDisable) {
   EXPECT_EQ(vpiShortRealVal, 16);
   EXPECT_EQ(vpiRawTwoStateVal, 17);
   EXPECT_EQ(vpiRawFourStateVal, 18);
+  EXPECT_EQ(vpiNoDelay, 1);
+  EXPECT_EQ(vpiInertialDelay, 2);
+  EXPECT_EQ(vpiTransportDelay, 3);
+  EXPECT_EQ(vpiPureTransportDelay, 4);
   EXPECT_EQ(vpiForceFlag, 5);
   EXPECT_EQ(vpiReleaseFlag, 6);
   EXPECT_EQ(vpiCancelEvent, 7);
@@ -555,10 +562,16 @@ TEST(VpiUserHeader, ConstantsFromShortIntValThroughCbDisable) {
   EXPECT_EQ(vpiH, 4);
   EXPECT_EQ(vpiL, 5);
   EXPECT_EQ(vpiDontCare, 6);
+  EXPECT_EQ(vpiSysTask, 1);
+  EXPECT_EQ(vpiSysFunc, 2);
   EXPECT_EQ(vpiCompile, 1);
   EXPECT_EQ(vpiPLI, 2);
   EXPECT_EQ(vpiRun, 3);
+  EXPECT_EQ(vpiNotice, 1);
+  EXPECT_EQ(vpiWarning, 2);
+  EXPECT_EQ(vpiError, 3);
   EXPECT_EQ(vpiSystem, 4);
+  EXPECT_EQ(vpiInternal, 5);
   EXPECT_EQ(cbForce, 3);
   EXPECT_EQ(cbRelease, 4);
   EXPECT_EQ(cbAssign, 25);

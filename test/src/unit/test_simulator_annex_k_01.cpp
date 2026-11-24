@@ -3,7 +3,7 @@
 #include <string_view>
 #include <type_traits>
 
-#include "simulator/sv_vpi_user.h"
+#include "helpers_c_compiler.h"
 #include "simulator/vpi_include_file.h"
 #include "simulator/vpi_user.h"
 
@@ -45,14 +45,6 @@ static_assert(std::is_same_v<decltype(vpi_handle_by_name),
                              vpiHandle(PLI_BYTE8*, vpiHandle)>,
               "vpi_user.h must provide vpi_handle_by_name");
 
-TEST(VpiUserHeaderProvided, IncludeFileIsPresentAndGuarded) {
-#ifdef SV_VPI_USER_H
-  SUCCEED();
-#else
-  FAIL() << "vpi_user.h include guard not provided by the simulator";
-#endif
-}
-
 TEST(VpiUserHeaderProvided, ProvidesCanonicalVpiTypes) {
   EXPECT_TRUE(std::is_pointer_v<vpiHandle>);
 
@@ -77,14 +69,29 @@ TEST(VpiUserHeaderProvided, ProvidesResolvableAccessRoutines) {
   EXPECT_NE(reinterpret_cast<void*>(&vpi_printf), nullptr);
 }
 
-TEST(VpiUserHeaderProvided, IdempotentUnderRepeatedInclusion) {
-#ifdef SV_VPI_USER_H
-  s_vpi_value value = {};
-  value.format = 0;
-  EXPECT_EQ(value.format, 0);
-#else
-  FAIL() << "vpi_user.h guard not latched after repeated inclusion";
-#endif
+TEST(VpiUserHeaderProvided, ASecondInclusionAddsNothing) {
+  CompilerResult run = CompileAsCxx(R"(#include <stdint.h>
+#include "simulator/vpi_user.h"
+#include "simulator/vpi_user.h"
+vpiHandle first;
+)");
+  EXPECT_TRUE(run.succeeded) << run.output;
+}
+
+TEST(VpiUserHeaderProvided, ACApplicationCompilesAgainstTheFile) {
+  CompilerResult run = CompileAsC(R"(#include <stdint.h>
+#include "simulator/vpi_user.h"
+static PLI_INT32 on_call(PLI_BYTE8* data) { return data != 0; }
+void register_tasks(void);
+void register_tasks(void) {
+  s_vpi_systf_data task = {0};
+  task.type = vpiSysTask;
+  task.calltf = on_call;
+  vpi_register_systf(&task);
+}
+void (*vlog_startup_routines[])(void) = {register_tasks, 0};
+)");
+  EXPECT_TRUE(run.succeeded) << run.output;
 }
 
 }  // namespace
