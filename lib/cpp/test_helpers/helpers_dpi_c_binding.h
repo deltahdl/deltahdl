@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <initializer_list>
 #include <map>
 #include <memory>
 #include <string>
