@@ -279,4 +279,45 @@ TEST(TightSatisfactionLocals, UnboundedRepeatRejectsEmptyWord) {
   EXPECT_TRUE(TightSatisfactionOutputs(Word{}, *seq, LocalContext{}).empty());
 }
 
+TEST(TightSatisfactionLocals,
+     DISABLED_FirstMatchJudgesAShorterMatchOnTheComplementedPrefix) {
+  auto seq = SeqFirstMatch(SeqOr(Bool("a"), SeqConcat(Bool("a"), Bool("b"))));
+  const LocalContext kInput{{"u", A({"z"})}};
+  EXPECT_TRUE(SameContexts(
+      TightSatisfactionOutputs(Word{LetterTop(), A({"b"})}, *seq, kInput),
+      {kInput}));
+  EXPECT_TRUE(
+      TightSatisfactionOutputs(Word{A({"a"}), A({"b"})}, *seq, kInput).empty());
+}
+
+TEST(TightSatisfactionLocals, IntersectTakesAnIncomingNameFromItsAssigner) {
+  const LocalContext kInput{{"u", A({"z"})}};
+  const Word kWord{A({"a"})};
+  const LocalContext kAssigned{{"u", A({"a"})}};
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(
+                       kWord, *SeqIntersect(Samp("u"), Bool("a")), kInput),
+                   {kAssigned}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(
+                       kWord, *SeqIntersect(Bool("a"), Samp("u")), kInput),
+                   {kAssigned}));
+  EXPECT_TRUE(
+      SameContexts(TightSatisfactionOutputs(
+                       kWord, *SeqIntersect(Bool("a"), Bool("a")), kInput),
+                   {kInput}));
+}
+
+TEST(TightSatisfactionLocals, ClockedSequenceIsDegenerateWhenItsRewriteIs) {
+  auto clocked = [](std::shared_ptr<const SequenceExpr> body) {
+    return SeqClock(BoolAtom("clk"), std::move(body));
+  };
+  EXPECT_FALSE(
+      IsNondegenerateSequenceWithLocals(*clocked(SeqNullRepeat(Samp("v")))));
+  EXPECT_FALSE(IsNondegenerateSequenceWithLocals(
+      *clocked(SeqIntersect(SeqNullRepeat(Samp("v")), Samp("w")))));
+  EXPECT_TRUE(IsNondegenerateSequenceWithLocals(
+      *clocked(SeqIntersect(Samp("w"), SeqConcat(Samp("v"), Samp("v"))))));
+}
+
 }  // namespace
