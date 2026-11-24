@@ -1,9 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
+#include "helpers_dpi_scope_names.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_context.h"
 #include "simulator/dpi_runtime.h"
@@ -114,6 +116,62 @@ TEST(DpiAndVpiContext, TheRuntimeHasOneExportInstancePerInstantiatedScope) {
 TEST(DpiAndVpiContext, TheRuntimeRunsTheInstanceSvSetScopeNamedBeforeTheCall) {
   ModuleInstantiatedTwice m;
   EXPECT_EQ(m.InstanceReachedFrom("top.i2_m", "top.i1_m"), 1);
+}
+
+TEST(ContextOfADesignsImport,
+     DISABLED_AHierarchicalCallRunsInTheDeclaringInstance) {
+  const std::vector<std::string> kSeen = ScopeNamesOfRun(
+      "module m;\n"
+      "  import \"DPI-C\" context function int see_scope();\n"
+      "  int r;\n"
+      "  initial r = see_scope();\n"
+      "endmodule\n"
+      "module caller;\n"
+      "  int r;\n"
+      "  initial #1 r = site.i1_m.see_scope();\n"
+      "endmodule\n"
+      "module site;\n"
+      "  m i1_m();\n"
+      "  caller i2();\n"
+      "endmodule\n",
+      "annex_h_09_01_hierarchical_call");
+  EXPECT_EQ(kSeen, (std::vector<std::string>{"site.i1_m", "site.i1_m"}));
+}
+
+TEST(ContextOfADesignsImport,
+     DISABLED_AHierarchicalTaskCallRunsInTheDeclaringInstance) {
+  const std::vector<std::string> kSeen = ScopeNamesOfRun(
+      "module m;\n"
+      "  import \"DPI-C\" context task see_scope();\n"
+      "  initial see_scope();\n"
+      "endmodule\n"
+      "module caller;\n"
+      "  initial #1 tsite.i1_m.see_scope();\n"
+      "endmodule\n"
+      "module tsite;\n"
+      "  m i1_m();\n"
+      "  caller i2();\n"
+      "endmodule\n",
+      "annex_h_09_01_hierarchical_task");
+  EXPECT_EQ(kSeen, (std::vector<std::string>{"tsite.i1_m", "tsite.i1_m"}));
+}
+
+TEST(ContextOfADesignsImport, ANativeCallerInTheSameInstanceKeepsItsContext) {
+  const std::vector<std::string> kSeen = ScopeNamesOfRun(
+      "module m;\n"
+      "  import \"DPI-C\" context function int see_scope();\n"
+      "  function int through(); return see_scope(); endfunction\n"
+      "endmodule\n"
+      "module caller;\n"
+      "  int r;\n"
+      "  initial r = nsite.i1_m.through();\n"
+      "endmodule\n"
+      "module nsite;\n"
+      "  m i1_m();\n"
+      "  caller i2();\n"
+      "endmodule\n",
+      "annex_h_09_01_native_caller");
+  EXPECT_EQ(kSeen, (std::vector<std::string>{"nsite.i1_m"}));
 }
 
 }  // namespace
