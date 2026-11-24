@@ -215,4 +215,29 @@ TEST(LocalVariableFlow, BlockOfIntersectCombinesOperandBlocksAndCommonSamples) {
   EXPECT_EQ(BlockLocals(*SeqIntersect(left, right)), (NameSet{"v", "x", "y"}));
 }
 
+TEST(LocalVariableFlow, FlowThroughConcatAndFusionAppliesTheRightOperandLast) {
+  for (auto join : {SeqConcat, SeqFusion}) {
+    EXPECT_EQ(FlowLocals({}, *join(Samp("v"), BlockOf("v"))), NameSet{});
+    EXPECT_EQ(FlowLocals({}, *join(BlockOf("v"), Samp("v"))), (NameSet{"v"}));
+  }
+}
+
+TEST(LocalVariableFlow, BlockOfConcatAndFusionKeepsTheRightOperandBlock) {
+  for (auto join : {SeqConcat, SeqFusion}) {
+    EXPECT_EQ(BlockLocals(*join(Bool(), BlockOf("v"))), (NameSet{"v"}));
+    EXPECT_EQ(BlockLocals(*join(BlockOf("w"), BlockOf("v"))),
+              (NameSet{"v", "w"}));
+  }
+}
+
+TEST(LocalVariableFlow, FlowThroughIntersectUnitesTheOperandFlows) {
+  EXPECT_EQ(FlowLocals({"a"}, *SeqIntersect(Samp("v"), Samp("w"))),
+            (NameSet{"a", "v", "w"}));
+}
+
+TEST(LocalVariableFlow, FlowThroughOrKeepsANameEveryAlternativeSamples) {
+  auto seq = SeqOr(Samp("v"), SeqConcat(Samp("w"), Samp("v")));
+  EXPECT_EQ(FlowLocals({"a"}, *seq), (NameSet{"a", "v"}));
+}
+
 }  // namespace
