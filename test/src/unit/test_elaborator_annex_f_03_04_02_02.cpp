@@ -137,4 +137,30 @@ TEST(DerivedDelay, ZeroDelayIsTheFusionOrTheDelayFromOne) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({"c"})}, *zero_or_more));
 }
 
+TEST(DerivedDelay, AZeroStartUnaryDelayAllowsNoBlankBeforeTheSequence) {
+  auto a = BoolSeq("a");
+  EXPECT_TRUE(SequenceExprEqual(*SeqDelayExactly(0, a),
+                                *SeqConcat(SeqNullRepeat(One()), a)));
+  EXPECT_TRUE(SequenceExprEqual(*SeqDelayRange(0, 2, a),
+                                *SeqConcat(SeqRepeatRange(One(), 0, 2), a)));
+  EXPECT_TRUE(SequenceExprEqual(
+      *SeqDelayAtLeast(0, a),
+      *SeqConcat(SeqOr(SeqNullRepeat(One()), SeqUnboundedRepeat(One())), a)));
+
+  auto zero = SeqDelayExactly(0, a);
+  EXPECT_TRUE(TightlySatisfies(BlanksThenA(0), *zero));
+  EXPECT_FALSE(TightlySatisfies(BlanksThenA(1), *zero));
+  EXPECT_FALSE(TightlySatisfies(Word{}, *zero));
+
+  auto zero_to_two = SeqDelayRange(0, 2, a);
+  EXPECT_TRUE(TightlySatisfies(BlanksThenA(0), *zero_to_two));
+  EXPECT_TRUE(TightlySatisfies(BlanksThenA(2), *zero_to_two));
+  EXPECT_FALSE(TightlySatisfies(BlanksThenA(3), *zero_to_two));
+
+  auto zero_or_more = SeqDelayAtLeast(0, a);
+  EXPECT_TRUE(TightlySatisfies(BlanksThenA(0), *zero_or_more));
+  EXPECT_TRUE(TightlySatisfies(BlanksThenA(5), *zero_or_more));
+  EXPECT_FALSE(TightlySatisfies(Word{A({"b"})}, *zero_or_more));
+}
+
 }  // namespace

@@ -12,14 +12,14 @@ namespace {
 constexpr const char* kStimulus =
     "  initial begin\n"
     "    #5 gclk = 1; #5 gclk = 0;\n"
-    "    #5 gclk = 1; clk = 1; -> e; t = 1; #5 gclk = 0;\n"
+    "    #5 gclk = 1; clk = 1; -> e; t = 1; v = 2'b10; #5 gclk = 0;\n"
     "    #5 gclk = 1; t = 0; #5 gclk = 0;\n"
-    "    #5 gclk = 1; clk = 0; d = 1; #5 gclk = 0;\n"
+    "    #5 gclk = 1; clk = 0; d = 1; v = 2'b11; #5 gclk = 0;\n"
     "    #5 gclk = 1; en = 0; #5 gclk = 0;\n"
-    "    #5 gclk = 1; clk = 1; d = 0; #5 gclk = 0;\n"
+    "    #5 gclk = 1; clk = 1; d = 0; v = 2'b01; #5 gclk = 0;\n"
     "    #5 gclk = 1; clk = 0; -> e; t = 1; #5 gclk = 0;\n"
-    "    #5 gclk = 1; t = 0; en = 1; #5 gclk = 0;\n"
-    "    #5 gclk = 1; clk = 1; #5 gclk = 0;\n"
+    "    #5 gclk = 1; t = 0; en = 1; v = 2'b00; #5 gclk = 0;\n"
+    "    #5 gclk = 1; clk = 1; v = 2'b01; #5 gclk = 0;\n"
     "    #5 gclk = 1; #5 gclk = 0;\n"
     "  end\n";
 
@@ -30,6 +30,7 @@ std::string Design(const std::string& control, const std::string& rewritten) {
          "  logic gclk = 0;\n"
          "  logic clk = 0;\n"
          "  logic d = 0;\n"
+         "  logic [1:0] v = 2'b00;\n"
          "  logic en = 1;\n"
          "  event e;\n"
          "  bit t = 0;\n"
@@ -90,6 +91,18 @@ TEST(ClockControlRewriteSim, OrIsDisjunction) {
 TEST(ClockControlRewriteSim, CommaIsDisjunction) {
   ExpectRewrite("negedge clk, negedge d",
                 "$falling_gclk(clk) || $falling_gclk(d)", 3);
+}
+
+TEST(ClockControlRewriteSim, PosedgeOfAVectorIsRisingGclkOfItsLsb) {
+  ExpectRewrite("posedge v", "$rising_gclk(v)", 2);
+}
+
+TEST(ClockControlRewriteSim, NegedgeOfAVectorIsFallingGclkOfItsLsb) {
+  ExpectRewrite("negedge v", "$falling_gclk(v)", 1);
+}
+
+TEST(ClockControlRewriteSim, ABareVectorIsChangingGclkOfTheWholeValue) {
+  ExpectRewrite("v", "$changing_gclk(v)", 5);
 }
 
 }  // namespace

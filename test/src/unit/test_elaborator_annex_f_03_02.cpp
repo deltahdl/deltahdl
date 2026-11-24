@@ -3,8 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "common/diagnostic.h"
 #include "elaborator/annex_f_grammar.h"
 #include "elaborator/annex_f_notation.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
@@ -218,6 +221,261 @@ TEST(AbstractGrammar, LocalVariableOperandMatchingEmptyWordIsRejected) {
       SeqOr(SeqNullRepeat(SeqBoolean(BoolAtom("a"))), SeqLocalVarSampling("v"));
   EXPECT_FALSE(
       SequenceOperandSatisfiesNondegeneracyRequirement(*admits_empty_too));
+}
+
+constexpr const char* kSignals = "  logic clk0, clk1, sig0, sig1;\n";
+
+constexpr const char* kClockedSequences =
+    "  sequence sc0; @(posedge clk0) sig0 ##1 sig1; endsequence "
+    "sequence sc1; @(posedge clk1) sig0 ##1 sig1; endsequence\n";
+
+constexpr const char* kRepeatedOnAnotherClock =
+    "a repeated sequence may name no clocking event other than the one in "
+    "force where it is written";
+
+struct RepetitionPlace {
+  std::string name;
+  std::string source;
+  std::vector<int> lines;
+};
+
+std::string DeclaredOnClk0(const std::string& body) {
+  return "  sequence r; @(posedge clk0) " + body +
+         "; endsequence\n"
+         "  property q; @(posedge clk0) " +
+         body + "; endproperty\n";
+}
+
+std::string AssertedOnClk0(const std::string& body) {
+  return "  assert property (@(posedge clk0) " + body + ");\n";
+}
+
+std::string InstancedBy(const std::string& unit, const std::string& end,
+                        const std::string& items, const std::string& instance) {
+  return unit + kSignals + kClockedSequences + items + end + "module m;\n" +
+         instance + "endmodule\n";
+}
+
+std::vector<RepetitionPlace> ModulePlace(const std::string& body) {
+  return {{"module",
+           std::string("module m;\n") + kSignals + kClockedSequences +
+               DeclaredOnClk0(body) + AssertedOnClk0(body) + "endmodule\n",
+           {4, 5, 6}}};
+}
+
+std::vector<RepetitionPlace> InstancedPlaces(const std::string& body) {
+  const std::string kAll = DeclaredOnClk0(body) + AssertedOnClk0(body);
+  return {
+      {"interface",
+       InstancedBy("interface i;\n", "endinterface\n", kAll, "  i u();\n"),
+       {4, 5, 6}},
+      {"program",
+       InstancedBy("program pr;\n", "endprogram\n", kAll, "  pr u();\n"),
+       {4, 5, 6}},
+      {"checker",
+       "checker c(input logic clk0, input logic clk1, input logic sig0, "
+       "input logic sig1);\n" +
+           std::string(kClockedSequences) + kAll + "endchecker\nmodule m;\n" +
+           kSignals + "  c u(clk0, clk1, sig0, sig1);\nendmodule\n",
+       {3, 4, 5}},
+      {"generate block",
+       std::string("module m;\n") + kSignals + kClockedSequences +
+           "  if (1) begin : g\n" + kAll + "  end\nendmodule\n",
+       {5, 6, 7}},
+  };
+}
+
+std::vector<RepetitionPlace> DeclarationOnlyPlaces(const std::string& body) {
+  const std::string kUse = "  assert property (q);\n";
+  return {
+      {"package",
+       InstancedBy("package p;\n", "endpackage\n", DeclaredOnClk0(body),
+                   "  import p::*;\n" + kUse),
+       {4, 5}},
+      {"compilation unit",
+       std::string(kSignals) + kClockedSequences + DeclaredOnClk0(body) +
+           "module m;\n" + kUse + "endmodule\n",
+       {3, 4}},
+  };
+}
+
+std::vector<RepetitionPlace> EveryPlace(const std::string& body) {
+  std::vector<RepetitionPlace> places = ModulePlace(body);
+  for (const auto& more :
+       {InstancedPlaces(body), DeclarationOnlyPlaces(body)}) {
+    places.insert(places.end(), more.begin(), more.end());
+  }
+  return places;
+}
+
+void ExpectReportedInEach(
+    const std::vector<std::string>& bodies,
+    std::vector<RepetitionPlace> (*places)(const std::string&)) {
+  for (const auto& body : bodies) {
+    for (const auto& place : places(body)) {
+      ElabFixture f;
+      Elaborate(place.source, f);
+      for (int line : place.lines) {
+        EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kRepeatedOnAnotherClock,
+                                  line, "F.3.2"))
+            << body << " in a " << place.name << " at line " << line;
+      }
+    }
+  }
+}
+
+void ExpectAcceptedInEach(
+    const std::vector<std::string>& bodies,
+    std::vector<RepetitionPlace> (*places)(const std::string&)) {
+  for (const auto& body : bodies) {
+    for (const auto& place : places(body)) {
+      ElabFixture f;
+      auto* design = ElaborateSrc(place.source, f);
+      EXPECT_NE(design, nullptr) << body << " in a " << place.name;
+      EXPECT_FALSE(f.has_errors) << body << " in a " << place.name;
+    }
+  }
+}
+
+std::vector<std::string> UnboundedOnClk1() {
+  return {"(@(posedge clk1) sig0 ##1 sig1)[*1:$]",
+          "(@(posedge clk1) sig0 ##1 sig1)[+]",
+          "(@(posedge clk1) sig0 ##1 sig1)[*] ##1 sig0"};
+}
+
+std::vector<std::string> UnboundedOnClk0() {
+  return {"(@(posedge clk0) sig0 ##1 sig1)[*1:$]",
+          "(@(posedge clk0) sig0 ##1 sig1)[+]",
+          "(@(posedge clk0) sig0 ##1 sig1)[*] ##1 sig0"};
+}
+
+std::vector<std::string> InstanceInAGroupOnClk1() {
+  return {"(sc1 ##1 sig0)[*2]"};
+}
+std::vector<std::string> InstanceInAGroupOnClk0() {
+  return {"(sc0 ##1 sig0)[*2]"};
+}
+
+std::vector<std::string> NestedGroupOnClk1() {
+  return {"((@(posedge clk1) sig0) ##1 sig1)[*2]"};
+}
+std::vector<std::string> NestedGroupOnClk0() {
+  return {"((@(posedge clk0) sig0) ##1 sig1)[*2]"};
+}
+
+std::vector<std::string> InstanceRangeOnClk1() {
+  return {"sc1[*1:2]", "sc1[+]"};
+}
+std::vector<std::string> InstanceRangeOnClk0() {
+  return {"sc0[*1:2]", "sc0[+]"};
+}
+
+std::vector<std::string> EveryFormOnClk1() {
+  std::vector<std::string> forms = {"(@(posedge clk1) sig0 ##1 sig1)[*2]",
+                                    "(@(posedge clk1) sig0 ##1 sig1)[*1:2]",
+                                    "(@(posedge clk1) sig0)[*2]",
+                                    "(@(posedge clk1) sig0 and sig1)[*2]",
+                                    "(sig0 ##1 @(posedge clk1) sig1)[*2]",
+                                    "sc1[*2]"};
+  for (const auto& group :
+       {UnboundedOnClk1, NestedGroupOnClk1, InstanceRangeOnClk1}) {
+    auto more = group();
+    forms.insert(forms.end(), more.begin(), more.end());
+  }
+  return forms;
+}
+
+std::vector<std::string> EveryFormOnClk0() {
+  std::vector<std::string> forms = {
+      "(@(posedge clk0) sig0 ##1 sig1)[*2]",
+      "(@(posedge clk0) sig0 ##1 sig1)[*1:2]", "(@(posedge clk0) sig0)[*2]",
+      "(@(posedge clk0) sig0 and sig1)[*2]", "sc0[*2]"};
+  for (const auto& group : {UnboundedOnClk0, InstanceInAGroupOnClk0,
+                            NestedGroupOnClk0, InstanceRangeOnClk0}) {
+    auto more = group();
+    forms.insert(forms.end(), more.begin(), more.end());
+  }
+  return forms;
+}
+
+TEST(RepetitionOfAClockedSequence,
+     AnUnboundedRepetitionOnAnotherClockIsReported) {
+  ExpectReportedInEach(UnboundedOnClk1(), ModulePlace);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     AnUnboundedRepetitionOnTheClockInForceIsLegal) {
+  ExpectAcceptedInEach(UnboundedOnClk0(), ModulePlace);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     DISABLED_AGroupHoldingAnInstanceOnAnotherClockIsReported) {
+  ExpectReportedInEach(InstanceInAGroupOnClk1(), EveryPlace);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     AGroupHoldingAnInstanceOnTheClockInForceIsLegal) {
+  ExpectAcceptedInEach(InstanceInAGroupOnClk0(), EveryPlace);
+}
+
+TEST(RepetitionOfAClockedSequence, ANestedGroupOnAnotherClockIsReported) {
+  ExpectReportedInEach(NestedGroupOnClk1(), ModulePlace);
+}
+
+TEST(RepetitionOfAClockedSequence, ANestedGroupOnTheClockInForceIsLegal) {
+  ExpectAcceptedInEach(NestedGroupOnClk0(), ModulePlace);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     AnInstanceRepeatedByARangeOnAnotherClockIsReported) {
+  ExpectReportedInEach(InstanceRangeOnClk1(), ModulePlace);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     AnInstanceRepeatedByARangeOnTheClockInForceIsLegal) {
+  ExpectAcceptedInEach(InstanceRangeOnClk0(), ModulePlace);
+}
+
+std::string PackageSequenceRepeated(const std::string& name) {
+  return "package p;\n" + std::string(kSignals) +
+         "  sequence s0; @(posedge clk0) sig0 ##1 sig1; endsequence "
+         "sequence s1; @(posedge clk1) sig0 ##1 sig1; endsequence\n"
+         "endpackage\n"
+         "module m;\n"
+         "  assert property (@(posedge p::clk0) p::" +
+         name + "[*2]);\nendmodule\n";
+}
+
+TEST(RepetitionOfAClockedSequence,
+     DISABLED_APackageSequenceOnAnotherClockRepeatedIsReported) {
+  ElabFixture f;
+  Elaborate(PackageSequenceRepeated("s1"), f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kRepeatedOnAnotherClock, 6, "F.3.2"));
+}
+
+TEST(RepetitionOfAClockedSequence,
+     APackageSequenceOnTheClockInForceRepeatedIsLegal) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(PackageSequenceRepeated("s0"), f);
+  EXPECT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     EveryFormOnAnotherClockIsReportedInAnInstancedUnitOrGenerateBlock) {
+  ExpectReportedInEach(EveryFormOnClk1(), InstancedPlaces);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     DISABLED_EveryFormOnAnotherClockIsReportedInAPackageOrCompilationUnit) {
+  ExpectReportedInEach(EveryFormOnClk1(), DeclarationOnlyPlaces);
+}
+
+TEST(RepetitionOfAClockedSequence,
+     EveryFormOnTheClockInForceIsLegalInEveryOtherPlace) {
+  ExpectAcceptedInEach(EveryFormOnClk0(), InstancedPlaces);
+  ExpectAcceptedInEach(EveryFormOnClk0(), DeclarationOnlyPlaces);
 }
 
 }  // namespace

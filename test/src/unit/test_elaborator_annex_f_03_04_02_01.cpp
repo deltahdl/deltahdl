@@ -101,4 +101,19 @@ TEST(DerivedConsecutiveRepetition, StarAndPlusUnfoldToTheTwoPrimitives) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({"b"})}, *plus));
 }
 
+TEST(DerivedConsecutiveRepetition, ARangeFromZeroAdmitsTheEmptyWord) {
+  auto a = BoolSeq("a");
+  EXPECT_TRUE(
+      SequenceExprEqual(*SeqRepeatRange(a, 0, 2),
+                        *SeqOr(SeqOr(SeqNullRepeat(a), SeqRepeatExactly(a, 1)),
+                               SeqRepeatExactly(a, 2))));
+
+  auto up_to_two = SeqRepeatRange(a, 0, 2);
+  EXPECT_TRUE(TightlySatisfies(Word{}, *up_to_two));
+  EXPECT_TRUE(TightlySatisfies(Repeated(A({"a"}), 1), *up_to_two));
+  EXPECT_TRUE(TightlySatisfies(Repeated(A({"a"}), 2), *up_to_two));
+  EXPECT_FALSE(TightlySatisfies(Repeated(A({"a"}), 3), *up_to_two));
+  EXPECT_FALSE(TightlySatisfies(Word{A({"b"})}, *up_to_two));
+}
+
 }  // namespace
