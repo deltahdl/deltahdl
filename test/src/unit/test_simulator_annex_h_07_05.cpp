@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "simulator/svdpi.h"
 
 namespace {
@@ -124,6 +129,163 @@ TEST(NormalizedLinearizedRanges,
       EXPECT_EQ(svGetBitselLogic(&vec, b), sv_0);
     }
   }
+}
+
+void SeePacked(const svBitVecVal* v) { SeeInC({v[0] & 0xFFFFFFU}); }
+
+void SeeElements(const svLogicVecVal* b) {
+  const svLogicVecVal& set = b[(2 * 32) + 5];
+  const svLogicVecVal& plain = b[(9 * 32) + 31];
+  SeeInC({set.aval & 0x3FFFFU, set.bval & 0x3FFFFU, plain.aval & 0x3FFFFU,
+          plain.bval & 0x3FFFFU});
+}
+
+struct ArrayOfRows {
+  int first;
+  svBitVecVal b[4][2];
+  int last;
+};
+
+void SeeRows(const ArrayOfRows* s) {
+  SeeInC({s->first, s->b[2][0], s->b[2][1] & 0xFFFFU, s->b[1][0], s->last});
+}
+
+void WritePacked(svBitVecVal* v) { v[0] = 1U << 18U; }
+
+void ShiftPacked(svBitVecVal* v) { v[0] = (v[0] & 0xFFFFFFU) << 1U; }
+
+void CallWithPacked() {
+  auto take =
+      NamedExport<void (*)(const svBitVecVal*, svBitVecVal*)>("sv_take_packed");
+  if (take == nullptr) return;
+  const svBitVecVal kIn = 1U << 18U;
+  svBitVecVal out = 0U;
+  take(&kIn, &out);
+  SeeInC({out & 0xFFFFFFU});
+}
+
+void RunPacked(const std::string& items, SimFixture& f) {
+  RunModuleWithC(items, f,
+                 {{"see_packed", CAddress(&SeePacked)},
+                  {"see_elements", CAddress(&SeeElements)},
+                  {"see_rows", CAddress(&SeeRows)},
+                  {"write_packed", CAddress(&WritePacked)},
+                  {"shift_packed", CAddress(&ShiftPacked)},
+                  {"call_export", CAddress(&CallWithPacked)}},
+                 "annex_h_07_05_packed");
+}
+
+TEST(DpiLinearizedPackedPart, TwoDimensionsCrossRowMajor) {
+  SimFixture f;
+  RunPacked(
+      "  import \"DPI-C\" function void see_packed(input bit [1:0][3:0] v);\n"
+      "  bit [1:0][3:0] v = {4'h1, 4'h2};\n"
+      "  initial see_packed(v);\n",
+      f);
+  ASSERT_EQ(SeenInC().size(), 1U);
+  EXPECT_EQ(SeenInC()[0] & 0xFF, 0x12);
+}
+
+TEST(DpiLinearizedPackedPart, ThreeDimensionsCrossRowMajor) {
+  SimFixture f;
+  RunPacked(
+      "  import \"DPI-C\" function void see_packed(\n"
+      "      input bit [1:0][2:0][3:0] m);\n"
+      "  bit [1:0][2:0][3:0] m;\n"
+      "  initial begin m[1][1][2] = 1; see_packed(m); end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1 << 18}));
+}
+
+TEST(DpiLinearizedPackedPart, AnUnpackedArraysElementsAreLinearizedEach) {
+  SimFixture f;
+  RunPacked(
+      "  import \"DPI-C\" function void see_elements(\n"
+      "      input logic [2:3][1:3][2:0] b [1:10][31:0]);\n"
+      "  logic [2:3][1:3][2:0] b [1:10][31:0];\n"
+      "  initial begin\n"
+      "    foreach (b[i, j]) b[i][j] = 18'd1;\n"
+      "    b[3][5] = 18'd0;\n"
+      "    b[3][5][3][2][1] = 1'bx;\n"
+      "    b[3][5][2][1][2] = 1'b1;\n"
+      "    see_elements(b);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{(1 << 17) + (1 << 4), 1 << 4, 1, 0}));
+}
+
+TEST(DpiLinearizedPackedPart, AStructMembersElementsAreLinearizedEach) {
+  SimFixture f;
+  RunPacked(
+      "  typedef struct { int first; bit [6:1][1:8] b [3:0]; int last; } s_t;\n"
+      "  import \"DPI-C\" function void see_rows(input s_t s);\n"
+      "  s_t s;\n"
+      "  initial begin\n"
+      "    s.first = 3; s.last = 9;\n"
+      "    s.b[2] = 48'h00a5_0000_0000;\n"
+      "    s.b[1] = 48'h0000_0000_0017;\n"
+      "    see_rows(s);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{3, 0, 0xA5, 0x17, 9}));
+}
+
+TEST(DpiLinearizedPackedPart, AStructMembersInnerRowLiesByItsIndex) {
+  SimFixture f;
+  RunPacked(
+      "  typedef struct { int first; bit [6:1][1:8] b [3:0]; int last; } s_t;\n"
+      "  import \"DPI-C\" function void see_rows(input s_t s);\n"
+      "  s_t s;\n"
+      "  bit [6:1][1:8] row;\n"
+      "  initial begin\n"
+      "    s.first = 3; s.last = 9;\n"
+      "    row[5] = 8'ha5; s.b[2] = row;\n"
+      "    see_rows(s);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{3, 0, 0xA5, 0, 9}));
+}
+
+TEST(DpiLinearizedPackedPart, AnOutputAndAnInoutLandInTheirElements) {
+  SimFixture f;
+  RunPacked(
+      "  import \"DPI-C\" function void write_packed(\n"
+      "      output bit [1:0][2:0][3:0] m);\n"
+      "  import \"DPI-C\" function void shift_packed(\n"
+      "      inout bit [1:0][2:0][3:0] m);\n"
+      "  bit [1:0][2:0][3:0] m, k;\n"
+      "  int written, set, shifted, was;\n"
+      "  initial begin\n"
+      "    write_packed(m); written = m[1][1]; set = m;\n"
+      "    k[0][2][3] = 1; shift_packed(k); shifted = k[1][0]; was = k[0][2];\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(DesignValue(f, "written"), 4U);
+  EXPECT_EQ(DesignValue(f, "set"), 1U << 18U);
+  EXPECT_EQ(DesignValue(f, "shifted"), 1U);
+  EXPECT_EQ(DesignValue(f, "was"), 0U);
+}
+
+TEST(DpiLinearizedPackedPart, AnExportsFormalsCrossRowMajorToo) {
+  SimFixture f;
+  RunPacked(
+      "  import \"DPI-C\" context function void call_export();\n"
+      "  export \"DPI-C\" function sv_take_packed;\n"
+      "  int got;\n"
+      "  function void sv_take_packed(input bit [1:0][2:0][3:0] m,\n"
+      "      output bit [1:0][2:0][3:0] o);\n"
+      "    bit [1:0][2:0][3:0] seen, given;\n"
+      "    seen = m;\n"
+      "    got = seen[1][1];\n"
+      "    given = 0;\n"
+      "    given[1][2][3] = 1;\n"
+      "    o = given;\n"
+      "  endfunction\n"
+      "  initial call_export();\n",
+      f);
+  EXPECT_EQ(DesignValue(f, "got"), 4U);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1 << 23}));
 }
 
 }  // namespace

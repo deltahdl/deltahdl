@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
@@ -333,6 +336,323 @@ TEST(DpiTypesOfFormals, ATypeNameCrossesAsTheTypeItStandsFor) {
   EXPECT_EQ(VariableValue(f, "u"), 6U);
   EXPECT_EQ(VariableValue(f, "e"), 31U);
   EXPECT_EQ(VariableValue(f, "l"), 104U);
+}
+
+void SeeByte(signed char v) { SeeInC({v}); }
+void SeeUnsignedByte(unsigned char v) { SeeInC({v}); }
+void SeeShort(short v) { SeeInC({v}); }
+void SeeInt(int v) { SeeInC({v}); }
+void SeeUnsigned(unsigned v) { SeeInC({v}); }
+void SeeLong(long long v) { SeeInC({v}); }
+void SeeTwoChunks(const svBitVecVal* v) { SeeInC({v[0], v[1] & 0xFFU}); }
+void SeeOneLogicChunk(const svLogicVecVal* v) { SeeInC({v->aval, v->bval}); }
+void SeeTwoLogicChunks(const svLogicVecVal* v) {
+  SeeInC({v[0].aval, v[0].bval, v[1].aval, v[1].bval});
+}
+void GiveByte(signed char* v) { *v = -5; }
+void AddToShort(short* v) { *v = static_cast<short>(*v + 1); }
+void GiveFourBits(svLogicVecVal* v) { *v = {0xCU, 0x5U}; }
+signed char ByteResult() { return -5; }
+int IntResult() { return -70000; }
+
+void RunEnums(const std::string& items, SimFixture& f) {
+  RunModuleWithC(items, f,
+                 {{"see_byte", CAddress(&SeeByte)},
+                  {"see_ubyte", CAddress(&SeeUnsignedByte)},
+                  {"see_short", CAddress(&SeeShort)},
+                  {"see_int", CAddress(&SeeInt)},
+                  {"see_uint", CAddress(&SeeUnsigned)},
+                  {"see_long", CAddress(&SeeLong)},
+                  {"see_two", CAddress(&SeeTwoChunks)},
+                  {"see_logic", CAddress(&SeeOneLogicChunk)},
+                  {"see_two_logic", CAddress(&SeeTwoLogicChunks)},
+                  {"give_byte", CAddress(&GiveByte)},
+                  {"add_to_short", CAddress(&AddToShort)},
+                  {"give_four", CAddress(&GiveFourBits)},
+                  {"byte_result", CAddress(&ByteResult)},
+                  {"int_result", CAddress(&IntResult)}},
+                 "annex_h_07_03_enums");
+}
+
+TEST(DpiEnumRepresentation, AnIntegerAtomBaseCrossesByValue) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum byte {BA = -5} eb;\n"
+      "  typedef enum shortint {SA = -300} es;\n"
+      "  typedef enum longint {LA = -64'sd5000000000} el;\n"
+      "  import \"DPI-C\" function void see_byte(input eb e);\n"
+      "  import \"DPI-C\" function void see_short(input es e);\n"
+      "  import \"DPI-C\" function void see_long(input el e);\n"
+      "  initial begin see_byte(BA); see_short(SA); see_long(LA); end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{-5, -300, -5000000000LL}));
+}
+
+TEST(DpiEnumRepresentation, AnUnsignedBaseKeepsItsWholeRange) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum byte unsigned {BA = 200} eb;\n"
+      "  typedef enum int unsigned {IA = 32'd4294967040} ei;\n"
+      "  import \"DPI-C\" function void see_ubyte(input eb e);\n"
+      "  import \"DPI-C\" function void see_uint(input ei e);\n"
+      "  initial begin see_ubyte(BA); see_uint(IA); end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{200, 4294967040LL}));
+}
+
+TEST(DpiEnumRepresentation, TheDefaultBaseCrossesAsAnInt) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum {A = -70000, B} e_t;\n"
+      "  import \"DPI-C\" function void see_int(input e_t e);\n"
+      "  initial begin see_int(A); see_int(B); end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{-70000, -69999}));
+}
+
+TEST(DpiEnumRepresentation, ABitVectorBaseCrossesAsItsCanonicalArray) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum bit [39:0] {A = 40'hab_0000_0001} e_t;\n"
+      "  import \"DPI-C\" function void see_two(input e_t e);\n"
+      "  initial see_two(A);\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 0xAB}));
+}
+
+TEST(DpiEnumRepresentation, AnIntegerBaseCrossesAsAFourStateArray) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum integer {A = 32'h1x0z} e_t;\n"
+      "  import \"DPI-C\" function void see_logic(input e_t e);\n"
+      "  initial see_logic(A);\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0x1F00, 0x0F0F}));
+}
+
+TEST(DpiEnumRepresentation, ATimeBaseCrossesAsTwoFourStateChunks) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum time {A = 64'h1234_5678_9abc_zzzz} e_t;\n"
+      "  import \"DPI-C\" function void see_two_logic(input e_t e);\n"
+      "  initial see_two_logic(A);\n",
+      f);
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{0x9ABC0000LL, 0xFFFF, 0x12345678, 0}));
+}
+
+TEST(DpiEnumRepresentation, AnOutputOrAnInoutIsWrittenInTheBaseType) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum byte {BA = -5, BB = 3} eb;\n"
+      "  typedef enum shortint {SA = -300, SB = -299} es;\n"
+      "  typedef enum logic [3:0] {VA = 4'b1x0z, VB = 4'b0001} ev;\n"
+      "  import \"DPI-C\" function void give_byte(output eb e);\n"
+      "  import \"DPI-C\" function void add_to_short(inout es e);\n"
+      "  import \"DPI-C\" function void give_four(output ev e);\n"
+      "  eb b = BB;\n"
+      "  es s = SA;\n"
+      "  ev v = VB;\n"
+      "  bit ob, os, ov;\n"
+      "  initial begin\n"
+      "    give_byte(b); add_to_short(s); give_four(v);\n"
+      "    ob = b == BA; os = s == SB; ov = v === VA;\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(DesignValue(f, "ob"), 1U);
+  EXPECT_EQ(DesignValue(f, "os"), 1U);
+  EXPECT_EQ(DesignValue(f, "ov"), 1U);
+}
+
+TEST(DpiEnumRepresentation, DISABLED_AResultIsReturnedInTheBaseType) {
+  SimFixture f;
+  RunEnums(
+      "  typedef enum byte {BA = -5, BB = 3} eb;\n"
+      "  typedef enum {IA = -70000, IB = 3} ei;\n"
+      "  import \"DPI-C\" function eb byte_result();\n"
+      "  import \"DPI-C\" function ei int_result();\n"
+      "  eb b;\n"
+      "  ei i;\n"
+      "  bit ob, oi;\n"
+      "  initial begin\n"
+      "    b = byte_result(); i = int_result();\n"
+      "    ob = b == BA; oi = i == IA;\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(DesignValue(f, "ob"), 1U);
+  EXPECT_EQ(DesignValue(f, "oi"), 1U);
+}
+
+int& FirstCell() {
+  static int cell = 41;
+  return cell;
+}
+
+int& SecondCell() {
+  static int cell = 42;
+  return cell;
+}
+
+void* HandleOf(int which) { return which == 0 ? &FirstCell() : &SecondCell(); }
+
+template <typename Element>
+const Element& ElementAt(svOpenArrayHandle h, int i) {
+  return *static_cast<const Element*>(svGetArrElemPtr1(h, i));
+}
+
+void SeeReals(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    SeeInC({static_cast<long long>(ElementAt<double>(h, i) * 100)});
+  }
+}
+
+void SeeShortreals(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    SeeInC({static_cast<long long>(ElementAt<float>(h, i) * 100)});
+  }
+}
+
+void SeeHandles(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    SeeInC({*static_cast<int*>(ElementAt<void*>(h, i))});
+  }
+}
+
+void SeeStrings(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    const char* const kText = ElementAt<const char*>(h, i);
+    SeeInC({kText[0], static_cast<long long>(std::strlen(kText))});
+  }
+}
+
+void SeeBytes(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    SeeInC({ElementAt<signed char>(h, i)});
+  }
+}
+
+void SeeLogics(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    SeeInC({svGetLogicArrElem1(h, i)});
+  }
+}
+
+void RunOpenElements(const std::string& items, SimFixture& f) {
+  RunModuleWithC(items, f,
+                 {{"see_reals", CAddress(&SeeReals)},
+                  {"see_shortreals", CAddress(&SeeShortreals)},
+                  {"see_handles", CAddress(&SeeHandles)},
+                  {"see_strings", CAddress(&SeeStrings)},
+                  {"see_bytes", CAddress(&SeeBytes)},
+                  {"see_logics", CAddress(&SeeLogics)},
+                  {"handle_of", CAddress(&HandleOf)}},
+                 "annex_h_07_03_open_elements");
+}
+
+TEST(DpiOpenArrayElements, RealsAreReachedAsDoublesAndFloats) {
+  SimFixture f;
+  RunOpenElements(
+      "  import \"DPI-C\" function void see_reals(input real a []);\n"
+      "  import \"DPI-C\" function void see_shortreals(input shortreal a "
+      "[]);\n"
+      "  real r [2:3] = '{1.5, -2.25};\n"
+      "  shortreal s [2:3] = '{0.5, -3.75};\n"
+      "  initial begin see_reals(r); see_shortreals(s); end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{150, -225, 50, -375}));
+}
+
+TEST(DpiOpenArrayElements, ChandlesAreReachedAsPointers) {
+  SimFixture f;
+  RunOpenElements(
+      "  import \"DPI-C\" function chandle handle_of(input int which);\n"
+      "  import \"DPI-C\" function void see_handles(input chandle a []);\n"
+      "  chandle h [2:3];\n"
+      "  initial begin\n"
+      "    h[2] = handle_of(0); h[3] = handle_of(1);\n"
+      "    see_handles(h);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{41, 42}));
+}
+
+TEST(DpiOpenArrayElements, StringsAreReachedAsCStrings) {
+  SimFixture f;
+  RunOpenElements(
+      "  import \"DPI-C\" function void see_strings(input string a []);\n"
+      "  string s [2:3] = '{\"abc\", \"zygote\"};\n"
+      "  initial see_strings(s);\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{'a', 3, 'z', 6}));
+}
+
+TEST(DpiOpenArrayElements, BytesAreReachedAsChars) {
+  SimFixture f;
+  RunOpenElements(
+      "  import \"DPI-C\" function void see_bytes(input byte a []);\n"
+      "  byte b [2:4] = '{-5, 7, 100};\n"
+      "  initial see_bytes(b);\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{-5, 7, 100}));
+}
+
+TEST(DpiOpenArrayElements, ScalarLogicsKeepTheirFourStates) {
+  SimFixture f;
+  RunOpenElements(
+      "  import \"DPI-C\" function void see_logics(input logic a []);\n"
+      "  logic l [2:5] = '{1'bx, 1'bz, 1'b1, 1'b0};\n"
+      "  initial see_logics(l);\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{sv_x, sv_z, sv_1, sv_0}));
+}
+
+void SizedReals(const double* a) {
+  SeeInC(
+      {static_cast<long long>(a[0] * 100), static_cast<long long>(a[1] * 100)});
+}
+
+void SizedShorts(const short* a) { SeeInC({a[0], a[1]}); }
+
+void SizedHandles(void* const* a) {
+  SeeInC({*static_cast<int*>(a[0]), *static_cast<int*>(a[1])});
+}
+
+void SizedStrings(const char* const* a) { SeeInC({a[0][0], a[1][0]}); }
+
+void SizedScalars(const svScalar* a) { SeeInC({a[0], a[1], a[2]}); }
+
+TEST(DpiSizedArrayElements, EachIsLaidOutAsItsTableType) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function chandle handle_of(input int which);\n"
+      "  import \"DPI-C\" function void reals(input real a [0:1]);\n"
+      "  import \"DPI-C\" function void shorts(input shortint a [0:1]);\n"
+      "  import \"DPI-C\" function void handles(input chandle a [0:1]);\n"
+      "  import \"DPI-C\" function void strings(input string a [0:1]);\n"
+      "  import \"DPI-C\" function void bits(input bit a [0:2]);\n"
+      "  import \"DPI-C\" function void logics(input logic a [0:2]);\n"
+      "  real r [0:1] = '{1.5, -2.25};\n"
+      "  shortint s [0:1] = '{-300, 7};\n"
+      "  chandle h [0:1];\n"
+      "  string t [0:1] = '{\"abc\", \"zygote\"};\n"
+      "  bit b [0:2] = '{1, 0, 1};\n"
+      "  logic l [0:2] = '{1'bx, 1'bz, 1'b1};\n"
+      "  initial begin\n"
+      "    h[0] = handle_of(0); h[1] = handle_of(1);\n"
+      "    reals(r); shorts(s); handles(h); strings(t); bits(b); logics(l);\n"
+      "  end\n",
+      f,
+      {{"handle_of", CAddress(&HandleOf)},
+       {"reals", CAddress(&SizedReals)},
+       {"shorts", CAddress(&SizedShorts)},
+       {"handles", CAddress(&SizedHandles)},
+       {"strings", CAddress(&SizedStrings)},
+       {"bits", CAddress(&SizedScalars)},
+       {"logics", CAddress(&SizedScalars)}},
+      "annex_h_07_03_sized_elements");
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{150, -225, -300, 7, 41, 42, 'a', 'z', 1, 0,
+                                    1, sv_x, sv_z, sv_1}));
 }
 
 }  // namespace

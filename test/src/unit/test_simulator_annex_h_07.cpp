@@ -40,8 +40,6 @@ TEST(DpiCLayerDataTypes, EachFormalCrossesAsOneOfTheLayersTypes) {
             DpiCLayerType::kOpenArrayHandle);
   EXPECT_EQ(DpiCLayerTypeOfFormal(Formal(DataTypeKind::kInt), true),
             DpiCLayerType::kOpenArrayHandle);
-  EXPECT_EQ(DpiCLayerTypeOfFormal(Formal(DataTypeKind::kStruct), false),
-            DpiCLayerType::kNone);
   EXPECT_EQ(DpiCLayerTypeOfFormal(Formal(DataTypeKind::kEvent), false),
             DpiCLayerType::kNone);
 }
@@ -53,6 +51,11 @@ TEST(DpiCLayerDataTypes, EachOfTheLayersTypesHasItsDefiningSubclause) {
   EXPECT_EQ(DpiSubclauseDefiningCLayerType(DpiCLayerType::kOpenArrayHandle),
             "H.12");
   EXPECT_EQ(DpiSubclauseDefiningCLayerType(DpiCLayerType::kNone), "");
+}
+
+TEST(DpiCLayerDataTypes, DISABLED_AnUnpackedStructCrossesAsALayerType) {
+  EXPECT_NE(DpiCLayerTypeOfFormal(Formal(DataTypeKind::kStruct), false),
+            DpiCLayerType::kNone);
 }
 
 }  // namespace

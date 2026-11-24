@@ -77,6 +77,29 @@ inline uint64_t DesignValue(SimFixture& f, std::string_view name) {
   return found == nullptr ? ~uint64_t{0} : found->value.ToUint64();
 }
 
+template <typename Function>
+void* CAddress(Function* function) {
+  return reinterpret_cast<void*>(function);
+}
+
+inline std::vector<long long>& SeenInC() {
+  static std::vector<long long> seen;
+  return seen;
+}
+
+inline void SeeInC(std::initializer_list<long long> values) {
+  SeenInC().insert(SeenInC().end(), values);
+}
+
+inline void RunModuleWithC(const std::string& items, SimFixture& f,
+                           const std::map<std::string, void*>& functions,
+                           const std::string& dir_name) {
+  SeenInC().clear();
+  RunWithImportsBound("module t;\n" + items + "endmodule\n", f, functions,
+                      dir_name);
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 inline DpiArg CFormal(std::string_view name, DataTypeKind type,
                       Direction direction, uint32_t width = 0) {
   DpiArg formal;

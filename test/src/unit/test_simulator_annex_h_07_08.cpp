@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -199,6 +200,205 @@ TEST(DpiUnpackedAggregates, ASizedOutputArrayOfStructsIsCopiedBack) {
   RunArrayOfStructsDesign(f);
   EXPECT_EQ(VariableValue(f, "q0"), 56U);
   EXPECT_EQ(VariableValue(f, "q1"), 78U);
+}
+
+struct Inner {
+  short s;
+  double r;
+};
+
+struct Outer {
+  char tag;
+  Inner in;
+  int last;
+};
+
+struct Mix {
+  char a;
+  double r;
+  short s;
+  void* h;
+  int i;
+};
+
+struct Arrays {
+  int a[3];
+  int c;
+};
+
+struct RealArrays {
+  short a;
+  double r[2];
+  int c;
+};
+
+struct Scattered {
+  char a;
+  short s;
+  char b;
+  long long l;
+  int i;
+};
+
+int& AggregateCell() {
+  static int cell = 77;
+  return cell;
+}
+
+void* AggregateHandle() { return &AggregateCell(); }
+
+void SeeOuter(const Outer* o) {
+  SeeInC({o->tag, o->in.s, static_cast<long long>(o->in.r * 100), o->last});
+}
+
+void GiveOuter(Outer* o) { *o = Outer{5, Inner{-300, 2.5}, 70000}; }
+
+void SeeMix(const Mix* m) {
+  SeeInC({m->a, static_cast<long long>(m->r * 100), m->s,
+          m->h == AggregateHandle() ? 1 : 0, m->i});
+}
+
+void SeeArrays(const Arrays* v) { SeeInC({v->a[0], v->a[1], v->a[2], v->c}); }
+
+void SeeRealArrays(const RealArrays* v) {
+  SeeInC({v->a, static_cast<long long>(v->r[0] * 100),
+          static_cast<long long>(v->r[1] * 100), v->c});
+}
+
+void SeeScattered(const Scattered* v) {
+  SeeInC({v->a, v->s, v->b, v->l, v->i});
+}
+
+void CallWithOuter() {
+  auto take = NamedExport<void (*)(const Outer*)>("sv_take_outer");
+  const Outer kOuter = {5, Inner{-300, 2.5}, 70000};
+  if (take != nullptr) take(&kOuter);
+}
+
+void RunNested(const std::string& items, SimFixture& f) {
+  RunModuleWithC(
+      "  typedef struct { shortint s; real r; } inner;\n"
+      "  typedef struct { byte tag; inner in; int last; } outer;\n"
+      "  typedef struct { byte a; real r; shortint s; chandle h; int i; } "
+      "mix;\n"
+      "  typedef struct { int a [3]; int c; } arrays;\n"
+      "  typedef struct { shortint a; real r [2]; int c; } real_arrays;\n"
+      "  typedef struct { byte a; shortint s; byte b; longint l; int i; } "
+      "scattered;\n" +
+          items,
+      f,
+      {{"handle", CAddress(&AggregateHandle)},
+       {"see_outer", CAddress(&SeeOuter)},
+       {"give_outer", CAddress(&GiveOuter)},
+       {"see_mix", CAddress(&SeeMix)},
+       {"see_arrays", CAddress(&SeeArrays)},
+       {"see_real_arrays", CAddress(&SeeRealArrays)},
+       {"see_scattered", CAddress(&SeeScattered)},
+       {"call_export", CAddress(&CallWithOuter)}},
+      "annex_h_07_08_nested");
+}
+
+TEST(DpiNestedAggregates, DISABLED_AnInnerStructLiesWhereTheCCompilerPutsIt) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" function void see_outer(input outer o);\n"
+      "  outer o;\n"
+      "  initial begin\n"
+      "    o.tag = 5; o.in.s = -300; o.in.r = 2.5; o.last = 70000;\n"
+      "    see_outer(o);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{5, -300, 250, 70000}));
+}
+
+TEST(DpiNestedAggregates, AnOutputsInnerStructIsCopiedBack) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" function void give_outer(output outer o);\n"
+      "  outer o;\n"
+      "  bit tag, s, r, last;\n"
+      "  initial begin\n"
+      "    give_outer(o);\n"
+      "    tag = o.tag == 5; s = o.in.s == -300; r = o.in.r == 2.5;\n"
+      "    last = o.last == 70000;\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(DesignValue(f, "tag"), 1U);
+  EXPECT_EQ(DesignValue(f, "s"), 1U);
+  EXPECT_EQ(DesignValue(f, "r"), 1U);
+  EXPECT_EQ(DesignValue(f, "last"), 1U);
+}
+
+TEST(DpiNestedAggregates, AnExportTakesANestedStruct) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" context function void call_export();\n"
+      "  export \"DPI-C\" function sv_take_outer;\n"
+      "  bit tag, s, r, last;\n"
+      "  function void sv_take_outer(input outer o);\n"
+      "    tag = o.tag == 5; s = o.in.s == -300; r = o.in.r == 2.5;\n"
+      "    last = o.last == 70000;\n"
+      "  endfunction\n"
+      "  initial call_export();\n",
+      f);
+  EXPECT_EQ(DesignValue(f, "tag"), 1U);
+  EXPECT_EQ(DesignValue(f, "s"), 1U);
+  EXPECT_EQ(DesignValue(f, "r"), 1U);
+  EXPECT_EQ(DesignValue(f, "last"), 1U);
+}
+
+TEST(DpiNestedAggregates, DISABLED_MembersArePaddedAsTheCCompilerPadsThem) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" function chandle handle();\n"
+      "  import \"DPI-C\" function void see_mix(input mix m);\n"
+      "  mix m;\n"
+      "  initial begin\n"
+      "    m.a = 9; m.r = -1.25; m.s = -7; m.h = handle(); m.i = 12;\n"
+      "    see_mix(m);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{9, -125, -7, 1, 12}));
+}
+
+TEST(DpiNestedAggregates, AMembersIntArrayHasTheCLayout) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" function void see_arrays(input arrays v);\n"
+      "  arrays v;\n"
+      "  initial begin\n"
+      "    v.a[0] = 1; v.a[1] = 2; v.a[2] = 3; v.c = 9;\n"
+      "    see_arrays(v);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 2, 3, 9}));
+}
+
+TEST(DpiNestedAggregates, DISABLED_AMembersRealArrayHasTheCLayout) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" function void see_real_arrays(input real_arrays v);\n"
+      "  real_arrays v;\n"
+      "  initial begin\n"
+      "    v.a = -3; v.r[0] = 1.5; v.r[1] = -2.25; v.c = 9;\n"
+      "    see_real_arrays(v);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{-3, 150, -225, 9}));
+}
+
+TEST(DpiNestedAggregates, IntegerMembersArePaddedAsTheCCompilerPadsThem) {
+  SimFixture f;
+  RunNested(
+      "  import \"DPI-C\" function void see_scattered(input scattered v);\n"
+      "  scattered v;\n"
+      "  initial begin\n"
+      "    v.a = 9; v.s = -300; v.b = -4; v.l = -64'sd5000000000; v.i = 12;\n"
+      "    see_scattered(v);\n"
+      "  end\n",
+      f);
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{9, -300, -4, -5000000000LL, 12}));
 }
 
 }  // namespace

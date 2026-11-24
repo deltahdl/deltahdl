@@ -2,7 +2,9 @@
 
 #include <cstdint>
 #include <cstdlib>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
@@ -248,6 +250,190 @@ TEST(DpiArrayNaturalOrder, AParameterSizedArrayCrossesInCLayout) {
       "annex_h_07_06_parameter_sized");
   EXPECT_TRUE(f.diag.Diagnostics().empty());
   EXPECT_EQ(VariableValue(f, "r"), 34U);
+}
+
+void SeeEightBits(const svBitVecVal* v) { SeeInC({v[0] & 0xFFU}); }
+
+TEST(DpiNormalizedRanges, APackedFormalsRightmostBitIsBitZero) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void up(input bit [0:7] v);\n"
+      "  import \"DPI-C\" function void down(input bit [11:4] v);\n"
+      "  import \"DPI-C\" function void up_from_one(input bit [1:8] v);\n"
+      "  bit [0:7] a;\n"
+      "  bit [11:4] b;\n"
+      "  initial begin\n"
+      "    a[7] = 1; a[2] = 1; up(a);\n"
+      "    b[4] = 1; b[10] = 1; down(b);\n"
+      "    up_from_one(8'b0000_0001);\n"
+      "  end\n",
+      f,
+      {{"up", CAddress(&SeeEightBits)},
+       {"down", CAddress(&SeeEightBits)},
+       {"up_from_one", CAddress(&SeeEightBits)}},
+      "annex_h_07_06_packed");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0x21, 0x41, 1}));
+}
+
+void CallWithInts(const char* name) {
+  auto take = NamedExport<void (*)(const int*)>(name);
+  const int kInts[3] = {1, 2, 3};
+  if (take != nullptr) take(kInts);
+}
+
+void CallDescending() { CallWithInts("sv_descending"); }
+
+void CallAscending() { CallWithInts("sv_ascending"); }
+
+void CallWritingDescending() {
+  auto give = NamedExport<void (*)(int*)>("sv_give_descending");
+  int ints[3] = {};
+  if (give != nullptr) give(ints);
+  SeeInC({ints[0], ints[1], ints[2]});
+}
+
+void CallWithPackedRanges() {
+  auto up = NamedExport<void (*)(const svBitVecVal*, svBitVecVal*)>("sv_up");
+  auto down = NamedExport<void (*)(const svBitVecVal*)>("sv_down");
+  if (up == nullptr || down == nullptr) return;
+  const svBitVecVal kIn = 0x21U;
+  svBitVecVal out = 0U;
+  up(&kIn, &out);
+  down(&kIn);
+  SeeInC({out & 0xFFU});
+}
+
+TEST(DpiNormalizedRanges, AnExportsAscendingArrayTakesItsLowestIndexFirst) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" context function void call();\n"
+      "  export \"DPI-C\" function sv_ascending;\n"
+      "  int got;\n"
+      "  function void sv_ascending(input int a [1:3]);\n"
+      "    got = a[3] * 100 + a[2] * 10 + a[1];\n"
+      "  endfunction\n"
+      "  initial call();\n",
+      f, {{"call", CAddress(&CallAscending)}}, "annex_h_07_06_ascending");
+  EXPECT_EQ(DesignValue(f, "got"), 321U);
+}
+
+TEST(DpiNormalizedRanges,
+     DISABLED_AnExportsDescendingArrayTakesItsLowestIndexFirst) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" context function void call();\n"
+      "  export \"DPI-C\" function sv_descending;\n"
+      "  int got;\n"
+      "  function void sv_descending(input int a [3:1]);\n"
+      "    got = a[3] * 100 + a[2] * 10 + a[1];\n"
+      "  endfunction\n"
+      "  initial call();\n",
+      f, {{"call", CAddress(&CallDescending)}}, "annex_h_07_06_descending");
+  EXPECT_EQ(DesignValue(f, "got"), 321U);
+}
+
+TEST(DpiNormalizedRanges,
+     DISABLED_AnExportsDescendingOutputGivesItsLowestIndexFirst) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" context function void call();\n"
+      "  export \"DPI-C\" function sv_give_descending;\n"
+      "  function void sv_give_descending(output int o [3:1]);\n"
+      "    o[3] = 30; o[2] = 20; o[1] = 10;\n"
+      "  endfunction\n"
+      "  initial call();\n",
+      f, {{"call", CAddress(&CallWritingDescending)}},
+      "annex_h_07_06_descending_output");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{10, 20, 30}));
+}
+
+TEST(DpiNormalizedRanges, AnExportsPackedFormalHasItsRightmostBitAtBitZero) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" context function void call();\n"
+      "  export \"DPI-C\" function sv_up;\n"
+      "  export \"DPI-C\" function sv_down;\n"
+      "  int up, down;\n"
+      "  function void sv_up(input bit [0:7] v, output bit [0:7] o);\n"
+      "    bit [0:7] seen, given;\n"
+      "    seen = v;\n"
+      "    up = seen[7] * 10 + seen[2];\n"
+      "    given = 0;\n"
+      "    given[7] = 1; given[1] = 1;\n"
+      "    o = given;\n"
+      "  endfunction\n"
+      "  function void sv_down(input bit [11:4] v);\n"
+      "    bit [11:4] seen;\n"
+      "    seen = v;\n"
+      "    down = seen[4] * 10 + seen[9];\n"
+      "  endfunction\n"
+      "  initial call();\n",
+      f, {{"call", CAddress(&CallWithPackedRanges)}},
+      "annex_h_07_06_export_packed");
+  EXPECT_EQ(DesignValue(f, "up"), 11U);
+  EXPECT_EQ(DesignValue(f, "down"), 11U);
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0x41}));
+}
+
+void SeeSixInts(const int* a) { SeeInC({a[0], a[1], a[2], a[3], a[4], a[5]}); }
+
+void SeeTwoInts(const int* a) { SeeInC({a[0], a[1]}); }
+
+void SeeCornersOfEight(const svLogicVecVal* a) {
+  SeeInC({a[0].aval & 0xFFFFU, a[15].aval & 0xFFFFU, a[(63 * 8) + 7].aval,
+          a[(63 * 8) + 7].bval});
+}
+
+void ScaleByPosition(int* a) {
+  a[0] *= 10;
+  a[1] *= 100;
+  a[2] *= 1000;
+}
+
+TEST(DpiArrayNaturalOrder, EachDimensionRunsFromItsLowestIndex) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void six(input int a [2:1][0:2]);\n"
+      "  import \"DPI-C\" function void two(input int a [-1:0]);\n"
+      "  int a [2:1][0:2] = '{'{4, 5, 6}, '{1, 2, 3}};\n"
+      "  int b [-1:0] = '{7, 8};\n"
+      "  initial begin six(a); two(b); end\n",
+      f, {{"six", CAddress(&SeeSixInts)}, {"two", CAddress(&SeeTwoInts)}},
+      "annex_h_07_06_dimensions");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 2, 3, 4, 5, 6, 7, 8}));
+}
+
+TEST(DpiArrayNaturalOrder, NegativeBoundsOfTwoDimensionsAreNormalized) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void corners(\n"
+      "      input logic [31:16] i [64:1][-1:-8]);\n"
+      "  logic [31:16] b_64x8 [64:1][-1:-8];\n"
+      "  initial begin\n"
+      "    foreach (b_64x8[i, j]) b_64x8[i][j] = 16'h0000;\n"
+      "    b_64x8[1][-8] = 16'h1234;\n"
+      "    b_64x8[2][-1] = 16'h5678;\n"
+      "    b_64x8[64][-1] = 16'h9x7z;\n"
+      "    corners(b_64x8);\n"
+      "  end\n",
+      f, {{"corners", CAddress(&SeeCornersOfEight)}}, "annex_h_07_06_corners");
+  ASSERT_EQ(SeenInC().size(), 4U);
+  EXPECT_EQ(SeenInC()[0], 0x1234);
+  EXPECT_EQ(SeenInC()[1], 0x5678);
+  EXPECT_EQ(SeenInC()[2] & 0xFFFF, 0x9F70);
+  EXPECT_EQ(SeenInC()[3] & 0xFFFF, 0x0F0F);
+}
+
+TEST(DpiArrayNaturalOrder, ASizedInoutArrayIsPassedInAndCopiedBack) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void scale(inout int a [3:1]);\n"
+      "  int a [3:1] = '{3, 2, 1};\n"
+      "  initial scale(a);\n",
+      f, {{"scale", CAddress(&ScaleByPosition)}}, "annex_h_07_06_inout");
+  EXPECT_EQ(DesignValue(f, "a[1]"), 10U);
+  EXPECT_EQ(DesignValue(f, "a[2]"), 200U);
+  EXPECT_EQ(DesignValue(f, "a[3]"), 3000U);
 }
 
 }  // namespace

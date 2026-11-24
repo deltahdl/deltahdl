@@ -99,7 +99,10 @@ TEST(DpiTypeDuality, AnOutputOfASmallTypeIsAPointerToItsTableType) {
   EXPECT_EQ(
       DpiCTypeOfFormal(Formal(DataTypeKind::kBit, Direction::kOutput), false),
       "svBit*");
-  EXPECT_EQ(
+}
+
+TEST(DpiTypeDuality, DISABLED_AnUnpackedStructHasACType) {
+  EXPECT_NE(
       DpiCTypeOfFormal(Formal(DataTypeKind::kStruct, Direction::kInput), false),
       "");
 }

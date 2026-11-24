@@ -33,9 +33,6 @@ TEST(DpiUnpackedArrayLayout, ASizedUnpackedFormalIsACArrayOfItsElementType) {
   EXPECT_EQ(DpiCDeclarationOfUnpackedFormal(
                 Formal(DataTypeKind::kByte, Direction::kInout), {{-1, -8}}),
             "char a[8]");
-  EXPECT_EQ(DpiCDeclarationOfUnpackedFormal(
-                Formal(DataTypeKind::kStruct, Direction::kInput), {{0, 1}}),
-            "");
 }
 
 TEST(DpiUnpackedArrayLayout, APackedElementIsOneMoreDimensionOfChunks) {
@@ -68,8 +65,6 @@ TEST(DpiUnpackedArrayLayout, AnElementIsSizeofItsCType) {
             2 * sizeof(SvBitVecVal));
   EXPECT_EQ(DpiCElementBytes(Formal(DataTypeKind::kInteger, Direction::kInput)),
             sizeof(SvLogicVecVal));
-  EXPECT_EQ(DpiCElementBytes(Formal(DataTypeKind::kStruct, Direction::kInput)),
-            0U);
 }
 
 TEST(DpiUnpackedArrayLayout, ASystemVerilogIndexCountsFromTheLowBound) {
@@ -127,6 +122,14 @@ TEST(DpiUnpackedArrayLayout, AnOpenArrayIsPassedByHandleInstead) {
   EXPECT_EQ(DpiCTypeOfFormal(
                 Formal(DataTypeKind::kLogic, Direction::kOutput, 18), true),
             "const svOpenArrayHandle");
+}
+
+TEST(DpiUnpackedArrayLayout, DISABLED_AnUnpackedStructElementHasALayout) {
+  EXPECT_NE(DpiCDeclarationOfUnpackedFormal(
+                Formal(DataTypeKind::kStruct, Direction::kInput), {{0, 1}}),
+            "");
+  EXPECT_NE(DpiCElementBytes(Formal(DataTypeKind::kStruct, Direction::kInput)),
+            0U);
 }
 
 }  // namespace
