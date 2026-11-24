@@ -5,6 +5,8 @@
 #include <cstring>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
@@ -76,6 +78,54 @@ TEST(DpiPackedArrayAccessExample, F2CopiesEachElementOfTheOpenArrayByItsIndex) {
   EXPECT_EQ(g_f2_last_chunks[0], 203u);
   EXPECT_EQ(g_f2_last_chunks[1], 103u);
   EXPECT_EQ(g_f2_last_chunks[2], 3u);
+}
+
+void SeeFourChunks(const svLogicVecVal* v) {
+  SeeInC({v[0].aval, v[1].aval, v[1].bval, v[2].aval, v[3].aval, v[3].bval});
+}
+
+void SeeElementsOf128Bits(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    svLogicVecVal arr[SV_PACKED_DATA_NELEMS(128)] = {};
+    svGetLogicArrElem1VecVal(arr, h, i);
+    for (const svLogicVecVal& chunk : arr) {
+      SeeInC({chunk.aval});
+      SeeInC({chunk.bval});
+    }
+    const auto* ptr = static_cast<const svLogicVecVal*>(svGetArrElemPtr1(h, i));
+    bool agrees = ptr == nullptr || memcmp(ptr, arr, sizeof(arr)) == 0;
+    SeeInC({agrees ? 1 : 0});
+  }
+}
+
+TEST(DpiPackedArrayAccessExample, ADesignsVectorArrivesAsFourChunks) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void f1(input logic [127:0]);\n"
+      "  logic [127:0] v;\n"
+      "  initial begin\n"
+      "    v = {32'h8x00_0001, 32'h2, 32'hz000_0003, 32'h4};\n"
+      "    f1(v);\n"
+      "  end\n",
+      f, {{"f1", CAddress(&SeeFourChunks)}}, "annex_h_12_10_vector");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{4, 3, 0xF0000000, 2, 0x8F000001,
+                                               0x0F000000}));
+}
+
+TEST(DpiPackedArrayAccessExample, ADesignsOpenArrayOfVectorsIsCopiedOut) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void f2(input logic [127:0] i []);\n"
+      "  logic [127:0] v [5:4];\n"
+      "  initial begin\n"
+      "    v[4] = {32'h1, 32'h2, 32'hz000_0003, 32'h4};\n"
+      "    v[5] = {32'h5, 32'hx, 32'h7, 32'h8};\n"
+      "    f2(v);\n"
+      "  end\n",
+      f, {{"f2", CAddress(&SeeElementsOf128Bits)}}, "annex_h_12_10_open");
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{4, 0, 3, 0xF0000000, 2, 0, 1, 0, 1, 8, 0, 7,
+                                    0, 0xFFFFFFFF, 0xFFFFFFFF, 5, 0, 1}));
 }
 
 }  // namespace

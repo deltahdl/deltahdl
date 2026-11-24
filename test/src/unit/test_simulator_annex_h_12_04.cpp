@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <type_traits>
+#include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
@@ -207,6 +210,104 @@ TEST(DpiActualRepresentationModel,
   SvOpenArrayDesc compacted;
   svOpenArrayHandle differing = MakeHandle(data, kRanges, 2, 0, &compacted);
   EXPECT_EQ(svGetArrElemPtr1(differing, 3), nullptr);
+}
+
+TEST(ActualRepresentation, AnIndexOutsideAnyOfTwoDimensionsGivesNull) {
+  const SvOpenArrayDimRange kRanges[] = {{31, 0}, {11, 12}, {1, -1}};
+  int data[6] = {};
+  SvOpenArrayDesc desc;
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, sizeof(int), &desc);
+  EXPECT_EQ(svGetArrElemPtr2(h, 12, -1), static_cast<void*>(&data[5]));
+  EXPECT_EQ(svGetArrElemPtr(h, 12, -1), static_cast<void*>(&data[5]));
+  EXPECT_EQ(svGetArrElemPtr2(h, 10, 0), nullptr);
+  EXPECT_EQ(svGetArrElemPtr2(h, 13, 0), nullptr);
+  EXPECT_EQ(svGetArrElemPtr2(h, 11, 2), nullptr);
+  EXPECT_EQ(svGetArrElemPtr2(h, 11, -2), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 10, 0), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 13, 0), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 11, 2), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 11, -2), nullptr);
+}
+
+TEST(ActualRepresentation, AnIndexOutsideAnyOfThreeDimensionsGivesNull) {
+  const SvOpenArrayDimRange kRanges[] = {{31, 0}, {3, 2}, {5, 6}, {-1, -2}};
+  int data[8] = {};
+  SvOpenArrayDesc desc;
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 4, sizeof(int), &desc);
+  EXPECT_EQ(svGetArrElemPtr3(h, 2, 6, -2), static_cast<void*>(&data[7]));
+  EXPECT_EQ(svGetArrElemPtr(h, 2, 6, -2), static_cast<void*>(&data[7]));
+  EXPECT_EQ(svGetArrElemPtr3(h, 4, 5, -1), nullptr);
+  EXPECT_EQ(svGetArrElemPtr3(h, 1, 5, -1), nullptr);
+  EXPECT_EQ(svGetArrElemPtr3(h, 2, 4, -1), nullptr);
+  EXPECT_EQ(svGetArrElemPtr3(h, 2, 7, -1), nullptr);
+  EXPECT_EQ(svGetArrElemPtr3(h, 2, 5, 0), nullptr);
+  EXPECT_EQ(svGetArrElemPtr3(h, 2, 5, -3), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 4, 5, -1), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 2, 7, -1), nullptr);
+  EXPECT_EQ(svGetArrElemPtr(h, 2, 5, -3), nullptr);
+}
+
+void SeeWhatLiesOutside(svOpenArrayHandle h) {
+  SeeInC({static_cast<long long>(svGetArrElemPtr2(h, 11, 1) != nullptr),
+          static_cast<long long>(svGetArrElemPtr2(h, 99, 0) != nullptr),
+          static_cast<long long>(svGetArrElemPtr2(h, 11, 99) != nullptr),
+          static_cast<long long>(svGetArrElemPtr(h, 11, 99) != nullptr)});
+}
+
+TEST(ActualRepresentation, ADesignsElementOutsideItsRangesHasNoAddress) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input int a [][]);\n"
+      "  int m [11:12][0:1];\n"
+      "  initial see(m);\n",
+      f, {{"see", CAddress(&SeeWhatLiesOutside)}}, "annex_h_12_04_outside");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 0, 0, 0}));
+}
+
+TEST(ActualRepresentation, DISABLED_AnArrayInCLayoutHasAnAddressAndASize) {
+  const SvOpenArrayDimRange kRanges[] = {{31, 0}, {1, 3}, {0, 1}};
+  int data[6] = {};
+  SvOpenArrayDesc desc;
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 3, sizeof(int), &desc);
+  EXPECT_EQ(svGetArrayPtr(h), static_cast<void*>(data));
+  EXPECT_EQ(svSizeOfArray(h), 24);
+}
+
+void SeeTheWholeArrayOfInts(svOpenArrayHandle h) {
+  const auto* whole = static_cast<const int*>(svGetArrayPtr(h));
+  if (whole == nullptr) {
+    SeeInC({0, svSizeOfArray(h)});
+    return;
+  }
+  SeeInC({whole[0], whole[2], svSizeOfArray(h)});
+}
+
+TEST(ActualRepresentation, DISABLED_ADesignsArrayOfIntsHasAnAddress) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input int a []);\n"
+      "  int x [3:1];\n"
+      "  initial begin\n"
+      "    x[3] = 30; x[2] = 20; x[1] = 10;\n"
+      "    see(x);\n"
+      "  end\n",
+      f, {{"see", CAddress(&SeeTheWholeArrayOfInts)}}, "annex_h_12_04_whole");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{10, 30, 12}));
+}
+
+TEST(ActualRepresentation, TheAddressFunctionsHaveTheirPrototypes) {
+  EXPECT_TRUE(
+      (std::is_same_v<decltype(svGetArrayPtr), void*(svOpenArrayHandle)>));
+  EXPECT_TRUE(
+      (std::is_same_v<decltype(svSizeOfArray), int(svOpenArrayHandle)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svGetArrElemPtr),
+                              void*(svOpenArrayHandle, int, ...)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svGetArrElemPtr1),
+                              void*(svOpenArrayHandle, int)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svGetArrElemPtr2),
+                              void*(svOpenArrayHandle, int, int)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svGetArrElemPtr3),
+                              void*(svOpenArrayHandle, int, int, int)>));
 }
 
 }  // namespace

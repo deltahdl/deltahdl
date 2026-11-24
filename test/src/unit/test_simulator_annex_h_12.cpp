@@ -2,10 +2,14 @@
 
 #include <cstddef>
 #include <string>
+#include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
+#include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
 using namespace delta;
@@ -66,6 +70,75 @@ TEST(DpiOpenArrayCapacity, AnOpenArrayFormalIsAHandleUnderEveryDirection) {
     formal.direction = kDirection;
     EXPECT_EQ(DpiCTypeOfFormal(formal, true), "const svOpenArrayHandle");
   }
+}
+
+void AddTenToEach(svOpenArrayHandle h) {
+  long long sum = 0;
+  int written = 0;
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    auto* element = static_cast<int*>(svGetArrElemPtr1(h, i));
+    if (element == nullptr) return;
+    sum = (sum * 10) + *element;
+    *element += i * 100;
+    ++written;
+  }
+  SeeInC({svSize(h, 1), svLeft(h, 1), svRight(h, 1), sum, written});
+}
+
+TEST(DpiOpenArrayCapacity, AnInoutArrayIsIndexedAndWrittenInItsOwnRange) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void add(inout int a []);\n"
+      "  int x [3:1];\n"
+      "  initial begin\n"
+      "    x[3] = 3; x[2] = 2; x[1] = 1;\n"
+      "    add(x);\n"
+      "  end\n",
+      f, {{"add", CAddress(&AddTenToEach)}}, "annex_h_12_inout");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{3, 3, 1, 123, 3}));
+  EXPECT_EQ(DesignValue(f, "x[1]"), 101U);
+  EXPECT_EQ(DesignValue(f, "x[2]"), 202U);
+  EXPECT_EQ(DesignValue(f, "x[3]"), 303U);
+}
+
+TEST(DpiOpenArrayCapacity, EachCallGivesTheSizeOfItsOwnActual) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void add(inout int a []);\n"
+      "  int x [-2:4];\n"
+      "  int y [5:6];\n"
+      "  int first;\n"
+      "  initial begin\n"
+      "    add(x);\n"
+      "    add(y);\n"
+      "    first = x[-2];\n"
+      "  end\n",
+      f, {{"add", CAddress(&AddTenToEach)}}, "annex_h_12_two_sizes");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{7, -2, 4, 0, 7, 2, 5, 6, 0, 2}));
+  EXPECT_EQ(DesignValue(f, "first"), 0xFFFFFF38U);
+  EXPECT_EQ(DesignValue(f, "x[4]"), 400U);
+  EXPECT_EQ(DesignValue(f, "y[5]"), 500U);
+  EXPECT_EQ(DesignValue(f, "y[6]"), 600U);
+}
+
+void FillWithIndices(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    auto* element = static_cast<int*>(svGetArrElemPtr1(h, i));
+    if (element != nullptr) *element = i + 50;
+  }
+  SeeInC({svSize(h, 1)});
+}
+
+TEST(DpiOpenArrayCapacity, AnOutputArrayIsWrittenToItsLastElement) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void fill(output int a []);\n"
+      "  int x [10:4];\n"
+      "  initial fill(x);\n",
+      f, {{"fill", CAddress(&FillWithIndices)}}, "annex_h_12_output");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{7}));
+  EXPECT_EQ(DesignValue(f, "x[10]"), 60U);
+  EXPECT_EQ(DesignValue(f, "x[4]"), 54U);
 }
 
 }  // namespace

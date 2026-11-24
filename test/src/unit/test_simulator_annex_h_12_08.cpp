@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
@@ -107,6 +110,52 @@ TEST(DpiTwoDimensionalOpenArray, TheSameF1VisitsA64x8OverItsNegativeRange) {
   ASSERT_NE(last, nullptr);
   EXPECT_EQ(last->i, 1);
   EXPECT_EQ(last->j, -8);
+}
+
+void SeeEveryElement(svOpenArrayHandle h) {
+  long long sum = 0;
+  int visited = 0;
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    for (int j = svLow(h, 2); j <= svHigh(h, 2); ++j) {
+      const auto* element =
+          static_cast<const MyType*>(svGetArrElemPtr2(h, i, j));
+      if (element == nullptr) return;
+      sum += static_cast<long long>(element->i) * element->j;
+      ++visited;
+    }
+  }
+  SeeInC({svLow(h, 1), svHigh(h, 1), svLow(h, 2), svHigh(h, 2), visited, sum});
+}
+
+void RunTwoDimensionalExample(SimFixture& f, const char* call,
+                              const char* dir_name) {
+  RunModuleWithC(
+      std::string("  typedef struct { int i; int j; } MyType;\n"
+                  "  import \"DPI-C\" function void f1(input MyType i [][]);\n"
+                  "  MyType a_10x5 [11:20][6:2];\n"
+                  "  MyType a_64x8 [64:1][-1:-8];\n"
+                  "  initial begin\n"
+                  "    foreach (a_10x5[x, y]) begin\n"
+                  "      a_10x5[x][y].i = x; a_10x5[x][y].j = y;\n"
+                  "    end\n"
+                  "    foreach (a_64x8[x, y]) begin\n"
+                  "      a_64x8[x][y].i = x; a_64x8[x][y].j = y;\n"
+                  "    end\n") +
+          "    " + call + ";\n  end\n",
+      f, {{"f1", CAddress(&SeeEveryElement)}}, dir_name);
+}
+
+TEST(DpiTwoDimensionalOpenArray, ADesignsA10x5IsVisitedByItsOwnIndices) {
+  SimFixture f;
+  RunTwoDimensionalExample(f, "f1(a_10x5)", "annex_h_12_08_a");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{11, 20, 2, 6, 50, 155LL * 20}));
+}
+
+TEST(DpiTwoDimensionalOpenArray, ADesignsA64x8IsVisitedByItsOwnIndices) {
+  SimFixture f;
+  RunTwoDimensionalExample(f, "f1(a_64x8)", "annex_h_12_08_b");
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{1, 64, -8, -1, 512, 2080LL * -36}));
 }
 
 }  // namespace

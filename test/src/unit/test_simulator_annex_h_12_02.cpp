@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <string_view>
+#include <type_traits>
+#include <vector>
 
 #include "fixture_simulator.h"
 #include "helpers_dpi_c_binding.h"
@@ -33,7 +36,7 @@ TEST(ArrayQueryingFunctions, DimensionZeroIsPackedPart) {
   EXPECT_EQ(svRight(h, 2), -8);
 }
 
-TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
+TEST(ArrayQueryingFunctions, LowHighSizeAnswerForAnAscendingRange) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
@@ -43,7 +46,7 @@ TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
   EXPECT_EQ(svSize(h, 1), 8);
 }
 
-TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
+TEST(ArrayQueryingFunctions, LowHighSizeAnswerForADescendingRange) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {-1, -8}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
@@ -57,7 +60,7 @@ TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
   EXPECT_EQ(svSize(h, 1), 8);
 }
 
-TEST(ArrayQueryingFunctions, IncrementMatchesTwentySevenSemantics) {
+TEST(ArrayQueryingFunctions, IncrementAnswersForBothDirections) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
@@ -160,6 +163,74 @@ TEST(ArrayQueryingFunctions, AnElementWithNoPackedPartAddsNoDimension) {
   EXPECT_EQ(VariableValue(f, "s1"), 2111U);
   EXPECT_EQ(VariableValue(f, "s2"), 13U);
   EXPECT_EQ(VariableValue(f, "s3"), 231U);
+}
+
+void SeeQueries(svOpenArrayHandle h) {
+  SeeInC({svDimensions(h)});
+  for (int d = 1; d <= svDimensions(h) && d <= 2; ++d) {
+    for (long long answer : {svLeft(h, d), svRight(h, d), svLow(h, d),
+                             svHigh(h, d), svIncrement(h, d), svSize(h, d)}) {
+      SeeInC({answer});
+    }
+  }
+}
+
+TEST(ArrayQueryingFunctions, EachFunctionAnswersForAnArrayOfReals) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input real a []);\n"
+      "  real a [4:-1];\n"
+      "  initial see(a);\n",
+      f, {{"see", CAddress(&SeeQueries)}}, "annex_h_12_02_reals");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 4, -1, -1, 4, 1, 6}));
+}
+
+TEST(ArrayQueryingFunctions, EachFunctionAnswersForTwoDimensions) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input int a [][]);\n"
+      "  int a [7:3][-5:2];\n"
+      "  initial see(a);\n",
+      f, {{"see", CAddress(&SeeQueries)}}, "annex_h_12_02_two");
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{3, 7, 3, 3, 7, 1, 5, -5, 2, -5, 2, -1, 8}));
+}
+
+void SeePackedQueries(svOpenArrayHandle h) {
+  SeeInC({svDimensions(h), svLeft(h, 0), svRight(h, 0), svLow(h, 0),
+          svHigh(h, 0), svIncrement(h, 0), svSize(h, 0)});
+}
+
+void RunPackedQueries(SimFixture& f, const char* declaration,
+                      const char* dir_name) {
+  RunModuleWithC(std::string("  import \"DPI-C\" function void see(") +
+                     "input bit [] a);\n" + "  " + declaration +
+                     ";\n  initial see(v);\n",
+                 f, {{"see", CAddress(&SeePackedQueries)}}, dir_name);
+}
+
+TEST(ArrayQueryingFunctions,
+     DISABLED_EachFunctionAnswersForAnUnsizedPackedFormal) {
+  SimFixture f;
+  RunPackedQueries(f, "bit [3:0][7:0] v", "annex_h_12_02_packed");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 31, 0, 0, 31, 1, 32}));
+}
+
+TEST(ArrayQueryingFunctions,
+     DISABLED_AnUnsizedPackedFormalNormalizesItsActual) {
+  SimFixture f;
+  RunPackedQueries(f, "bit [2:1][4:8] v", "annex_h_12_02_offset");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 9, 0, 0, 9, 1, 10}));
+}
+
+TEST(ArrayQueryingFunctions, TheQueriesHaveTheirPrototypes) {
+  EXPECT_TRUE((std::is_same_v<decltype(svLeft), int(svOpenArrayHandle, int)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svRight), decltype(svLeft)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svLow), decltype(svLeft)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svHigh), decltype(svLeft)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svIncrement), decltype(svLeft)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svSize), decltype(svLeft)>));
+  EXPECT_TRUE((std::is_same_v<decltype(svDimensions), int(svOpenArrayHandle)>));
 }
 
 }  // namespace

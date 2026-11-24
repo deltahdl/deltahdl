@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <type_traits>
+#include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
@@ -294,6 +297,147 @@ TEST(DpiScalarElementModel, AGetReturnsTheScalarAndAPutTakesItByValue) {
   EXPECT_TRUE(
       (std::is_same<decltype(&svPutLogicArrElem2),
                     void (*)(svOpenArrayHandle, svLogic, int, int)>::value));
+}
+
+TEST(ScalarElementAccess, TheVariadicFormsReachFourDimensions) {
+  const SvOpenArrayDimRange kRanges[] = {
+      {0, 0}, {1, 0}, {3, 4}, {-1, -2}, {7, 8}};
+  svBitVecVal bits[16] = {};
+  svLogicVecVal logic[16] = {};
+  SvOpenArrayDesc bit_desc;
+  SvOpenArrayDesc logic_desc;
+  svOpenArrayHandle b = MakeHandle(bits, kRanges, 5, &bit_desc);
+  svOpenArrayHandle l = MakeHandle(logic, kRanges, 5, &logic_desc);
+  for (int n = 0; n < 16; ++n) {
+    int i = 1 - (n / 8);
+    int j = 3 + ((n / 4) % 2);
+    int k = -1 - ((n / 2) % 2);
+    int m = 7 + (n % 2);
+    svPutBitArrElem(b, 1, i, j, k, m);
+    EXPECT_EQ(bits[n] & 1U, 1U);
+    EXPECT_EQ(svGetBitArrElem(b, i, j, k, m), sv_1);
+    svPutBitArrElem(b, 0, i, j, k, m);
+    EXPECT_EQ(svGetBitArrElem(b, i, j, k, m), sv_0);
+    svPutBitArrElem(b, 1, i, j, k, m);
+    svPutLogicArrElem(l, sv_x, i, j, k, m);
+    EXPECT_EQ(logic[n].aval & 1U, 1U);
+    EXPECT_EQ(logic[n].bval & 1U, 1U);
+    EXPECT_EQ(svGetLogicArrElem(l, i, j, k, m), sv_x);
+  }
+}
+
+void SeeBits(svOpenArrayHandle a, svOpenArrayHandle b, svOpenArrayHandle c) {
+  SeeInC({svGetBitArrElem1(a, 4), svGetBitArrElem1(a, 3), svGetBitArrElem(a, 2),
+          svGetBitArrElem2(b, -1, 5), svGetBitArrElem2(b, 0, 6),
+          svGetBitArrElem(b, 0, 5), svGetBitArrElem3(c, 1, 3, 8),
+          svGetBitArrElem3(c, 2, 3, 8), svGetBitArrElem(c, 2, 4, 7)});
+}
+
+TEST(ScalarElementAccess, ADesignsBitsAreRead) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input bit a [], input bit b [][],\n"
+      "                                   input bit c [][][]);\n"
+      "  bit a [4:2];\n"
+      "  bit b [-1:0][6:5];\n"
+      "  bit c [1:2][4:3][7:8];\n"
+      "  initial begin\n"
+      "    a[4] = 1; a[2] = 1;\n"
+      "    b[-1][5] = 1; b[0][5] = 1;\n"
+      "    c[2][3][8] = 1; c[2][4][7] = 1;\n"
+      "    see(a, b, c);\n"
+      "  end\n",
+      f, {{"see", CAddress(&SeeBits)}}, "annex_h_12_06_bits");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{1, 0, 1, 1, 0, 1, 0, 1, 1}));
+}
+
+void SeeLogics(svOpenArrayHandle a, svOpenArrayHandle b, svOpenArrayHandle c) {
+  SeeInC({svGetLogicArrElem1(a, 2), svGetLogicArrElem1(a, 3),
+          svGetLogicArrElem1(a, 4), svGetLogicArrElem(a, 5),
+          svGetLogicArrElem2(b, -1, 5), svGetLogicArrElem2(b, 0, 6),
+          svGetLogicArrElem(b, 0, 5), svGetLogicArrElem3(c, 1, 3, 8),
+          svGetLogicArrElem3(c, 2, 3, 8), svGetLogicArrElem(c, 2, 4, 7)});
+}
+
+TEST(ScalarElementAccess, ADesignsLogicsAreReadInFourStates) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void see(input logic a [],\n"
+      "      input logic b [][], input logic c [][][]);\n"
+      "  logic a [5:2];\n"
+      "  logic b [-1:0][6:5];\n"
+      "  logic c [1:2][4:3][7:8];\n"
+      "  initial begin\n"
+      "    a[2] = 0; a[3] = 1; a[4] = 1'bz; a[5] = 1'bx;\n"
+      "    b[-1][5] = 1'bz; b[0][6] = 1'b1; b[0][5] = 1'b0;\n"
+      "    c[1][3][8] = 1'b1; c[2][3][8] = 1'bx; c[2][4][7] = 1'bz;\n"
+      "    see(a, b, c);\n"
+      "  end\n",
+      f, {{"see", CAddress(&SeeLogics)}}, "annex_h_12_06_logics");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{sv_0, sv_1, sv_z, sv_x, sv_z,
+                                               sv_1, sv_0, sv_1, sv_x, sv_z}));
+}
+
+void PutLogics(svOpenArrayHandle a, svOpenArrayHandle b, svOpenArrayHandle c) {
+  svPutLogicArrElem1(a, sv_x, 2);
+  svPutLogicArrElem1(a, sv_z, 3);
+  svPutLogicArrElem1(a, sv_1, 4);
+  svPutLogicArrElem(a, sv_0, 5);
+  svPutLogicArrElem2(b, sv_z, -1, 5);
+  svPutLogicArrElem(b, sv_x, 0, 6);
+  svPutLogicArrElem3(c, sv_0, 1, 3, 8);
+  svPutLogicArrElem(c, sv_z, 2, 4, 7);
+}
+
+TEST(ScalarElementAccess, ADesignsLogicsAreWrittenInFourStates) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void put(output logic a [],\n"
+      "      inout logic b [][], inout logic c [][][]);\n"
+      "  logic a [5:2];\n"
+      "  logic b [-1:0][6:5];\n"
+      "  logic c [1:2][4:3][7:8];\n"
+      "  bit ok_a, ok_b, ok_c;\n"
+      "  initial begin\n"
+      "    foreach (b[i, j]) b[i][j] = 1;\n"
+      "    foreach (c[i, j, k]) c[i][j][k] = 1;\n"
+      "    put(a, b, c);\n"
+      "    ok_a = a[2] === 1'bx && a[3] === 1'bz && a[4] === 1 && a[5] === 0;\n"
+      "    ok_b = b[-1][5] === 1'bz && b[0][6] === 1'bx && b[0][5] === 1;\n"
+      "    ok_c = c[1][3][8] === 0 && c[2][4][7] === 1'bz &&\n"
+      "           c[2][3][8] === 1;\n"
+      "  end\n",
+      f, {{"put", CAddress(&PutLogics)}}, "annex_h_12_06_put");
+  EXPECT_EQ(DesignValue(f, "ok_a"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok_b"), 1U);
+  EXPECT_EQ(DesignValue(f, "ok_c"), 1U);
+}
+
+void PutBits(svOpenArrayHandle a, svOpenArrayHandle b) {
+  svPutBitArrElem2(a, sv_1, -1, 5);
+  svPutBitArrElem(a, sv_1, 0, 6);
+  svPutBitArrElem3(b, sv_0, 1, 3, 8);
+  svPutBitArrElem(b, sv_0, 2, 4, 7);
+}
+
+TEST(ScalarElementAccess, ADesignsBitsAreWrittenInTwoAndThreeDimensions) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void put(inout bit a [][],\n"
+      "                                   inout bit b [][][]);\n"
+      "  bit a [-1:0][6:5];\n"
+      "  bit b [1:2][4:3][7:8];\n"
+      "  bit [3:0] seen_a;\n"
+      "  bit [2:0] seen_b;\n"
+      "  initial begin\n"
+      "    foreach (b[i, j, k]) b[i][j][k] = 1;\n"
+      "    put(a, b);\n"
+      "    seen_a = {a[-1][5], a[-1][6], a[0][5], a[0][6]};\n"
+      "    seen_b = {b[1][3][8], b[2][4][7], b[2][4][8]};\n"
+      "  end\n",
+      f, {{"put", CAddress(&PutBits)}}, "annex_h_12_06_put_bits");
+  EXPECT_EQ(DesignValue(f, "seen_a"), 9U);
+  EXPECT_EQ(DesignValue(f, "seen_b"), 1U);
 }
 
 }  // namespace

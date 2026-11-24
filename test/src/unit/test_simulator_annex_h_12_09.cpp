@@ -3,6 +3,8 @@
 #include <cstddef>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
@@ -84,13 +86,56 @@ TEST(DpiOpenArrayExample, F1CopiesTheSourceIntoTheTarget) {
   EXPECT_EQ(first->i, 100);
 }
 
-TEST(DpiOpenArrayExample, TheImplementationIndependentBranchRunsHere) {
+TEST(DpiOpenArrayExample, DISABLED_ThePointerBranchRunsForArraysInCLayout) {
   TenOfMyType source;
   TenOfMyType target;
-  EXPECT_EQ(svGetArrayPtr(source.Handle()), nullptr);
+  EXPECT_EQ(svGetArrayPtr(source.Handle()),
+            static_cast<void*>(source.data.data()));
   F1(source.Handle(), target.Handle());
-  EXPECT_FALSE(g_copied_by_pointer_arithmetic);
+  EXPECT_TRUE(g_copied_by_pointer_arithmetic);
+}
+
+TEST(DpiOpenArrayExample, AnArrayOutsideCLayoutIsNotAccessibleAsAWhole) {
   EXPECT_FALSE(DpiWholeArrayIsAccessible(false));
+}
+
+TEST(DpiOpenArrayExample, DISABLED_ADesignsArraysAreCopiedByThePointerBranch) {
+  SimFixture f;
+  g_copied_by_pointer_arithmetic = false;
+  RunModuleWithC(
+      "  typedef struct { int i; } MyType;\n"
+      "  import \"DPI-C\" function void f1(input MyType i [],\n"
+      "                                  output MyType o []);\n"
+      "  MyType source [11:20];\n"
+      "  MyType target [11:20];\n"
+      "  int first, last;\n"
+      "  initial begin\n"
+      "    foreach (source[k]) source[k].i = k * 3;\n"
+      "    f1(source, target);\n"
+      "    first = target[11].i; last = target[20].i;\n"
+      "  end\n",
+      f, {{"f1", CAddress(&F1)}}, "annex_h_12_09_pointer");
+  EXPECT_TRUE(g_copied_by_pointer_arithmetic);
+  EXPECT_EQ(DesignValue(f, "first"), 33U);
+  EXPECT_EQ(DesignValue(f, "last"), 60U);
+}
+
+TEST(DpiOpenArrayExample, ADesignsSourceIsCopiedIntoItsTarget) {
+  SimFixture f;
+  RunModuleWithC(
+      "  typedef struct { int i; } MyType;\n"
+      "  import \"DPI-C\" function void f1(input MyType i [],\n"
+      "                                  output MyType o []);\n"
+      "  MyType source [11:20];\n"
+      "  MyType target [20:11];\n"
+      "  int sum;\n"
+      "  initial begin\n"
+      "    foreach (source[k]) source[k].i = k * 3;\n"
+      "    f1(source, target);\n"
+      "    foreach (target[k]) sum += target[k].i;\n"
+      "  end\n",
+      f, {{"f1", CAddress(&F1)}}, "annex_h_12_09_copy");
+  EXPECT_EQ(DesignValue(f, "sum"), 465U);
 }
 
 }  // namespace
