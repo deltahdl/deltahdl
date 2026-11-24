@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_directives.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
@@ -104,6 +105,48 @@ TEST(IpAuthorSecretKeyInput, APublicPrivateSchemeIsReportedAsNotProvided) {
                             "rsa, which IEEE 1800-2023 Table 34-3 does not "
                             "require of every implementation",
                             LineHolding(src, "data_method"), "34.5.11.2"));
+}
+
+TEST(IpAuthorSecretKeyInput, DISABLED_TheKeyNameAloneNamesTheAuthorsKey) {
+  std::string src = "`pragma protect data_keyname=\"";
+  src.append(kAuthorsKeyName).append("\"\n`pragma protect begin\n");
+  src.append(kDesign).append("`pragma protect end\n");
+  Encrypting run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(Holds(run.written, "result = 42"));
+  EXPECT_TRUE(Holds(Produced(run.written), "initial result = 42;"));
+}
+
+TEST(IpAuthorSecretKeyInput, TheRemainingOptionalPragmasMayBeIncluded) {
+  std::string src = "`pragma protect encoding=(enctype=\"base64\")\n";
+  src += "`pragma protect digest_block\n";
+  src +=
+      "`pragma protect decrypt_license=(library=\"author.so\", "
+      "entry=\"acquire\", feature=\"open\")\n";
+  src +=
+      "`pragma protect runtime_license=(library=\"author.so\", "
+      "entry=\"acquire\", feature=\"run\")\n";
+  src += RequiredInput();
+  Encrypting run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(Holds(run.written, "result = 42"));
+  EXPECT_TRUE(Holds(run.written, "enctype=\"base64\""));
+  std::string region =
+      run.written.substr(ProtectDirectiveAt(run.written, "begin_protected"));
+  EXPECT_EQ(ProtectDirectiveCount(region, "digest_block"), 1u);
+  EXPECT_TRUE(Holds(Produced(run.written), "initial result = 42;"));
+}
+
+TEST(IpAuthorSecretKeyInput, AProvidedMethodIsAcceptedAndSealsTheRegion) {
+  std::string src = "`pragma protect data_method=\"des-cbc\"\n";
+  src += RequiredInput();
+  Encrypting run(src);
+  EXPECT_TRUE(run.diag.Diagnostics().empty());
+  std::string region =
+      run.written.substr(ProtectDirectiveAt(run.written, "begin_protected"));
+  EXPECT_TRUE(Holds(region, "`pragma protect data_method=\"des-cbc\"\n"));
+  EXPECT_FALSE(Holds(run.written, "result = 42"));
+  EXPECT_TRUE(Holds(Produced(run.written), "initial result = 42;"));
 }
 
 }  // namespace

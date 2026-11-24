@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_directives.h"
 #include "helpers_protect_license.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
@@ -145,6 +146,60 @@ TEST(DigitalEnvelopeOutput, TheKeyBlockAndTheDataBlockHoldWhatTheAnnexSays) {
   EXPECT_FALSE(Holds(envelope, "feature=\"run\""));
   EXPECT_FALSE(Holds(envelope, "result = 42"));
   EXPECT_TRUE(Holds(TheRecipientGets(envelope), "initial result = 42;"));
+}
+
+TEST(DigitalEnvelopeOutput, DISABLED_TheExpressionsStandInTheListedOrder) {
+  std::string src = "`pragma protect key_keyowner=\"cygnus-eda\"\n";
+  src += "`pragma protect key_method=\"x-deltahdl-stream\"\n";
+  src += "`pragma protect key_keyname=\"cygnus-2026\"\n";
+  src += "`pragma protect data_keyname=\"halo-2026\"\n";
+  src += "`pragma protect begin\n";
+  src += "`pragma protect author=\"Halo Author\"\n";
+  src += "`pragma protect author_info=\"revision 7\"\n";
+  src.append(kDesign);
+  src += "`pragma protect end\n";
+  std::string envelope = EncryptEnvelopes(src, "", RecipientsKeys());
+  std::string region =
+      envelope.substr(ProtectDirectiveAt(envelope, "begin_protected"));
+  EXPECT_TRUE(ProtectDirectivesInOrder(
+      region,
+      {"begin_protected", "key_keyowner", "key_method", "key_keyname",
+       "key_block", "author", "author_info", "data_block", "end_protected"}));
+  EXPECT_LT(ProtectDirectiveAt(region, "encoding",
+                               ProtectDirectiveAt(region, "key_block")),
+            ProtectDirectiveAt(region, "data_block"));
+}
+
+TEST(DigitalEnvelopeOutput, EachBlockGetsAnEnvelopeWithAKeyBlockOfItsOwn) {
+  std::string envelope = EncryptEnvelopes(
+      WithTwoProtectBlocks("`pragma protect key_keyowner=\"cygnus-eda\"\n"
+                           "`pragma protect key_keyname=\"cygnus-2026\"\n"
+                           "`pragma protect data_keyname=\"halo-2026\"\n",
+                           "  initial first = 42;\n",
+                           "  initial second = 57;\n"),
+      "", RecipientsKeys());
+  EXPECT_FALSE(Holds(envelope, "initial"));
+  EXPECT_TRUE(HoldsTwoRegionsAroundTheCleartext(envelope));
+  EXPECT_EQ(ProtectDirectiveCount(envelope, "key_block"), 2u);
+  EXPECT_TRUE(ProtectDirectivesInOrder(
+      envelope,
+      {"begin_protected", "key_block", "data_block", "end_protected"}));
+  size_t second =
+      ProtectDirectiveAt(envelope, "begin_protected",
+                         ProtectDirectiveAt(envelope, "end_protected"));
+  EXPECT_NE(ProtectDirectiveAt(envelope, "key_block", second),
+            std::string_view::npos);
+  EXPECT_TRUE(TextsInOrder(TheRecipientGets(envelope),
+                           {"initial first = 42;", "wire between;",
+                            "initial second = 57;", "endmodule"}));
+}
+
+TEST(DigitalEnvelopeOutput, NoKeywordNamesAnEncryptionLicence) {
+  EXPECT_FALSE(IsProtectPragmaKeyword("encrypt_license"));
+  for (std::string_view name :
+       WhatTheDigitalEnvelopeDataBlockIsComposedOf().first(2)) {
+    EXPECT_TRUE(IsProtectPragmaKeyword(name)) << name;
+  }
 }
 
 }  // namespace

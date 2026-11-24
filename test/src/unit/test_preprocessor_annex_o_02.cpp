@@ -74,4 +74,19 @@ TEST(EncryptionFlowOverview, InformationInTheBlockIsProtectedOnceEncrypted) {
                                       "not-the-authors-key", &cleartext));
 }
 
+TEST(EncryptionFlowOverview, AModifiedBlockIsNotRecovered) {
+  std::string written = EncryptEnvelopes(
+      "`pragma protect begin\n"
+      "  initial result = 42;\n"
+      "`pragma protect end\n",
+      kExchangeKey);
+  std::string block = TheRecordedBlock(written);
+  ASSERT_FALSE(block.empty());
+  std::string cleartext;
+  EXPECT_TRUE(DecryptProtectedRegion(block, kExchangeKey, &cleartext));
+  char& touched = block[block.size() / 2];
+  touched = touched == 'A' ? 'B' : 'A';
+  EXPECT_FALSE(DecryptProtectedRegion(block, kExchangeKey, &cleartext));
+}
+
 }  // namespace

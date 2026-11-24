@@ -5,6 +5,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_processing.h"
@@ -57,6 +58,29 @@ TEST(ToolVendorSecretKeySystem,
       "`pragma protect end\n",
       kVendorKey);
   EXPECT_FALSE(Holds(Produced(envelope, ""), "result = 42"));
+}
+
+TEST(ToolVendorSecretKeySystem, ABlockAroundAWholeModuleIsSealedAndRecovered) {
+  std::string envelope = EncryptEnvelopes(
+      "`pragma protect begin\n"
+      "module sealed_whole;\n"
+      "endmodule\n"
+      "`pragma protect end\n",
+      kVendorKey);
+  EXPECT_FALSE(Holds(envelope, "sealed_whole"));
+  EXPECT_TRUE(Holds(Produced(envelope, kVendorKey),
+                    "module sealed_whole;\nendmodule\n"));
+  SourceManager mgr;
+  DiagEngine diag{mgr};
+  PreprocConfig config;
+  config.protect_key = kOtherKey;
+  Preprocessor pp(mgr, diag, config);
+  std::string refused = pp.Preprocess(mgr.AddFile("<test>", envelope));
+  EXPECT_FALSE(Holds(refused, "sealed_whole"));
+  EXPECT_TRUE(ReportedError(
+      diag.Diagnostics(),
+      "protect pragma data block cannot be decrypted with the key supplied",
+      LineHolding(envelope, "data_block") + 1, "34.3.2"));
 }
 
 }  // namespace

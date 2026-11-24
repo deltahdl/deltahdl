@@ -4,6 +4,7 @@
 #include <string>
 #include <string_view>
 
+#include "helpers_protect_directives.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -102,6 +103,81 @@ TEST(ToolVendorSecretKeyOutput,
   std::string composed(kDecryptLicense);
   composed.append(kRuntimeLicense).append(kDesign);
   EXPECT_EQ(cleartext, composed);
+}
+
+std::string Sealed(std::string_view names, std::string_view inside) {
+  std::string src = "module m;\n";
+  src.append(names).append("`pragma protect begin\n").append(inside);
+  src.append("`pragma protect end\nendmodule\n");
+  return EncryptEnvelopes(src, kVendorKey);
+}
+
+TEST(ToolVendorSecretKeyOutput, TheCleartextKeepsItsPlaceAroundEachRegion) {
+  std::string written = EncryptEnvelopes(
+      WithTwoProtectBlocks("`pragma protect data_keyname=\"vendor-2026\"\n",
+                           kDesign, "  initial other = 57;\n"),
+      kVendorKey);
+  EXPECT_FALSE(Holds(written, "initial"));
+  EXPECT_TRUE(HoldsTwoRegionsAroundTheCleartext(written));
+}
+
+TEST(ToolVendorSecretKeyOutput, ARegionOfAnUnnamedAuthorNamesNone) {
+  std::string written =
+      Sealed("`pragma protect data_keyname=\"vendor-2026\"\n", kDesign);
+  EXPECT_EQ(ProtectDirectiveCount(written, "author"), 0u);
+  EXPECT_EQ(ProtectDirectiveCount(written, "author_info"), 0u);
+  EXPECT_EQ(ProtectDirectiveCount(written, "data_block"), 1u);
+}
+
+TEST(ToolVendorSecretKeyOutput, ARegionOfAnUnnamedKeyOwnerNamesNone) {
+  std::string written =
+      Sealed("`pragma protect data_keyname=\"vendor-2026\"\n", kDesign);
+  EXPECT_EQ(ProtectDirectiveCount(written, "data_keyowner"), 0u);
+  std::string region =
+      written.substr(ProtectDirectiveAt(written, "begin_protected"));
+  EXPECT_TRUE(Holds(region, "`pragma protect data_keyname=\"vendor-2026\"\n"));
+}
+
+TEST(ToolVendorSecretKeyOutput, ADigestIsWrittenOnlyWhereOneWasAskedFor) {
+  std::string without =
+      Sealed("`pragma protect data_keyname=\"vendor-2026\"\n", kDesign);
+  EXPECT_EQ(ProtectDirectiveCount(without, "digest_block"), 0u);
+  std::string region = EncryptEnvelopes(TheInput(), kVendorKey);
+  region = region.substr(ProtectDirectiveAt(region, "begin_protected"));
+  EXPECT_EQ(ProtectDirectiveCount(region, "digest_block"), 1u);
+  EXPECT_TRUE(ProtectDirectivesInOrder(region, {"data_block", "digest_block"}));
+}
+
+TEST(ToolVendorSecretKeyOutput, DISABLED_TheExpressionsStandInTheListedOrder) {
+  std::string written = Sealed(
+      "`pragma protect data_keyowner=\"acme-eda\"\n"
+      "`pragma protect data_keyname=\"vendor-2026\"\n",
+      "`pragma protect author=\"Acme Author\"\n"
+      "`pragma protect author_info=\"revision 3\"\n"
+      "  initial result = 42;\n");
+  std::string region =
+      written.substr(ProtectDirectiveAt(written, "begin_protected"));
+  EXPECT_TRUE(ProtectDirectivesInOrder(
+      region,
+      {"begin_protected", "data_keyowner", "data_keyname", "data_method",
+       "encoding", "author", "author_info", "data_block", "end_protected"}));
+}
+
+TEST(ToolVendorSecretKeyOutput, WithoutLicencesTheDataAreTheTextAlone) {
+  std::string written =
+      Sealed("`pragma protect data_keyname=\"vendor-2026\"\n", kDesign);
+  std::string cleartext;
+  ASSERT_TRUE(DecryptProtectedRegion(LineBeneath(written, "data_block"),
+                                     kVendorKey, &cleartext));
+  EXPECT_EQ(cleartext, kDesign);
+}
+
+TEST(ToolVendorSecretKeyOutput, TheDataEndWithTheTextBetweenBeginAndEnd) {
+  auto composition = WhatTheToolVendorSecretKeyDataBlockIsComposedOf();
+  ASSERT_EQ(composition.size(), 3u);
+  EXPECT_TRUE(Holds(composition[2], "text"));
+  EXPECT_TRUE(Holds(composition[2], "between begin and end"));
+  EXPECT_FALSE(IsProtectPragmaKeyword("encrypt_license"));
 }
 
 }  // namespace

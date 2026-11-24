@@ -5,8 +5,10 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_directives.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
+#include "preprocessor/protect_encoding.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_keywords.h"
 #include "preprocessor/protect_processing.h"
@@ -137,6 +139,91 @@ TEST(DigitalEnvelopeInput, TheOptionalPragmasMayBeIncluded) {
   EXPECT_TRUE(Holds(run.envelope, "author=\"Core Author\""));
   EXPECT_FALSE(Holds(run.envelope, "result = 42"));
   EXPECT_TRUE(Opens(run.envelope, RecipientsKeys()));
+}
+
+std::string SealedKeyBlock(const std::string& envelope,
+                           std::string_view enctype) {
+  std::string buffer;
+  EXPECT_TRUE(DecryptProtectedRegion(ProtectBlockBeneath(envelope, "key_block"),
+                                     kRecipientsKey, &buffer, enctype))
+      << envelope;
+  return buffer;
+}
+
+std::string RecoveredData(const std::string& envelope,
+                          const std::string& buffer, std::string_view enctype,
+                          std::string_view method) {
+  std::string key;
+  std::string_view stated =
+      Holds(buffer, "(enctype=\"x-deltahdl-block\"") ? kBlockEnctype : enctype;
+  EXPECT_TRUE(DecodeProtectBlock(
+      ProtectBlockBeneath(buffer, "data_decrypt_key"), stated, &key))
+      << buffer;
+  std::string cleartext;
+  EXPECT_TRUE(
+      DecryptProtectedRegion(ProtectBlockBeneath(envelope, "data_block"), key,
+                             &cleartext, enctype, method))
+      << buffer;
+  return cleartext;
+}
+
+TEST(DigitalEnvelopeInput, TheDataMethodIsTheKeyBlocksAndTheDatas) {
+  std::string src = Pragma("data_method", "des-cbc");
+  src += ExpectedInput("x-deltahdl-stream");
+  Sending run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  std::string buffer = SealedKeyBlock(run.envelope, kBlockEnctype);
+  EXPECT_TRUE(Holds(buffer, Pragma("data_method", "des-cbc"))) << buffer;
+  EXPECT_EQ(RecoveredData(run.envelope, buffer, kBlockEnctype, "des-cbc"),
+            kDesign);
+  EXPECT_TRUE(Opens(run.envelope, RecipientsKeys()));
+
+  Sending defaulted(ExpectedInput("x-deltahdl-stream"));
+  EXPECT_FALSE(Holds(SealedKeyBlock(defaulted.envelope, kBlockEnctype),
+                     Pragma("data_method", "des-cbc")));
+}
+
+void ExpectsBlocksWrittenIn(std::string_view enctype) {
+  std::string src = "`pragma protect encoding=(enctype=\"";
+  src.append(enctype).append("\")\n");
+  src += ExpectedInput("x-deltahdl-stream");
+  Sending run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  std::string stated = "`pragma protect encoding=(enctype=\"";
+  stated.append(enctype).append("\", bytes=");
+  EXPECT_TRUE(TextsInOrder(run.envelope, {stated, "protect key_block\n", stated,
+                                          "protect data_block\n"}));
+  std::string buffer = SealedKeyBlock(run.envelope, enctype);
+  EXPECT_EQ(RecoveredData(run.envelope, buffer, enctype, "x-deltahdl-stream"),
+            kDesign);
+  EXPECT_TRUE(Opens(run.envelope, RecipientsKeys()));
+}
+
+TEST(DigitalEnvelopeInput, TheEncodingIsTheKeyBlocksAndTheDataBlocks) {
+  ExpectsBlocksWrittenIn("uuencode");
+  ExpectsBlocksWrittenIn("base64");
+  ExpectsBlocksWrittenIn("quoted-printable");
+}
+
+TEST(DigitalEnvelopeInput, TheLicencesTravelInTheDataBlock) {
+  std::string licences =
+      "`pragma protect decrypt_license=(library=\"envelope.so\", "
+      "entry=\"acquire\", feature=\"open\")\n"
+      "`pragma protect runtime_license=(library=\"envelope.so\", "
+      "entry=\"acquire\", feature=\"run\")\n";
+  std::string src = Pragma("key_keyowner", kRecipient);
+  src += Pragma("key_keyname", kRecipientsKeyName);
+  src += Pragma("data_keyname", kProvidersKeyName);
+  src += "`pragma protect begin\n";
+  src.append(licences).append(kDesign);
+  src += "`pragma protect end\n";
+  Sending run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(Holds(run.envelope, "envelope.so"));
+  std::string buffer = SealedKeyBlock(run.envelope, kBlockEnctype);
+  EXPECT_EQ(
+      RecoveredData(run.envelope, buffer, kBlockEnctype, "x-deltahdl-stream"),
+      licences.append(kDesign));
 }
 
 }  // namespace

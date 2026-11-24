@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_directives.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
 #include "preprocessor/protect_keywords.h"
@@ -104,6 +105,59 @@ TEST(ToolVendorSecretKeyInput, TheOptionalPragmasMayBeIncluded) {
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_FALSE(Holds(run.written, "result = 42"));
   EXPECT_TRUE(Holds(Recovered(run.written), kDesign));
+}
+
+TEST(ToolVendorSecretKeyInput, SeveralRegionsMayFollowOneKeyName) {
+  Encrypting run(WithTwoProtectBlocks(
+      "`pragma protect data_keyname=\"vendor-2026\"\n",
+      "  initial first = 42;\n", "  initial second = 57;\n"));
+  EXPECT_FALSE(run.diag.HasErrors());
+  EXPECT_FALSE(Holds(run.written, "first"));
+  EXPECT_FALSE(Holds(run.written, "second"));
+  EXPECT_TRUE(HoldsTwoRegionsAroundTheCleartext(run.written));
+  EXPECT_TRUE(TextsInOrder(Recovered(run.written),
+                           {"module m;", "initial first = 42;", "wire between;",
+                            "initial second = 57;", "endmodule"}));
+}
+
+std::string SealedAs(std::string_view method, std::string_view enctype) {
+  std::string src = "`pragma protect data_keyname=\"vendor-2026\"\n";
+  src.append("`pragma protect data_method=\"").append(method).append("\"\n");
+  src.append("`pragma protect encoding=(enctype=\"").append(enctype);
+  src.append("\")\n`pragma protect begin\n").append(kDesign);
+  src.append("`pragma protect end\n");
+  Encrypting run(src);
+  EXPECT_FALSE(run.diag.HasErrors());
+  return run.written;
+}
+
+void ExpectsSealedAs(std::string_view method, std::string_view enctype) {
+  std::string written = SealedAs(method, enctype);
+  std::string region =
+      written.substr(ProtectDirectiveAt(written, "begin_protected"));
+  std::string recorded = "data_method=\"";
+  recorded.append(method).append("\"\n");
+  EXPECT_TRUE(Holds(region, recorded)) << region;
+  EXPECT_EQ(ProtectDirectiveCount(region, "data_method"), 1u);
+  std::string_view ahead = std::string_view(region).substr(
+      0, ProtectDirectiveAt(region, "data_block"));
+  std::string_view encoding =
+      ahead.substr(ahead.rfind("`pragma protect encoding="));
+  std::string chosen = "(enctype=\"";
+  chosen.append(enctype).append("\"");
+  EXPECT_TRUE(Holds(encoding, chosen)) << encoding;
+  std::string cleartext;
+  EXPECT_TRUE(DecryptProtectedRegion(ProtectBlockBeneath(region, "data_block"),
+                                     kVendorKey, &cleartext, enctype, method))
+      << region;
+  EXPECT_EQ(cleartext, kDesign);
+}
+
+TEST(ToolVendorSecretKeyInput, TheChosenMethodAndEncodingAreTheRegions) {
+  ExpectsSealedAs("des-cbc", "uuencode");
+  ExpectsSealedAs("des-cbc", "base64");
+  ExpectsSealedAs("des-cbc", "quoted-printable");
+  ExpectsSealedAs("x-deltahdl-stream", "uuencode");
 }
 
 }  // namespace

@@ -6,6 +6,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "helpers_protect_directives.h"
 #include "helpers_protect_license.h"
 #include "preprocessor/preprocessor.h"
 #include "preprocessor/protect_flow.h"
@@ -115,6 +116,46 @@ TEST(IpAuthorSecretKeyOutput,
   EXPECT_EQ(Count(Recovered(written), "  initial result = 42;\n"), 1u);
   EXPECT_FALSE(ToolProvidesAPublicPrivateEncryptionScheme());
   EXPECT_EQ(Count(written, "data_method=\"rsa\""), 0u);
+}
+
+constexpr std::string_view kAuthorsNames =
+    "`pragma protect data_keyowner=\"acme-ip\"\n"
+    "`pragma protect data_keyname=\"acme-2026\"\n";
+
+TEST(IpAuthorSecretKeyOutput, ARegionOfAnUnnamedAuthorNamesNone) {
+  std::string src(kAuthorsNames);
+  src += "`pragma protect begin\n  initial result = 42;\n";
+  src += "`pragma protect end\n";
+  std::string written = EncryptEnvelopes(src, "", TheAuthorsKeyInTheDatabase());
+  EXPECT_EQ(ProtectDirectiveCount(written, "data_block"), 1u);
+  EXPECT_EQ(ProtectDirectiveCount(written, "author"), 0u);
+  EXPECT_EQ(ProtectDirectiveCount(written, "author_info"), 0u);
+}
+
+TEST(IpAuthorSecretKeyOutput, TheDigestAndTheDataStandBeneathTheirKeywords) {
+  std::string written = TheOutput();
+  std::string region =
+      written.substr(ProtectDirectiveAt(written, "begin_protected"));
+  std::string cleartext;
+  EXPECT_TRUE(DecryptProtectedRegion(ProtectBlockBeneath(region, "data_block"),
+                                     kAuthorsKey, &cleartext));
+  EXPECT_EQ(cleartext, kInsideTheBlock);
+  std::string digest = ProtectBlockBeneath(region, "digest_block");
+  EXPECT_FALSE(digest.empty());
+  EXPECT_EQ(Count(digest, "`pragma"), 0u);
+  EXPECT_NE(digest, ProtectBlockBeneath(region, "data_block"));
+}
+
+TEST(IpAuthorSecretKeyOutput, EachBlockGetsARegionAroundTheCleartext) {
+  std::string written = EncryptEnvelopes(
+      WithTwoProtectBlocks(kAuthorsNames, "  initial first = 42;\n",
+                           "  initial second = 57;\n"),
+      "", TheAuthorsKeyInTheDatabase());
+  EXPECT_EQ(Count(written, "initial"), 0u);
+  EXPECT_TRUE(HoldsTwoRegionsAroundTheCleartext(written));
+  EXPECT_TRUE(
+      TextsInOrder(Recovered(written), {"initial first = 42;", "wire between;",
+                                        "initial second = 57;", "endmodule"}));
 }
 
 }  // namespace
