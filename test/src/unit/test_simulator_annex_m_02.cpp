@@ -1,11 +1,18 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <filesystem>
 #include <iterator>
+#include <string>
 #include <type_traits>
 
+#include "helpers_c_compiler.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_user.h"
+
+extern "C" vpiHandle vpi_register_assertion_cb(
+    vpiHandle assertion, PLI_INT32 reason, vpi_assertion_callback_func* cb_rtn,
+    PLI_BYTE8* user_data);
 
 namespace {
 
@@ -499,6 +506,77 @@ TEST(SvVpiUserHeader, TheCallbackTypeAndTheRegistrationRoutineAreAsDeclared) {
                                vpi_assertion_callback_func*, PLI_BYTE8*)>);
   vpi_assertion_callback_func* routine = nullptr;
   EXPECT_EQ(routine, nullptr);
+}
+
+TEST(SvVpiUserHeader, TheStepStructureHasItsTagAndMemberOrder) {
+  static_assert(std::is_same_v<struct t_vpi_assertion_step_info,
+                               s_vpi_assertion_step_info>);
+  EXPECT_EQ(offsetof(s_vpi_assertion_step_info, matched_expression_count), 0u);
+  EXPECT_LT(offsetof(s_vpi_assertion_step_info, matched_expression_count),
+            offsetof(s_vpi_assertion_step_info, matched_exprs));
+  EXPECT_LT(offsetof(s_vpi_assertion_step_info, matched_exprs),
+            offsetof(s_vpi_assertion_step_info, stateFrom));
+  EXPECT_LT(offsetof(s_vpi_assertion_step_info, stateFrom),
+            offsetof(s_vpi_assertion_step_info, stateTo));
+}
+
+TEST(SvVpiUserHeader, TheAttemptStructureHasItsTagUnionAndMemberOrder) {
+  static_assert(std::is_same_v<struct t_vpi_attempt_info, s_vpi_attempt_info>);
+  static_assert(std::is_union_v<decltype(s_vpi_attempt_info::detail)>);
+  EXPECT_EQ(offsetof(s_vpi_attempt_info, detail), 0u);
+  EXPECT_EQ(offsetof(s_vpi_attempt_info, detail.failExpr), 0u);
+  EXPECT_EQ(offsetof(s_vpi_attempt_info, detail.step), 0u);
+  EXPECT_LT(offsetof(s_vpi_attempt_info, detail),
+            offsetof(s_vpi_attempt_info, attemptStartTime));
+}
+
+TEST(SvVpiUserHeader, TheAssertionRoutineHasCLinkageInCxx) {
+  EXPECT_NE(reinterpret_cast<void*>(&vpi_register_assertion_cb), nullptr);
+}
+
+TEST(SvVpiUserHeader, ACSourceMayIncludeTheFileTwice) {
+  CompilerResult run = CompileAsC(
+      "#include <stdint.h>\n#include \"simulator/sv_vpi_user.h\"\n"
+      "#include \"simulator/sv_vpi_user.h\"\nint unit;\n");
+  EXPECT_TRUE(run.succeeded) << run.output;
+}
+
+TEST(SvVpiUserHeader, ACObjectLinksToTheRoutineDefinedInCxx) {
+  const std::filesystem::path kDir =
+      std::filesystem::path(::testing::TempDir()) / "assertion_cb_link";
+  std::filesystem::create_directories(kDir);
+  const std::string kObject = (kDir / "caller.o").string();
+  const std::string kProgram = (kDir / "program").string();
+  CompilerResult c_object = CompileSource(R"(#include <stdint.h>
+#include "simulator/sv_vpi_user.h"
+static PLI_INT32 on_event(PLI_INT32 reason, p_vpi_time cb_time,
+                          vpiHandle assertion, p_vpi_attempt_info info,
+                          PLI_BYTE8* user_data) {
+  return 0;
+}
+int registered(void) {
+  return vpi_register_assertion_cb(0, cbAssertionStart, on_event, 0) == 0;
+}
+)",
+                                          {"-x", "c", "-c", "-o", kObject});
+  EXPECT_TRUE(c_object.succeeded) << c_object.output;
+  CompilerResult program =
+      CompileSource(R"(#include <stdint.h>
+#include "simulator/sv_vpi_user.h"
+vpiHandle vpi_register_assertion_cb(vpiHandle, PLI_INT32 reason,
+                                    vpi_assertion_callback_func* cb_rtn,
+                                    PLI_BYTE8*) {
+  static PLI_UINT32 given = 0;
+  return reason == cbAssertionStart && cb_rtn ? &given : 0;
+}
+extern "C" int registered(void);
+int main() { return registered(); }
+)",
+                    {kObject, "-x", "c++", "-o", kProgram});
+  EXPECT_TRUE(program.succeeded) << program.output;
+  EXPECT_TRUE(
+      SpawnedCommandSucceeds({kProgram}, (kDir / "program.log").string()));
+  std::filesystem::remove_all(kDir);
 }
 
 TEST(SvVpiUserHeader, TheFileIncludesTheBaseFileUnderTheAnnexsGuard) {
