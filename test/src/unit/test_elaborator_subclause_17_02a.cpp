@@ -263,6 +263,23 @@ TEST(CheckerDeclaration, AnEnclosingForkBlocksElementIsReported) {
       ReportedError(f.diag.Diagnostics(), "fork-join block", 11, "17.2"));
 }
 
+TEST(CheckerDeclaration, DISABLED_AnEnclosingNamedBlocksElementIsAccepted) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m;\n"
+      "  logic clk;\n"
+      "  initial begin : b\n"
+      "    static int w = 1;\n"
+      "  end\n"
+      "  checker c;\n"
+      "    a2: assert property (@(posedge clk) b.w == 1);\n"
+      "  endchecker\n"
+      "  c u();\n"
+      "endmodule\n",
+      f, "m");
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(CheckerDeclaration, ATypedefIndexAndAPackageClassAreDynamic) {
   ElabFixture f;
   ElaborateSrc(

@@ -485,4 +485,47 @@ TEST(FlattenedSequence, ALegalSubstitutionIsAcceptedInEachUse) {
   }
 }
 
+std::string DefaultedBy(const std::string& kind, const std::string& formals,
+                        const std::string& body) {
+  return "module m;\n"
+         "  logic clk, b, v;\n"
+         "  " +
+         kind + " s(" + formals + ");\n    " + body + ";\n  end" + kind +
+         "\n"
+         "  cover property (@(posedge clk) s(b));\n"
+         "endmodule\n";
+}
+
+void ExpectDefaultUnresolved(const std::string& formals,
+                             const std::string& body, const std::string& name) {
+  for (const char* kind : {"sequence", "property"}) {
+    std::string src = DefaultedBy(kind, formals, body);
+    SCOPED_TRACE(src);
+    EXPECT_TRUE(ReportedError(
+        DiagnoseSource(src),
+        "reference to unresolved identifier '" + name + "'", 3, "23.9"));
+  }
+}
+
+TEST(DefaultActualNames, DISABLED_AnUndeclaredNameIsUnresolved) {
+  ExpectDefaultUnresolved("c, x = zz", "c ##1 x", "zz");
+}
+
+TEST(DefaultActualNames, DISABLED_AnotherFormalIsUnresolved) {
+  ExpectDefaultUnresolved("x, y = x", "x ##1 y", "x");
+}
+
+TEST(DefaultActualNames, DISABLED_AnotherFormalOfALocalFormalIsUnresolved) {
+  ExpectDefaultUnresolved("c, local input logic d = c", "c ##1 d", "c");
+}
+
+TEST(DefaultActualNames, AModuleVariableIsAccepted) {
+  for (const char* kind : {"sequence", "property"}) {
+    std::string src =
+        DefaultedBy(kind, "x, y = b, local input logic d = v", "x ##1 y ##1 d");
+    SCOPED_TRACE(src);
+    EXPECT_EQ(ErrorsOf(DiagnoseSource(src)), "");
+  }
+}
+
 }  // namespace
