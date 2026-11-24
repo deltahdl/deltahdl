@@ -1,0 +1,3 @@
+#!SV_LIBRARIES
+ foreign_library_loaded_once
+ ./foreign_library_loaded_once

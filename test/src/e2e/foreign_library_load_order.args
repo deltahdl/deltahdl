@@ -1,0 +1,8 @@
+-sv_lib
+missing_e
+-sv_liblist
+test/src/e2e/foreign_library_load_order_first.bootstrap
+-sv_lib
+missing_a
+-sv_liblist
+test/src/e2e/foreign_library_load_order_second.bootstrap

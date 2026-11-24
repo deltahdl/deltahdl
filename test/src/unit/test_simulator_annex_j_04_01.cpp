@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 #include "simulator/foreign_code.h"
 
@@ -71,6 +72,45 @@ TEST(ForeignCodeBootstrapFile, AnEntryIsKeptAsThePathNameWithoutExtension) {
   ForeignCodeLocator locator;
   locator.SetRoot("/home/user");
   EXPECT_EQ(locator.Resolve(kFile.libraries[1]), "/home/user/rel/lib");
+}
+
+TEST(ForeignCodeBootstrapFile, BlanksMaySurroundTheHeaderOnTheFirstLine) {
+  for (const char* text :
+       {"  #!SV_LIBRARIES\n lib1\n", "#!SV_LIBRARIES  \n lib1\n",
+        "\t#!SV_LIBRARIES\t\n lib1\n"}) {
+    const ForeignCodeBootstrap kFile = ParseForeignCodeBootstrap(text);
+    EXPECT_TRUE(kFile.Ok()) << kFile.error;
+    EXPECT_EQ(kFile.libraries, std::vector<std::string>{"lib1"}) << text;
+  }
+}
+
+TEST(ForeignCodeBootstrapFile, AHeaderOtherThanTheStringIsRefused) {
+  const std::string kMissing =
+      "line 1: the first line of a bootstrap file contains #!SV_LIBRARIES";
+  for (const char* text :
+       {"#! SV_LIBRARIES\n lib1\n", "#!sv_libraries\n lib1\n",
+        "\n#!SV_LIBRARIES\n lib1\n", "# note\n#!SV_LIBRARIES\n lib1\n"}) {
+    EXPECT_EQ(ParseForeignCodeBootstrap(text).error, kMissing) << text;
+  }
+}
+
+TEST(ForeignCodeBootstrapFile, ACommentSharesNoLineWithAnEntry) {
+  EXPECT_EQ(ParseForeignCodeBootstrap("#!SV_LIBRARIES\n a # c\n").error,
+            "line 2: a line holds exactly one library entry, and this holds "
+            "more");
+  const ForeignCodeBootstrap kOwnLine =
+      ParseForeignCodeBootstrap("#!SV_LIBRARIES\n a\n # c\n");
+  ASSERT_TRUE(kOwnLine.Ok()) << kOwnLine.error;
+  EXPECT_EQ(kOwnLine.libraries, std::vector<std::string>{"a"});
+}
+
+TEST(ForeignCodeBootstrapFile, AnEmptyLineIsNoEntry) {
+  EXPECT_EQ(ParseForeignCodeBootstrap("#!SV_LIBRARIES\n lib1\n\n lib2\n").error,
+            "line 3: a library entry has to be indented by one or more blanks");
+  const ForeignCodeBootstrap kWithout =
+      ParseForeignCodeBootstrap("#!SV_LIBRARIES\n lib1\n lib2\n");
+  EXPECT_TRUE(kWithout.Ok()) << kWithout.error;
+  EXPECT_EQ(kWithout.libraries.size(), 2u);
 }
 
 }  // namespace

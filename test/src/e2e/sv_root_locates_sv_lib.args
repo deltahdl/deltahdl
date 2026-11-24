@@ -1,0 +1,4 @@
+-sv_root
+vendor/models
+-sv_lib
+../../sv_root_locates_sv_lib

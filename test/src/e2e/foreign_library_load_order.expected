@@ -1,0 +1,5 @@
+<unknown location>: error: object code file 'missing_d', named by a bootstrap entry, is not there with the platform's shared library extension appended (§J.4)
+<unknown location>: error: object code file 'missing_b', named by a bootstrap entry, is not there with the platform's shared library extension appended (§J.4)
+<unknown location>: error: object code file 'missing_c', named by a bootstrap entry, is not there with the platform's shared library extension appended (§J.4)
+<unknown location>: error: object code file 'missing_e', named by -sv_lib, is not there with the platform's shared library extension appended (§J.4)
+<unknown location>: error: object code file 'missing_a', named by -sv_lib, is not there with the platform's shared library extension appended (§J.4)

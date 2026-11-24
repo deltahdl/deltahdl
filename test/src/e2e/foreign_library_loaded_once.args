@@ -1,0 +1,6 @@
+-sv_lib
+foreign_library_loaded_once
+-sv_liblist
+first.bootstrap
+-sv_liblist
+second.bootstrap
