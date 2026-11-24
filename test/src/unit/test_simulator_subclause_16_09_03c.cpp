@@ -454,4 +454,52 @@ TEST(SampledInADisableConditionRun, DISABLED_AnInterfaceAProgramAndAChecker) {
   }
 }
 
+struct SampledCount {
+  const char* call;
+  int count;
+};
+
+const SampledCount kSampledCounts[] = {{"$rose(r)", 1},
+                                       {"$fell(r)", 1},
+                                       {"$past(r)", 4},
+                                       {"$stable(r)", 8},
+                                       {"$changed(r)", 2}};
+
+std::string SampledDeclarationSource(const std::string& kind,
+                                     const std::string& formals,
+                                     const std::string& actuals,
+                                     const std::string& call) {
+  std::string guard = formals.empty() ? "" : " && h";
+  return "module t;\n  logic clk = 0;\n  bit r;\n  int n = 0;\n"
+         "  initial repeat (20) #5 clk = ~clk;\n"
+         "  initial begin #10 r = 1; #40 r = 0; end\n  " +
+         kind + " s" + formals + "; " + call + guard + "; end" + kind +
+         "\n  cover property (@(posedge clk) s" + actuals +
+         ") n++;\n  initial #98 $display(\"n=%0d\", n);\nendmodule\n";
+}
+
+void ExpectSampledInADeclaration(const std::string& kind,
+                                 const std::string& formals,
+                                 const std::string& actuals) {
+  for (const SampledCount& sampled : kSampledCounts) {
+    SimFixture f;
+    std::string src =
+        SampledDeclarationSource(kind, formals, actuals, sampled.call);
+    std::string line = "n=" + std::to_string(sampled.count) + "\n";
+    EXPECT_NE(RunCapture(src, f).find(line), std::string::npos) << src;
+  }
+}
+
+TEST(SampledInAClocklessDeclarationRun, ASequenceWithAFormal) {
+  ExpectSampledInADeclaration("sequence", "(h)", "(1'b1)");
+}
+
+TEST(SampledInAClocklessDeclarationRun, DISABLED_APropertyWithoutFormals) {
+  ExpectSampledInADeclaration("property", "", "");
+}
+
+TEST(SampledInAClocklessDeclarationRun, DISABLED_APropertyWithAFormal) {
+  ExpectSampledInADeclaration("property", "(h)", "(1'b1)");
+}
+
 }  // namespace
