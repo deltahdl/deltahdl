@@ -522,4 +522,55 @@ TEST(WordSet, FeasibilityRequiresEveryAssumption) {
   EXPECT_TRUE(WordIsFeasible(Word{A({"clk", "a", "b"})}, assumptions));
 }
 
+TEST(NeutralSatisfaction, StrongOfAnEmptyOnlySequenceHoldsOnNoWord) {
+  auto p = PropStrong(SeqNullRepeat(BoolSeq("a")));
+  EXPECT_FALSE(NeutrallySatisfies(Word{A({"a"})}, *p));
+  EXPECT_FALSE(NeutrallySatisfies(Word{A({"x"}), A({"a"})}, *p));
+  EXPECT_FALSE(NeutrallySatisfies(Word{LetterTop()}, *p));
+}
+
+TEST(NeutralSatisfaction, ImplicationMatchesItsAntecedentOnTheComplement) {
+  auto delayed = PropImplication(
+      BoolSeq("a"), PropStrong(SeqConcat(BoolSeq("b"), BoolSeq("c"))));
+  EXPECT_TRUE(NeutrallySatisfies(Word{LetterTop(), A({"x"})}, *delayed));
+  EXPECT_FALSE(NeutrallySatisfies(Word{A({"a"}), A({"x"})}, *delayed));
+  auto single = PropImplication(BoolSeq("a"), PropStrong(BoolSeq("b")));
+  EXPECT_FALSE(NeutrallySatisfies(Word{LetterBottom()}, *single));
+}
+
+TEST(Disabling, DisableIffIsJudgedAtTheLeastIndexWhereItsGuardHolds) {
+  auto t = TopDisableIff(BoolAtom("d"),
+                         PropStrong(SeqConcat(BoolSeq("a"), BoolSeq("b"))));
+  EXPECT_TRUE(DisablesTopLevel(Word{A({"a", "d"}), A({"b"}), A({"d"})}, *t));
+  EXPECT_FALSE(DisablesTopLevel(Word{A({"a"}), A({"b"}), A({"d"})}, *t));
+  EXPECT_FALSE(DisablesTopLevel(Word{A({"x"}), A({"d"}), A({"d"})}, *t));
+}
+
+TEST(WordSet, AnAssertFailingOnAFeasibleWordDoesNotHoldGlobally) {
+  std::vector<EnabledAssertion> no_assumptions;
+  std::vector<Word> words{Word{A({"clk", "b"})}, Word{A({"clk"})}};
+  EnabledAssertion assertion{
+      *AssertionWithClock(AssertionStatement::Activation::kAlways,
+                          AssertionStatement::Role::kAssert, BoolAtom("clk"),
+                          BodyStrong("b")),
+      BoolTrue()};
+  EXPECT_FALSE(HoldsGloballyOnWordSet(assertion, words, no_assumptions));
+  std::vector<Word> passing{Word{A({"clk", "b"})}, Word{A({"x"})}};
+  EXPECT_TRUE(HoldsGloballyOnWordSet(assertion, passing, no_assumptions));
+}
+
+TEST(WordSet, ACoverHoldsGloballyOnlyWhenEveryFeasibleWordSatisfiesIt) {
+  std::vector<EnabledAssertion> no_assumptions;
+  EnabledAssertion cover{
+      *AssertionWithClock(AssertionStatement::Activation::kAlways,
+                          AssertionStatement::Role::kCover, BoolAtom("clk"),
+                          BodyStrong("a")),
+      BoolTrue()};
+  std::vector<Word> mixed{Word{A({"clk", "a"})}, Word{A({"clk"})}};
+  EXPECT_TRUE(CoverSatisfiedOnWordSet(cover, mixed, no_assumptions));
+  EXPECT_FALSE(HoldsGloballyOnWordSet(cover, mixed, no_assumptions));
+  std::vector<Word> all{Word{A({"clk", "a"})}, Word{A({"x"}), A({"clk", "a"})}};
+  EXPECT_TRUE(HoldsGloballyOnWordSet(cover, all, no_assumptions));
+}
+
 }  // namespace

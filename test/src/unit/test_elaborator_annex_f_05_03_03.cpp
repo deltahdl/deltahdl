@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <memory>
 #include <set>
 #include <string>
 #include <utility>
@@ -270,6 +271,99 @@ TEST(NonVacuity, TheOtherDerivedOperatorsUnroll) {
   EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"}), L({"a", "t"})}, *p));
   EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a", "t"}), L({"x"})}, *p));
   EXPECT_FALSE(NonVacuouslyEvaluates(Word{}, *p));
+}
+
+TEST(NonVacuity, DisableIffWithItsGuardPresentNeedsADecidingPrefix) {
+  auto t = TopDisableIff(BoolAtom("b"), Strong("s"));
+  EXPECT_TRUE(NonVacuouslyEvaluatesTopLevel(Word{L({"s"}), L({"b"})}, *t));
+  EXPECT_TRUE(NonVacuouslyEvaluatesTopLevel(Word{L({"x"}), L({"b"})}, *t));
+  EXPECT_FALSE(NonVacuouslyEvaluatesTopLevel(Word{L({"b", "s"})}, *t));
+}
+
+TEST(NonVacuity, NonoverlappingImplicationUnrollsThroughADelayedAntecedent) {
+  auto p = PropNonoverlappingImplication(Bs("a"), Strong("s"));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"a"}), L({"x"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"x"}), L({"a"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{}, *p));
+}
+
+TEST(NonVacuity, IfUnrollsThroughImplication) {
+  auto p = PropIf(BoolAtom("b"), Trig("a"));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"b", "a"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"b"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a"})}, *p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{}, *p));
+}
+
+TEST(NonVacuity, IfElseUnrollsThroughItsWeakElseGuard) {
+  auto p = PropIfElse(BoolAtom("b"), Trig("a"), Trig("a"));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"})}, *p));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"b"})}, *p));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{}, *p));
+}
+
+std::shared_ptr<const BooleanExpr> Eq(
+    const std::shared_ptr<const BooleanExpr>&,
+    const std::shared_ptr<const BooleanExpr>& item) {
+  return BoolAtom("eq_" + item->atom);
+}
+
+TEST(NonVacuity, CaseUnrollsThroughItsIfChain) {
+  auto single =
+      PropCase(BoolAtom("sel"), {{BoolAtom("x"), Trig("a")}}, nullptr, Eq);
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"eq_x", "a"})}, *single));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"eq_x"})}, *single));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a"})}, *single));
+  auto pair = PropCase(BoolAtom("sel"),
+                       {{BoolAtom("x"), Trig("a")}, {BoolAtom("y"), Trig("a")}},
+                       nullptr, Eq);
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"z"})}, *pair));
+  auto with_default =
+      PropCase(BoolAtom("sel"), {{BoolAtom("x"), Trig("a")}}, Trig("a"), Eq);
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"z"})}, *with_default));
+}
+
+TEST(NonVacuity, FollowedByUnrollsThroughANegatedImplication) {
+  auto overlapping = PropFollowedBy(Bs("a"), Trig("c"));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"a", "c"})}, *overlapping));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a"})}, *overlapping));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"c"})}, *overlapping));
+  auto nonoverlapping = PropNonoverlappingFollowedBy(Bs("a"), Trig("c"));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"a"}), L({"c"})}, *nonoverlapping));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"a", "c"})}, *nonoverlapping));
+}
+
+void ExpectUntilWithOfTriggersUnrolls(const PropertyExpr& p) {
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"a"})}, p));
+  EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"c"})}, p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"x"})}, p));
+  EXPECT_FALSE(NonVacuouslyEvaluates(Word{}, p));
+}
+
+TEST(NonVacuity, UntilWithUnrollsThroughUntilOfAConjunction) {
+  ExpectUntilWithOfTriggersUnrolls(*PropUntilWith(Trig("a"), Trig("c")));
+}
+
+TEST(NonVacuity, DISABLED_SUntilWithUnrollsThroughSUntilOfAConjunction) {
+  ExpectUntilWithOfTriggersUnrolls(*PropSUntilWith(Trig("a"), Trig("c")));
+}
+
+TEST(NonVacuity, NexttimeCountUnrollsIntoNestedNexttime) {
+  for (const auto& p : {PropNexttimeExactly(Trig("a"), 2),
+                        PropSNexttimeExactly(Trig("a"), 2)}) {
+    EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"}), L({"x"}), L({"a"})}, *p));
+    EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"x"}), L({"a"}), L({"x"})}, *p));
+    EXPECT_FALSE(NonVacuouslyEvaluates(Word{L({"x"}), L({"x"})}, *p));
+  }
+}
+
+TEST(NonVacuity, NexttimeZeroUnrollsThroughATrueAntecedent) {
+  for (const auto& p : {PropNexttimeExactly(Strong("s"), 0),
+                        PropSNexttimeExactly(Strong("s"), 0)}) {
+    EXPECT_TRUE(NonVacuouslyEvaluates(Word{L({"x"})}, *p));
+    EXPECT_FALSE(NonVacuouslyEvaluates(Word{}, *p));
+  }
 }
 
 }  // namespace

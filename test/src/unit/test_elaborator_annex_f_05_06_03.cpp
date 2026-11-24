@@ -365,4 +365,15 @@ TEST(NonVacuityLocals, RejectOnSharesTheAbortShapeWithLocals) {
   }
 }
 
+TEST(NonVacuityLocals,
+     TopLevelDisableIffWithItsGuardPresentNeedsADecidingPrefix) {
+  auto t = LvTopDisableIff(BoolAtom("b"), Strong("s"));
+  EXPECT_TRUE(NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"s"}), L({"b"})},
+                                                      *t, LocalContext{}));
+  EXPECT_TRUE(NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"x"}), L({"b"})},
+                                                      *t, LocalContext{}));
+  EXPECT_FALSE(NonVacuouslyEvaluatesTopLevelWithLocals(Word{L({"b", "s"})}, *t,
+                                                       LocalContext{}));
+}
+
 }  // namespace
