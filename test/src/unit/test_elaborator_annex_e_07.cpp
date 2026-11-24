@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_delay_mode_directives.h"
 
 using namespace delta;
 
@@ -85,6 +86,22 @@ TEST(Elaborator, DelayModeZero_ControlsOnlyTheModulesAfterIt) {
   ASSERT_EQ(design->top_modules.size(), 2u);
   EXPECT_EQ(ZeroCaseDelayMode(design, "ticking"), DelayModeDirective::kUnit);
   EXPECT_EQ(ZeroCaseDelayMode(design, "instant"), DelayModeDirective::kZero);
+}
+
+TEST(Elaborator, DelayModeZero_PropagatedToAMacromodule) {
+  ExpectPropagatedToAMacromodule(kZeroDirective);
+}
+
+TEST(Elaborator, DISABLED_DelayModeZero_SetInsideAnInterfaceProgramOrPackage) {
+  ExpectSetInsideAnInterfaceProgramOrPackage(kZeroDirective);
+}
+
+TEST(Elaborator, DelayModeZero_ReachesEveryLaterModuleAndItsNestedModule) {
+  ExpectReachesEveryLaterModuleAndItsNestedModule(kZeroDirective);
+}
+
+TEST(Elaborator, DISABLED_DelayModeZero_AnInterfaceAfterItTakesNoMode) {
+  ExpectAnInterfaceAfterItTakesNoMode(kZeroDirective);
 }
 
 }  // namespace

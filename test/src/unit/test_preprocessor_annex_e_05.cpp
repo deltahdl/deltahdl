@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_preprocessor.h"
+#include "helpers_delay_mode_directives.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
@@ -88,6 +89,43 @@ TEST(Preprocessor, DelayModePath_RecordedAtEachModuleHeader) {
   EXPECT_EQ(recorded[0].delay_mode, DelayModeDirective::kDistributed);
   EXPECT_EQ(recorded[1].module, "pathed");
   EXPECT_EQ(recorded[1].delay_mode, DelayModeDirective::kPath);
+}
+
+TEST(Preprocessor, DelayModePath_CommentAfterItIsNoArgument) {
+  ExpectCommentAfterItIsNoArgument(kPathDirective);
+}
+
+TEST(Preprocessor, DISABLED_DelayModePath_ALongerNameIsAMacroUse) {
+  ExpectALongerNameIsAMacroUse(kPathDirective);
+}
+
+TEST(Preprocessor, DelayModePath_RecordedForAMacromodule) {
+  ExpectRecordedForAMacromodule(kPathDirective);
+}
+
+TEST(Preprocessor, DelayModePath_ReadFromAnIncludedHeader) {
+  ExpectReadFromAnIncludedHeader(kPathDirective);
+}
+
+TEST(Preprocessor, DelayModePath_CarriedIntoALaterFile) {
+  ExpectCarriedIntoALaterFile(kPathDirective);
+}
+
+TEST(Preprocessor, DelayModePath_ReportedAnywhereInAModuleDeclaration) {
+  ExpectReportedAnywhereInAModuleDeclaration(kPathDirective);
+}
+
+TEST(Preprocessor,
+     DISABLED_DelayModePath_AcceptedInsideAnInterfaceProgramOrPackage) {
+  ExpectAcceptedInsideAnInterfaceProgramOrPackage(kPathDirective);
+}
+
+TEST(Preprocessor, DelayModePath_AcceptedInsideAClass) {
+  ExpectAcceptedInsideAClass(kPathDirective);
+}
+
+TEST(Preprocessor, DelayModePath_AfterTheLastModuleSetsNoModule) {
+  ExpectAfterTheLastModuleSetsNoModule(kPathDirective);
 }
 
 }  // namespace

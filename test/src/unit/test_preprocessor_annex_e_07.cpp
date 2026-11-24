@@ -2,6 +2,7 @@
 
 #include "common/types.h"
 #include "fixture_preprocessor.h"
+#include "helpers_delay_mode_directives.h"
 #include "helpers_reported_error.h"
 #include "preprocessor/preprocessor.h"
 
@@ -88,6 +89,43 @@ TEST(Preprocessor, DelayModeZero_RecordedAtEachModuleHeader) {
   EXPECT_EQ(per_module[0].delay_mode, DelayModeDirective::kUnit);
   EXPECT_EQ(per_module[1].module, "instant");
   EXPECT_EQ(per_module[1].delay_mode, DelayModeDirective::kZero);
+}
+
+TEST(Preprocessor, DelayModeZero_CommentAfterItIsNoArgument) {
+  ExpectCommentAfterItIsNoArgument(kZeroDirective);
+}
+
+TEST(Preprocessor, DISABLED_DelayModeZero_ALongerNameIsAMacroUse) {
+  ExpectALongerNameIsAMacroUse(kZeroDirective);
+}
+
+TEST(Preprocessor, DelayModeZero_RecordedForAMacromodule) {
+  ExpectRecordedForAMacromodule(kZeroDirective);
+}
+
+TEST(Preprocessor, DelayModeZero_ReadFromAnIncludedHeader) {
+  ExpectReadFromAnIncludedHeader(kZeroDirective);
+}
+
+TEST(Preprocessor, DelayModeZero_CarriedIntoALaterFile) {
+  ExpectCarriedIntoALaterFile(kZeroDirective);
+}
+
+TEST(Preprocessor, DelayModeZero_ReportedAnywhereInAModuleDeclaration) {
+  ExpectReportedAnywhereInAModuleDeclaration(kZeroDirective);
+}
+
+TEST(Preprocessor,
+     DISABLED_DelayModeZero_AcceptedInsideAnInterfaceProgramOrPackage) {
+  ExpectAcceptedInsideAnInterfaceProgramOrPackage(kZeroDirective);
+}
+
+TEST(Preprocessor, DelayModeZero_AcceptedInsideAClass) {
+  ExpectAcceptedInsideAClass(kZeroDirective);
+}
+
+TEST(Preprocessor, DelayModeZero_AfterTheLastModuleSetsNoModule) {
+  ExpectAfterTheLastModuleSetsNoModule(kZeroDirective);
 }
 
 }  // namespace

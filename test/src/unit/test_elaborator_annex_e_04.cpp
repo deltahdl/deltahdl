@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <string>
 #include <string_view>
 
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_delay_mode_directives.h"
 
 using namespace delta;
 
@@ -97,29 +97,21 @@ TEST(Elaborator, DelayModeDistributed_ControlsOnlyTheModulesAfterIt) {
 }
 
 TEST(Elaborator, DelayModeDistributed_PropagatedToAMacromodule) {
-  ElabFixture f;
-  auto* design = ElaborateWithPreprocessor(
-      "`delay_mode_distributed\n"
-      "macromodule t;\n"
-      "endmodule\n",
-      f);
-  ASSERT_NE(design, nullptr);
-  EXPECT_FALSE(f.has_errors);
-  EXPECT_EQ(ModeOf(design, "t"), DelayModeDirective::kDistributed);
+  ExpectPropagatedToAMacromodule(kDistributedDirective);
 }
 
 TEST(Elaborator,
      DISABLED_DelayModeDistributed_SetInsideAnInterfaceProgramOrPackage) {
-  for (const char* element : {"interface", "program", "package"}) {
-    ElabFixture f;
-    auto* design = ElaborateWithPreprocessor(
-        std::string(element) + " e;\n`delay_mode_distributed\nend" + element +
-            "\nmodule m;\nendmodule\n",
-        f, "m");
-    ASSERT_NE(design, nullptr) << element;
-    EXPECT_FALSE(f.has_errors) << element;
-    EXPECT_EQ(ModeOf(design, "m"), DelayModeDirective::kDistributed) << element;
-  }
+  ExpectSetInsideAnInterfaceProgramOrPackage(kDistributedDirective);
+}
+
+TEST(Elaborator,
+     DelayModeDistributed_ReachesEveryLaterModuleAndItsNestedModule) {
+  ExpectReachesEveryLaterModuleAndItsNestedModule(kDistributedDirective);
+}
+
+TEST(Elaborator, DISABLED_DelayModeDistributed_AnInterfaceAfterItTakesNoMode) {
+  ExpectAnInterfaceAfterItTakesNoMode(kDistributedDirective);
 }
 
 }  // namespace

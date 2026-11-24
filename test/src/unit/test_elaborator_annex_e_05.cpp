@@ -5,6 +5,7 @@
 #include "common/types.h"
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
+#include "helpers_delay_mode_directives.h"
 
 using namespace delta;
 
@@ -90,6 +91,22 @@ TEST(Elaborator, DelayModePath_ControlsOnlyTheModulesAfterIt) {
   ASSERT_EQ(design->top_modules.size(), 2u);
   EXPECT_EQ(TopDelayMode(design, "spread"), DelayModeDirective::kDistributed);
   EXPECT_EQ(TopDelayMode(design, "pathed"), DelayModeDirective::kPath);
+}
+
+TEST(Elaborator, DelayModePath_PropagatedToAMacromodule) {
+  ExpectPropagatedToAMacromodule(kPathDirective);
+}
+
+TEST(Elaborator, DISABLED_DelayModePath_SetInsideAnInterfaceProgramOrPackage) {
+  ExpectSetInsideAnInterfaceProgramOrPackage(kPathDirective);
+}
+
+TEST(Elaborator, DelayModePath_ReachesEveryLaterModuleAndItsNestedModule) {
+  ExpectReachesEveryLaterModuleAndItsNestedModule(kPathDirective);
+}
+
+TEST(Elaborator, DISABLED_DelayModePath_AnInterfaceAfterItTakesNoMode) {
+  ExpectAnInterfaceAfterItTakesNoMode(kPathDirective);
 }
 
 }  // namespace
