@@ -3,7 +3,6 @@
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <spawn.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 
 #include <algorithm>
