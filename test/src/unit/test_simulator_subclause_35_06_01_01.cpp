@@ -59,7 +59,7 @@ TEST(DpiWysiwygOpenArray, EmptyActualYieldsEmptyOpenArray) {
 TEST(DpiWysiwygOpenArray, NonOpenFormalSeenAsDeclaredType) {
   DpiRuntime rt;
   DpiArgValue result =
-      CallTakeIntReportingFormal(rt, DpiArgValue::FromLongint(7));
+      CallTakeIntReportingFormal(rt, DpiArgValue::FromLongint(0x100000007));
 
   EXPECT_EQ(result.AsInt(), 7);
 }

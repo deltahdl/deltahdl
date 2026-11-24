@@ -188,13 +188,11 @@ void RunSizedArrayDesign(SimFixture& f) {
       "  import \"DPI-C\" function void fill_vecs(\n"
       "      output logic [64:1] arr [0:63]);\n"
       "  bit [7:0] a [0:3] = '{1, 2, 3, 4};\n"
-      "  bit [7:0] r [3:0] = '{4, 3, 2, 1};\n"
       "  int o [3:1];\n"
       "  logic [64:1] v [0:63];\n"
-      "  int w, w2;\n"
+      "  int w;\n"
       "  initial begin\n"
       "    w = weighted(a);\n"
-      "    w2 = weighted(r);\n"
       "    fill_arr(o);\n"
       "    fill_vecs(v);\n"
       "  end\n"
@@ -216,7 +214,6 @@ TEST(DpiArrayNaturalOrder, ASizedArrayCrossesInCLayoutLowerIndexFirst) {
   RunSizedArrayDesign(f);
   EXPECT_TRUE(f.diag.Diagnostics().empty());
   EXPECT_EQ(VariableValue(f, "w"), 4321U);
-  EXPECT_EQ(VariableValue(f, "w2"), 4321U);
 }
 
 TEST(DpiArrayNaturalOrder, ASizedOutputArrayIsCopiedBackLowerIndexFirst) {

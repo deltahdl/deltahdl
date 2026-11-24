@@ -1,5 +1,6 @@
 #pragma once
 
+#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -63,6 +64,17 @@ inline int32_t IntVariableAfterRun(
   EXPECT_NE(found, nullptr);
   return found == nullptr ? INT32_MIN
                           : static_cast<int32_t>(found->value.ToUint64());
+}
+
+template <typename Function>
+Function NamedExport(const char* name) {
+  return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
+}
+
+inline uint64_t DesignValue(SimFixture& f, std::string_view name) {
+  auto* found = f.ctx.FindVariable(name);
+  EXPECT_NE(found, nullptr) << name;
+  return found == nullptr ? ~uint64_t{0} : found->value.ToUint64();
 }
 
 inline DpiArg CFormal(std::string_view name, DataTypeKind type,

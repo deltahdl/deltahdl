@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
@@ -53,6 +55,62 @@ TEST(DpiMemorySpaces, ABlockBehindAChandleIsFreedInCThroughAnImport) {
   const DpiArgValue kHandle = rt.CallImport("acquire", {});
   rt.CallImport("release", {kHandle});
   EXPECT_EQ(released, kHandle.AsChandle());
+}
+
+struct Block {
+  int allocations = 0;
+  int frees = 0;
+  void* allocated = nullptr;
+  void* freed = nullptr;
+};
+
+Block& TheBlock() {
+  static Block block;
+  return block;
+}
+
+void* AllocateBlock() {
+  ++TheBlock().allocations;
+  TheBlock().allocated = new int(7);
+  return TheBlock().allocated;
+}
+
+int ReadBlock(void* handle) {
+  return handle == TheBlock().allocated ? *static_cast<int*>(handle) : -1;
+}
+
+void FreeBlock(void* handle) {
+  ++TheBlock().frees;
+  TheBlock().freed = handle;
+  delete static_cast<int*>(handle);
+}
+
+TEST(DpiMemorySpaces, ADesignsChandleCarriesABlockFromItsAllocationToItsFree) {
+  TheBlock() = Block{};
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function chandle c_alloc();\n"
+      "  import \"DPI-C\" function int c_read(input chandle h);\n"
+      "  import \"DPI-C\" function void c_free(input chandle h);\n"
+      "  chandle h;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    h = c_alloc();\n"
+      "    #5 r = c_read(h);\n"
+      "    c_free(h);\n"
+      "  end\n"
+      "endmodule\n",
+      f,
+      {{"c_alloc", reinterpret_cast<void*>(&AllocateBlock)},
+       {"c_read", reinterpret_cast<void*>(&ReadBlock)},
+       {"c_free", reinterpret_cast<void*>(&FreeBlock)}},
+      "annex_h_06_06_chandle");
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+  EXPECT_EQ(TheBlock().allocations, 1);
+  EXPECT_EQ(TheBlock().frees, 1);
+  EXPECT_EQ(TheBlock().freed, TheBlock().allocated);
+  EXPECT_EQ(DesignValue(f, "r"), 7U);
 }
 
 }  // namespace

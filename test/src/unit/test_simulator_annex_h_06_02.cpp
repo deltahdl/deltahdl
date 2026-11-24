@@ -5,10 +5,13 @@
 #include <utility>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -76,6 +79,72 @@ TEST(DpiInputArguments, AModificationOfAPackedInputDoesNotReachTheActual) {
   ASSERT_TRUE(actuals[0].IsWideVec());
   EXPECT_EQ(actuals[0].AsLogicVecWords()[0].aval, 0x12345678U);
   EXPECT_EQ(actuals[0].AsLogicVecWords()[1].aval, 0x9ABCDEF0U);
+}
+
+void OverwriteBits(const svBitVecVal* v) {
+  auto* writable = const_cast<svBitVecVal*>(v);
+  writable[0] = 0xFFFFFFFFU;
+  writable[1] = 0xFFFFFFFFU;
+}
+
+void OverwriteLogic(const svLogicVecVal* v) {
+  auto* writable = const_cast<svLogicVecVal*>(v);
+  writable[0] = {0xFFFFFFFFU, 0U};
+  writable[1] = {0xFFFFFFFFU, 0U};
+}
+
+void OverwriteString(const char* s) { const_cast<char*>(s)[0] = 'X'; }
+
+void OverwriteOpenArray(svOpenArrayHandle h) {
+  for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
+    *static_cast<int*>(svGetArrElemPtr1(h, i)) = -1;
+  }
+}
+
+TEST(DpiInputArguments, AWriteToAWidePackedInputLeavesTheDesignsActual) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function void over_bits(input bit [63:0] v);\n"
+      "  import \"DPI-C\" function void over_logic(input logic [63:0] v);\n"
+      "  bit [63:0] b = 64'h1234_5678_9abc_def0;\n"
+      "  logic [63:0] l = 64'h0fed_cba9_8765_4321;\n"
+      "  initial begin over_bits(b); over_logic(l); end\n"
+      "endmodule\n",
+      f,
+      {{"over_bits", reinterpret_cast<void*>(&OverwriteBits)},
+       {"over_logic", reinterpret_cast<void*>(&OverwriteLogic)}},
+      "annex_h_06_02_packed");
+  EXPECT_EQ(DesignValue(f, "b"), 0x123456789ABCDEF0U);
+  EXPECT_EQ(DesignValue(f, "l"), 0x0FEDCBA987654321U);
+}
+
+TEST(DpiInputArguments, AWriteToAStringInputLeavesTheDesignsActual) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function void over_string(input string s);\n"
+      "  string s = \"abc\";\n"
+      "  bit kept;\n"
+      "  initial begin over_string(s); kept = s == \"abc\"; end\n"
+      "endmodule\n",
+      f, {{"over_string", reinterpret_cast<void*>(&OverwriteString)}},
+      "annex_h_06_02_string");
+  EXPECT_EQ(DesignValue(f, "kept"), 1U);
+}
+
+TEST(DpiInputArguments, AWriteToAnOpenArrayInputLeavesTheDesignsActual) {
+  SimFixture f;
+  RunWithImportsBound(
+      "module t;\n"
+      "  import \"DPI-C\" function void over_array(input int a []);\n"
+      "  int a [2:3] = '{20, 30};\n"
+      "  initial over_array(a);\n"
+      "endmodule\n",
+      f, {{"over_array", reinterpret_cast<void*>(&OverwriteOpenArray)}},
+      "annex_h_06_02_open_array");
+  EXPECT_EQ(DesignValue(f, "a[2]"), 20U);
+  EXPECT_EQ(DesignValue(f, "a[3]"), 30U);
 }
 
 }  // namespace
