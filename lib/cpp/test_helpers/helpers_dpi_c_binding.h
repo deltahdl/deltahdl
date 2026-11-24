@@ -15,6 +15,7 @@
 
 #include "common/diagnostic.h"
 #include "common/source_mgr.h"
+#include "elaborator/rtlir.h"
 #include "fixture_diagnosed.h"
 #include "fixture_simulator.h"
 #include "parser/ast_type.h"
@@ -41,11 +42,10 @@ inline std::filesystem::path CallBuildDir(const std::string& name) {
   return dir / (std::string(test->test_suite_name()) + "." + test->name());
 }
 
-inline void RunWithImportsBound(const std::string& src, SimFixture& f,
-                                const std::map<std::string, void*>& functions,
-                                const std::string& dir_name,
-                                const std::string& compiler = "cc") {
-  auto* design = ElaborateSrc(src, f);
+inline void RunDesignWithImportsBound(
+    const RtlirDesign* design, SimFixture& f,
+    const std::map<std::string, void*>& functions, const std::string& dir_name,
+    const std::string& compiler = "cc") {
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
@@ -53,6 +53,14 @@ inline void RunWithImportsBound(const std::string& src, SimFixture& f,
   BindDpiImports(*f.ctx.GetDpiRuntime(), LookupIn(functions),
                  CallBuildDir(dir_name), compiler, f.diag);
   f.scheduler.Run();
+}
+
+inline void RunWithImportsBound(const std::string& src, SimFixture& f,
+                                const std::map<std::string, void*>& functions,
+                                const std::string& dir_name,
+                                const std::string& compiler = "cc") {
+  RunDesignWithImportsBound(ElaborateSrc(src, f), f, functions, dir_name,
+                            compiler);
 }
 
 inline int32_t IntVariableAfterRun(

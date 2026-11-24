@@ -119,25 +119,22 @@ TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
   EXPECT_EQ(with_scope.low, null_scope.low);
 }
 
-TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
-  VpiHandle top = vpi_ctx_.CreateModule("top", "top");
-  ASSERT_NE(top, nullptr);
-  top->time_precision = -9;
+TEST_F(SvGetTimeSim, NoScopeReadsTheSmallestPrecisionOfTheModules) {
+  VpiHandle fine = vpi_ctx_.CreateModule("fine", "fine");
+  ASSERT_NE(fine, nullptr);
+  fine->time_unit = -9;
+  fine->time_precision = -12;
+  VpiHandle coarse = vpi_ctx_.CreateModule("coarse", "coarse");
+  ASSERT_NE(coarse, nullptr);
+  coarse->time_unit = -6;
+  coarse->time_precision = -10;
 
-  const DpiScope* scope = DpiRegisterScope("top.u_plain_unit_h_13");
-  ASSERT_NE(scope, nullptr);
-
-  int32_t unit_scoped = 0;
-  int32_t unit_null = 0;
-  EXPECT_EQ(svGetTimeUnit(scope, &unit_scoped), 0);
-  EXPECT_EQ(svGetTimeUnit(nullptr, &unit_null), 0);
-  EXPECT_EQ(unit_scoped, unit_null);
-
-  int32_t prec_scoped = 0;
-  int32_t prec_null = 0;
-  EXPECT_EQ(svGetTimePrecision(scope, &prec_scoped), 0);
-  EXPECT_EQ(svGetTimePrecision(nullptr, &prec_null), 0);
-  EXPECT_EQ(prec_scoped, prec_null);
+  int32_t unit = 0;
+  EXPECT_EQ(svGetTimeUnit(nullptr, &unit), 0);
+  EXPECT_EQ(unit, -12);
+  int32_t precision = 0;
+  EXPECT_EQ(svGetTimePrecision(nullptr, &precision), 0);
+  EXPECT_EQ(precision, -12);
 }
 
 TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
@@ -172,7 +169,7 @@ TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
   EXPECT_EQ(sim_unit, -12);
 }
 
-TEST_F(SvGetTimeSim, AScopeWithoutATimescaleReadsAsTheNullScope) {
+TEST_F(SvGetTimeSim, ATimescaleBindsToItsOwnScopeOnly) {
   vpi_ctx_.SetSimTimeUnit(-12);
   AdvanceTo(7);
   const DpiScope* scope = DpiRegisterScope("top.u_unbound_h_13");
@@ -185,10 +182,6 @@ TEST_F(SvGetTimeSim, AScopeWithoutATimescaleReadsAsTheNullScope) {
   EXPECT_EQ(svGetTime(bound, &raw), 0);
   EXPECT_EQ(raw.low, 7u);
 
-  s_vpi_time unbound = {};
-  unbound.type = kSvScaledRealTime;
-  EXPECT_EQ(svGetTime(scope, &unbound), 0);
-  EXPECT_DOUBLE_EQ(unbound.real, 7.0);
   int32_t unit = 0;
   int32_t prec = 0;
   EXPECT_FALSE(DpiScopeTimescale(scope, &unit, &prec));
