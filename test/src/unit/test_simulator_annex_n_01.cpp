@@ -91,4 +91,89 @@ TEST(DistributionAlgorithmAnnex, ADesignsRandomAnswersTheReferenceValue) {
   EXPECT_EQ(lines[1], std::to_string(seed));
 }
 
+std::string Following(int32_t* seed) {
+  int32_t value = RtlDistUniform(seed, INT32_MIN, INT32_MAX);
+  return std::to_string(value);
+}
+
+TEST(DistributionAlgorithmAnnex, ASeedlessRandomDrawsOnFromTheLastSeed) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  integer seed, v;\n"
+      "  initial begin\n"
+      "    seed = 4321;\n"
+      "    v = $random(seed);\n"
+      "    v = $random; $display(\"%0d\", v);\n"
+      "    v = $random(); $display(\"%0d\", v);\n"
+      "    v = $random; $display(\"%0d\", v);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  auto lines = Lines(out);
+  int32_t seed = 4321;
+  Following(&seed);
+  ASSERT_EQ(lines.size(), 3u);
+  for (const std::string& line : lines) EXPECT_EQ(line, Following(&seed));
+}
+
+void ExpectsFullRangeDraws(const std::string& source) {
+  SimFixture f;
+  auto lines = Lines(RunCapture(source, f));
+  int32_t seed = 777;
+  std::string first = Following(&seed);
+  std::string after_first = std::to_string(seed);
+  std::string second = Following(&seed);
+  ASSERT_EQ(lines.size(), 4u);
+  EXPECT_EQ(lines[0], first);
+  EXPECT_EQ(lines[1], after_first);
+  EXPECT_EQ(lines[2], second);
+  EXPECT_EQ(lines[3], std::to_string(seed));
+}
+
+TEST(DistributionAlgorithmAnnex, ARandomInAClassMethodIsTheFullRangeDraw) {
+  ExpectsFullRangeDraws(
+      "class C;\n"
+      "  integer seed = 777;\n"
+      "  function integer draw(); return $random(seed); endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  C c;\n"
+      "  integer v;\n"
+      "  initial begin\n"
+      "    c = new;\n"
+      "    v = c.draw(); $display(\"%0d\", v); $display(\"%0d\", c.seed);\n"
+      "    v = c.draw(); $display(\"%0d\", v); $display(\"%0d\", c.seed);\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(DistributionAlgorithmAnnex, ARandomInAFunctionIsTheFullRangeDraw) {
+  ExpectsFullRangeDraws(
+      "module t;\n"
+      "  integer v, s = 777;\n"
+      "  function automatic integer draw(ref integer seed);\n"
+      "    return $random(seed);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    v = draw(s); $display(\"%0d\", v); $display(\"%0d\", s);\n"
+      "    v = draw(s); $display(\"%0d\", v); $display(\"%0d\", s);\n"
+      "  end\n"
+      "endmodule\n");
+}
+
+TEST(DistributionAlgorithmAnnex, ARandomInATaskIsTheFullRangeDraw) {
+  ExpectsFullRangeDraws(
+      "module t;\n"
+      "  integer v, s = 777;\n"
+      "  task draw(inout integer seed, output integer value);\n"
+      "    value = $random(seed);\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    draw(s, v); $display(\"%0d\", v); $display(\"%0d\", s);\n"
+      "    draw(s, v); $display(\"%0d\", v); $display(\"%0d\", s);\n"
+      "  end\n"
+      "endmodule\n");
+}
+
 }  // namespace

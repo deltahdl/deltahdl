@@ -432,4 +432,167 @@ TEST(ProbabilisticDistributionAlgorithm, TheSevenCFunctionsMatchTheReference) {
   }
 }
 
+struct SeededDraw {
+  int32_t value = 0;
+  int32_t seed = 0;
+  bool reported = false;
+
+  bool operator==(const SeededDraw& other) const {
+    return value == other.value && seed == other.seed &&
+           reported == other.reported;
+  }
+};
+
+SeededDraw DrawFrom(int32_t seed, const char* name,
+                    const std::vector<int32_t>& operands) {
+  SimFixture f;
+  MakeVar(f, "seed", 32, static_cast<uint32_t>(seed));
+  std::vector<Expr*> args = {MkId(f.arena, "seed")};
+  for (int32_t operand : operands) {
+    args.push_back(MkInt(f.arena, static_cast<uint32_t>(operand)));
+  }
+  SeededDraw draw;
+  draw.value = EvalDist(f, name, std::move(args));
+  draw.seed =
+      static_cast<int32_t>(f.ctx.FindVariable("seed")->value.ToUint64());
+  draw.reported = !f.diag.Diagnostics().empty();
+  return draw;
+}
+
+SeededDraw Drawn(int32_t value, int32_t seed, bool reported = false) {
+  SeededDraw draw;
+  draw.value = value;
+  draw.seed = seed;
+  draw.reported = reported;
+  return draw;
+}
+
+void ExpectNoDrawFor(const char* name, const std::vector<int32_t>& operands) {
+  EXPECT_EQ(DrawFrom(5, name, operands), Drawn(0, 5, true)) << name;
+}
+
+TEST(ProbabilisticDistributionAlgorithm, ANegativeSeedMatchesTheReference) {
+  EXPECT_EQ(DrawFrom(-5, "$dist_uniform", {0, 1000}), Drawn(1000, -345344));
+  for (int32_t s : {-1, -5, -777, INT32_MIN}) {
+    int32_t g = s;
+    int32_t p = s;
+    EXPECT_EQ(delta::RtlDistUniform(&p, -5, 5),
+              GoldenRtlDistUniform(&g, -5, 5));
+    EXPECT_EQ(p, g);
+    EXPECT_EQ(delta::RtlDistPoisson(&p, 6), GoldenRtlDistPoisson(&g, 6));
+    EXPECT_EQ(p, g) << "seed=" << s;
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, UniformWithoutARangeDrawsNothing) {
+  EXPECT_EQ(DrawFrom(5, "$dist_uniform", {20, 10}), Drawn(20, 5));
+  EXPECT_EQ(DrawFrom(5, "$dist_uniform", {55, 55}), Drawn(55, 5));
+  EXPECT_EQ(DrawFrom(0, "$dist_uniform", {20, 10}), Drawn(20, 0));
+}
+
+TEST(ProbabilisticDistributionAlgorithm, UniformBelowZeroMatchesReference) {
+  EXPECT_EQ(DrawFrom(5, "$dist_uniform", {-20, -10}), Drawn(-20, 345346));
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    int32_t expected = GoldenRtlDistUniform(&g, -20, -10);
+    EXPECT_EQ(DrawFrom(s, "$dist_uniform", {-20, -10}), Drawn(expected, g));
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, NormalTakesANegativeMean) {
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    int32_t expected = GoldenRtlDistNormal(&g, -100, 10);
+    EXPECT_EQ(DrawFrom(s, "$dist_normal", {-100, 10}), Drawn(expected, g));
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, NormalTakesANegativeDeviation) {
+  EXPECT_EQ(DrawFrom(5, "$dist_normal", {0, -50}).value, 19);
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    int32_t expected = GoldenRtlDistNormal(&g, 0, -50);
+    EXPECT_EQ(DrawFrom(s, "$dist_normal", {0, -50}), Drawn(expected, g));
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, NormalWithoutDeviationStillDraws) {
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    GoldenRtlDistNormal(&g, 7, 0);
+    EXPECT_NE(g, s);
+    EXPECT_EQ(DrawFrom(s, "$dist_normal", {7, 0}), Drawn(7, g));
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, ExponentialDrawsNothingWithoutAMean) {
+  ExpectNoDrawFor("$dist_exponential", {0});
+  ExpectNoDrawFor("$dist_exponential", {-3});
+}
+
+TEST(ProbabilisticDistributionAlgorithm, PoissonDrawsNothingWithoutAMean) {
+  ExpectNoDrawFor("$dist_poisson", {0});
+  ExpectNoDrawFor("$dist_poisson", {-3});
+}
+
+TEST(ProbabilisticDistributionAlgorithm, PoissonCountsPastAnUnderflowingMean) {
+  EXPECT_EQ(std::exp(-800.0), 0.0);
+  EXPECT_EQ(DrawFrom(5, "$dist_poisson", {800}), Drawn(741, 1791066039));
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    int32_t expected = GoldenRtlDistPoisson(&g, 800);
+    EXPECT_EQ(DrawFrom(s, "$dist_poisson", {800}), Drawn(expected, g));
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, ChiSquareOfAnEvenDegreeMatches) {
+  EXPECT_EQ(DrawFrom(5, "$dist_chi_square", {4}).value, 20);
+  for (int32_t s : kSeeds) {
+    int32_t g = s;
+    int32_t p = s;
+    int32_t expected = GoldenRtlDistChiSquare(&g, 4);
+    EXPECT_EQ(delta::RtlDistChiSquare(&p, 4), expected);
+    EXPECT_EQ(p, g);
+    EXPECT_EQ(DrawFrom(s, "$dist_chi_square", {4}), Drawn(expected, g));
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, ChiSquareDrawsNothingWithoutADegree) {
+  ExpectNoDrawFor("$dist_chi_square", {0});
+  ExpectNoDrawFor("$dist_chi_square", {-2});
+}
+
+TEST(ProbabilisticDistributionAlgorithm, TOfEitherParityLeavesTheSeedDrawn) {
+  for (int32_t s : kSeeds) {
+    for (int32_t df : {4, 5}) {
+      int32_t g = s;
+      int32_t expected = GoldenRtlDistT(&g, df);
+      EXPECT_EQ(DrawFrom(s, "$dist_t", {df}), Drawn(expected, g));
+    }
+  }
+}
+
+TEST(ProbabilisticDistributionAlgorithm, TDrawsNothingWithoutADegree) {
+  ExpectNoDrawFor("$dist_t", {0});
+  ExpectNoDrawFor("$dist_t", {-2});
+}
+
+TEST(ProbabilisticDistributionAlgorithm, ErlangDrawsNothingWithoutAStage) {
+  ExpectNoDrawFor("$dist_erlang", {0, 7});
+  ExpectNoDrawFor("$dist_erlang", {-2, 7});
+}
+
+TEST(ProbabilisticDistributionAlgorithm, ErlangDrawsForAnyMean) {
+  EXPECT_EQ(DrawFrom(5, "$dist_erlang", {3, -7}).value, -26);
+  for (int32_t s : kSeeds) {
+    for (int32_t mean : {-7, 0}) {
+      int32_t g = s;
+      int32_t expected = GoldenRtlDistErlang(&g, 3, mean);
+      EXPECT_NE(g, s);
+      EXPECT_EQ(DrawFrom(s, "$dist_erlang", {3, mean}),
+                Drawn(expected, g, true));
+    }
+  }
+}
+
 }  // namespace
