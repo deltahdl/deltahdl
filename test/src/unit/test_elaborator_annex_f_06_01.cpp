@@ -150,6 +150,44 @@ TEST(ExtendedBooleans, MatchedRequiresTriggerNotJustClock) {
       MatchedOutputs({kWord, 1, *seq, NameSet{}}, clk, LocalContext{}).empty());
 }
 
+TEST(ExtendedBooleans, MatchedIgnoresATriggerAtJItself) {
+  auto seq = Bool("a");
+  auto clk = BoolAtom("clk");
+  const Word kWord{A({}), A({"a", "clk"})};
+  EXPECT_TRUE(
+      MatchedOutputs({kWord, 1, *seq, NameSet{}}, clk, LocalContext{}).empty());
+}
+
+TEST(ExtendedBooleans, MatchedLeavesATickAtTheTriggerOutOfTheGap) {
+  auto seq = Bool("a");
+  auto clk = BoolAtom("clk");
+  const Word kWord{A({"a", "clk"}), A({}), A({"clk"})};
+  EXPECT_TRUE(MatchedSatisfies({kWord, 2, *seq, NameSet{}}, clk, LocalContext{},
+                               LocalContext{}));
+}
+
+TEST(ExtendedBooleans, MatchedGivesAContextForEachTriggerBeforeTheTick) {
+  auto seq = Samp("v");
+  auto clk = BoolAtom("clk");
+  const Word kWord{A({"x"}), A({"y"}), A({"clk"})};
+  EXPECT_TRUE(SameContexts(
+      MatchedOutputs({kWord, 2, *seq, NameSet{"v"}}, clk, LocalContext{}),
+      {LocalContext{{"v", A({"x"})}}, LocalContext{{"v", A({"y"})}}}));
+}
+
+TEST(ExtendedBooleans, MatchedTriggersOnTheSequenceClockAndTicksOnItsOwn) {
+  auto seq = SeqClock(BoolAtom("clk1"), SeqConcat(Bool("a"), Bool("b")));
+  auto clk = BoolAtom("clk2");
+  const Word kWord{A({"a", "clk1"}), A({"x"}), A({"b", "clk1"}), A({"clk2"})};
+  EXPECT_TRUE(MatchedSatisfies({kWord, 3, *seq, NameSet{}}, clk, LocalContext{},
+                               LocalContext{}));
+  EXPECT_TRUE(MatchedOutputs({kWord, 3, *seq, NameSet{}}, BoolAtom("clk1"),
+                             LocalContext{})
+                  .empty());
+  EXPECT_TRUE(
+      MatchedOutputs({kWord, 2, *seq, NameSet{}}, clk, LocalContext{}).empty());
+}
+
 TEST(ExtendedBooleans, TriggeredDecidesAClockedSequenceThroughItsRewrite) {
   auto seq = SeqClock(BoolAtom("clk"), SeqConcat(Bool("a"), Bool("b")));
   const Word kWord{A({"a", "clk"}), A({"x"}), A({"b", "clk"}), A({"b"})};
