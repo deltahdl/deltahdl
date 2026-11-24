@@ -4,10 +4,13 @@
 #include <string>
 #include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "parser/ast_type.h"
 #include "simulator/dpi_arg_value.h"
 #include "simulator/dpi_c_type.h"
 #include "simulator/dpi_runtime.h"
+#include "simulator/svdpi.h"
 
 using namespace delta;
 
@@ -85,6 +88,84 @@ TEST(DpiTwoStateArguments, F7ReceivesTwoIntsAndACanonicalVector) {
   ASSERT_EQ(s_fbv3.size(), DpiCanonicalWordCount(33));
   EXPECT_EQ(s_fbv3[0].aval, 0x80000001u);
   EXPECT_EQ(s_fbv3[1].aval, 1u);
+}
+
+void SeeTwoWordsAndAVector(unsigned int fbv1, unsigned int fbv2,
+                           const svBitVecVal* fbv3) {
+  SeeInC({fbv1, fbv2, fbv3[0], SV_GET_UNSIGNED_BITS(fbv3[1], 1)});
+}
+
+void RunExampleFour(SimFixture& f, const std::string& range,
+                    const char* dir_name) {
+  RunModuleWithC(
+      "  parameter W = 33;\n"
+      "  localparam L = 32;\n"
+      "  int abv1;\n"
+      "  bit [29:0] abv2;\n"
+      "  bit [W-1:0] abv3;\n"
+      "  import \"DPI-C\" function void f7(input int unsigned fbv1,\n"
+      "      input int unsigned fbv2, input bit " +
+          range +
+          " fbv3);\n"
+          "  initial begin\n"
+          "    abv1 = 32'h8123_4567;\n"
+          "    abv2 = 30'h2abc_def0;\n"
+          "    abv3 = 33'h1_0000_0005;\n"
+          "    f7(abv1, abv2, abv3);\n"
+          "  end\n",
+      f, {{"f7", CAddress(&SeeTwoWordsAndAVector)}}, dir_name);
+}
+
+TEST(DpiTwoStateArguments, ADesignsVectorsAreCoercedToTheCFormals) {
+  SimFixture f;
+  RunExampleFour(f, "[32:0]", "annex_h_11_01_literal");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0x81234567, 0x2ABCDEF0, 5, 1}));
+}
+
+TEST(DpiTwoStateArguments, DISABLED_AFormalTakesItsWidthFromAParameter) {
+  SimFixture f;
+  RunExampleFour(f, "[W-1:0]", "annex_h_11_01_parameter");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0x81234567, 0x2ABCDEF0, 5, 1}));
+}
+
+TEST(DpiTwoStateArguments, DISABLED_AFormalTakesItsWidthFromALocalParameter) {
+  SimFixture f;
+  RunExampleFour(f, "[L:0]", "annex_h_11_01_localparam");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{0x81234567, 0x2ABCDEF0, 5, 1}));
+}
+
+void SeeFiveElements(const int a[5]) { SeeInC({a[0], a[4]}); }
+
+TEST(DpiTwoStateArguments, AnUnpackedFormalTakesItsSizeFromAParameter) {
+  SimFixture f;
+  RunModuleWithC(
+      "  parameter N = 5;\n"
+      "  int v [N];\n"
+      "  import \"DPI-C\" function void see(input int a [N]);\n"
+      "  initial begin\n"
+      "    foreach (v[i]) v[i] = i + 10;\n"
+      "    see(v);\n"
+      "  end\n",
+      f, {{"see", CAddress(&SeeFiveElements)}}, "annex_h_11_01_unpacked");
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{10, 14}));
+}
+
+void SeeFourSizes(unsigned char b, unsigned short s, unsigned long long l) {
+  SeeInC({b, s, static_cast<long long>(l)});
+}
+
+TEST(DpiTwoStateArguments, AVectorOfAnyWidthBindsToEachCCompatibleFormal) {
+  SimFixture f;
+  RunModuleWithC(
+      "  import \"DPI-C\" function void sizes(input byte unsigned b,\n"
+      "      input shortint unsigned s, input longint unsigned l);\n"
+      "  bit [4:0] narrow = 5'h1f;\n"
+      "  bit [19:0] wide = 20'hf8001;\n"
+      "  bit [49:0] wider = 50'h2_0000_0000_0003;\n"
+      "  initial sizes(narrow, wide, wider);\n",
+      f, {{"sizes", CAddress(&SeeFourSizes)}}, "annex_h_11_01_sizes");
+  EXPECT_EQ(SeenInC(),
+            (std::vector<long long>{0x1F, 0x8001, 0x2000000000003LL}));
 }
 
 }  // namespace
