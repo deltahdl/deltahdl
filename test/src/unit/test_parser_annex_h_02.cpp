@@ -105,4 +105,18 @@ TEST_F(DpiParseTest, UnspecifiedPackedRangeIsRejectedOnAnImportResult) {
       ReportedError(diag_.Diagnostics(), "expected expression", 2, "11.2"));
 }
 
+TEST_F(DpiParseTest,
+       DISABLED_UnspecifiedPackedRangeOfAnExportedFormalIsRejected) {
+  Parse(
+      "module m;\n"
+      "  function void sv_take(input bit [] a); endfunction\n"
+      "  export \"DPI-C\" function sv_take;\n"
+      "endmodule\n");
+  EXPECT_TRUE(
+      ReportedError(diag_.Diagnostics(),
+                    "formal argument 'a' gives a packed dimension no range, "
+                    "which only a formal of an import declaration may do",
+                    2, "35.5.6.1"));
+}
+
 }  // namespace
