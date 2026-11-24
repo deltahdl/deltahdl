@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
+#include "fixture_simulator.h"
+#include "helpers_dpi_c_binding.h"
 #include "simulator/svdpi_src.h"
 #include "simulator/svdpi_sv31a.h"
 
@@ -66,6 +69,48 @@ TEST(DpiSourceCompatibleExample,
   EXPECT_EQ(g_al[0].c, 2u);
   EXPECT_EQ(g_al[1].c, 4u);
   EXPECT_EQ(g_al[0].d + g_al[1].d, 0u);
+}
+
+struct SmallTriple {
+  int a;
+  SV_BIT_PACKED_ARRAY(6 * 8, b)
+  [4];
+  int c;
+};
+
+void SeeTriple(const SmallTriple* t) {
+  SeeInC({t->a, t->c});
+  for (const auto& word : t->b) {
+    svBitVec32 value[SV_CANONICAL_SIZE(6 * 8)] = {};
+    svGetBitVec32(value, const_cast<void*>(static_cast<const void*>(&word)),
+                  6 * 8);
+    SeeInC({value[0], value[1] & 0xFFFFu});
+  }
+}
+
+TEST(DpiSourceCompatibleExample, AStructsPackedMemberIsReadThroughAReference) {
+  SimFixture f;
+  SeenInC().clear();
+  RunWithImportsBound(
+      "module top;\n"
+      "  typedef struct { int a; bit [6:1][1:8] b [65:62]; int c; } triple;\n"
+      "  import \"DPI\" function void f1(input triple t);\n"
+      "  triple t;\n"
+      "  initial begin\n"
+      "    t.a = 5;\n"
+      "    t.c = 9;\n"
+      "    t.b[62] = 48'h1111_2222_3333;\n"
+      "    t.b[63] = 48'h4444_5555_6666;\n"
+      "    t.b[64] = 48'h7777_8888_9999;\n"
+      "    t.b[65] = 48'hAAAA_BBBB_CCCC;\n"
+      "    f1(t);\n"
+      "  end\n"
+      "endmodule\n",
+      f, {{"f1", CAddress(&SeeTriple)}}, "annex_h_14_05_struct");
+  EXPECT_FALSE(f.diag.HasErrors());
+  EXPECT_EQ(SeenInC(), (std::vector<long long>{5, 9, 0x22223333, 0x1111,
+                                               0x55556666, 0x4444, 0x88889999,
+                                               0x7777, 0xBBBBCCCC, 0xAAAA}));
 }
 
 }  // namespace

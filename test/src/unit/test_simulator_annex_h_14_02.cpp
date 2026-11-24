@@ -101,4 +101,101 @@ TEST(Sv31aDefinitions, PartSelectsCopyANarrowSliceEachWay) {
   EXPECT_EQ(svGetSelectLogic(logic, 32), sv_0);
 }
 
+TEST(Sv31aDefinitions, ABitArrayOfWholeChunksIsCopiedWithoutAnother) {
+  svBitVecVal actual[3] = {0x11111111u, 0x22222222u, 0x33333333u};
+  const svBitVec32 kIn[3] = {0xDEADBEEFu, 0x8000005Au, 0x77777777u};
+  svPutBitVec32(actual, kIn, 32);
+  EXPECT_EQ(actual[0], 0xDEADBEEFu);
+  EXPECT_EQ(actual[1], 0x22222222u);
+  svPutBitVec32(actual, kIn, 64);
+  EXPECT_EQ(actual[1], 0x8000005Au);
+  EXPECT_EQ(actual[2], 0x33333333u);
+
+  svBitVec32 out[3] = {1u, 2u, 3u};
+  svGetBitVec32(out, actual, 32);
+  EXPECT_EQ(out[0], 0xDEADBEEFu);
+  EXPECT_EQ(out[1], 2u);
+  svGetBitVec32(out, actual, 64);
+  EXPECT_EQ(out[1], 0x8000005Au);
+  EXPECT_EQ(out[2], 3u);
+}
+
+TEST(Sv31aDefinitions, ASelectPastTheFirstChunkChangesItsOwnBitOnly) {
+  svBitVecVal bits[3] = {0u, 0xFFFFFFFFu, 0u};
+  svPutSelectBit(bits, 37, sv_0);
+  EXPECT_EQ(bits[0], 0u);
+  EXPECT_EQ(bits[1], 0xFFFFFFDFu);
+  EXPECT_EQ(bits[2], 0u);
+  svPutSelectBit(bits, 64, sv_1);
+  EXPECT_EQ(bits[0], 0u);
+  EXPECT_EQ(bits[1], 0xFFFFFFDFu);
+  EXPECT_EQ(bits[2], 1u);
+  EXPECT_EQ(svGetSelectBit(bits, 37), sv_0);
+
+  svLogicVecVal logic[2] = {{0u, 0u}, {0u, 0u}};
+  svPutSelectLogic(logic, 37, sv_x);
+  svPutSelectLogic(logic, 32, sv_z);
+  svPutSelectLogic(logic, 63, sv_1);
+  EXPECT_EQ(logic[0].aval, 0u);
+  EXPECT_EQ(logic[0].bval, 0u);
+  EXPECT_EQ(logic[1].aval, 0x80000020u);
+  EXPECT_EQ(logic[1].bval, 0x00000021u);
+  EXPECT_EQ(svGetSelectLogic(logic, 37), sv_x);
+  EXPECT_EQ(svGetSelectLogic(logic, 32), sv_z);
+}
+
+TEST(Sv31aDefinitions, ABitPartSelectTakesAWholeChunk) {
+  svBitVecVal bits[3] = {0x89ABCDEFu, 0x01234567u, 0xFEDCBA98u};
+  svBitVec32 chunk = 0;
+  svGetPartSelectBit(&chunk, bits, 32, 32);
+  EXPECT_EQ(chunk, 0x01234567u);
+  svGetPartSelectBit(&chunk, bits, 4, 32);
+  EXPECT_EQ(chunk, 0x789ABCDEu);
+  svPutPartSelectBit(bits, 0xC0FFEE42u, 32, 32);
+  EXPECT_EQ(bits[0], 0x89ABCDEFu);
+  EXPECT_EQ(bits[1], 0xC0FFEE42u);
+  EXPECT_EQ(bits[2], 0xFEDCBA98u);
+  svPutPartSelectBit(bits, 0x12345678u, 4, 32);
+  EXPECT_EQ(bits[0], 0x2345678Fu);
+  EXPECT_EQ(bits[1], 0xC0FFEE41u);
+}
+
+TEST(Sv31aDefinitions, ALogicPartSelectTakesAWholeChunk) {
+  svLogicVecVal logic[2] = {{0x89ABCDEFu, 0x0F0F0F0Fu},
+                            {0x01234567u, 0xF0F0F0F0u}};
+  svLogicVec32 chunk = {0u, 0u};
+  svGetPartSelectLogic(&chunk, logic, 32, 32);
+  EXPECT_EQ(chunk.c, 0x01234567u);
+  EXPECT_EQ(chunk.d, 0xF0F0F0F0u);
+  svGetPartSelectLogic(&chunk, logic, 4, 32);
+  EXPECT_EQ(chunk.c, 0x789ABCDEu);
+  EXPECT_EQ(chunk.d, 0x00F0F0F0u);
+  const svLogicVec32 kAligned = {0xC0FFEE42u, 0x00FF00FFu};
+  svPutPartSelectLogic(logic, kAligned, 32, 32);
+  EXPECT_EQ(logic[0].aval, 0x89ABCDEFu);
+  EXPECT_EQ(logic[1].aval, 0xC0FFEE42u);
+  EXPECT_EQ(logic[1].bval, 0x00FF00FFu);
+  const svLogicVec32 kUnaligned = {0x12345678u, 0x87654321u};
+  svPutPartSelectLogic(logic, kUnaligned, 4, 32);
+  EXPECT_EQ(logic[0].aval, 0x2345678Fu);
+  EXPECT_EQ(logic[0].bval, 0x7654321Fu);
+  EXPECT_EQ(logic[1].aval, 0xC0FFEE41u);
+  EXPECT_EQ(logic[1].bval, 0x00FF00F8u);
+}
+
+TEST(Sv31aDefinitions, APartSelectCrossesAChunkBoundary) {
+  svBitVecVal bits[2] = {0x01234567u, 0x89ABCDEFu};
+  svPutPartSelectBit(bits, 0xA5u, 28, 8);
+  EXPECT_EQ(bits[0], 0x51234567u);
+  EXPECT_EQ(bits[1], 0x89ABCDEAu);
+
+  const svLogicVecVal kLogic[2] = {{0x51234567u, 0xC0000000u},
+                                   {0x89ABCDEAu, 0x00000003u}};
+  svLogicVecVal logic[2] = {kLogic[0], kLogic[1]};
+  svLogicVec32 slice = {0u, 0u};
+  svGetPartSelectLogic(&slice, logic, 28, 8);
+  EXPECT_EQ(slice.c, 0xA5u);
+  EXPECT_EQ(slice.d, 0x3Cu);
+}
+
 }  // namespace
