@@ -63,4 +63,15 @@ TEST(RandomizeStdPackageElaborator, AScopeArgumentShallBeAVariableIdentifier) {
   }
 }
 
+TEST(RandomizeStdPackageElaborator, AVoidCastDiscardsTheResultSilently) {
+  ElabFixture f;
+  EXPECT_TRUE(
+      ElabOk("module m;\n"
+             "  int a;\n"
+             "  initial void'(std::randomize(a));\n"
+             "endmodule\n",
+             f));
+  EXPECT_TRUE(f.diag.Diagnostics().empty());
+}
+
 }  // namespace
