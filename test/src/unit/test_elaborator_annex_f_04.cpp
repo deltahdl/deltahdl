@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "elaborator/rewrite_item.h"
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
 #include "parser/ast_expr.h"
 
 using namespace delta;
@@ -72,6 +76,32 @@ TEST(RewriteItem, UndefinedTypeAdmitsNothing) {
   EXPECT_FALSE(wrapped.Admits(ItemOperation::kNamedItemOfTypeOp));
   EXPECT_FALSE(wrapped.Admits(ItemOperation::kSequenceInstanceOp));
   EXPECT_FALSE(wrapped.Admits(ItemOperation::kPropertyInstanceOp));
+}
+
+std::string BoundedThroughAnUntypedFormal(const std::string& actual) {
+  return "module m;\n"
+         "  logic clk, a, b;\n"
+         "  sequence s(x); a ##[1:x] b ##0 x[0]; endsequence\n"
+         "  assert property (@(posedge clk) s(" +
+         actual +
+         "));\n"
+         "endmodule\n";
+}
+
+TEST(RewriteItem, ASelectOfAFormalBoundToAnIntegerIsLegal) {
+  ElabFixture f;
+  Elaborate(BoundedThroughAnUntypedFormal("3"), f);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(RewriteItem,
+     DISABLED_ASelectOfAFormalBoundToTheUnboundedMarkerIsReported) {
+  ElabFixture f;
+  Elaborate(BoundedThroughAnUntypedFormal("$"), f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "an actual of undefined type takes no operation "
+                            "through its formal",
+                            4, "F.4"));
 }
 
 }  // namespace
