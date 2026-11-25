@@ -167,6 +167,8 @@ std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
 
 void AdoptReferencedType(DataType& dt, const DataType& type);
 
+bool NamesPackageType(const Expr& ref, const CompilationUnit* unit);
+
 std::vector<Expr*> ResolveScopeTypeRef(DataType& dt,
                                        const std::vector<ModuleItem*>& items,
                                        Arena& arena);

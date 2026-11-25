@@ -656,6 +656,10 @@ std::vector<Expr*> ElaboratorOperationRules::ResolveUnitScopeTypeRef(
     DataType& dt, std::span<const ProceduralLocal> locals) {
   std::vector<Expr*> taken;
   const Expr* ref = dt.type_ref_expr;
+  if (NamesPackageType(*ref, unit_)) {
+    AdoptReferencedType(dt, TypeSpelledBy(ref));
+    return taken;
+  }
   InLocals(locals, [&] {
     if (std::optional<UnpackedArrayType> array =
             TypeRefValueArray(ref, nullptr)) {

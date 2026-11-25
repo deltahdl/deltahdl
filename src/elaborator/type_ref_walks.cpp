@@ -293,7 +293,7 @@ void ResolveTypeRefArguments(DataType& type,
       if (ref.type_value != nullptr) referenced = *ref.type_value;
       resolve(referenced);
       referenced.param_arg_name = arg.param_arg_name;
-      arg = referenced;
+      if (referenced.type_ref_expr == nullptr) arg = referenced;
     }
     ResolveTypeRefArguments(arg, resolve);
   }

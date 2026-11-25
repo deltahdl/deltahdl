@@ -137,6 +137,24 @@ static bool DeclaresAType(const ModuleItem& item) {
          item.kind == ModuleItemKind::kClassDecl;
 }
 
+static const PackageDecl* PackageOfScopedName(const Expr& ref,
+                                              const CompilationUnit* unit) {
+  return PackageDeclaring(unit, ref.rhs->text, [&](std::string_view package) {
+    return package == ref.lhs->text;
+  });
+}
+
+static bool IsPlainScopedName(const Expr& ref) {
+  return ref.kind == ExprKind::kMemberAccess && ref.is_scope_resolution &&
+         !ref.lhs->has_param_spec;
+}
+
+bool NamesPackageType(const Expr& ref, const CompilationUnit* unit) {
+  if (!IsPlainScopedName(ref)) return false;
+  const PackageDecl* pkg = PackageOfScopedName(ref, unit);
+  return pkg != nullptr && DeclaresAType(*ItemNamed(pkg->items, ref.rhs->text));
+}
+
 static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
                                  const TypeRefScope& scope) {
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
@@ -160,9 +178,7 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
     AdoptReferencedType(dt, *bound);
     return true;
   }
-  const PackageDecl* pkg = PackageDeclaring(
-      scope.unit, ref->rhs->text,
-      [&](std::string_view package) { return package == prefix; });
+  const PackageDecl* pkg = PackageOfScopedName(*ref, scope.unit);
   if (pkg == nullptr) return false;
   const ModuleItem& item = *ItemNamed(pkg->items, ref->rhs->text);
   AdoptReferencedType(dt, DeclaresAType(item)
