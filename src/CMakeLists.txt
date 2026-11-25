@@ -150,6 +150,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/property_instance.cpp
     elaborator/interface_property_instance.cpp
     elaborator/assertion_body_slots.cpp
+    elaborator/covergroup_expr_slots.cpp
     elaborator/package_assertion_scope.cpp
     elaborator/assertion_name_rules.cpp
     elaborator/assertion_bound_rules.cpp

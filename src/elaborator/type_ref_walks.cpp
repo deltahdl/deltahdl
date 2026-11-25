@@ -11,6 +11,7 @@
 #include "common/source_loc.h"
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assoc_index_type.h"
+#include "elaborator/covergroup_expr_slots.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -18,6 +19,7 @@
 #include "elaborator/type_ref_dynamic_element.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
+#include "parser/ast_covergroup.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -397,6 +399,24 @@ void ResolveItemArgumentTypeRefs(ModuleItem& item,
   });
 }
 
+void ResolveCovergroupPrefixTypeRefs(const CovergroupDecl& group, SourceLoc loc,
+                                     const TypeRefResolver& resolve,
+                                     Arena& arena) {
+  for (const FunctionArg& formal : group.formals)
+    ResolvePrefixTypeRefs(formal.default_value, loc, {}, resolve, arena);
+  std::vector<ProceduralLocal> formals;
+  formals.reserve(group.formals.size() + group.event.sample_formals.size());
+  for (const auto* list : {&group.formals, &group.event.sample_formals}) {
+    for (const FunctionArg& formal : *list)
+      formals.push_back(
+          {formal.name, &formal.data_type, &formal.unpacked_dims});
+  }
+  auto in_expr = [&](const Expr* e) {
+    ResolvePrefixTypeRefs(e, loc, formals, resolve, arena);
+  };
+  ForEachCovergroupExpr(group, in_expr);
+}
+
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve,
                               const CompilationUnit* unit, Arena& arena,
@@ -420,6 +440,10 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
         break;
       case ModuleItemKind::kClassDecl:
         ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena, visit);
+        break;
+      case ModuleItemKind::kCovergroupDecl:
+        ResolveCovergroupPrefixTypeRefs(*item->covergroup, item->loc, resolve,
+                                        arena);
         break;
       default:
         break;
@@ -526,6 +550,8 @@ void ResolveItemPrefixTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
   ForEachEventSlot(item.clocking_event, in_expr);
   for (const Expr* terminal : item.gate_terminals) in_expr(terminal);
   for (const auto& [port, actual] : item.inst_ports) in_expr(actual);
+  if (item.covergroup != nullptr)
+    ResolveCovergroupPrefixTypeRefs(*item.covergroup, item.loc, resolve, arena);
 }
 
 static bool HeaderRefersToAType(const ClassDecl& cls) {
@@ -626,6 +652,10 @@ class ClassTypeRefs {
     }
     if (m.kind == ClassMemberKind::kConstraint) {
       ResolveConstraintPrefixTypeRefs(m, m.loc, {}, in_class, arena_);
+      return;
+    }
+    if (m.kind == ClassMemberKind::kCovergroup) {
+      ResolveCovergroupPrefixTypeRefs(*m.covergroup, m.loc, in_class, arena_);
       return;
     }
     if (m.kind != ClassMemberKind::kProperty) return;
@@ -773,6 +803,9 @@ void ResolveUnitScopeProcedureTypeRefs(
           if (item->kind == ModuleItemKind::kFunctionDecl ||
               item->kind == ModuleItemKind::kTaskDecl) {
             ResolveProceduralTypeRefs(item, resolve, arena, visit);
+          } else if (item->kind == ModuleItemKind::kCovergroupDecl) {
+            ResolveCovergroupPrefixTypeRefs(*item->covergroup, item->loc,
+                                            resolve, arena);
           } else if (item->kind == ModuleItemKind::kClassDecl &&
                      item->class_decl->params.empty()) {
             ResolveClassTypeRefs(*item->class_decl, resolve, unit, arena,
