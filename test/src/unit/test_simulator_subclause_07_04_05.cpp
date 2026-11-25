@@ -912,4 +912,34 @@ TEST(ArrayIndexingAndSlicing,
             "3 '{1, 2, 3}\n");
 }
 
+TEST(ArrayIndexingAndSlicing, InvalidIndexWritesNoElementOfAClassProperty) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module top;\n"
+                       "  class H;\n"
+                       "    int a [1:3] = '{1, 2, 3};\n"
+                       "    int d [];\n"
+                       "    static int st [2] = '{4, 5};\n"
+                       "    function void past_the_end();\n"
+                       "      a[4] = 9;\n"
+                       "    endfunction\n"
+                       "  endclass\n"
+                       "  H h = new;\n"
+                       "  initial begin\n"
+                       "    h.d = '{6, 7};\n"
+                       "    h.a[0] = 9;\n"
+                       "    h.a[-1] = 9;\n"
+                       "    h.a[1'bx] = 9;\n"
+                       "    h.past_the_end();\n"
+                       "    h.d[5] = 9;\n"
+                       "    H::st[2] = 9;\n"
+                       "    $display(\"%p %p %p\", h.a, h.d, H::st);\n"
+                       "    h.a[3] = 8;\n"
+                       "    $display(\"%p\", h.a);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "'{1, 2, 3} '{6, 7} '{4, 5}\n"
+            "'{1, 2, 8}\n");
+}
+
 }  // namespace

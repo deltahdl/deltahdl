@@ -272,12 +272,12 @@ TEST(MailboxSim, PackageClassMailboxPropertyThroughAChainOfPackageTypedefs) {
             1u);
 }
 
-void ExpectPackagePropertyPutOfStringReported(const std::string& typedefs,
-                                              const std::string& type,
-                                              int line) {
+void ExpectPackagePropertyPutOfStringReported(
+    const std::string& typedefs, const std::string& type, int line,
+    const std::string& unit_typedefs = "") {
   SimFixture f;
-  auto* var =
-      RunAndFindVar(PackageClassMailboxSrc(typedefs, type, "\"s\""), f, "y");
+  auto* var = RunAndFindVar(
+      unit_typedefs + PackageClassMailboxSrc(typedefs, type, "\"s\""), f, "y");
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "argument to mailbox method 'put' is not type-equivalent",
@@ -298,6 +298,16 @@ TEST(MailboxSim, PackageClassMailboxPropertyThroughTypedefChainRejectsAPut) {
   ExpectPackagePropertyPutOfStringReported(
       std::string(kPackageIntMailboxTypedef) + "  typedef mb_t mb2_t;\n",
       "mb2_t", 7);
+}
+
+TEST(MailboxSim, PackageClassMailboxPropertyThroughAUnitTypedefRejectsAPut) {
+  ExpectPackagePropertyPutOfStringReported("", "mb_t", 6, kPropertyTypedefHead);
+}
+
+TEST(MailboxSim, PackageClassMailboxPropertyThroughAUnitTypedefTakesAnInt) {
+  EXPECT_EQ(
+      RunAndGet(kPropertyTypedefHead + PackageClassMailboxSrc("", "mb_t"), "y"),
+      1u);
 }
 
 TEST(SemaphoreSim, TypedefdSemaphoreHoldsItsKeys) {
