@@ -4,7 +4,6 @@
 #include <functional>
 #include <optional>
 #include <span>
-#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -616,14 +615,7 @@ std::vector<Expr*> ElaboratorOperationRules::TypeRefUnpackedDims(
 
 static ScopeMap UnitProcedureConstants(const ScopeMap& all,
                                        const PackageDecl* pkg) {
-  ScopeMap constants = all;
-  if (pkg == nullptr) return constants;
-  const std::string kPrefix = std::string(pkg->name) + ".";
-  for (const auto& [name, value] : all) {
-    if (name.starts_with(kPrefix))
-      constants[name.substr(kPrefix.size())] = value;
-  }
-  return constants;
+  return pkg == nullptr ? all : PackageConstants(all, *pkg);
 }
 
 std::optional<bool> ElaboratorOperationRules::TypeRefsMatch(

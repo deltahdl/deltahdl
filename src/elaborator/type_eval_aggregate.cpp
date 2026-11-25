@@ -1,6 +1,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <vector>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
@@ -81,22 +82,29 @@ void FoldPackedBounds(Expr*& left, Expr*& right, const ScopeMap& scope,
 
 }  // namespace
 
+void FoldUnpackedDims(std::vector<Expr*>& dims, const ScopeMap& scope,
+                      Arena& arena) {
+  for (Expr*& dim : dims) dim = FoldedUnpackedDim(dim, scope, arena);
+}
+
 void FoldMemberDims(DataType& type, const ScopeMap& scope, Arena& arena) {
   for (StructMember& m : type.struct_members) {
     FoldPackedBounds(m.packed_dim_left, m.packed_dim_right, scope, arena);
     for (auto& [left, right] : m.extra_packed_dims)
       FoldPackedBounds(left, right, scope, arena);
-    for (Expr*& dim : m.unpacked_dims)
-      dim = FoldedUnpackedDim(dim, scope, arena);
+    FoldUnpackedDims(m.unpacked_dims, scope, arena);
     if (m.nested_type == nullptr) continue;
     auto* nested = arena.Create<DataType>(*m.nested_type);
-    FoldPackedBounds(nested->packed_dim_left, nested->packed_dim_right, scope,
-                     arena);
-    for (auto& [left, right] : nested->extra_packed_dims)
-      FoldPackedBounds(left, right, scope, arena);
-    FoldMemberDims(*nested, scope, arena);
+    FoldTypeDims(*nested, scope, arena);
     m.nested_type = nested;
   }
+}
+
+void FoldTypeDims(DataType& type, const ScopeMap& scope, Arena& arena) {
+  FoldPackedBounds(type.packed_dim_left, type.packed_dim_right, scope, arena);
+  for (auto& [left, right] : type.extra_packed_dims)
+    FoldPackedBounds(left, right, scope, arena);
+  FoldMemberDims(type, scope, arena);
 }
 
 uint32_t FoldedMembersWidth(const DataType& dtype, const TypedefMap& typedefs,

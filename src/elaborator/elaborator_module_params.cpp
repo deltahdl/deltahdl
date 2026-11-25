@@ -15,9 +15,11 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/dollar_contexts.h"
 #include "elaborator/dollar_parameter_values.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_validate_internal.h"
@@ -27,6 +29,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_specify.h"
@@ -80,10 +83,6 @@ static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                              "type",
                              dt.type_name),
                  Subclause("23.10.3"));
-}
-
-static bool TypeParamPortHasDefault(const DataType& type) {
-  return type.kind != DataTypeKind::kImplicit || type.type_ref_expr != nullptr;
 }
 
 bool HasParamPortWithoutDefault(const ModuleDecl* decl) {
@@ -396,7 +395,7 @@ struct ParamPortCtx {
   const TypedefMap& typedefs;
   const ScopeMap& scope;
   std::unordered_set<std::string_view>& real_param_names;
-  const TypedefMap& written_types;
+  const AssignedTypes& written_types;
   Arena& arena;
 };
 
@@ -404,7 +403,7 @@ static const DataType* PortTypeParamType(const ModuleDecl* decl, size_t i,
                                          const ParamPortCtx& ctx) {
   auto written = ctx.written_types.find(decl->params[i].first);
   if (written != ctx.written_types.end()) {
-    return ctx.arena.Create<DataType>(written->second);
+    return ctx.arena.Create<DataType>(written->second.written);
   }
   if (i < decl->param_types.size() &&
       decl->param_types[i].kind != DataTypeKind::kImplicit) {
@@ -471,11 +470,46 @@ void Elaborator::DeclareTypeParamPortEnums(const ModuleDecl& decl,
                         FindParamOverride(params, param.name) != nullptr, mod);
 }
 
+void Elaborator::BindTypeParamDims(std::string_view name,
+                                   const std::vector<Expr*>& dims) {
+  if (dims.empty()) {
+    td_array_dims_.erase(name);
+    return;
+  }
+  td_array_dims_[name] = dims;
+  aggregate_typedef_names_.insert(name);
+}
+
+void Elaborator::BindTypeParamPort(const ModuleDecl& decl, std::size_t i,
+                                   const AssignedTypes& assigned,
+                                   RtlirParamDecl& param, RtlirModule* mod) {
+  if (!param.is_type_param) return;
+  auto given = assigned.find(param.name);
+  if (given != assigned.end()) {
+    BindTypeParamDims(param.name,
+                      WithTypedefDims(given->second.resolved.element,
+                                      given->second.resolved.dims,
+                                      {typedefs_, td_array_dims_, class_names_})
+                          .dims);
+    return;
+  }
+  const Expr* ref = decl.param_types.at(i).type_ref_expr;
+  if (ref == nullptr) return;
+  AssignedType referenced = TypeAssignedIn(mod, ref, param.loc);
+  if (referenced.written.kind == DataTypeKind::kImplicit) {
+    ReportTypeParamSetToNoType(param.name, param.loc, diag_);
+    return;
+  }
+  typedefs_[param.name] = referenced.resolved.element;
+  BindTypeParamDims(param.name, referenced.resolved.dims);
+  param.resolved_type = arena_.Create<DataType>(referenced.written);
+}
+
 void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                                         const ParamList& params,
                                         RtlirModule* mod) {
   TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
-  const TypedefMap kWrittenTypes = std::exchange(pending_type_param_types_, {});
+  const auto kWrittenTypes = std::exchange(pending_type_param_types_, {});
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   const InstanceParamAssignments kAssigns{
       params, RegisteredModuleScope(), RegisteredModule(),
@@ -492,6 +526,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     RtlirParamDecl pd = BuildParamDeclShell(
         decl, i, {typedefs_, scope, real_param_names_, kWrittenTypes, arena_},
         has_param_type);
+    BindTypeParamPort(*decl, i, kWrittenTypes, pd, mod);
     RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     const DataType* param_type =
         has_param_type ? &decl->param_types[i] : nullptr;
@@ -589,6 +624,70 @@ static bool MayHoldAggregate(const ModuleDecl* decl, std::string_view pname) {
   return type != nullptr && (type->kind == DataTypeKind::kStruct ||
                              type->kind == DataTypeKind::kUnion ||
                              type->kind == DataTypeKind::kNamed);
+}
+
+AppliedTypeParams Elaborator::ApplyTypeParams(TypeParamAssignments from,
+                                              const ModuleDecl* child_decl,
+                                              const RtlirModule* mod) {
+  from.type_of = [&](const Expr* value, SourceLoc loc) {
+    return TypeAssignedIn(mod, value, loc);
+  };
+  from.default_type = [&](const DataType& type) {
+    UnpackedArrayType shape =
+        WithTypedefDims(type, {}, {typedefs_, td_array_dims_, class_names_});
+    shape.element = InInstantiatingScope(std::move(shape.element), typedefs_);
+    return shape;
+  };
+  AppliedTypeParams applied =
+      ApplyChildTypeParams(from, child_decl, typedefs_, diag_);
+  ReportChildTypeParamsOutsideRestrictions(
+      child_decl, applied, {typedefs_, unit_, class_names_}, diag_);
+  return applied;
+}
+
+void Elaborator::ReadTypesAssigned(ParamList& params,
+                                   const ModuleDecl& child_decl,
+                                   const RtlirModule* mod) {
+  for (ParamOverride& given : params) {
+    if (!IsBodyTypeParam(&child_decl, given.name)) continue;
+    given.assigned_type = arena_.Create<AssignedType>(
+        TypeAssignedIn(mod, given.value_expr, given.value_expr->range.start));
+  }
+}
+
+bool Elaborator::NamesNoType(const DataType& type,
+                             const RtlirModule* mod) const {
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+    return false;
+  const std::string_view kName = type.type_name;
+  return !typedefs_.contains(kName) && !class_names_.contains(kName) &&
+         VisibleCovergroup(kName, mod, unit_) == nullptr;
+}
+
+AssignedType Elaborator::TypeAssignedIn(const RtlirModule* mod,
+                                        const Expr* value, SourceLoc loc) {
+  AssignedType assigned;
+  if (value->kind == ExprKind::kTypeRef) {
+    CheckTypeRefArgInner(value->lhs, loc, mod);
+    std::optional<UnpackedArrayType> referenced =
+        TypeRefOperandArray(value, mod);
+    if (!referenced || NamesNoType(referenced->element, mod)) return assigned;
+    assigned.written = std::move(referenced->element);
+    assigned.resolved.dims = std::move(referenced->dims);
+  } else {
+    assigned.written = TypeParamOverrideToDataType(value, unit_, diag_, loc);
+  }
+  if (assigned.written.kind == DataTypeKind::kImplicit) return assigned;
+  assigned.resolved =
+      WithTypedefDims(assigned.written, std::move(assigned.resolved.dims),
+                      {typedefs_, td_array_dims_, class_names_});
+  DataType& element = assigned.resolved.element;
+  element = InInstantiatingScope(std::move(element), typedefs_);
+  const ScopeMap kScope = BuildParamScope(mod);
+  FoldTypeDims(assigned.written, kScope, arena_);
+  FoldTypeDims(element, kScope, arena_);
+  FoldUnpackedDims(assigned.resolved.dims, kScope, arena_);
+  return assigned;
 }
 
 static void PushUnfoldedValue(std::string_view pname, const Expr* pexpr,

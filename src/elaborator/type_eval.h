@@ -38,6 +38,11 @@ const DataType* NamedPackedVectorType(const DataType& dtype,
 
 void FoldMemberDims(DataType& type, const ScopeMap& scope, Arena& arena);
 
+void FoldTypeDims(DataType& type, const ScopeMap& scope, Arena& arena);
+
+void FoldUnpackedDims(std::vector<Expr*>& dims, const ScopeMap& scope,
+                      Arena& arena);
+
 uint32_t PackedDimProduct(const DataType& dtype);
 
 uint32_t PackedDimProduct(const DataType& dtype, const ScopeMap& scope);

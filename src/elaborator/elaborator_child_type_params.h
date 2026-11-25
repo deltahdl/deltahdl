@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -8,6 +9,7 @@
 #include "common/source_loc.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_restriction.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -24,18 +26,24 @@ struct SavedTypedef {
   DataType prev;
 };
 
+using DefaultTypeReader = std::function<UnpackedArrayType(const DataType&)>;
+
+using AssignedTypeReader = std::function<AssignedType(const Expr*, SourceLoc)>;
+
 struct TypeParamAssignments {
   const ModuleItem* item;
   std::vector<std::pair<std::string_view, Expr*>> config;
   bool config_reset_all = false;
   std::vector<std::string_view> config_reset;
+  AssignedTypeReader type_of;
+  DefaultTypeReader default_type;
 };
 
 template <typename Overrides>
 TypeParamAssignments TypeParamSourcesFor(const ModuleItem* item,
                                          const Overrides& overrides,
                                          const std::string& inst_path) {
-  TypeParamAssignments from{item, {}, false, {}};
+  TypeParamAssignments from{item, {}, false, {}, {}, {}};
   for (const auto& ov : overrides) {
     if (ov.inst_path != inst_path) continue;
     if (ov.reset_all) from.config_reset_all = true;
@@ -58,21 +66,21 @@ struct OverridingType {
 
 struct AppliedTypeParams {
   std::vector<SavedTypedef> saved;
-  TypedefMap written;
+  AssignedTypes written;
   std::vector<OverridingType> overrides;
 };
 
 AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
                                        const ModuleDecl* child_decl,
-                                       TypedefMap& typedefs,
-                                       const CompilationUnit* unit,
-                                       DiagEngine& diag);
+                                       TypedefMap& typedefs, DiagEngine& diag);
 
 void ReportChildTypeParamsOutsideRestrictions(
     const ModuleDecl* decl, const AppliedTypeParams& applied,
     const TypeParamRestrictionScope& scope, DiagEngine& diag);
 
-bool AllTypeParamsHaveDefaults(const ModuleDecl* decl);
+DataType InInstantiatingScope(DataType dt, const TypedefMap& typedefs);
+
+bool TypeParamPortHasDefault(const DataType& type);
 
 void RestoreChildTypeParams(TypedefMap& typedefs,
                             const std::vector<SavedTypedef>& saved);

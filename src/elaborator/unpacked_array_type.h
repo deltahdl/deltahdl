@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "elaborator/const_eval.h"
@@ -28,6 +30,13 @@ struct UnpackedArrayType {
   DataType element;
   std::vector<Expr*> dims;
 };
+
+struct AssignedType {
+  DataType written;
+  UnpackedArrayType resolved;
+};
+
+using AssignedTypes = std::unordered_map<std::string_view, AssignedType>;
 
 UnpackedArrayType WithTypedefDims(const DataType& element,
                                   std::vector<Expr*> dims,

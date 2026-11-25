@@ -299,4 +299,6 @@ std::unordered_set<std::string_view> NonConfigCellNames(
 bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
                           const CompilationUnit* unit);
 
+ScopeMap PackageConstants(const ScopeMap& all, const PackageDecl& pkg);
+
 }  // namespace delta

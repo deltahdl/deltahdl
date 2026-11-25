@@ -657,9 +657,7 @@ void ValidateSpecifyBlockSpecparams(const ModuleItem* block,
 
 void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& constants,
                            DiagEngine& diag, bool parameter_is_local = false) {
-  if (item->data_type.kind == DataTypeKind::kVoid &&
-      item->typedef_type.kind != DataTypeKind::kImplicit)
-    return;
+  if (item->data_type.kind == DataTypeKind::kVoid) return;
   if (!item->init_expr) {
     diag.Error(
         item->loc,

@@ -606,7 +606,8 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
   if (bound != nullptr && bound->kind == DataTypeKind::kEnum) {
     var.enum_type_name =
-        named->scope_name.empty()
+        !bound->type_name.empty() ? bound->type_name
+        : named->scope_name.empty()
             ? named->type_name
             : *arena.Create<std::string>(std::string(named->scope_name) +
                                          "::" + std::string(named->type_name));

@@ -23,6 +23,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -34,8 +35,10 @@ namespace delta {
 
 class Arena;
 class DiagEngine;
+struct AppliedTypeParams;
 struct ContTargetLeaf;
 struct Expr;
+struct TypeParamAssignments;
 
 class Elaborator : public ElaboratorClassRules {
  public:
@@ -45,6 +48,7 @@ class Elaborator : public ElaboratorClassRules {
     const Expr* value_expr = nullptr;
     std::optional<double> real{};
     bool unfolded = false;
+    const AssignedType* assigned_type = nullptr;
   };
 
   using ParamList = std::vector<ParamOverride>;
@@ -167,8 +171,22 @@ class Elaborator : public ElaboratorClassRules {
   void CheckPropertyOperandInstances(const ModuleItem* item);
   void ElaborateAssertPropertyItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
-  void ResolveBodyTypeParam(const ModuleItem* item, RtlirParamDecl& pd,
-                            RtlirModule* mod);
+  void ResolveBodyTypeParam(const ModuleItem* item,
+                            const AssignedType& default_type,
+                            RtlirParamDecl& pd, RtlirModule* mod);
+  AssignedType TypeAssignedIn(const RtlirModule* mod, const Expr* value,
+                              SourceLoc loc);
+  void ReadTypesAssigned(ParamList& params, const ModuleDecl& child_decl,
+                         const RtlirModule* mod);
+  AppliedTypeParams ApplyTypeParams(TypeParamAssignments from,
+                                    const ModuleDecl* child_decl,
+                                    const RtlirModule* mod);
+  void BindTypeParamDims(std::string_view name, const std::vector<Expr*>& dims);
+  void BindTypeParamPort(const ModuleDecl& decl, std::size_t i,
+                         const AssignedTypes& assigned, RtlirParamDecl& param,
+                         RtlirModule* mod);
+  AssignedType BodyTypeParamDefault(ModuleItem* item, RtlirModule* mod);
+  bool NamesNoType(const DataType& type, const RtlirModule* mod) const;
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
 

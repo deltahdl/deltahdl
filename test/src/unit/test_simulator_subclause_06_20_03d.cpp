@@ -215,4 +215,122 @@ TEST(ScopeTypeParameterSim, PackageTypeParameterNamesAClass) {
   LowerRunAndCheck(f, design, {{"r1", 70u}});
 }
 
+TEST(UnpackedArrayTypeParameter, EveryUnitTakesItsDimensions) {
+  constexpr std::string_view kBody =
+      "  T x;\n"
+      "  initial $display(\"%0d %0d\", $size(x), $bits(x));\n";
+  for (const char* unit : {"module", "interface", "program"}) {
+    for (const char* header :
+         {" #(type T = int) ();\n", ";\n  parameter type T = int;\n"}) {
+      SCOPED_TRACE(std::string(unit) + header);
+      SimFixture f;
+      EXPECT_EQ(RunCapture(std::string(unit) + " sub" + header +
+                               std::string(kBody) + "end" + unit +
+                               "\n"
+                               "module top;\n"
+                               "  typedef byte arr_t [4];\n"
+                               "  typedef int pair_t [2][3];\n"
+                               "  arr_t v;\n"
+                               "  sub #(.T(arr_t)) s1();\n"
+                               "  sub #(arr_t) s2();\n"
+                               "  sub #(pair_t) s3();\n"
+                               "  sub #(type(v)) s4();\n"
+                               "  sub s5();\n"
+                               "endmodule\n",
+                           f),
+                "4 32\n4 32\n2 192\n4 32\n32 32\n");
+    }
+  }
+}
+
+TEST(UnpackedArrayTypeParameter, DefaultsTakeTheirDimensions) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk; typedef byte arr_t [4]; endpackage\n"
+                 "typedef shortint unit_t [5];\n"
+                 "module a #(type T = pk::arr_t, U = unit_t, V = T) ();\n"
+                 "  T x; U y; V z;\n"
+                 "  initial $display(\"%0d %0d %0d\", $bits(x), $bits(y),\n"
+                 "                   $bits(z));\n"
+                 "endmodule\n"
+                 "module b;\n"
+                 "  import pk::arr_t;\n"
+                 "  typedef int own_t [3];\n"
+                 "  parameter type T = pk::arr_t, U = unit_t, V = own_t;\n"
+                 "  T x; U y; V z;\n"
+                 "  initial $display(\"%0d %0d %0d\", $bits(x), $bits(y),\n"
+                 "                   $bits(z));\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  a u1();\n"
+                 "  b u2();\n"
+                 "endmodule\n",
+                 f),
+      "32 80 32\n32 80 96\n");
+}
+
+TEST(UnpackedArrayTypeParameter, VariableSizedArraysKeepTheirMethods) {
+  for (const char* header :
+       {" #(type T = int) ();\n", ";\n  parameter type T = int;\n"}) {
+    SCOPED_TRACE(header);
+    SimFixture f;
+    EXPECT_EQ(
+        RunCapture(std::string("module d") + header +
+                       "  T v;\n"
+                       "  initial begin\n"
+                       "    v = new[3];\n"
+                       "    $display(\"%0d\", v.size());\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module q" +
+                       header +
+                       "  T v;\n"
+                       "  initial begin\n"
+                       "    v.push_back(1);\n"
+                       "    v.push_back(2);\n"
+                       "    #1 $display(\"%0d %0d\", v.size(), v[1]);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module a" +
+                       header +
+                       "  T v;\n"
+                       "  initial begin\n"
+                       "    v[\"x\"] = 1;\n"
+                       "    #2 $display(\"%0d %0d\", v.num(), v[\"x\"]);\n"
+                       "  end\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  typedef int dyn_t [];\n"
+                       "  typedef int queue_t [$];\n"
+                       "  typedef int assoc_t [string];\n"
+                       "  d #(dyn_t) s1();\n"
+                       "  q #(queue_t) s2();\n"
+                       "  a #(assoc_t) s3();\n"
+                       "endmodule\n",
+                   f),
+        "3\n2 2\n1 1\n");
+  }
+}
+
+TEST(UnpackedArrayTypeParameter, ClassSpecializationTakesItsDimensions) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef int unit_t [4];\n"
+                       "class C #(type T = int);\n"
+                       "  T v;\n"
+                       "  function int bits(); return $bits(v); endfunction\n"
+                       "  function int last(); v[2] = 7; return v[2];\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module top;\n"
+                       "  typedef int arr_t [3];\n"
+                       "  C #(arr_t) a = new;\n"
+                       "  C #(unit_t) b = new;\n"
+                       "  C c = new;\n"
+                       "  initial $display(\"%0d %0d %0d %0d\", a.bits(),\n"
+                       "                   a.last(), b.bits(), c.bits());\n"
+                       "endmodule\n",
+                       f),
+            "96 7 128 32\n");
+}
+
 }  // namespace

@@ -568,12 +568,11 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   std::vector<std::string_view> config_locked;
   ApplyConfigParamOverrides(item, child_decl, child_params, parent_scope,
                             config_locked);
+  ReadTypesAssigned(child_params, *child_decl, mod);
 
-  auto applied_type_params = ApplyChildTypeParams(
+  auto applied_type_params = ApplyTypeParams(
       TypeParamSourcesFor(item, instance_param_overrides_, config_inst_path_),
-      child_decl, typedefs_, unit_, diag_);
-  ReportChildTypeParamsOutsideRestrictions(
-      child_decl, applied_type_params, {typedefs_, unit_, class_names_}, diag_);
+      child_decl, mod);
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
     nested_default_clock_ = DefaultClockingEvent(mod);

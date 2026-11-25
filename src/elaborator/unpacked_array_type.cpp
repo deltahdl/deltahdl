@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <utility>
 #include <vector>
@@ -109,10 +110,11 @@ UnpackedArrayType WithTypedefDims(const DataType& element,
   UnpackedArrayType array{element, dims};
   const DataType* at = &element;
   for (int names = 0; names < kMaxTypedefNames; ++names) {
-    if (at->kind != DataTypeKind::kNamed || !at->scope_name.empty()) break;
-    auto named = tables.typedefs.find(at->type_name);
+    if (at->kind != DataTypeKind::kNamed) break;
+    const std::string kName = NamedTypeKey(*at);
+    auto named = tables.typedefs.find(kName);
     if (named == tables.typedefs.end()) break;
-    auto written = tables.typedef_dims.find(at->type_name);
+    auto written = tables.typedef_dims.find(kName);
     if (written != tables.typedef_dims.end()) {
       dims.insert(dims.end(), written->second.begin(), written->second.end());
       array = UnpackedArrayType{named->second, dims};

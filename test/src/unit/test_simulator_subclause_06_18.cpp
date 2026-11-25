@@ -657,8 +657,7 @@ TEST(TypedefSim, CastToAnUnpackedArrayTypeGoesThroughItsTypedefName) {
             "1 3\n");
 }
 
-TEST(TypedefSim,
-     DISABLED_TypeParameterGivenAnUnpackedArrayTypedefKeepsItsDimensions) {
+TEST(TypedefSim, TypeParameterGivenAnUnpackedArrayTypedefKeepsItsDimensions) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub #(parameter type T = int);\n"
                        "  T v;\n"

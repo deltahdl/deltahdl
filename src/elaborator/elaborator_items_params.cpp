@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdint>
 #include <format>
-#include <functional>
 #include <optional>
 #include <string_view>
 #include <unordered_map>
@@ -27,6 +26,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
+#include "elaborator/unpacked_array_type.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -99,6 +99,15 @@ std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
   return FoldDeclaredParamValue(value, type, scope);
 }
 
+void ReportTypeParamSetToNoType(std::string_view name, SourceLoc loc,
+                                DiagEngine& diag) {
+  diag.Error(loc,
+             std::format("type parameter '{}' can only be set to a data "
+                         "type, not a value expression",
+                         name),
+             Subclause("6.20.3"));
+}
+
 void ResolveConstantValue(RtlirParamDecl& pd, const Expr* init,
                           const DataType& type, const ScopeMap& scope) {
   if (TryFoldRealParamValue(pd, init, type, scope)) return;
@@ -117,14 +126,8 @@ namespace {
 
 void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
-      item->typedef_type.kind == DataTypeKind::kImplicit &&
-      item->init_expr != nullptr &&
-      item->init_expr->kind != ExprKind::kTypeRef) {
-    diag.Error(item->loc,
-               std::format("type parameter '{}' can only be set to a data "
-                           "type, not a value expression",
-                           item->name),
-               Subclause("6.20.3"));
+      item->typedef_type.kind == DataTypeKind::kImplicit) {
+    ReportTypeParamSetToNoType(item->name, item->loc, diag);
   }
 }
 
@@ -147,39 +150,14 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
   RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
 }
 
-bool ResolveTypeOperatorDefault(
-    ModuleItem* item, const CompilationUnit* unit,
-    const std::function<void(DataType&)>& resolve_expr_type) {
-  if (item->data_type.kind != DataTypeKind::kVoid ||
-      item->typedef_type.kind != DataTypeKind::kImplicit ||
-      item->init_expr == nullptr || item->init_expr->kind != ExprKind::kTypeRef)
-    return false;
-  const Expr* ref = item->init_expr;
-  if (ref->text.empty()) {
-    if (ref->lhs == nullptr) return false;
-    DataType dt;
-    dt.type_ref_expr = ref->lhs;
-    resolve_expr_type(dt);
-    if (dt.type_ref_expr == nullptr) item->typedef_type = dt;
-  } else if (ref->scope_prefix.empty()) {
-    item->typedef_type = ref->type_value != nullptr
-                             ? *ref->type_value
-                             : TypeNameToDataType(ref->text);
-  } else if (const DataType* scoped = FindClassScopedTypedefType(
-                 ref->scope_prefix, ref->text, unit)) {
-    item->typedef_type = *scoped;
-  }
-  return item->typedef_type.kind != DataTypeKind::kImplicit;
-}
-
 struct AssignedTypeParam {
-  DataType type;
+  AssignedType type;
   SourceLoc loc;
 };
 
 std::optional<AssignedTypeParam> AssignedTypeParamType(
     const ModuleItem* item, RtlirParamDecl& pd, const RtlirModule* mod,
-    const CompilationUnit* unit, DiagEngine& diag) {
+    const AssignedType& default_type, DiagEngine& diag) {
   const InstanceParamAssignments* assigns =
       pd.is_localparam || !pd.gen_block_prefix.empty() ? nullptr
                                                        : BodyParamAssignments();
@@ -187,12 +165,10 @@ std::optional<AssignedTypeParam> AssignedTypeParamType(
       assigns == nullptr ? nullptr
                          : FindParamOverride(assigns->params, item->name);
   if (ovr == nullptr || ovr->value_expr == nullptr) {
-    return AssignedTypeParam{item->typedef_type, item->loc};
+    return AssignedTypeParam{default_type, item->loc};
   }
   const SourceLoc kLoc = ovr->value_expr->range.start;
-  DataType resolved =
-      TypeParamOverrideToDataType(ovr->value_expr, unit, diag, kLoc);
-  if (resolved.kind == DataTypeKind::kImplicit) {
+  if (ovr->assigned_type->written.kind == DataTypeKind::kImplicit) {
     diag.Error(kLoc,
                std::format("parameter value assignment for type parameter '{}' "
                            "of '{}' does not name a type",
@@ -201,7 +177,7 @@ std::optional<AssignedTypeParam> AssignedTypeParamType(
     return std::nullopt;
   }
   pd.from_override = true;
-  return AssignedTypeParam{resolved, kLoc};
+  return AssignedTypeParam{*ovr->assigned_type, kLoc};
 }
 
 void ReportAssignedTypeOutsideRestriction(
@@ -210,8 +186,8 @@ void ReportAssignedTypeOutsideRestriction(
   const RestrictedTypeParam kParam{item->name, item->forward_type_kind};
   ReportTypeOutsideRestriction(kParam, item->typedef_type, item->loc, scope,
                                diag);
-  ReportTypeOutsideRestriction(kParam, assigned.type, assigned.loc, scope,
-                               diag);
+  ReportTypeOutsideRestriction(kParam, assigned.type.resolved.element,
+                               assigned.loc, scope, diag);
 }
 
 void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
@@ -267,26 +243,38 @@ void RecordTypeParamActual(RtlirParamDecl& pd,
 }
 
 void Elaborator::ResolveBodyTypeParam(const ModuleItem* item,
+                                      const AssignedType& default_type,
                                       RtlirParamDecl& pd, RtlirModule* mod) {
   ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
                                  {mod->params, typedefs_, class_names_, unit_},
                                  diag_);
-  auto assigned = AssignedTypeParamType(item, pd, mod, unit_, diag_);
+  auto assigned = AssignedTypeParamType(item, pd, mod, default_type, diag_);
   if (!assigned) return;
   ReportAssignedTypeOutsideRestriction(item, *assigned,
                                        {typedefs_, unit_, class_names_}, diag_);
-  typedefs_[item->name] = assigned->type;
-  pd.resolved_type = arena_.Create<DataType>(assigned->type);
+  RecordTypedef(typedefs_, item->name, assigned->type.resolved.element);
+  BindTypeParamDims(item->name, assigned->type.resolved.dims);
+  pd.resolved_type = arena_.Create<DataType>(assigned->type.written);
+}
+
+AssignedType Elaborator::BodyTypeParamDefault(ModuleItem* item,
+                                              RtlirModule* mod) {
+  if (item->data_type.kind != DataTypeKind::kVoid) return {};
+  if (item->init_expr != nullptr &&
+      item->init_expr->kind == ExprKind::kTypeRef) {
+    AssignedType referenced = TypeAssignedIn(mod, item->init_expr, item->loc);
+    item->typedef_type = referenced.written;
+    return referenced;
+  }
+  return {item->typedef_type,
+          WithTypedefDims(item->typedef_type, {},
+                          {typedefs_, td_array_dims_, class_names_})};
 }
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->data_type, item->loc, mod);
-  bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
-                 item->typedef_type.kind != DataTypeKind::kImplicit;
-  if (!is_type) {
-    is_type = ResolveTypeOperatorDefault(
-        item, unit_, [&](DataType& dt) { ResolveTypeRef(dt, item->loc, mod); });
-  }
+  const AssignedType kDefaultType = BodyTypeParamDefault(item, mod);
+  const bool kIsType = kDefaultType.written.kind != DataTypeKind::kImplicit;
 
   CheckTypeParamNotSetToValue(item, diag_);
 
@@ -294,20 +282,20 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.name = item->name;
   pd.loc = item->loc;
   pd.gen_block_prefix = InternedGenPrefix();
-  pd.is_type_param = is_type;
+  pd.is_type_param = kIsType;
 
   pd.is_localparam = item->is_localparam || mod->has_param_port_list;
   pd.default_value = item->init_expr;
   if (!item->unpacked_dims.empty()) pd.unpacked_dims = &item->unpacked_dims;
-  if (is_type) {
-    ResolveBodyTypeParam(item, pd, mod);
+  if (kIsType) {
+    ResolveBodyTypeParam(item, kDefaultType, pd, mod);
     DeclareTypeParamEnums(item->typedef_type, pd, pd.from_override, mod);
   } else {
     EmitBareEnumMembers(item, mod);
   }
   const ScopeMap kScope = BuildParamScope(mod);
   FoldParamUnpackedBounds(pd, kScope);
-  if (!is_type) {
+  if (!kIsType) {
     PopulateValueParamInfo(pd, item, real_param_names_, typedefs_, kScope);
     RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
     RecordParamDeclRange(pd, item->data_type, kScope);
@@ -332,7 +320,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
                   Subclause("6.20.7"));
     }
     ValidateTypenameAsElabConstant(item->init_expr);
-    ResolveParamConstValue(pd, item, is_type, kScope, arena_);
+    ResolveParamConstValue(pd, item, kIsType, kScope, arena_);
     RecordUntypedRealParam(pd, item, real_param_names_);
   }
   mod->params.push_back(pd);

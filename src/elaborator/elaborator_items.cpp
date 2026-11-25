@@ -11,6 +11,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
@@ -385,6 +386,17 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   });
 }
 
+static ModuleItem* DeclarationOfInstance(ModuleItem* item,
+                                         const RtlirModule& mod, Arena& arena) {
+  const DataType& type = item->data_type;
+  const bool kNamesTypeParam =
+      type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
+      std::ranges::any_of(mod.params, [&](const RtlirParamDecl& param) {
+        return param.is_type_param && param.name == type.type_name;
+      });
+  return kNamesTypeParam ? arena.Create<ModuleItem>(*item) : item;
+}
+
 bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   auto make_implicit_net = [&](std::string_view n, SourceLoc l) {
     MaybeCreateImplicitNet(n, l, mod);
@@ -394,7 +406,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNetDecl(item, mod);
       return true;
     case ModuleItemKind::kVarDecl:
-      ElaborateVarDecl(item, mod);
+      ElaborateVarDecl(DeclarationOfInstance(item, *mod, arena_), mod);
       return true;
     case ModuleItemKind::kContAssign:
       ElaborateContAssign(item, mod);

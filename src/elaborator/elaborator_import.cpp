@@ -3,10 +3,12 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 #include "common/arena.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/nettype_registration.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -70,7 +72,10 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
   } else if (pi->kind == ModuleItemKind::kNettypeDecl) {
     RegisterImportedNettype(pkg.name, pi->name, name, scope);
   } else if (pi->kind == ModuleItemKind::kTypedef) {
-    scope.typedefs[name] = PackageTypedefType(*pi, pkg, scope.arena);
+    DataType type = PackageTypedefType(*pi, pkg, scope.arena);
+    FoldTypeDims(type, PackageConstants(scope.cu_param_scope, pkg),
+                 scope.arena);
+    scope.typedefs[name] = std::move(type);
     if (!pi->unpacked_dims.empty()) scope.aggregate_typedefs.insert(name);
   } else if (pi->kind == ModuleItemKind::kParamDecl) {
     RegisterImportedParam(pi, pkg, name, scope);

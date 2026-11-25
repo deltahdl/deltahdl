@@ -30,6 +30,7 @@
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_param_values.h"
+#include "elaborator/unpacked_array_type.h"
 #include "elaborator/uwire_drivers.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -147,7 +148,7 @@ class ElaboratorData {
   BoundCheckerFormals pending_checker_actuals_;
   ActualsByFormal pending_checker_tree_actuals_;
   std::unordered_map<const RtlirModule*, ActualsByFormal> checker_tree_actuals_;
-  TypedefMap pending_type_param_types_;
+  AssignedTypes pending_type_param_types_;
 
   std::unordered_set<std::string_view> declared_names_;
   std::unordered_set<std::string_view> dpi_import_names_;

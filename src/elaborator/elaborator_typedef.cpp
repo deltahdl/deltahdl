@@ -621,6 +621,27 @@ static void EmitWildcardImportEnumLiterals(
   }
 }
 
+static void EmitNamedImportEnumTypes(const std::vector<ModuleItem*>& items,
+                                     RtlirModule* mod,
+                                     const ImportedEnumCtx& ctx) {
+  for (const auto* item : items) {
+    if (item->kind != ModuleItemKind::kImportDecl) continue;
+    const ImportItem& imp = item->import_item;
+    const PackageDecl* pkg = FindUnitPackage(ctx.unit, imp.package_name);
+    if (imp.is_wildcard || pkg == nullptr) continue;
+    for (ModuleItem* declared : pkg->items) {
+      if (declared->name != imp.item_name) continue;
+      std::unordered_set<std::string_view> literals;
+      ForEachEnumTypeOfItem(declared,
+                            [&](std::string_view, const DataType& type) {
+                              for (const EnumMember& member : type.enum_members)
+                                literals.insert(member.name);
+                            });
+      EmitEnumLiteralsOfItems({declared}, mod, ctx, literals);
+    }
+  }
+}
+
 void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
                                   const ImportedEnumCtx& ctx) {
   const std::vector<ModuleItem*> kUnitBefore =
@@ -630,6 +651,8 @@ void RegisterImportedEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,
   unit_explicit.insert(module_explicit.begin(), module_explicit.end());
   EmitWildcardImportEnumLiterals(kUnitBefore, mod, ctx, unit_explicit);
   EmitWildcardImportEnumLiterals(decl->items, mod, ctx, module_explicit);
+  EmitNamedImportEnumTypes(kUnitBefore, mod, ctx);
+  EmitNamedImportEnumTypes(decl->items, mod, ctx);
 }
 
 void RegisterCuEnumLiterals(const ModuleDecl* decl, RtlirModule* mod,

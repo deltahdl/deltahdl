@@ -128,8 +128,8 @@ TEST(TypeRefCompareInstanceSim, EachLoopIterationComparesItsOwnWidth) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), (kNoneMatch << 16) | kAllMatch);
 }
 
-TEST(TypeRefOverrideSim, DISABLED_TypeReferenceOverridesATypeParameter) {
-  EXPECT_EQ(RunAndGet("module add_float #(type T = int) (input T a);\n"
+TEST(TypeRefOverrideSim, TypeReferenceOverridesATypeParameter) {
+  EXPECT_EQ(RunAndGet("module add_float #(type T = int) (input var T a);\n"
                       "  localparam int W = $bits(T);\n"
                       "  localparam bit IsReal = type(T) == type(real);\n"
                       "endmodule\n"

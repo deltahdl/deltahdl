@@ -232,6 +232,25 @@ void RegisterPackageTypedefs(
   }
 }
 
+static void FoldPackageTypedefs(
+    const CompilationUnit& unit, const ScopeMap& constants,
+    TypedefMap& typedefs,
+    std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
+    Arena& arena) {
+  for (const PackageDecl* pkg : unit.packages) {
+    const ScopeMap kInPackage = PackageConstants(constants, *pkg);
+    for (const ModuleItem* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kTypedef) continue;
+      const std::string kKey =
+          std::string(pkg->name) + "::" + std::string(item->name);
+      FoldTypeDims(typedefs.at(kKey), kInPackage, arena);
+      auto dims = td_array_dims.find(kKey);
+      if (dims != td_array_dims.end())
+        FoldUnpackedDims(dims->second, kInPackage, arena);
+    }
+  }
+}
+
 static void MarkPackageStagedArrays(CompilationUnit* unit) {
   for (auto* pkg : unit->packages) {
     std::unordered_set<std::string_view> array_typedefs;
@@ -304,7 +323,9 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   if (!item->name.empty()) scope.names.insert(item->name);
   BindEnumConstantsOfItem(item, scope.param_scope, scope.arena);
   if (item->kind == ModuleItemKind::kTypedef) {
-    scope.typedefs[item->name] = item->typedef_type;
+    DataType type = item->typedef_type;
+    FoldTypeDims(type, scope.param_scope, scope.arena);
+    scope.typedefs[item->name] = std::move(type);
     if (!item->unpacked_dims.empty())
       scope.aggregate_typedefs.insert(item->name);
   } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
@@ -469,6 +490,16 @@ bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
          FindUdpInLibrary(src_lib, name, unit) != nullptr;
 }
 
+ScopeMap PackageConstants(const ScopeMap& all, const PackageDecl& pkg) {
+  ScopeMap constants = all;
+  const std::string kPrefix = std::string(pkg.name) + ".";
+  for (const auto& [name, value] : all) {
+    if (name.starts_with(kPrefix))
+      constants[name.substr(kPrefix.size())] = value;
+  }
+  return constants;
+}
+
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
   TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
@@ -489,12 +520,18 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterScopedClassNames(unit_, class_names_, arena_);
   MarkPackageStagedArrays(unit_);
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
+  FoldPackageTypedefs(*unit_, cu_param_scope_, typedefs_, td_array_dims_,
+                      arena_);
   for (auto* item : unit_->cu_items) {
     if (item->kind == ModuleItemKind::kImportDecl)
       RecordUnitParamImport({}, item->import_item);
     ClassifyCuScopeItem(item, cu_scope);
-    if (item->kind == ModuleItemKind::kTypedef && !item->unpacked_dims.empty())
-      td_array_dims_[item->name] = item->unpacked_dims;
+    if (item->kind == ModuleItemKind::kTypedef &&
+        !item->unpacked_dims.empty()) {
+      std::vector<Expr*> dims = item->unpacked_dims;
+      FoldUnpackedDims(dims, cu_param_scope_, arena_);
+      td_array_dims_[item->name] = std::move(dims);
+    }
     if (item->kind == ModuleItemKind::kNettypeDecl) {
       typedefs_[item->name] = item->typedef_type;
       nettype_names_.insert(item->name);

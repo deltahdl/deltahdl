@@ -358,6 +358,33 @@ TEST(NoDefaultParameterElaboration,
 }
 
 TEST(NoDefaultParameterElaboration,
+     TopNamedWithATypeParameterWithoutADefaultIsReported) {
+  for (const char* unit : {"module", "program"}) {
+    for (const char* given :
+         {"type T", "type T, U = byte", "int P = 1, type T"}) {
+      SCOPED_TRACE(std::string(unit).append(" #(").append(given));
+      ElabFixture f;
+      ElaborateSrc(std::string("\n")
+                       .append(unit)
+                       .append(" lib #(")
+                       .append(given)
+                       .append(") ();\nend")
+                       .append(unit)
+                       .append("\n"),
+                   f, "lib");
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "type parameter 'T' of 'lib' has no default "
+                                "type and no override at instantiation",
+                                2, "6.20.1"));
+    }
+    EXPECT_TRUE(ElabOk(std::string(unit)
+                           .append(" lib #(type T = int, U = T) ();\nend")
+                           .append(unit)
+                           .append("\n")));
+  }
+}
+
+TEST(NoDefaultParameterElaboration,
      NestedModuleWithATypeParameterWithoutADefaultIsNotInstantiated) {
   ElabFixture f;
   auto* design = ElaborateSrc(

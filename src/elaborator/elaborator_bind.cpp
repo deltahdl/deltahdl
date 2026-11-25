@@ -8,6 +8,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -16,6 +17,7 @@
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_bind_params.h"
+#include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_modport_imports.h"
@@ -458,7 +460,12 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
   ParamList child_params;
   ScopeMap target_scope = BuildParamScope(target, {});
   ResolveInstParams(item, child_decl, target_scope, child_params, diag_);
+  ReadTypesAssigned(child_params, *child_decl, target);
+  AppliedTypeParams applied =
+      ApplyTypeParams({item, {}, false, {}, {}, {}}, child_decl, target);
+  pending_type_param_types_ = std::move(applied.written);
   auto* resolved = ElaborateModule(child_decl, child_params);
+  RestoreChildTypeParams(typedefs_, applied.saved);
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = item->inst_name;

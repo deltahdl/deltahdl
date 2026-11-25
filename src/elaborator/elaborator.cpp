@@ -407,18 +407,15 @@ bool Elaborator::ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
     std::vector<std::string_view> config_locked;
     ModuleItem top_item;
     top_item.inst_module = mod_decl->name;
+    top_item.loc = mod_decl->range.start;
     ApplyConfigParamOverrides(&top_item, mod_decl, top_params, cu_param_scope_,
                               config_locked);
-    AppliedTypeParams applied_type_params;
-    if (AllTypeParamsHaveDefaults(mod_decl)) {
-      applied_type_params = ApplyChildTypeParams(
-          TypeParamSourcesFor(&top_item, instance_param_overrides_,
-                              config_inst_path_),
-          mod_decl, typedefs_, unit_, diag_);
-      ReportChildTypeParamsOutsideRestrictions(mod_decl, applied_type_params,
-                                               {typedefs_, unit_, class_names_},
-                                               diag_);
-    }
+    const RtlirModule kUnitScope;
+    ReadTypesAssigned(top_params, *mod_decl, &kUnitScope);
+    AppliedTypeParams applied_type_params = ApplyTypeParams(
+        TypeParamSourcesFor(&top_item, instance_param_overrides_,
+                            config_inst_path_),
+        mod_decl, &kUnitScope);
     pending_type_param_types_ = std::move(applied_type_params.written);
     auto* top = ElaborateModule(mod_decl, top_params);
     RestoreChildTypeParams(typedefs_, applied_type_params.saved);
