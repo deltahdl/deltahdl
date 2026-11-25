@@ -10,7 +10,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name to `git add` a path neither on disk nor in the index; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
-- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it finishes, every case of each one's rule passing; only a red-run fix, writing `Refs #N` for each issue whose tests it changes, or a change the user asks for may close none.
+- [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it finishes, every case each one lists passing; only a red-run fix, writing `Refs #N` for each issue whose tests it changes, or a change the user asks for may close none.
 - [A commit body is left unwrapped](commit-body-left-unwrapped.md) — each body paragraph on one line, never broken at a column; pre-push-checks refuses a paragraph running onto a second line.
 - [Closing keywords](closing-keywords.md) — nine words close an issue from anywhere in a message; `Closes #N` on its own line per finished issue, `Refs #N` or `See #N` to mention.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
@@ -51,7 +51,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [A deleted test leaves its cases shown](a-deleted-test-leaves-its-cases-shown.md) — establish what it asserts, what the standard requires and what still shows each correct case; the commit says so.
 - [Test-driven development](test-driven-development.md) — tests first, each seen to fail for its issue's reason before the fix; a test lands in the same commit as its code, and no src line lands uncovered.
 - [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
-- [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
+- [Fixing a rule in full](fixing-a-rule-in-full.md) — list every case of the rule, each on the issue of its part, then test and fix every case the issue in hand lists in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
 - [Rename rather than delete a duplicate](renaming-rather-than-deleting-a-duplicate-test.md) — keep both files covering one rule and qualify the names.
@@ -94,9 +94,9 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Issues
 
-- [What does not get filed](what-does-not-get-filed.md) — a case of the rule in hand joins the fix and one of an open issue's rule joins that issue; only a defect with no rule behind it is fixed on the spot.
+- [What does not get filed](what-does-not-get-filed.md) — a case of the part of a rule in hand joins the fix and one of an open issue's part joins that issue; only a defect with no rule behind it is fixed on the spot.
 - [Searching for an existing report before filing](searching-for-an-existing-report-before-filing.md) — grep all of src/ and test/ for the rule's own words before filing "not reported".
-- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one rule with every case listed, or one defect with one fix; split two rules, merge cases of one.
+- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one rule, or one part of a rule that a small commit takes, with every case listed, or one defect with one fix; split two, merge cases of one.
 - [Research lives in issues](research-lives-in-issues.md) — file a plan that outlives the session, and each finding, as it arises.
 - [Issues carry a standard label and a clause label](issues-carry-a-standard-and-a-clause-label.md) — a standard's issue carries its standard's label and its `§N` or `Annex X`, as does a defect whose fix rewrites a rule's tests; a coverage or harness issue neither.
 - [Issue sections take headings](issue-sections-take-headings.md) — open each section of an issue body with `## Heading`, never a bolded first sentence.
