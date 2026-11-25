@@ -508,9 +508,13 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
     if (!member->typedef_item->unpacked_dims.empty()) continue;
     auto* alias = arena.Create<std::string>(std::string(info->name) +
                                             "::" + std::string(member->name));
-    if (ctx.FindClassType(*alias) != nullptr) continue;
-    ClassTypeInfo* cls = ClassNamedByTypedef(member->typedef_item->typedef_type,
-                                             info, ctx, arena);
+    const DataType& target = member->typedef_item->typedef_type;
+    const ClassTypeInfo* registered = ctx.FindClassType(*alias);
+    if (registered != nullptr &&
+        (target.type_params.empty() || registered->param_actuals != nullptr)) {
+      continue;
+    }
+    ClassTypeInfo* cls = ClassNamedByTypedef(target, info, ctx, arena);
     if (cls != nullptr) ctx.RegisterClassType(*alias, cls);
   }
 }
