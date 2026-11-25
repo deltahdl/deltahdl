@@ -9,7 +9,7 @@ Every form's work, reading, searching and filing as well as code, is done in the
 
 ## Reminders
 
-Each reminder states one indivisible matter and fires every 10 minutes, per `.claude/memories/a-reminder-states-one-matter.md`. Reminders share minutes, so a scheduled job is told apart from another by its prompt.
+Each reminder states one indivisible matter and fires every 15 minutes, per `.claude/memories/a-reminder-states-one-matter.md`. Two reminders can share a minute, so a scheduled job is told apart from another by its prompt.
 
 What the user instructs is done in full and at once, whatever a reminder says, per `.claude/memories/what-the-user-instructs-is-done.md`.
 
@@ -19,30 +19,30 @@ Every `start` form creates these.
 
 | Cron | Prompt |
 | --- | --- |
-| `0,10,20,30,40,50 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth for SystemVerilog.` |
-| `1,11,21,31,41,51 * * * *` | `REMINDER: sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests.` |
-| `2,12,22,32,42,52 * * * *` | `REMINDER: ~/IEEE 1800.2-2020.pdf is the source of truth for UVM.` |
-| `3,13,23,33,43,53 * * * *` | `REMINDER: Every section of ~/IEEE 1800-2023.pdf has been swept and a test written for each case of each rule it states: a plain name passes, and DISABLED_ marks what deltahdl does not yet do, so take a case's test to be under test/ already.` |
-| `4,14,24,34,44,54 * * * *` | `REMINDER: Before proposing or adding a test, search all of test/ for one that already shows the case, open it, trace the code it runs, and add yours once you can name what it would catch that the existing one would not.` |
-| `5,15,25,35,45,55 * * * *` | `REMINDER: Before deleting or weakening a test, establish what it asserts, what the standard requires and which remaining test shows each of its correct cases, and say so in the commit that removes it.` |
-| `6,16,26,36,46,56 * * * *` | `REMINDER: While anything runs in the background, whether a CI run, a build, a test run, the pre-push check or any other command, only wait until its notification arrives, except for what the user instructs, which is done in full at once.` |
-| `7,17,27,37,47,57 * * * *` | `REMINDER: Start a background command as the last call of a turn.` |
-| `8,18,28,38,48,58 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue.` |
-| `9,19,29,39,49,59 * * * *` | `REMINDER: Fix a defect outside the rule in hand on the spot when that is quicker and safer than filing it, and file it otherwise.` |
-| `0,10,20,30,40,50 * * * *` | `REMINDER: File one issue per rule of a standard that deltahdl breaks or leaves untested, listing every case of it, or one per problem with deltahdl itself, such as a coverage gap.` |
-| `1,11,21,31,41,51 * * * *` | `REMINDER: Label an issue of a standard with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; an issue about deltahdl itself takes neither.` |
-| `2,12,22,32,42,52 * * * *` | `REMINDER: Build and run each case's test before writing its fix, and read why it fails: it fails for the reason its issue names, or it has found another defect, which is fixed on the spot or filed before the fix is designed.` |
-| `3,13,23,33,43,53 * * * *` | `REMINDER: Before every push, commit, then run .claude/skills/pre-push-checks/check.sh in the background over the touched test files, naming at most the targets that hold the existing tests of the rule in hand; push once it prints that every check passed, or reports only a changed line that a test file it did not run reaches.` |
-| `4,14,24,34,44,54 * * * *` | `REMINDER: Leave to CI every unit test beyond the rule in hand and the touched files, clang-tidy beyond the touched files, and the integration and e2e runs.` |
-| `5,15,25,35,45,55 * * * *` | `REMINDER: Keep the task list current with TaskCreate and TaskUpdate: add a task when it arises, mark each one as it starts and finishes, rewrite or remove one whose shape changed or that turned out unneeded, and delete finished ones, so the list says what is left to do.` |
-| `6,16,26,36,46,56 * * * *` | `REMINDER: Before fixing an issue of a standard, list every case of the rule it documents: each form the rule allows and each form it forbids, written in every place the standard lets that form appear (a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies) and with every kind of operand or type the rule names.` |
-| `7,17,27,37,47,57 * * * *` | `REMINDER: Make deltahdl pass the test of every case of the rule in the same commit, with the test showing a forbidden form reported beside one showing the nearest allowed form accepted without a report.` |
+| `1,16,31,46 * * * *` | `REMINDER: ~/IEEE 1800-2023.pdf is the source of truth for SystemVerilog.` |
+| `2,17,32,47 * * * *` | `REMINDER: sv-tests was written against ~/IEEE 1800-2017.pdf, so its tags and file names carry 2017 clause numbers: read the 2017 edition only to learn what such a number meant there, resolve it to the 2023 clause, and let no 2017 number, wording or rule reach deltahdl's code, reports or tests.` |
+| `3,18,33,48 * * * *` | `REMINDER: ~/IEEE 1800.2-2020.pdf is the source of truth for UVM.` |
+| `4,19,34,49 * * * *` | `REMINDER: Every section of ~/IEEE 1800-2023.pdf has been swept and a test written for each case of each rule it states: a plain name passes, and DISABLED_ marks what deltahdl does not yet do, so take a case's test to be under test/ already.` |
+| `5,20,35,50 * * * *` | `REMINDER: Before proposing or adding a test, search all of test/ for one that already shows the case, open it, trace the code it runs, and add yours once you can name what it would catch that the existing one would not.` |
+| `6,21,36,51 * * * *` | `REMINDER: Before deleting or weakening a test, establish what it asserts, what the standard requires and which remaining test shows each of its correct cases, and say so in the commit that removes it.` |
+| `7,22,37,52 * * * *` | `REMINDER: While anything runs in the background, whether a CI run, a build, a test run, the pre-push check or any other command, only wait until its notification arrives, except for what the user instructs, which is done in full at once.` |
+| `8,23,38,53 * * * *` | `REMINDER: Start a background command as the last call of a turn.` |
+| `9,24,39,54 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue.` |
+| `10,25,40,55 * * * *` | `REMINDER: Fix a defect outside the rule in hand on the spot when that is quicker and safer than filing it, and file it otherwise.` |
+| `11,26,41,56 * * * *` | `REMINDER: File one issue per rule of a standard that deltahdl breaks or leaves untested, listing every case of it, or one per problem with deltahdl itself, such as a coverage gap.` |
+| `12,27,42,57 * * * *` | `REMINDER: Label an issue of a standard with both the standard it falls under (IEEE 1800-2023, IEEE 1800.2-2020 or IEEE 1735-2023) and its clause in that standard (§N or Annex X), creating the clause label first when the repository has none; an issue about deltahdl itself takes neither.` |
+| `13,28,43,58 * * * *` | `REMINDER: Build and run each case's test before writing its fix, and read why it fails: it fails for the reason its issue names, or it has found another defect, which is fixed on the spot or filed before the fix is designed.` |
+| `14,29,44,59 * * * *` | `REMINDER: Before every push, commit, then run .claude/skills/pre-push-checks/check.sh in the background over the touched test files, naming at most the targets that hold the existing tests of the rule in hand; push once it prints that every check passed, or reports only a changed line that a test file it did not run reaches.` |
+| `1,16,31,46 * * * *` | `REMINDER: Leave to CI every unit test beyond the rule in hand and the touched files, clang-tidy beyond the touched files, and the integration and e2e runs.` |
+| `2,17,32,47 * * * *` | `REMINDER: Keep the task list current with TaskCreate and TaskUpdate: add a task when it arises, mark each one as it starts and finishes, rewrite or remove one whose shape changed or that turned out unneeded, and delete finished ones, so the list says what is left to do.` |
+| `3,18,33,48 * * * *` | `REMINDER: Before fixing an issue of a standard, list every case of the rule it documents: each form the rule allows and each form it forbids, written in every place the standard lets that form appear (a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies) and with every kind of operand or type the rule names.` |
+| `4,19,34,49 * * * *` | `REMINDER: Make deltahdl pass the test of every case of the rule in the same commit, with the test showing a forbidden form reported beside one showing the nearest allowed form accepted without a report.` |
 
 ## The loop reminders
 
 Every `start` form but `reminders-only` adds these.
 
-The loop command is on `8,18,28,38,48,58 * * * *`, by form:
+The loop command is on `5,20,35,50 * * * *`, by form:
 
 `start bysubclause`:
 
@@ -72,15 +72,15 @@ And these:
 
 | Cron | Prompt |
 | --- | --- |
-| `9,19,29,39,49,59 * * * *` | `REMINDER: Before solving an issue the loop's command lists, read the title of every issue in the list and the body of each that shares a subclause or names the same code as another, and sort them into groups of issues whose fixes go through the same code.` |
-| `0,10,20,30,40,50 * * * *` | `REMINDER: Take the first group whole as one piece of work, adding to it any other listed issues you choose.` |
-| `1,11,21,31,41,51 * * * *` | `REMINDER: Commit and push each commit once it closes at least one issue, as many as you choose to finish in it, with every case of each one's rule passing.` |
-| `2,12,22,32,42,52 * * * *` | `REMINDER: Before writing any of its code, split by rule an issue whose open cases cannot all land in one commit.` |
-| `3,13,23,33,43,53 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING, not just about what to take next.` |
-| `4,14,24,34,44,54 * * * *` | `REMINDER: When an issue needs human feedback, rewrite its title if necessary and its body, label it 'needs decision', and move on to the next issue.` |
-| `5,15,25,35,45,55 * * * *` | `REMINDER: Before working on an issue, check that it is up to date, and correct its title, body and labels where it is not.` |
-| `6,16,26,36,46,56 * * * *` | `REMINDER: Split an issue that turns out to hold more than one rule or problem, and merge one that repeats another open issue, where that helps the work.` |
-| `7,17,27,37,47,57 * * * *` | `REMINDER: Before labeling an issue with 'needs decision', assess the issue against the sources of truth to determine whether it truly needs a decision.` |
+| `6,21,36,51 * * * *` | `REMINDER: Before solving an issue the loop's command lists, read the title of every issue in the list and the body of each that shares a subclause or names the same code as another, and sort them into groups of issues whose fixes go through the same code.` |
+| `7,22,37,52 * * * *` | `REMINDER: Take the first group whole as one piece of work, adding to it any other listed issues you choose.` |
+| `8,23,38,53 * * * *` | `REMINDER: Commit and push each commit once it closes at least one issue, as many as you choose to finish in it, with every case of each one's rule passing.` |
+| `9,24,39,54 * * * *` | `REMINDER: Before writing any of its code, split by rule an issue whose open cases cannot all land in one commit.` |
+| `10,25,40,55 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING, not just about what to take next.` |
+| `11,26,41,56 * * * *` | `REMINDER: When an issue needs human feedback, rewrite its title if necessary and its body, label it 'needs decision', and move on to the next issue.` |
+| `12,27,42,57 * * * *` | `REMINDER: Before working on an issue, check that it is up to date, and correct its title, body and labels where it is not.` |
+| `13,28,43,58 * * * *` | `REMINDER: Split an issue that turns out to hold more than one rule or problem, and merge one that repeats another open issue, where that helps the work.` |
+| `14,29,44,59 * * * *` | `REMINDER: Before labeling an issue with 'needs decision', assess the issue against the sources of truth to determine whether it truly needs a decision.` |
 
 ## Start
 

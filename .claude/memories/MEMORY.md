@@ -81,7 +81,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Scripts and CI mechanisms
 
 - [Failing loudly](failing-loudly-in-orchestrators.md) — an orchestrator under `scripts/` raises or exits non-zero; it never skips and carries on.
-- [A reminder states one matter](a-reminder-states-one-matter.md) — each autopilot reminder holds one indivisible matter and fires every 10 minutes; two matters make two reminders.
+- [A reminder states one matter](a-reminder-states-one-matter.md) — each autopilot reminder holds one indivisible matter and fires every 15 minutes; two matters make two reminders.
 - [Positive prompts](positive-prompts.md) — write a skill's instructions or an autopilot reminder as the action wanted, not the one forbidden.
 - [CI shows all output](ci-shows-all-output.md) — every step prints all its tools say: no quiet flags, no /dev/null.
 - [CI toolchain versions](ci-toolchain-versions.md) — LLVM's major is install-llvm's default, moved in its own commit; platform-named jobs pin their image; the rest floats; Actions tags stay at their major.
