@@ -110,8 +110,6 @@ SampledValue SampleRecursiveExpression(SampledValue a, SampledValue b,
 
 SampledValue DefaultSampledValueOfVariableOrNet(uint64_t type_default);
 
-bool InterpretAssertionExprAsBoolean(uint64_t aval, uint64_t bval);
-
 struct SampledArrayElement {
   uint64_t value = 0;
   bool live = true;

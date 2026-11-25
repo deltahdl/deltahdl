@@ -8,10 +8,6 @@
 
 namespace delta {
 
-bool CheckerAssumeStatementIsCheckedForViolationDuringSimulation() {
-  return true;
-}
-
 bool AssumeRandomizationIsTriggeredBy(RandomizationTrigger trigger) {
   return trigger == RandomizationTrigger::kAssumeSetClockEvent;
 }

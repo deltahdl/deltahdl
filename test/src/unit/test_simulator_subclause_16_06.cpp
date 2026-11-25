@@ -1,8 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <cstdint>
 #include <initializer_list>
-#include <limits>
 #include <string>
 
 #include "fixture_simulator.h"
@@ -12,34 +10,6 @@
 using namespace delta;
 
 namespace {
-
-TEST(AssertionBooleanInterpretation, AllZeroKnownValueIsFalse) {
-  EXPECT_FALSE(InterpretAssertionExprAsBoolean(0, 0));
-}
-
-TEST(AssertionBooleanInterpretation, AnyKnownNonZeroValueIsTrue) {
-  EXPECT_TRUE(InterpretAssertionExprAsBoolean(1, 0));
-  EXPECT_TRUE(InterpretAssertionExprAsBoolean(0xDEADBEEF, 0));
-}
-
-TEST(AssertionBooleanInterpretation, AnyUnknownBitForcesFalse) {
-  EXPECT_FALSE(InterpretAssertionExprAsBoolean(0xFFFFFFFF, 0x1));
-  EXPECT_FALSE(InterpretAssertionExprAsBoolean(0x1, 0x1));
-  EXPECT_FALSE(InterpretAssertionExprAsBoolean(0x0, 0xFF));
-}
-
-TEST(AssertionBooleanInterpretation, MaximumKnownValueIsTrue) {
-  EXPECT_TRUE(
-      InterpretAssertionExprAsBoolean(std::numeric_limits<uint64_t>::max(), 0));
-}
-
-TEST(AssertionBooleanInterpretation, AllBitsUnknownIsFalse) {
-  EXPECT_FALSE(
-      InterpretAssertionExprAsBoolean(std::numeric_limits<uint64_t>::max(),
-                                      std::numeric_limits<uint64_t>::max()));
-  EXPECT_FALSE(
-      InterpretAssertionExprAsBoolean(0, std::numeric_limits<uint64_t>::max()));
-}
 
 TEST(AssertionSampledArrayElement, SurvivesArrayMutationDuringEvaluationScope) {
   SampledArrayElement s = SampleArrayElementForAssertion(0xABCD);

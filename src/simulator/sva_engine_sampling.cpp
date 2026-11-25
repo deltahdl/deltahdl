@@ -141,11 +141,6 @@ bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew) {
   return skew == ClockingInputSkew::kStep1;
 }
 
-bool InterpretAssertionExprAsBoolean(uint64_t aval, uint64_t bval) {
-  if (bval != 0) return false;
-  return aval != 0;
-}
-
 SampledArrayElement SampleArrayElementForAssertion(uint64_t element_value) {
   return SampledArrayElement{element_value, true};
 }

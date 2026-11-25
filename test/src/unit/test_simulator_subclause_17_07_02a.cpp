@@ -12,10 +12,6 @@ using namespace delta;
 
 namespace {
 
-TEST(CheckerVariableRandomization, CheckerAssumeIsCheckedForViolation) {
-  EXPECT_TRUE(CheckerAssumeStatementIsCheckedForViolationDuringSimulation());
-}
-
 TEST(CheckerVariableRandomization, SolveTriggeredByAssumeSetClockEvent) {
   EXPECT_TRUE(AssumeRandomizationIsTriggeredBy(
       RandomizationTrigger::kAssumeSetClockEvent));

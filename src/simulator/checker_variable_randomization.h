@@ -8,8 +8,6 @@
 
 namespace delta {
 
-bool CheckerAssumeStatementIsCheckedForViolationDuringSimulation();
-
 enum class RandomizationTrigger : uint8_t {
   kAssumeSetClockEvent,
   kExplicitProceduralCall,
