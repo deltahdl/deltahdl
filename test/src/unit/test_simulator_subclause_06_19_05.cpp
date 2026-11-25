@@ -353,13 +353,13 @@ TEST(EnumMethodWithoutArgumentList, OnAPropertyAndChained) {
                  "  typedef enum {red, green, blue, yellow} Colors;\n"
                  "  class C;\n"
                  "    Colors e = green;\n"
-                 "    function string nn(); return e.next.name; endfunction\n"
+                 "    function string nn(); return e.next().name; endfunction\n"
                  "  endclass\n"
                  "  C h; Colors c = yellow;\n"
                  "  initial begin\n"
                  "    h = new;\n"
                  "    $display(\"p=%s pn=%s cn=%s hnn=%s\", h.e.name, h.nn(),\n"
-                 "             c.next.name, h.e.next.next.name);\n"
+                 "             c.next().name, h.e.next().next().name);\n"
                  "  end\n"
                  "endmodule\n",
                  f),

@@ -5,7 +5,6 @@
 #include <initializer_list>
 #include <optional>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "parser/ast_class.h"
@@ -22,7 +21,7 @@ namespace {
 constexpr int kDeepestChain = 64;
 
 ValueSymbol DataSymbol(const DataType& type, std::size_t dims,
-                       const ValueScope& scope) {
+                       const NameScope& scope) {
   ValueSymbol symbol;
   symbol.kind = SymbolKind::kData;
   symbol.type = &type;
@@ -31,13 +30,13 @@ ValueSymbol DataSymbol(const DataType& type, std::size_t dims,
   return symbol;
 }
 
-void DeclareFunction(const ModuleItem& function, ValueScope& scope) {
+void DeclareFunction(const ModuleItem& function, NameScope& scope) {
   ValueSymbol symbol = DataSymbol(function.return_type, 0, scope);
   symbol.kind = SymbolKind::kFunction;
   scope.names.insert_or_assign(function.name, symbol);
 }
 
-void DeclareTypedef(const ModuleItem& def, ValueScope& scope) {
+void DeclareTypedef(const ModuleItem& def, NameScope& scope) {
   if (def.forward_type_kind != DataTypeKind::kImplicit) return;
   ValueSymbol symbol =
       DataSymbol(def.typedef_type, def.unpacked_dims.size(), scope);
@@ -45,14 +44,14 @@ void DeclareTypedef(const ModuleItem& def, ValueScope& scope) {
   scope.names.insert_or_assign(def.name, symbol);
 }
 
-void DeclareEnumConstants(const DataType& type, ValueScope& scope) {
+void DeclareEnumConstants(const DataType& type, NameScope& scope) {
   for (const EnumMember& constant : type.enum_members) {
     scope.names.emplace(constant.name, DataSymbol(type, 0, scope));
   }
 }
 
 template <typename Decl>
-void DeclareParamPorts(const Decl& decl, ValueScope& scope) {
+void DeclareParamPorts(const Decl& decl, NameScope& scope) {
   for (std::size_t i = 0; i < decl.params.size(); ++i) {
     const std::string_view kName = decl.params[i].first;
     if (decl.type_param_names.contains(kName)) {
@@ -70,24 +69,23 @@ void DeclareParamPorts(const Decl& decl, ValueScope& scope) {
 
 }  // namespace
 
-void DeclareOther(std::string_view name, ValueScope& scope) {
+void DeclareOther(std::string_view name, NameScope& scope) {
   scope.names.insert_or_assign(name, ValueSymbol{});
 }
 
 void DeclareData(std::string_view name, const DataType& type, std::size_t dims,
-                 ValueScope& scope) {
+                 NameScope& scope) {
   scope.names.insert_or_assign(name, DataSymbol(type, dims, scope));
 }
 
-void DeclareFormals(const std::vector<FunctionArg>& formals,
-                    ValueScope& scope) {
+void DeclareFormals(const std::vector<FunctionArg>& formals, NameScope& scope) {
   for (const FunctionArg& formal : formals) {
     DeclareData(formal.name, formal.data_type, formal.unpacked_dims.size(),
                 scope);
   }
 }
 
-void DeclareResult(const ModuleItem& function, ValueScope& scope) {
+void DeclareResult(const ModuleItem& function, NameScope& scope) {
   if (function.kind == ModuleItemKind::kFunctionDecl) {
     scope.names.insert_or_assign(function.name,
                                  DataSymbol(function.return_type, 0, scope));
@@ -110,8 +108,8 @@ ValueScopes::ValueScopes(const CompilationUnit& unit) {
 }
 
 void ValueScopes::DeclareModule(const ModuleDecl& decl,
-                                const ValueScope& outer) {
-  ValueScope& scope = modules_[&decl];
+                                const NameScope& outer) {
+  NameScope& scope = modules_[&decl];
   scope.outer = &outer;
   DeclareParamPorts(decl, scope);
   for (const auto* ports : {&decl.ports, &decl.port_expr_objects}) {
@@ -124,7 +122,7 @@ void ValueScopes::DeclareModule(const ModuleDecl& decl,
 }
 
 void ValueScopes::DeclareClassMember(const ClassMember& member,
-                                     ValueScope& scope) {
+                                     NameScope& scope) {
   switch (member.kind) {
     case ClassMemberKind::kProperty:
       DeclareEnumConstants(member.data_type, scope);
@@ -153,12 +151,12 @@ void ValueScopes::DeclareClassMember(const ClassMember& member,
   }
 }
 
-void ValueScopes::DeclareClass(const ClassDecl& cls, ValueScope& scope) {
+void ValueScopes::DeclareClass(const ClassDecl& cls, NameScope& scope) {
   ValueSymbol symbol;
   symbol.kind = SymbolKind::kClass;
   symbol.cls = &cls;
   scope.names.insert_or_assign(cls.name, symbol);
-  ValueScope& members = classes_[&cls];
+  NameScope& members = classes_[&cls];
   members.outer = &scope;
   members.cls = &cls;
   DeclareParamPorts(cls, members);
@@ -168,7 +166,7 @@ void ValueScopes::DeclareClass(const ClassDecl& cls, ValueScope& scope) {
 }
 
 void ValueScopes::DeclareImport(const ImportItem& import,
-                                ValueScope& scope) const {
+                                NameScope& scope) const {
   if (import.is_wildcard) {
     scope.wildcards.push_back(import.package_name);
     return;
@@ -179,7 +177,7 @@ void ValueScopes::DeclareImport(const ImportItem& import,
                                imported == nullptr ? ValueSymbol{} : *imported);
 }
 
-void ValueScopes::DeclareItem(const ModuleItem& item, ValueScope& scope) {
+void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
   DeclareEnumConstants(item.data_type, scope);
   DeclareEnumConstants(item.typedef_type, scope);
   switch (item.kind) {
@@ -221,12 +219,12 @@ void ValueScopes::DeclareItem(const ModuleItem& item, ValueScope& scope) {
 }
 
 void ValueScopes::DeclareItems(const std::vector<ModuleItem*>& items,
-                               ValueScope& scope) {
+                               NameScope& scope) {
   for (const ModuleItem* item : items) DeclareItem(*item, scope);
 }
 
 void ValueScopes::DeclareStmts(const std::vector<Stmt*>& stmts,
-                               ValueScope& scope) {
+                               NameScope& scope) {
   for (const Stmt* stmt : stmts) {
     if (stmt->kind == StmtKind::kVarDecl) {
       DeclareEnumConstants(stmt->var_decl_type, scope);
@@ -238,21 +236,21 @@ void ValueScopes::DeclareStmts(const std::vector<Stmt*>& stmts,
   }
 }
 
-const ValueScope& ValueScopes::PackageScope(std::string_view name) const {
-  static const ValueScope kNone;
+const NameScope& ValueScopes::PackageScope(std::string_view name) const {
+  static const NameScope kNone;
   const auto kFound = packages_.find(name);
   return kFound == packages_.end() ? kNone : kFound->second;
 }
 
-const ValueScope& ValueScopes::ModuleScope(const ModuleDecl& decl) const {
+const NameScope& ValueScopes::ModuleScope(const ModuleDecl& decl) const {
   return modules_.at(&decl);
 }
 
-const ValueScope& ValueScopes::ClassScope(const ClassDecl& cls) const {
+const NameScope& ValueScopes::ClassScope(const ClassDecl& cls) const {
   return classes_.at(&cls);
 }
 
-const ValueScope* ValueScopes::ModuleNamed(std::string_view name) const {
+const NameScope* ValueScopes::ModuleNamed(std::string_view name) const {
   const auto kFound = module_names_.find(name);
   return kFound == module_names_.end() ? nullptr
                                        : &ModuleScope(*kFound->second);
@@ -266,7 +264,7 @@ const ClassDecl* ValueScopes::ClassOfSymbol(const ValueSymbol& symbol) const {
 }
 
 const ClassDecl* ValueScopes::ClassNamed(std::string_view name,
-                                         const ValueScope& scope) const {
+                                         const NameScope& scope) const {
   return ClassOfSymbol(Find(name, scope));
 }
 
@@ -283,7 +281,7 @@ const ValueSymbol* ValueScopes::FindInClass(std::string_view name,
   static const ValueSymbol kUnknown;
   const ClassDecl* walked = &cls;
   for (int depth = 0; walked != nullptr && depth < kDeepestChain; ++depth) {
-    const ValueScope& members = ClassScope(*walked);
+    const NameScope& members = ClassScope(*walked);
     const auto kFound = members.names.find(name);
     if (kFound != members.names.end()) return &kFound->second;
     if (walked->base_class.empty()) return nullptr;
@@ -293,7 +291,7 @@ const ValueSymbol* ValueScopes::FindInClass(std::string_view name,
 }
 
 const ValueSymbol* ValueScopes::FindHere(std::string_view name,
-                                         const ValueScope& scope) const {
+                                         const NameScope& scope) const {
   const auto kFound = scope.names.find(name);
   if (kFound != scope.names.end()) return &kFound->second;
   if (scope.cls != nullptr) {
@@ -301,7 +299,7 @@ const ValueSymbol* ValueScopes::FindHere(std::string_view name,
     if (member != nullptr) return member;
   }
   for (const std::string_view kPackage : scope.wildcards) {
-    const ValueScope& package = PackageScope(kPackage);
+    const NameScope& package = PackageScope(kPackage);
     const auto kImported = package.names.find(name);
     if (kImported != package.names.end()) return &kImported->second;
   }
@@ -309,8 +307,8 @@ const ValueSymbol* ValueScopes::FindHere(std::string_view name,
 }
 
 ValueSymbol ValueScopes::Find(std::string_view name,
-                              const ValueScope& scope) const {
-  for (const ValueScope* at = &scope; at != nullptr; at = at->outer) {
+                              const NameScope& scope) const {
+  for (const NameScope* at = &scope; at != nullptr; at = at->outer) {
     if (const ValueSymbol* found = FindHere(name, *at)) return *found;
   }
   return {};
@@ -318,7 +316,7 @@ ValueSymbol ValueScopes::Find(std::string_view name,
 
 ValueSymbol ValueScopes::FindScoped(std::string_view prefix,
                                     std::string_view name,
-                                    const ValueScope& scope) const {
+                                    const NameScope& scope) const {
   const ClassDecl* cls = ClassNamed(prefix, scope);
   const ValueSymbol* found = cls != nullptr ? FindInClass(name, *cls)
                              : prefix == "$unit"
@@ -328,7 +326,7 @@ ValueSymbol ValueScopes::FindScoped(std::string_view prefix,
 }
 
 ValueSymbol ValueScopes::SymbolNamedBy(const Expr& e,
-                                       const ValueScope& scope) const {
+                                       const NameScope& scope) const {
   if (e.kind == ExprKind::kIdentifier) {
     return e.scope_prefix.empty() ? Find(e.text, scope)
                                   : FindScoped(e.scope_prefix, e.text, scope);
@@ -347,7 +345,7 @@ ValueSymbol ValueScopes::MemberOfClass(const ClassDecl* cls,
 }
 
 ScopedValue ValueScopes::Resolve(const DataType& type, std::size_t dims,
-                                 const ValueScope& where) const {
+                                 const NameScope& where) const {
   if (resolving_ == kDeepestChain) return {};
   ++resolving_;
   ScopedValue value = ResolveNames(type, dims, where);
@@ -356,7 +354,7 @@ ScopedValue ValueScopes::Resolve(const DataType& type, std::size_t dims,
 }
 
 ScopedValue ValueScopes::ResolveNames(const DataType& type, std::size_t dims,
-                                      const ValueScope& where) const {
+                                      const NameScope& where) const {
   ScopedValue value;
   value.where = &where;
   if (type.type_ref_expr != nullptr) {
@@ -373,7 +371,7 @@ ScopedValue ValueScopes::ResolveNames(const DataType& type, std::size_t dims,
 }
 
 ValueSymbol ValueScopes::FindQualified(const DataType& type,
-                                       const ValueScope& where) const {
+                                       const NameScope& where) const {
   std::vector<std::string_view> names = type.outer_scope_names;
   if (!type.scope_name.empty()) names.push_back(type.scope_name);
   names.push_back(type.type_name);
@@ -386,7 +384,7 @@ ValueSymbol ValueScopes::FindQualified(const DataType& type,
 }
 
 ScopedValue ValueScopes::ResolveName(const DataType& type,
-                                     const ValueScope& where) const {
+                                     const NameScope& where) const {
   const ValueSymbol kNamed = FindQualified(type, where);
   ScopedValue value;
   if (kNamed.kind == SymbolKind::kType) {
@@ -554,11 +552,11 @@ MethodResult ValueScopes::MethodOn(const ScopedValue& receiver,
 }
 
 ScopedValue ValueScopes::ValueOfIdentifier(const Expr& e,
-                                           const ValueScope& scope) const {
+                                           const NameScope& scope) const {
   if (e.text != "this" && e.text != "super") {
     return ValueOfSymbol(SymbolNamedBy(e, scope));
   }
-  const ValueScope* at = &scope;
+  const NameScope* at = &scope;
   while (at != nullptr && at->cls == nullptr) at = at->outer;
   ScopedValue value;
   if (at != nullptr) value.cls = e.text == "this" ? at->cls : BaseOf(*at->cls);
@@ -566,7 +564,7 @@ ScopedValue ValueScopes::ValueOfIdentifier(const Expr& e,
 }
 
 ScopedValue ValueScopes::ValueOfSelect(const Expr& e,
-                                       const ValueScope& scope) const {
+                                       const NameScope& scope) const {
   ScopedValue value = ValueOf(*e.base, scope);
   std::size_t& levels = value.dims != 0 ? value.dims : value.packed;
   if (levels == 0) return {};
@@ -575,7 +573,7 @@ ScopedValue ValueScopes::ValueOfSelect(const Expr& e,
 }
 
 ScopedValue ValueScopes::ValueOfAccess(const Expr& access, bool has_with,
-                                       const ValueScope& scope) const {
+                                       const NameScope& scope) const {
   const ScopedValue kHolder = ValueOf(*access.lhs, scope);
   const std::optional<ScopedValue> kMember =
       MemberOf(kHolder, access.rhs->text);
@@ -584,13 +582,13 @@ ScopedValue ValueScopes::ValueOfAccess(const Expr& access, bool has_with,
 }
 
 ScopedValue ValueScopes::ValueOfCast(const Expr& cast,
-                                     const ValueScope& scope) const {
+                                     const NameScope& scope) const {
   if (cast.text == "string") return PlainValue(DataTypeKind::kString);
   return cast.rhs == nullptr ? ScopedValue{} : ValueOf(*cast.rhs, scope);
 }
 
 ScopedValue ValueScopes::ValueOfConcatenation(const Expr& e,
-                                              const ValueScope& scope) const {
+                                              const NameScope& scope) const {
   for (const Expr* element : e.elements) {
     ScopedValue value = ValueOf(*element, scope);
     if (value.kind == DataTypeKind::kString && value.dims == 0) return value;
@@ -599,7 +597,7 @@ ScopedValue ValueScopes::ValueOfConcatenation(const Expr& e,
 }
 
 ScopedValue ValueScopes::ValueOfName(const Expr& name, const Expr& written,
-                                     const ValueScope& scope) const {
+                                     const NameScope& scope) const {
   switch (name.kind) {
     case ExprKind::kIdentifier:
       return ValueOfIdentifier(name, scope);
@@ -614,7 +612,7 @@ ScopedValue ValueScopes::ValueOfName(const Expr& name, const Expr& written,
   }
 }
 
-ScopedValue ValueScopes::ValueOf(const Expr& e, const ValueScope& scope) const {
+ScopedValue ValueScopes::ValueOf(const Expr& e, const NameScope& scope) const {
   switch (e.kind) {
     case ExprKind::kCast:
       return ValueOfCast(e, scope);
@@ -633,8 +631,8 @@ ScopedValue ValueScopes::ValueOf(const Expr& e, const ValueScope& scope) const {
   }
 }
 
-void ValueScopes::DeclareIterator(const Expr& call, const ValueScope& scope,
-                                  ValueScope& with) const {
+void ValueScopes::DeclareIterator(const Expr& call, const NameScope& scope,
+                                  NameScope& with) const {
   const Expr* access = call.kind == ExprKind::kCall ? call.lhs : &call;
   for (const Expr* arg : call.args) DeclareOther(arg->text, with);
   if (access->kind != ExprKind::kMemberAccess) return;

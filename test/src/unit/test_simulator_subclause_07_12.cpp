@@ -243,7 +243,7 @@ TEST(ArrayMethodsSim, MethodResultIsAReceiver) {
       "    IA[0] = 9; IA[1] = 2; IA[2] = 9; IA[3] = 5;\n"
       "    q = IA.find(x) with (x > 5).unique;\n"
       "    $display(\"%0d %0d %0d %0d %0d\", SA.unique().size(), q.size(),\n"
-      "             q[0], IA.min()[0], IA.find with (item == 9).size());\n"
+      "             q[0], IA.min()[0], IA.find() with (item == 9).size());\n"
       "  end\n"
       "endmodule\n",
       f);

@@ -41,7 +41,7 @@ class ImplicitVariableWalk {
   }
 
  private:
-  void Judge(const Expr& e, const ValueScope& scope) {
+  void Judge(const Expr& e, const NameScope& scope) {
     if (e.kind != ExprKind::kMemberAccess || e.is_scope_resolution ||
         !IsBuiltinMethodNameWithoutArguments(e.rhs->text)) {
       return;
@@ -57,30 +57,30 @@ class ImplicitVariableWalk {
                 Subclause("5.13"));
   }
 
-  void WalkExprs(const std::vector<Expr*>& exprs, const ValueScope& scope) {
+  void WalkExprs(const std::vector<Expr*>& exprs, const NameScope& scope) {
     for (const Expr* e : exprs) WalkExpr(e, scope);
   }
 
   void WalkEach(std::initializer_list<const Expr*> exprs,
-                const ValueScope& scope) {
+                const NameScope& scope) {
     for (const Expr* e : exprs) WalkExpr(e, scope);
   }
 
-  void WalkWith(const Expr& call, const ValueScope& scope) {
-    ValueScope with{&scope};
+  void WalkWith(const Expr& call, const NameScope& scope) {
+    NameScope with{&scope};
     scopes_.DeclareIterator(call, scope, with);
     WalkExpr(call.with_expr, with);
   }
 
-  void WalkInlineConstraint(const Expr& call, const ValueScope& scope) {
-    ValueScope object{&scope};
+  void WalkInlineConstraint(const Expr& call, const NameScope& scope) {
+    NameScope object{&scope};
     if (call.lhs->kind == ExprKind::kMemberAccess &&
         !call.lhs->is_scope_resolution)
       object.cls = scopes_.ValueOf(*call.lhs->lhs, scope).cls;
     WalkConstraints(call.inline_constraint->constraint_items, object);
   }
 
-  void WalkExpr(const Expr* e, const ValueScope& scope) {
+  void WalkExpr(const Expr* e, const NameScope& scope) {
     if (e == nullptr) return;
     if (e->kind == ExprKind::kSelect && e->base != nullptr) {
       Judge(*e->base, scope);
@@ -97,7 +97,7 @@ class ImplicitVariableWalk {
   }
 
   void WalkDist(const std::vector<ConstraintDistItem>& items,
-                const ValueScope& scope) {
+                const NameScope& scope) {
     for (const ConstraintDistItem& item : items) {
       WalkEach({item.value, item.lo, item.hi, item.tolerance, item.weight},
                scope);
@@ -105,9 +105,9 @@ class ImplicitVariableWalk {
   }
 
   void WalkConstraints(const std::vector<ConstraintItem*>& items,
-                       const ValueScope& scope) {
+                       const NameScope& scope) {
     for (const ConstraintItem* item : items) {
-      ValueScope loop{&scope};
+      NameScope loop{&scope};
       for (const std::string_view kVar : item->loop_vars) {
         DeclareOther(kVar, loop);
       }
@@ -121,13 +121,13 @@ class ImplicitVariableWalk {
   }
 
   void WalkEvents(const std::vector<EventExpr>& events,
-                  const ValueScope& scope) {
+                  const NameScope& scope) {
     for (const EventExpr& event : events) {
       WalkEach({event.signal, event.iff_condition}, scope);
     }
   }
 
-  void WalkSequence(const SeqLinearBody& body, const ValueScope& scope) {
+  void WalkSequence(const SeqLinearBody& body, const NameScope& scope) {
     ForEachBody(body, [&](const SeqLinearBody& nested) {
       for (const auto& clock : nested.clocks) WalkEvents(clock, scope);
       WalkEvents(nested.clock_out, scope);
@@ -135,7 +135,7 @@ class ImplicitVariableWalk {
     ForEachBodyExpr(body, [&](const Expr* e) { WalkExpr(e, scope); });
   }
 
-  void WalkTree(const PropertyExprNode* tree, const ValueScope& scope) {
+  void WalkTree(const PropertyExprNode* tree, const NameScope& scope) {
     ForEachTreeNode(tree, [&](const PropertyExprNode& node) {
       WalkExpr(node.boolean, scope);
       WalkEvents(node.clock, scope);
@@ -146,14 +146,14 @@ class ImplicitVariableWalk {
     });
   }
 
-  void WalkType(const DataType& type, const ValueScope& scope) {
+  void WalkType(const DataType& type, const NameScope& scope) {
     WalkEach({type.packed_dim_left, type.packed_dim_right}, scope);
     for (const auto& [left, right] : type.extra_packed_dims) {
       WalkEach({left, right}, scope);
     }
   }
 
-  void DeclareLoopNames(const Stmt& stmt, ValueScope& scope) {
+  void DeclareLoopNames(const Stmt& stmt, NameScope& scope) {
     for (const std::string_view kVar : stmt.foreach_vars) {
       DeclareOther(kVar, scope);
     }
@@ -164,9 +164,9 @@ class ImplicitVariableWalk {
     }
   }
 
-  void WalkStmt(const Stmt* stmt, const ValueScope& outer) {
+  void WalkStmt(const Stmt* stmt, const NameScope& outer) {
     if (stmt == nullptr) return;
-    ValueScope scope{&outer};
+    NameScope scope{&outer};
     scopes_.DeclareStmts(stmt->stmts, scope);
     scopes_.DeclareStmts(stmt->fork_stmts, scope);
     DeclareLoopNames(*stmt, scope);
@@ -183,7 +183,7 @@ class ImplicitVariableWalk {
   }
 
   void WalkFormals(const std::vector<FunctionArg>& formals,
-                   const ValueScope& scope) {
+                   const NameScope& scope) {
     for (const FunctionArg& formal : formals) {
       WalkType(formal.data_type, scope);
       WalkExpr(formal.default_value, scope);
@@ -191,9 +191,9 @@ class ImplicitVariableWalk {
     }
   }
 
-  void WalkBody(const ModuleItem& item, const ValueScope& outer) {
+  void WalkBody(const ModuleItem& item, const NameScope& outer) {
     WalkFormals(item.func_args, outer);
-    ValueScope scope{&outer};
+    NameScope scope{&outer};
     DeclareResult(item, scope);
     DeclareFormals(item.func_args, scope);
     scopes_.DeclareStmts(item.func_body_stmts, scope);
@@ -201,15 +201,15 @@ class ImplicitVariableWalk {
     if (item.kind == ModuleItemKind::kLetDecl) WalkExpr(item.init_expr, scope);
   }
 
-  void WalkSubroutine(const ModuleItem& item, const ValueScope& scope) {
+  void WalkSubroutine(const ModuleItem& item, const NameScope& scope) {
     const ClassDecl* cls = item.method_class.empty()
                                ? nullptr
                                : scopes_.ClassNamed(item.method_class, scope);
     WalkBody(item, cls == nullptr ? scope : scopes_.ClassScope(*cls));
   }
 
-  void WalkPropertyOrSequence(const ModuleItem& item, const ValueScope& outer) {
-    ValueScope scope{&outer};
+  void WalkPropertyOrSequence(const ModuleItem& item, const NameScope& outer) {
+    NameScope scope{&outer};
     for (std::size_t i = 0; i < item.prop_formals.size(); ++i) {
       if (item.prop_formal_types[i] != nullptr) {
         DeclareData(item.prop_formals[i], *item.prop_formal_types[i],
@@ -231,13 +231,13 @@ class ImplicitVariableWalk {
   }
 
   void WalkRanges(const std::vector<CovergroupValueRange>& ranges,
-                  const ValueScope& scope) {
+                  const NameScope& scope) {
     for (const CovergroupValueRange& range : ranges) {
       WalkEach({range.lo, range.hi}, scope);
     }
   }
 
-  void WalkBins(const BinsOrOptions& bins, const ValueScope& scope) {
+  void WalkBins(const BinsOrOptions& bins, const NameScope& scope) {
     WalkEach({bins.option.value, bins.array_size, bins.with_expr, bins.set_expr,
               bins.iff},
              scope);
@@ -251,7 +251,7 @@ class ImplicitVariableWalk {
   }
 
   void WalkBinsSelection(const SelectExpression* select,
-                         const ValueScope& scope) {
+                         const NameScope& scope) {
     if (select == nullptr) return;
     WalkRanges(select->intersect, scope);
     WalkEach({select->expr, select->matches}, scope);
@@ -259,7 +259,7 @@ class ImplicitVariableWalk {
     WalkBinsSelection(select->rhs, scope);
   }
 
-  void WalkCross(const CoverCrossDecl& cross, const ValueScope& scope) {
+  void WalkCross(const CoverCrossDecl& cross, const NameScope& scope) {
     WalkExpr(cross.iff, scope);
     for (const CrossBodyItem& item : cross.body) {
       if (item.function != nullptr) WalkBody(*item.function, scope);
@@ -268,9 +268,9 @@ class ImplicitVariableWalk {
     }
   }
 
-  void WalkCovergroup(const CovergroupDecl& group, const ValueScope& outer) {
+  void WalkCovergroup(const CovergroupDecl& group, const NameScope& outer) {
     WalkFormals(group.formals, outer);
-    ValueScope scope{&outer};
+    NameScope scope{&outer};
     DeclareFormals(group.formals, scope);
     DeclareFormals(group.event.sample_formals, scope);
     WalkEvents(group.event.clocking, scope);
@@ -287,7 +287,7 @@ class ImplicitVariableWalk {
   }
 
   void WalkClass(const ClassDecl& cls) {
-    const ValueScope& scope = scopes_.ClassScope(cls);
+    const NameScope& scope = scopes_.ClassScope(cls);
     for (const auto& [name, value] : cls.params) WalkExpr(value, scope);
     WalkExprs(cls.extends_args, scope);
     for (const ClassMember* member : cls.members) {
@@ -303,7 +303,7 @@ class ImplicitVariableWalk {
     }
   }
 
-  void WalkGenerate(const ModuleItem& item, const ValueScope& outer) {
+  void WalkGenerate(const ModuleItem& item, const NameScope& outer) {
     WalkExpr(item.gen_cond, outer);
     for (const GenerateCaseItem& arm : item.gen_case_items) {
       WalkExprs(arm.patterns, outer);
@@ -314,13 +314,13 @@ class ImplicitVariableWalk {
   }
 
   void WalkGenerateBlock(const std::vector<ModuleItem*>& items,
-                         const ValueScope& outer) {
-    ValueScope scope{&outer};
+                         const NameScope& outer) {
+    NameScope scope{&outer};
     scopes_.DeclareItems(items, scope);
     WalkItems(items, scope);
   }
 
-  void WalkInstance(const ModuleItem& item, const ValueScope& scope) {
+  void WalkInstance(const ModuleItem& item, const NameScope& scope) {
     for (const auto& [name, value] : item.inst_params) WalkExpr(value, scope);
     for (const auto& [name, value] : item.inst_ports) WalkExpr(value, scope);
     for (const auto& [left, right] : item.inst_dims) {
@@ -333,20 +333,20 @@ class ImplicitVariableWalk {
   }
 
   void WalkBind(const BindDirective& bind) {
-    const ValueScope* target = scopes_.ModuleNamed(bind.target.path);
+    const NameScope* target = scopes_.ModuleNamed(bind.target.path);
     if (target != nullptr) {
       WalkInstance(*bind.instantiation, *target);
     }
   }
 
-  void WalkClocking(const ModuleItem& item, const ValueScope& scope) {
+  void WalkClocking(const ModuleItem& item, const NameScope& scope) {
     WalkEvents(item.clocking_event, scope);
     for (const ClockingSignalDecl& signal : item.clocking_signals) {
       WalkExpr(signal.hier_expr, scope);
     }
   }
 
-  void WalkItem(const ModuleItem& item, const ValueScope& scope) {
+  void WalkItem(const ModuleItem& item, const NameScope& scope) {
     WalkType(item.data_type, scope);
     WalkExprs(item.unpacked_dims, scope);
     WalkEach({item.assign_lhs, item.assign_rhs, item.assign_delay,
@@ -370,12 +370,12 @@ class ImplicitVariableWalk {
   }
 
   void WalkItems(const std::vector<ModuleItem*>& items,
-                 const ValueScope& scope) {
+                 const NameScope& scope) {
     for (const ModuleItem* item : items) WalkItem(*item, scope);
   }
 
   void WalkModule(const ModuleDecl& decl) {
-    const ValueScope& scope = scopes_.ModuleScope(decl);
+    const NameScope& scope = scopes_.ModuleScope(decl);
     for (const auto& [name, value] : decl.params) WalkExpr(value, scope);
     for (const PortDecl& port : decl.ports) {
       WalkType(port.data_type, scope);
