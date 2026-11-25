@@ -458,7 +458,11 @@ TEST(DpiExportOfAnEarlierRun, ALaterBindThatFailsToBuildDropsIt) {
       kNoExport, later,
       {{"call_it", reinterpret_cast<void*>(&CallTheEarlierExport)}},
       "subclause_35_07_later_unbuilt", "no_such_c_compiler");
-  EXPECT_FALSE(later.diag.Diagnostics().empty());
+  EXPECT_TRUE(ReportedError(
+      later.diag.Diagnostics(),
+      "the calls into C of the design's imported subroutines could not be "
+      "built: 'no_such_c_compiler' did not build a shared library",
+      0, ""));
   CallTheEarlierExport();
   EXPECT_EQ(g_stale, 0);
   EXPECT_EQ(VariableValue(earlier, "calls"), 1U);
