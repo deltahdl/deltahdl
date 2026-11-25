@@ -76,7 +76,7 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
     dt.type_name = expr->rhs->text;
     dt.type_params = OverrideSpecializationArgs(expr->lhs, unit, diag, loc);
     FillDefaultSpecializationArgs(dt.type_params, cls);
-    if (!ResolveParameterizedType(dt, unit, diag, loc)) return DataType{};
+    if (!ResolveParameterizedType(dt, unit)) return DataType{};
     return dt;
   }
   const DataType* resolved =

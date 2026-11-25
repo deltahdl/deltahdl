@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_elaborator.h"
 #include "fixture_simulator.h"
 #include "helpers_param_value.h"
@@ -573,6 +575,189 @@ TEST(LocalparamElaboration, TypeParameterInALocalGroupKeepsItsDefault) {
                  "endmodule\n",
                  f),
       "32\n");
+}
+
+TEST(LocalparamElaboration, SpecializationNamingAClassLocalparamIsRejected) {
+  const char* const kSources[] = {
+      "class C #(int P = 1, localparam int L = 2);\n"
+      "endclass\n"
+      "module top;\n"
+      "  C #(.L(3)) h;\n"
+      "endmodule\n",
+      "class C #(int P = 1);\n"
+      "  localparam int L = 2;\n"
+      "endclass\n"
+      "module top;  C #(.L(3)) h;\n"
+      "endmodule\n",
+  };
+  for (const char* src : kSources) {
+    ElabFixture f;
+    ElaborateSrc(src, f, "top");
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "class 'C' has no parameter 'L'", 4,
+                              "23.10.2.2"));
+  }
+}
+
+TEST(LocalparamElaboration, OrderedSpecializationPassesOverAClassLocalparam) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C #(int P = 1, localparam int L = 2);\n"
+      "endclass\n"
+      "module top;\n"
+      "  C #(3, 4) h;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "too many positional parameter overrides for "
+                            "class 'C': 2 provided, 1 allowed",
+                            4, "23.10.2.1"));
+}
+
+TEST(LocalparamElaboration, SpecializationNamingTheClassParameterIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(int P = 1, localparam int L = 2, parameter int Q = 3);\n"
+      "endclass\n"
+      "module top;\n"
+      "  C #(.P(3)) h;\n"
+      "  C #(3) o;\n"
+      "  C #(3, 4) q;\n"
+      "  C #(.Q(4)) n;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(LocalparamElaboration, InterfaceLocalparamTakesNoInstanceOverride) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface ifc #(parameter int W = 1);\n"
+      "  localparam int L = 2;\n"
+      "endinterface\n"
+      "interface jfc #(localparam int L = 2);\n"
+      "endinterface\n"
+      "module top;\n"
+      "  ifc #(.L(3)) i();\n"
+      "  jfc #(.L(3)) j();\n"
+      "  jfc #(3) k();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'ifc' has no parameter 'L'", 7,
+                            "23.10.2.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "module 'jfc' has no parameter 'L'", 8,
+                            "23.10.2.2"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(),
+                    "too many positional parameter overrides for module 'jfc'",
+                    9, "23.10.2.1"));
+}
+
+TEST(LocalparamElaboration, InterfaceParameterBesideALocalparamIsOverridable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc #(parameter int W = 1);\n"
+      "  localparam int L = 2;\n"
+      "endinterface\n"
+      "module top;\n"
+      "  ifc #(.W(3)) i();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const auto* w = FindParam(design, "ifc", "W");
+  ASSERT_NE(w, nullptr);
+  EXPECT_EQ(w->resolved_value, 3);
+}
+
+constexpr const char kGenerateBlockParameters[] =
+    "module c;\n"
+    "  if (1) begin : g\n"
+    "    parameter int P = 1;\n"
+    "    localparam int L = 2;\n"
+    "    if (1) begin : h\n"
+    "      parameter int H = 3;\n"
+    "    end\n"
+    "  end\n"
+    "  for (genvar i = 0; i < 2; i++) begin : l\n"
+    "    parameter int P = i;\n"
+    "  end\n"
+    "  case (1)\n"
+    "    1: begin : k\n"
+    "      parameter int P = 4;\n"
+    "    end\n"
+    "  endcase\n"
+    "  parameter int Q = 5;\n"
+    "  initial #1 $display(\"%0d %0d %0d %0d %0d %0d %0d\", g.P, g.L, g.h.H,\n"
+    "                      l[0].P, l[1].P, k.P, Q);\n";
+
+void ExpectLocalToItsGenerateBlock(const std::string& rest) {
+  SCOPED_TRACE(rest);
+  ElabFixture f;
+  const std::string kSource = kGenerateBlockParameters + rest;
+  ElaborateSrc(kSource, f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter",
+                            LineHolding(kSource, "defparam"), "23.10.1"));
+}
+
+TEST(LocalparamElaboration, DefparamOfAGenerateBlockParameterIsRejected) {
+  for (const char* target :
+       {"u.g.P", "u.g.L", "u.g.h.H", "u.l[1].P", "u.k.P", "top.u.g.P"}) {
+    ExpectLocalToItsGenerateBlock(std::string("endmodule\n"
+                                              "module top;\n"
+                                              "  c u();\n"
+                                              "  defparam ") +
+                                  target +
+                                  " = 9;\n"
+                                  "endmodule\n");
+  }
+}
+
+TEST(LocalparamElaboration,
+     DefparamOfAGenerateBlockParameterOfItsOwnModuleIsRejected) {
+  for (const char* target : {"g.P", "g.L", "g.h.H", "l[1].P", "k.P"}) {
+    ExpectLocalToItsGenerateBlock(std::string("  defparam ") + target +
+                                  " = 9;\n"
+                                  "endmodule\n"
+                                  "module top;\n"
+                                  "  c u();\n"
+                                  "endmodule\n");
+  }
+}
+
+TEST(LocalparamElaboration,
+     DefparamInAGenerateBlockOfAParameterOfABlockWithinItIsRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    if (1) begin : h\n"
+      "      parameter int P = 1;\n"
+      "    end\n"
+      "    defparam h.P = 2;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "defparam cannot override a local parameter", 6,
+                            "23.10.1"));
+}
+
+TEST(LocalparamElaboration,
+     DefparamOfAModuleParameterBesideGenerateBlocksIsApplied) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(std::string(kGenerateBlockParameters) + "endmodule\n"
+                                                         "module top;\n"
+                                                         "  c u();\n"
+                                                         "  defparam u.Q = 9;\n"
+                                                         "endmodule\n",
+                 f),
+      "1 2 3 0 1 4 9\n");
 }
 
 }  // namespace

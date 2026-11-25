@@ -106,9 +106,9 @@ static void ValidateWeakReferenceTypeParam(
 
 static void ResolveDeclaredTypeName(
     ModuleItem* item, const CompilationUnit* unit, const TypedefMap& typedefs,
-    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
+    const std::unordered_set<std::string_view>& class_names) {
   DataType& dtype = item->data_type;
-  ResolveParameterizedType(dtype, unit, diag, item->loc);
+  ResolveParameterizedType(dtype, unit);
   if (dtype.kind != DataTypeKind::kNamed) return;
   if (class_names.count(dtype.type_name) > 0) return;
   const DataType* bound = FindNamedType(dtype, typedefs);
@@ -502,7 +502,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
-  ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_, diag_);
+  ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_);
 
   ResolveOrReportClassScopedDeclType(item, typedefs_, unit_, diag_);
 

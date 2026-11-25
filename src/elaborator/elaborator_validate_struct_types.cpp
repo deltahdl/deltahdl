@@ -6,7 +6,6 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "common/arena.h"
@@ -517,35 +516,10 @@ BuildSpecializationSubst(const ClassDecl* cls,
   return subst;
 }
 
-static void ValidateSpecializationArgNames(const ClassDecl* cls,
-                                           const std::vector<DataType>& args,
-                                           DiagEngine& diag, SourceLoc loc) {
-  std::unordered_set<std::string_view> declared;
-  for (const auto& [pname, pexpr] : cls->params) declared.insert(pname);
-  std::unordered_set<std::string_view> assigned;
-  for (const auto& arg : args) {
-    if (arg.param_arg_name.empty()) continue;
-    if (declared.count(arg.param_arg_name) == 0) {
-      diag.Error(loc,
-                 std::format("class '{}' has no parameter '{}'", cls->name,
-                             arg.param_arg_name),
-                 Subclause("23.10.2.2"));
-    } else if (!assigned.insert(arg.param_arg_name).second) {
-      diag.Error(loc,
-                 std::format("parameter '{}' of class '{}' is assigned more "
-                             "than once",
-                             arg.param_arg_name, cls->name),
-                 Subclause("23.10.2.2"));
-    }
-  }
-}
-
-bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
-                              DiagEngine& diag, SourceLoc loc) {
+bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit) {
   if (dtype.scope_name.empty() || dtype.type_params.empty()) return false;
   const auto* cls = FindClassDecl(dtype.scope_name, unit);
   if (!cls) return false;
-  ValidateSpecializationArgNames(cls, dtype.type_params, diag, loc);
   auto subst = BuildSpecializationSubst(cls, dtype.type_params);
 
   std::string_view param_name = dtype.type_name;

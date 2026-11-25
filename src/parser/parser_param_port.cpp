@@ -32,9 +32,7 @@ struct ParserParamPortHelpers {
     DataType def_type;
     if (p.Match(TokenKind::kEq)) {
       has_default = true;
-      if (p.Check(TokenKind::kKwType)) {
-        p.ParseExpr();
-      } else {
+      if (!ParserDataDeclHelpers::ReadTypeReference(p, def_type)) {
         def_type = p.ParseTypeAssignmentValue();
       }
     }

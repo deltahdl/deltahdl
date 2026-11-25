@@ -88,6 +88,13 @@ void CollectBoundNames(const std::vector<BindDirective*>& binds,
   }
 }
 
+bool MayBeAnImplicitTop(
+    const ModuleDecl* decl,
+    const std::unordered_set<std::string_view>& instantiated) {
+  return !instantiated.contains(decl->name) &&
+         !HasParamPortWithoutDefault(decl);
+}
+
 std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
   std::unordered_set<std::string_view> instantiated;
   for (const auto* mod : unit->modules) {
@@ -104,9 +111,9 @@ std::vector<ModuleDecl*> CollectAutoTopModules(const CompilationUnit* unit) {
 
   std::vector<ModuleDecl*> tops;
   for (auto* mod : unit->modules)
-    if (!instantiated.contains(mod->name)) tops.push_back(mod);
+    if (MayBeAnImplicitTop(mod, instantiated)) tops.push_back(mod);
   for (auto* prog : unit->programs)
-    if (!prog->is_extern && !instantiated.contains(prog->name))
+    if (!prog->is_extern && MayBeAnImplicitTop(prog, instantiated))
       tops.push_back(prog);
   return tops;
 }
@@ -443,6 +450,16 @@ void Elaborator::ResolveDefparamsAndGenerates(RtlirDesign* design) {
   }
 }
 
+static void JudgeParamValues(const RtlirDesign& design, DiagEngine& diag) {
+  std::unordered_set<const RtlirModule*> judged;
+  for (const auto* top : design.top_modules) {
+    ReportParamsMissingValue(*top, judged, diag);
+  }
+  for (const auto* top : design.top_modules) {
+    ReportParamDefaultMismatches(*top, diag);
+  }
+}
+
 RtlirDesign* Elaborator::ElaborateTops(
     const std::vector<ModuleDecl*>& top_decls) {
   auto* design = arena_.Create<RtlirDesign>();
@@ -466,8 +483,7 @@ RtlirDesign* Elaborator::ElaborateTops(
     for (const auto& pg : batch) ProcessPendingGenerate(pg);
   }
 
-  for (const auto* top : design->top_modules)
-    ReportParamDefaultMismatches(*top, diag_);
+  JudgeParamValues(*design, diag_);
   for (auto* top : design->top_modules) {
     ValidateModportExportConflicts(top);
     CollectAllModules(top, design->all_modules);

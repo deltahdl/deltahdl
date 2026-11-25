@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 
 #include <initializer_list>
+#include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
 #include "helpers_child_instance.h"
@@ -647,6 +649,244 @@ TEST(ParameterizedClassElaboration,
                             "and 'u1' each declare for themselves",
                             13, "6.22"));
   EXPECT_FALSE(ErrorOnLine(diags, 14));
+}
+
+struct SpecializationPlace {
+  std::string_view before_class;
+  std::string_view after_class;
+  std::string_view prefix;
+};
+
+constexpr SpecializationPlace kSpecializationPlaces[] = {
+    {"", "", ""},
+    {"package q;\n", "endpackage\n", "q::"},
+    {"class O;\n", "endclass\n", "O::"},
+};
+
+constexpr std::string_view kSpecializationSites[] = {
+    "module top;\n  %C #(%A) c;\nendmodule\n",
+    "module top;\n  initial begin\n    %C #(%A) c;\n  end\nendmodule\n",
+    "module top;\n  typedef %C #(%A) t;\nendmodule\n",
+    "module top;\n  int v = %C #(%A)::P;\nendmodule\n",
+    "module top;\n  function void f(%C #(%A) c);\n  endfunction\nendmodule\n",
+    "module top;\n  function %C #(%A) f();\n  endfunction\nendmodule\n",
+    "module top;\n  if (1) begin\n    %C #(%A) c;\n  end\nendmodule\n",
+    "class D extends %C #(%A);\nendclass\n",
+    "class D;\n  %C #(%A) c;\nendclass\n",
+    "class D;\n  function void f();\n  %C #(%A) c;\n  endfunction\nendclass\n",
+    "class D;\n  typedef %C #(%A) t;\nendclass\n",
+    "%C #(%A) c;\n",
+    "interface i;\n  %C #(%A) c;\nendinterface\n",
+    "checker k;\n  %C #(%A) c;\nendchecker\n",
+    "program i;\n  %C #(%A) c;\nendprogram\n",
+    "module m #(type T = %C #(%A)) ();\nendmodule\n",
+    "module m (input var %C #(%A) c);\nendmodule\n",
+    "module top;\n  struct { %C #(%A) c; } s;\nendmodule\n",
+    "module top;\n  initial for (%C #(%A) c = null; c != null;) ;\nendmodule\n",
+};
+
+constexpr std::string_view kNewSite =
+    "module top;\n  initial begin\n    %C b;\n"
+    "    b = %C #(%A)::new;\n  end\nendmodule\n";
+
+std::string Replaced(std::string text, std::string_view from,
+                     std::string_view to) {
+  for (auto at = text.find(from); at != std::string::npos;
+       at = text.find(from)) {
+    text.replace(at, from.size(), to);
+  }
+  return text;
+}
+
+std::string SpecializedAt(const SpecializationPlace& place,
+                          std::string_view site, std::string_view arguments) {
+  std::string source(place.before_class);
+  source +=
+      "class C #(int W = 1);\n"
+      "  parameter int P = 2;\n"
+      "  localparam int L = 3;\n"
+      "  parameter type T = int;\n"
+      "endclass\n";
+  source += place.after_class;
+  source += Replaced(std::string(site), "%C",
+                     std::string(place.prefix) + std::string("C"));
+  if (!site.contains("module top;")) source += "module top;\nendmodule\n";
+  return Replaced(source, "%A", arguments);
+}
+
+void ExpectSpecializationReported(std::string_view arguments,
+                                  std::string_view message,
+                                  std::string_view subclause) {
+  for (const auto& place : kSpecializationPlaces) {
+    for (std::string_view site : kSpecializationSites) {
+      const std::string kSource = SpecializedAt(place, site, arguments);
+      SCOPED_TRACE(kSource);
+      ElabFixture f;
+      ElaborateSrc(kSource, f, "top");
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                                LineHolding(kSource, arguments), subclause));
+    }
+  }
+}
+
+TEST(SpecializationAssignments, NamedAssignmentNamesAClassPortParameter) {
+  ExpectSpecializationReported(".Z(5)", "class 'C' has no parameter 'Z'",
+                               "23.10.2.2");
+  ExpectSpecializationReported(".P(5)", "class 'C' has no parameter 'P'",
+                               "23.10.2.2");
+  ExpectSpecializationReported(".L(5)", "class 'C' has no parameter 'L'",
+                               "23.10.2.2");
+  ExpectSpecializationReported(".T(byte)", "class 'C' has no parameter 'T'",
+                               "23.10.2.2");
+}
+
+TEST(SpecializationAssignments, NamedAssignmentSetsEachParameterOnce) {
+  ExpectSpecializationReported(
+      ".W(4), .W(5)", "parameter 'W' of class 'C' is assigned more than once",
+      "23.10.2.2");
+}
+
+TEST(SpecializationAssignments, OrderedListGivesAtMostThePortListsValues) {
+  ExpectSpecializationReported("4, 5",
+                               "too many positional parameter overrides for "
+                               "class 'C': 2 provided, 1 allowed",
+                               "23.10.2.1");
+}
+
+TEST(SpecializationAssignments, AssignmentsOfThePortParameterAreAccepted) {
+  for (const auto& place : kSpecializationPlaces) {
+    for (std::string_view site : kSpecializationSites) {
+      for (std::string_view arguments : {".W(4)", "4", ""}) {
+        const std::string kSource = SpecializedAt(place, site, arguments);
+        SCOPED_TRACE(kSource);
+        ElabFixture f;
+        EXPECT_NE(ElaborateSrc(kSource, f, "top"), nullptr);
+        EXPECT_FALSE(f.has_errors);
+      }
+    }
+  }
+}
+
+TEST(SpecializationAssignments, PackageItemIsJudged) {
+  const std::string_view kPackageSite =
+      "package r;\n  %C #(%A) c;\nendpackage\nmodule top;\nendmodule\n";
+  ElabFixture rejected;
+  const std::string kRejected =
+      SpecializedAt(kSpecializationPlaces[1], kPackageSite, ".P(5)");
+  ElaborateSrc(kRejected, rejected, "top");
+  EXPECT_TRUE(ReportedError(rejected.diag.Diagnostics(),
+                            "class 'C' has no parameter 'P'",
+                            LineHolding(kRejected, ".P(5)"), "23.10.2.2"));
+  ElabFixture accepted;
+  EXPECT_NE(ElaborateSrc(
+                SpecializedAt(kSpecializationPlaces[1], kPackageSite, ".W(5)"),
+                accepted, "top"),
+            nullptr);
+  EXPECT_FALSE(accepted.has_errors);
+}
+
+TEST(SpecializationAssignments, ClassOfANewIsJudged) {
+  const std::string kSource =
+      SpecializedAt(kSpecializationPlaces[0], kNewSite, ".Z(5)");
+  ElabFixture f;
+  ElaborateSrc(kSource, f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'C' has no parameter 'Z'",
+                            LineHolding(kSource, ".Z(5)"), "23.10.2.2"));
+}
+
+TEST(SpecializationAssignments, InterfaceClassSpecializationsAreJudged) {
+  for (std::string_view clause :
+       {"class D implements I #(.Z(int));\n",
+        "interface class J extends I #(.Z(int));\n"}) {
+    const std::string kSource =
+        "interface class I #(type T = int);\n"
+        "endclass\n" +
+        std::string(clause) +
+        "endclass\n"
+        "module top;\n"
+        "endmodule\n";
+    ElabFixture f;
+    ElaborateSrc(kSource, f, "top");
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "class 'I' has no parameter 'Z'", 3,
+                              "23.10.2.2"));
+  }
+}
+
+TEST(SpecializationAssignments, NameIsTheClassItsScopeDeclares) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "class C #(int W = 1);\n"
+      "endclass\n"
+      "module top;\n"
+      "  class C #(int V = 1);\n"
+      "  endclass\n"
+      "  C #(.V(2)) c;\n"
+      "endmodule\n"
+      "module other;\n"
+      "  C #(.W(2)) c;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(SpecializationAssignments, ClassDeepInAScopeIsNotTheUnitClassOfItsName) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C #(int V = 1);\n"
+      "endclass\n"
+      "package q;\n"
+      "  class O;\n"
+      "    class C #(int W = 1);\n"
+      "      parameter int P = 2;\n"
+      "    endclass\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  int v = q::O::C #(.W(5))::P;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_FALSE(ReportedError(
+      f.diag.Diagnostics(), "class 'C' has no parameter 'W'", 11, "23.10.2.2"));
+}
+
+TEST(SpecializationAssignments, ScopeSpecializationIsJudgedAgainstItsClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class O #(int W = 1);\n"
+      "  class C #(int V = 1);\n"
+      "  endclass\n"
+      "endclass\n"
+      "module top;\n"
+      "  O #(.V(2))::C #(.V(3)) a;\n"
+      "  O #(.W(2))::C #(.W(3)) b;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'O' has no parameter 'V'", 6, "23.10.2.2"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "class 'C' has no parameter 'W'", 7, "23.10.2.2"));
+}
+
+TEST(SpecializationAssignments, SpecializationAsATypeArgumentIsJudged) {
+  const std::string_view kTypeArgumentSite =
+      "class E #(type T = int);\nendclass\nmodule top;\n"
+      "  E #(%C #(%A)) e;\nendmodule\n";
+  ElabFixture rejected;
+  const std::string kRejected =
+      SpecializedAt(kSpecializationPlaces[0], kTypeArgumentSite, ".Z(5)");
+  ElaborateSrc(kRejected, rejected, "top");
+  EXPECT_TRUE(ReportedError(rejected.diag.Diagnostics(),
+                            "class 'C' has no parameter 'Z'",
+                            LineHolding(kRejected, ".Z(5)"), "23.10.2.2"));
+  ElabFixture accepted;
+  EXPECT_NE(ElaborateSrc(SpecializedAt(kSpecializationPlaces[0],
+                                       kTypeArgumentSite, ".W(5)"),
+                         accepted, "top"),
+            nullptr);
+  EXPECT_FALSE(accepted.has_errors);
 }
 
 }  // namespace

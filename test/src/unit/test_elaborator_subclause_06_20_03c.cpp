@@ -4,6 +4,7 @@
 #include <string_view>
 
 #include "fixture_elaborator.h"
+#include "helpers_child_instance.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -69,6 +70,39 @@ TEST(TypeParameterElab, LocalTypeAsATypeParameterValueIsAccepted) {
     ElaborateSrc(src, f);
     EXPECT_FALSE(f.diag.HasErrors());
   }
+}
+
+TEST(BodyTypeParameter, DefparamOfABodyTypeParameterIsRejected) {
+  ElabFixture e;
+  ElaborateSrc(
+      "module c;\n"
+      "  parameter type T = int;\n"
+      "  T x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u();\n"
+      "  defparam u.T = 16;\n"
+      "endmodule\n",
+      e, "top");
+  EXPECT_TRUE(ReportedError(e.diag.Diagnostics(),
+                            "defparam cannot override a type parameter", 7,
+                            "23.10.1"));
+}
+
+TEST(BodyTypeParameter, InstanceOverrideOfABodyTypeParameterIsAccepted) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  parameter type T = int;\n"
+      "  T x;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c #(.T(byte)) v();\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ExpectVariableWidth(SoleChildInstance(design), "x", 8u);
 }
 
 }  // namespace

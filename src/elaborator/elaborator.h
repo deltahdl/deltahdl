@@ -373,7 +373,8 @@ class Elaborator : public ElaboratorClassRules {
   const RtlirParamDecl* ParamOfWhichPathNamesAPart(RtlirModule* mod,
                                                    const HierPath& path);
   bool ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
-                                   const HierPath& path);
+                                   const HierPath& path,
+                                   const HierPath& writer);
 
   void CheckEarlyResolutionAmbiguity(
       RtlirModule* mod, const std::unordered_set<std::string_view>& top_names);

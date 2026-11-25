@@ -517,4 +517,24 @@ TEST(ParameterOverride,
   EXPECT_FALSE(data->is_signed);
 }
 
+TEST(ParameterOverride, ClassScopedOverrideNamingNoTypeOfTheClassIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class Buf #(type T = int);\n"
+      "  typedef T elem_t;\n"
+      "endclass\n"
+      "module child #(type T = int) ();\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(.T(Buf #(byte)::elem_t)) u0();\n"
+      "  child #(.T(Buf #(byte)::absent)) u1();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter value assignment for type parameter 'T' "
+                            "of 'child' does not name a type",
+                            8, "23.10.2"));
+  EXPECT_EQ(f.diag.Diagnostics().size(), 1u);
+}
+
 }  // namespace

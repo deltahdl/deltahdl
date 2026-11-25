@@ -42,7 +42,7 @@ TEST(ParameterPortKeywordSim, ProgramParameterWithoutTheKeywordIsOverridable) {
 }
 
 TEST(NoDefaultParameterSim,
-     DISABLED_DefparamSuppliesTheValueOfAParameterWithoutADefault) {
+     DefparamSuppliesTheValueOfAParameterWithoutADefault) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child #(parameter int P);\n"
                        "  initial $display(\"%0d\", P);\n"
@@ -171,6 +171,29 @@ TEST(BodyParameterLocalitySim, ClassWithoutAPortListKeepsItsBodyValue) {
                        "endmodule\n",
                        f),
             "2\n");
+}
+
+TEST(NoDefaultParameterSim, DefparamValueSizesWhatTheParameterSizes) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module child #(parameter int P);\n"
+                       "  logic [P-1:0] x;\n"
+                       "  int a [P];\n"
+                       "  int b [P-1:0][2];\n"
+                       "  wire n [P];\n"
+                       "  wire s;\n"
+                       "  int q [$];\n"
+                       "  if (P > 3) begin : g\n"
+                       "    initial #1 $display(\"above 3\");\n"
+                       "  end\n"
+                       "  initial $display(\"%0d %0d %0d %0d %0d %0d\", P, "
+                       "$bits(x), $size(a), $size(b), $size(n), $size(q));\n"
+                       "endmodule\n"
+                       "module top;\n"
+                       "  child u0();\n"
+                       "  defparam u0.P = 7;\n"
+                       "endmodule\n",
+                       f),
+            "7 7 7 7 7 0\nabove 3\n");
 }
 
 }  // namespace

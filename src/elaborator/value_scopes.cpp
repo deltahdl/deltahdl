@@ -290,6 +290,11 @@ const ClassDecl* ValueScopes::ClassNamed(std::string_view name,
   return ClassOfSymbol(Find(name, scope));
 }
 
+const ClassDecl* ValueScopes::ClassDeclaredAs(const DataType& named,
+                                              const NameScope& scope) const {
+  return FindQualified(named, scope).cls;
+}
+
 const ClassDecl* ValueScopes::BaseOf(const ClassDecl& cls) const {
   DataType base;
   base.kind = DataTypeKind::kNamed;

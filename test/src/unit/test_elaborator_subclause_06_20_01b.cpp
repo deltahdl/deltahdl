@@ -35,7 +35,7 @@ size_t CountReports(const ElabFixture& f, std::string_view message) {
 }
 
 TEST(NoDefaultParameterElaboration,
-     DISABLED_UninstantiatedModuleWithoutADefaultIsNoImplicitTop) {
+     UninstantiatedModuleWithoutADefaultIsNoImplicitTop) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
       "module lib #(parameter int P);\n"
@@ -50,7 +50,7 @@ TEST(NoDefaultParameterElaboration,
 }
 
 TEST(NoDefaultParameterElaboration,
-     DISABLED_UninstantiatedProgramWithoutADefaultIsNoImplicitTop) {
+     UninstantiatedProgramWithoutADefaultIsNoImplicitTop) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
       "program prg #(parameter int P);\n"
@@ -80,7 +80,7 @@ TEST(NoDefaultParameterElaboration,
 }
 
 TEST(NoDefaultParameterElaboration,
-     DISABLED_DefparamSuppliesTheValueOfAParameterWithoutADefault) {
+     DefparamSuppliesTheValueOfAParameterWithoutADefault) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter int P);\n"
@@ -269,19 +269,19 @@ void ExpectSpecializationReported(std::string_view cls,
 }
 
 TEST(BodyParameterLocality,
-     DISABLED_NamedOverrideOfABodyValueParameterIsReportedInEveryPlace) {
+     NamedOverrideOfABodyValueParameterIsReportedInEveryPlace) {
   ExpectSpecializationReported(kClassWithAPortList, "#(.P(5))",
                                "class 'C' has no parameter 'P'", "23.10.2.2");
 }
 
 TEST(BodyParameterLocality,
-     DISABLED_NamedOverrideOfABodyTypeParameterIsReportedInEveryPlace) {
+     NamedOverrideOfABodyTypeParameterIsReportedInEveryPlace) {
   ExpectSpecializationReported(kClassWithAPortList, "#(.T(byte))",
                                "class 'C' has no parameter 'T'", "23.10.2.2");
 }
 
 TEST(BodyParameterLocality,
-     DISABLED_OrderedValueBeyondThePortListIsReportedInEveryPlace) {
+     OrderedValueBeyondThePortListIsReportedInEveryPlace) {
   ExpectSpecializationReported(kClassWithAPortList, "#(4, 5)",
                                "too many positional parameter overrides for "
                                "class 'C': 2 provided, 1 allowed",
@@ -289,13 +289,13 @@ TEST(BodyParameterLocality,
 }
 
 TEST(BodyParameterLocality,
-     DISABLED_NamedOverrideOfAClassWithoutAPortListIsReportedInEveryPlace) {
+     NamedOverrideOfAClassWithoutAPortListIsReportedInEveryPlace) {
   ExpectSpecializationReported(kClassWithoutAPortList, "#(.P(3))",
                                "class 'C' has no parameter 'P'", "23.10.2.2");
 }
 
 TEST(BodyParameterLocality,
-     DISABLED_OrderedOverrideOfAClassWithoutAPortListIsReportedInEveryPlace) {
+     OrderedOverrideOfAClassWithoutAPortListIsReportedInEveryPlace) {
   ExpectSpecializationReported(kClassWithoutAPortList, "#(3)",
                                "too many positional parameter overrides for "
                                "class 'C': 1 provided, 0 allowed",
@@ -321,8 +321,165 @@ TEST(BodyParameterLocality,
 }
 
 TEST(BodyParameterLocality,
-     DISABLED_OverridesOfThePortParameterOfANestedClassAreAccepted) {
+     OverridesOfThePortParameterOfANestedClassAreAccepted) {
   ExpectPortOverridesAccepted(kClassPlaces[3]);
+}
+
+TEST(NoDefaultParameterElaboration,
+     UninstantiatedModuleWithATypeParameterWithoutADefaultIsNoImplicitTop) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module lib #(parameter type T);\n"
+      "endmodule\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(HasTopNamed(design, "top"));
+  EXPECT_FALSE(HasTopNamed(design, "lib"));
+}
+
+TEST(NoDefaultParameterElaboration,
+     UninstantiatedModuleWithADefaultedTypeParameterIsAnImplicitTop) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module lib #(parameter type T = int, localparam int L = 2);\n"
+      "endmodule\n"
+      "program prg #(parameter type T = int);\n"
+      "endprogram\n"
+      "module top;\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(HasTopNamed(design, "lib"));
+  EXPECT_TRUE(HasTopNamed(design, "prg"));
+}
+
+TEST(NoDefaultParameterElaboration,
+     NestedModuleWithATypeParameterWithoutADefaultIsNotInstantiated) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  module inner #(parameter type T);\n"
+      "  endmodule\n"
+      "  module other #(parameter type T = int);\n"
+      "  endmodule\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
+  EXPECT_EQ(design->top_modules[0]->children[0].inst_name, "other");
+}
+
+TEST(NoDefaultParameterElaboration, OnlyTheInstanceWithoutADefparamIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int P);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u0();\n"
+      "  child u1();\n"
+      "  defparam u0.P = 7;\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' of 'child' has no default value", 1,
+                            "6.20.1"));
+  EXPECT_EQ(CountReports(f, kMissingValue), 1u);
+}
+
+TEST(NoDefaultParameterElaboration,
+     DefparamSuppliesInterfaceAndGeneratedInstanceValues) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "interface ifc #(parameter int P);\n"
+      "endinterface\n"
+      "module child #(parameter int P);\n"
+      "  logic [P-1:0] x;\n"
+      "  if (P > 3) begin : g\n"
+      "    logic y;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  ifc i();\n"
+      "  defparam i.P = 2;\n"
+      "  for (genvar k = 0; k < 2; k++) begin : l\n"
+      "    child u();\n"
+      "    defparam u.P = 4 + k;\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(NoDefaultParameterElaboration,
+     InstanceWithoutAValueInAGenerateBlockIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int P);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    child u();\n"
+      "  end\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' of 'child' has no default value", 1,
+                            "6.20.1"));
+}
+
+TEST(NoDefaultParameterElaboration,
+     BoundInstanceWithoutAValueIsReportedAndOneWithAValueIsNot) {
+  for (bool gives_value : {false, true}) {
+    ElabFixture f;
+    ElaborateSrc(std::string("module child #(parameter int P);\n"
+                             "endmodule\n"
+                             "module top;\n"
+                             "endmodule\n"
+                             "bind top child ") +
+                     (gives_value ? "#(3) " : "") + "u();\n",
+                 f, "top");
+    EXPECT_EQ(CountReports(f, kMissingValue), gives_value ? 0u : 1u);
+  }
+}
+
+TEST(NoDefaultParameterElaboration,
+     InstantiatedModuleIsNoImplicitTopAndATypeOperatorIsADefault) {
+  ElabFixture f;
+  auto* design = ElaborateWithPreprocessor(
+      "module child #(parameter int P);\n"
+      "endmodule\n"
+      "module lib #(parameter type T = type(int));\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child #(3) u0();\n"
+      "endmodule\n",
+      f, "", true);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(HasTopNamed(design, "top"));
+  EXPECT_TRUE(HasTopNamed(design, "lib"));
+  EXPECT_FALSE(HasTopNamed(design, "child"));
+}
+
+TEST(NoDefaultParameterElaboration, ArrayOfInstancesWithoutAValueIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module child #(parameter int P);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  child u[2]();\n"
+      "endmodule\n",
+      f, "top");
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "parameter 'P' of 'child' has no default value", 1,
+                            "6.20.1"));
+  EXPECT_EQ(CountReports(f, kMissingValue), 1u);
 }
 
 }  // namespace

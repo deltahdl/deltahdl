@@ -100,6 +100,14 @@ static bool RhsContainsHierarchicalRef(const Expr* e,
   return AnyListChildContainsHierarchicalRef(e, params);
 }
 
+static RtlirParamDecl* ModuleParamNamed(RtlirModule& mod,
+                                        std::string_view name) {
+  for (auto& p : mod.params) {
+    if (p.name == name && p.gen_block_prefix.empty()) return &p;
+  }
+  return nullptr;
+}
+
 RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
                                                  const HierPath& path,
                                                  const HierPath& writer,
@@ -114,14 +122,9 @@ RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
                           });
   if (!cur) return nullptr;
 
-  auto param_name = path.back().name;
-  for (auto& p : cur->params) {
-    if (p.name == param_name) {
-      if (out_mod) *out_mod = cur;
-      return &p;
-    }
-  }
-  return nullptr;
+  RtlirParamDecl* param = ModuleParamNamed(*cur, path.back().name);
+  if (param != nullptr && out_mod != nullptr) *out_mod = cur;
+  return param;
 }
 
 RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
@@ -139,13 +142,8 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   if (rooted.steps.size() != 1) {
     return ResolveDefparamSteps(top, rooted.steps, {}, &rooted.target_mod);
   }
-  for (auto& p : top->params) {
-    if (p.name == rooted.steps.front().name) {
-      rooted.target_mod = top;
-      return &p;
-    }
-  }
-  return nullptr;
+  rooted.target_mod = top;
+  return ModuleParamNamed(*top, rooted.steps.front().name);
 }
 
 static TypedefMap ModuleTypedefTable(const TypedefMap& all,
@@ -241,23 +239,43 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
   }
 }
 
-static void RefoldFixedUnpackedDims(RtlirVariable& var, const ScopeMap& scope) {
-  if (var.declared_unpacked_dims == nullptr ||
-      var.unpacked_dim_sizes.size() != var.declared_unpacked_dims->size()) {
-    return;
-  }
+static std::vector<RtlirUnpackedDim> FixedUnpackedDims(
+    const std::vector<Expr*>* declared, const ScopeMap& scope) {
   std::vector<RtlirUnpackedDim> dims;
-  for (const Expr* dim : *var.declared_unpacked_dims) {
+  if (declared == nullptr) return dims;
+  for (const Expr* dim : *declared) {
     auto folded = FoldUnpackedDimBounds(dim, scope);
-    if (!folded) return;
+    if (!folded) return {};
     dims.push_back(*folded);
   }
-  var.unpacked_dims = dims;
-  var.unpacked_dim_sizes.clear();
-  for (const auto& dim : dims) var.unpacked_dim_sizes.push_back(dim.Size());
-  var.unpacked_size = dims[0].Size();
-  var.unpacked_lo = dims[0].Low();
-  var.is_descending = dims[0].left > dims[0].right;
+  return dims;
+}
+
+static std::vector<uint32_t> DimSizes(
+    const std::vector<RtlirUnpackedDim>& dims) {
+  std::vector<uint32_t> sizes;
+  sizes.reserve(dims.size());
+  for (const auto& dim : dims) sizes.push_back(dim.Size());
+  return sizes;
+}
+
+static void ResizeUnpackedVariable(RtlirVariable& var, const ScopeMap& scope) {
+  const std::vector<RtlirUnpackedDim> kDims =
+      FixedUnpackedDims(var.declared_unpacked_dims, scope);
+  if (kDims.empty()) return;
+  var.unpacked_dims = kDims;
+  var.unpacked_dim_sizes = DimSizes(kDims);
+  var.unpacked_size = kDims[0].Size();
+  var.unpacked_lo = kDims[0].Low();
+  var.is_descending = kDims[0].left > kDims[0].right;
+}
+
+static void ResizeUnpackedNet(RtlirNet& net, const ScopeMap& scope) {
+  const std::vector<RtlirUnpackedDim> kDims =
+      FixedUnpackedDims(net.declared_unpacked_dims, scope);
+  if (kDims.empty()) return;
+  net.unpacked_dims = kDims;
+  net.unpacked_dim_sizes = DimSizes(kDims);
 }
 
 static void ResizeParamSizedDecls(RtlirModule* mod, const TypedefMap& typedefs,
@@ -266,11 +284,12 @@ static void ResizeParamSizedDecls(RtlirModule* mod, const TypedefMap& typedefs,
     ScopeMap var_scope = scope;
     for (const auto& [name, value] : var.gen_block_consts)
       var_scope[name] = value;
-    RefoldFixedUnpackedDims(var, var_scope);
+    ResizeUnpackedVariable(var, var_scope);
     if (var.dtype == nullptr) continue;
     var.width = EvalTypeWidth(*var.dtype, typedefs, var_scope);
   }
   for (auto& net : mod->nets) {
+    ResizeUnpackedNet(net, scope);
     if (net.dtype == nullptr || net.name.find('.') != std::string_view::npos)
       continue;
     net.width = EvalTypeWidth(*net.dtype, typedefs, scope);
@@ -658,9 +677,10 @@ static bool DefparamTargetsSpecparam(RtlirModule* mod, const HierPath& path,
 }
 
 static const RtlirParamDecl* ParamAtPath(RtlirModule* root,
-                                         const HierPath& path) {
+                                         const HierPath& path,
+                                         const HierPath& writer = {}) {
   std::vector<PathDescent> descents;
-  DefparamPathEnd reach = WalkDefparamPath(root, path, {}, descents);
+  DefparamPathEnd reach = WalkDefparamPath(root, path, writer, descents);
   std::string block_prefix;
   for (const HierStep& block : reach.blocks) {
     block_prefix += std::format("{}_", block.name);
@@ -696,7 +716,8 @@ const RtlirParamDecl* Elaborator::ParamOfWhichPathNamesAPart(
 }
 
 bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
-                                             const HierPath& path) {
+                                             const HierPath& path,
+                                             const HierPath& writer) {
   DefparamTopRooted any{nullptr, path, mod};
   if (ResolveDefparamSteps(mod, path, {}) != nullptr ||
       ResolveDefparamFromTop(path, any) != nullptr) {
@@ -713,6 +734,12 @@ bool Elaborator::ReportUnappliedDefparamPath(RtlirModule* mod, SourceLoc loc,
     diag_.Error(loc,
                 "defparam inside a generate block or an array of instances "
                 "reaches a parameter outside that hierarchy",
+                Subclause("23.10.1"));
+    return true;
+  }
+  if (ParamAtPath(mod, path, writer) != nullptr ||
+      ParamAtPathFromAnyRoot(mod, path) != nullptr) {
+    diag_.Error(loc, "defparam cannot override a local parameter",
                 Subclause("23.10.1"));
     return true;
   }
@@ -743,7 +770,7 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
     const Expr* path_expr = site.item->defparam_assigns[idx].first;
     HierPath path;
     if (CollectPathSteps(path_expr, scope, path) &&
-        ReportUnappliedDefparamPath(mod, site.item->loc, path)) {
+        ReportUnappliedDefparamPath(mod, site.item->loc, path, site.path)) {
       continue;
     }
     diag_.Warning(site.item->loc, "defparam target not found",

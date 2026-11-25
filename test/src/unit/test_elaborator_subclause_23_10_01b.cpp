@@ -595,4 +595,62 @@ TEST(DefparamElaboration, RhsRejectsAPartOfAParameterOfAnotherScope) {
   }
 }
 
+TEST(DefparamElaboration, NameOfTheModuleReachesPastAGenerateBlockParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  if (1) begin : g\n"
+      "    parameter int P = 1;\n"
+      "  end\n"
+      "  parameter int P = 2;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u();\n"
+      "  defparam u.P = 9;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (const auto& p : design->top_modules[0]->children[0].resolved->params) {
+    EXPECT_EQ(p.resolved_value, p.gen_block_prefix.empty() ? 9 : 1);
+  }
+}
+
+TEST(DefparamElaboration, TopModuleNameReachesPastAGenerateBlockParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module top;\n"
+      "  if (1) begin : g\n"
+      "    parameter int P = 1;\n"
+      "  end\n"
+      "  parameter int P = 2;\n"
+      "  defparam top.P = 9;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  for (const auto& p : design->top_modules[0]->params) {
+    EXPECT_EQ(p.resolved_value, p.gen_block_prefix.empty() ? 9 : 1);
+  }
+}
+
+TEST(DefparamElaboration, ModuleNameAloneReachesNoGenerateBlockParameter) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module c;\n"
+      "  if (1) begin : g\n"
+      "    parameter int P = 1;\n"
+      "  end\n"
+      "endmodule\n"
+      "module top;\n"
+      "  c u();\n"
+      "  defparam u.P = 9;\n"
+      "endmodule\n",
+      f, "top");
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "defparam target not found",
+                              8, "23.10.1"));
+}
+
 }  // namespace

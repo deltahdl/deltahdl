@@ -153,6 +153,10 @@ const ClassDecl* FindClassDecl(std::string_view name,
 
 bool HasParamPortWithoutDefault(const ModuleDecl* decl);
 
+void ReportParamsMissingValue(const RtlirModule& mod,
+                              std::unordered_set<const RtlirModule*>& judged,
+                              DiagEngine& diag);
+
 std::unordered_set<std::string_view> DeclaredSpecparamNames(
     const ModuleDecl* decl);
 
@@ -219,8 +223,7 @@ std::string_view PackageClassKey(const DataType& dtype,
                                  const TypedefMap& typedefs,
                                  const CompilationUnit* unit, Arena& arena);
 
-bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
-                              DiagEngine& diag, SourceLoc loc);
+bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit);
 bool IsRealType(DataTypeKind k);
 
 struct VarSelectShape {

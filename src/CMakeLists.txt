@@ -128,6 +128,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
     elaborator/implicit_variable_calls.cpp
+    elaborator/scoped_walk.cpp
     elaborator/specify_parameter_uses.cpp
     elaborator/subroutine_instance_copy.cpp
     elaborator/type_ref_compare_fold.cpp
@@ -272,6 +273,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_validate_timescale.cpp
     elaborator/class_base_resolution.cpp
     elaborator/class_default_specialization.cpp
+    elaborator/class_specialization_assignments.cpp
     elaborator/class_member_names.cpp
     elaborator/class_method_reads.cpp
     elaborator/elaborator_validate_enum_assign.cpp

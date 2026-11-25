@@ -88,6 +88,9 @@ class ValueScopes {
   const ClassDecl* ClassNamed(std::string_view name,
                               const NameScope& scope) const;
 
+  const ClassDecl* ClassDeclaredAs(const DataType& named,
+                                   const NameScope& scope) const;
+
   void DeclareItems(const std::vector<ModuleItem*>& items, NameScope& scope);
 
   void DeclareItem(const ModuleItem& item, NameScope& scope);

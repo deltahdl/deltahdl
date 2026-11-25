@@ -82,13 +82,41 @@ static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                  Subclause("23.10.3"));
 }
 
+static bool TypeParamPortHasDefault(const DataType& type) {
+  return type.kind != DataTypeKind::kImplicit || type.type_ref_expr != nullptr;
+}
+
 bool HasParamPortWithoutDefault(const ModuleDecl* decl) {
-  for (const auto& [name, expr] : decl->params) {
+  for (size_t i = 0; i < decl->params.size(); ++i) {
+    const auto& [name, expr] = decl->params[i];
     if (decl->localparam_port_names.count(name)) continue;
-    if (decl->type_param_names.count(name)) continue;
-    if (expr == nullptr) return true;
+    if (decl->type_param_names.count(name)
+            ? !TypeParamPortHasDefault(decl->param_types.at(i))
+            : expr == nullptr) {
+      return true;
+    }
   }
   return false;
+}
+
+void ReportParamsMissingValue(const RtlirModule& mod,
+                              std::unordered_set<const RtlirModule*>& judged,
+                              DiagEngine& diag) {
+  if (!judged.insert(&mod).second) return;
+  for (const auto& pd : mod.params) {
+    if (pd.is_localparam || pd.is_type_param) continue;
+    if (pd.default_value != nullptr || pd.from_override) continue;
+    diag.Error(mod.loc,
+               std::format("parameter '{}' of '{}' has no default value and "
+                           "no override at instantiation",
+                           pd.name, mod.name),
+               Subclause("6.20.1"));
+  }
+  for (const auto& child : mod.children) {
+    if (child.resolved != nullptr) {
+      ReportParamsMissingValue(*child.resolved, judged, diag);
+    }
+  }
 }
 
 std::unordered_set<std::string_view> DeclaredSpecparamNames(

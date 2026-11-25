@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <cstdint>
-#include <format>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -112,20 +111,6 @@ static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod,
       rp.is_signed = ExplicitPortExprSigned(src.port_expr, mod);
       break;
     }
-  }
-}
-
-static void ReportParamsMissingValue(const ModuleDecl* decl,
-                                     const RtlirModule* mod, DiagEngine& diag) {
-  for (const auto& pd : mod->params) {
-    if (pd.is_localparam || pd.is_type_param) continue;
-    if (pd.default_value != nullptr) continue;
-    if (pd.from_override) continue;
-    diag.Error(decl->range.start,
-               std::format("parameter '{}' of '{}' has no default value and "
-                           "no override at instantiation",
-                           pd.name, decl->name),
-               Subclause("6.20.1"));
   }
 }
 
@@ -491,8 +476,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       InnermostScope(RegisteredGenPrefixes())};
   BodyParamAssignmentsGuard body_assignments_guard(
       decl->has_param_port_list ? nullptr : &kBodyAssignments);
-
-  ReportParamsMissingValue(decl, mod, diag_);
 
   ElaboratePorts(decl, mod);
 

@@ -1,6 +1,7 @@
 #include "elaborator/class_base_resolution.h"
 #include "elaborator/class_default_specialization.h"
 #include "elaborator/class_method_reads.h"
+#include "elaborator/class_specialization_assignments.h"
 #include "elaborator/elaborator_call_targets.h"
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_validate_classes.h"
@@ -19,6 +20,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   ValidateWeakReferenceMembers();
 
   ReportClassSpecializationsWithoutValues(*unit_, diag_);
+
+  ReportClassSpecializationAssignments(*unit_, diag_);
 
   ReportBasesNamingNoClass(*unit_, diag_);
 
