@@ -128,6 +128,7 @@ std::vector<const DpiRtExport*> CallableExports(DpiRuntime& dpi) {
 void BindDpiImports(DpiRuntime& dpi, const DpiSymbolLookup& lookup,
                     const std::filesystem::path& work_dir,
                     const std::string& compiler, DiagEngine& diag) {
+  ExportBinding() = DpiExportBinding{};
   std::vector<DpiRtFunction*> callable;
   std::vector<const DpiRtFunction*> declarations;
   std::vector<void*> symbols;

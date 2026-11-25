@@ -394,4 +394,75 @@ TEST(DpiExportCalledFromC, AnExportRunsInTheContextOfItsInstance) {
   EXPECT_EQ(VariableValue(f, "r"), 12U);
 }
 
+int g_stale = -1;
+
+int CallTheEarlierExport() {
+  auto sv_earlier = ExportNamed<int (*)()>("sv_earlier");
+  g_stale = sv_earlier == nullptr ? -1 : sv_earlier();
+  return 1;
+}
+
+void RunTheEarlierDesign(SimFixture& f) {
+  g_stale = -1;
+  RunWithImportsBound(
+      "module top;\n"
+      "  export \"DPI-C\" function sv_earlier;\n"
+      "  import \"DPI-C\" context function int call_it();\n"
+      "  int calls = 0;\n"
+      "  int r;\n"
+      "  function int sv_earlier(); calls++; return 40 + calls; endfunction\n"
+      "  initial r = call_it();\n"
+      "endmodule\n",
+      f, {{"call_it", reinterpret_cast<void*>(&CallTheEarlierExport)}},
+      "subclause_35_07_earlier_design");
+  ASSERT_EQ(g_stale, 41);
+}
+
+constexpr const char* kNoExport =
+    "module top;\n"
+    "  import \"DPI-C\" context function int call_it();\n"
+    "  int r;\n"
+    "  initial r = call_it();\n"
+    "endmodule\n";
+
+TEST(DpiExportOfAnEarlierRun, ALaterDesignsImportDoesNotReachIt) {
+  SimFixture earlier;
+  RunTheEarlierDesign(earlier);
+  SimFixture later;
+  RunWithImportsBound(
+      kNoExport, later,
+      {{"call_it", reinterpret_cast<void*>(&CallTheEarlierExport)}},
+      "subclause_35_07_later_design");
+  EXPECT_EQ(VariableValue(later, "r"), 1U);
+  EXPECT_EQ(g_stale, 0);
+  EXPECT_EQ(VariableValue(earlier, "calls"), 1U);
+  EXPECT_TRUE(earlier.diag.Diagnostics().empty());
+}
+
+TEST(DpiExportOfAnEarlierRun, ALaterRuntimeWithNothingToBindDropsIt) {
+  SimFixture earlier;
+  RunTheEarlierDesign(earlier);
+  DpiCBinding later;
+  later.Bind({}, "subclause_35_07_later_empty");
+  CallTheEarlierExport();
+  EXPECT_EQ(g_stale, 0);
+  EXPECT_EQ(VariableValue(earlier, "calls"), 1U);
+  EXPECT_TRUE(earlier.diag.Diagnostics().empty());
+}
+
+TEST(DpiExportOfAnEarlierRun, ALaterBindThatFailsToBuildDropsIt) {
+  SimFixture earlier;
+  RunTheEarlierDesign(earlier);
+  SimFixture later;
+  RunWithImportsBound(
+      kNoExport, later,
+      {{"call_it", reinterpret_cast<void*>(&CallTheEarlierExport)}},
+      "subclause_35_07_later_unbuilt", "no_such_c_compiler");
+  EXPECT_FALSE(later.diag.Diagnostics().empty());
+  CallTheEarlierExport();
+  EXPECT_EQ(g_stale, 0);
+  EXPECT_EQ(VariableValue(earlier, "calls"), 1U);
+  EXPECT_TRUE(earlier.diag.Diagnostics().empty());
+}
+
 }  // namespace

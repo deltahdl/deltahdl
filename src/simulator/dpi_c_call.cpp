@@ -590,8 +590,8 @@ std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
   if (kResult == "void") {
     body += "  deltahdl_dpi_export_entry(" + kIndex + ", args, 0);\n";
   } else {
-    body += "  " + kResult + " result;\n  deltahdl_dpi_export_entry(" + kIndex +
-            ", args, &result);\n  return result;\n";
+    body += "  " + kResult + " result = 0;\n  deltahdl_dpi_export_entry(" +
+            kIndex + ", args, &result);\n  return result;\n";
   }
   return kResult + " " + std::string(DpiGlobalName(exp)) + "(" + parameters +
          ") {\n" + body + "}\n";

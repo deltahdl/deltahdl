@@ -1,7 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "helpers_scheduler.h"
@@ -177,6 +180,70 @@ TEST(RandcModifierCyclic, StaticRandcSharesOneCycleAcrossInstances) {
         << "value " << v << " repeated across instances of a static randc";
   }
   EXPECT_EQ(seen.size(), 4u);
+}
+
+ConstraintExpr NestedRangeOfX(bool condition) {
+  ConstraintExpr then_range;
+  then_range.kind = ConstraintKind::kRange;
+  then_range.var_name = "x";
+  then_range.lo = 4;
+  then_range.hi = 5;
+  ConstraintExpr else_range = then_range;
+  else_range.lo = 2;
+  else_range.hi = 3;
+  ConstraintExpr branch;
+  branch.kind = ConstraintKind::kIfElse;
+  branch.cond_fn =
+      [condition](const std::unordered_map<std::string, int64_t>&) {
+        return condition;
+      };
+  if (condition) {
+    branch.sub_constraints.push_back(then_range);
+  } else {
+    branch.else_constraints.push_back(else_range);
+  }
+  return branch;
+}
+
+void ExpectEachPairOfDrawsHolds(ConstraintSolver& solver,
+                                const ConstraintExpr& constraint,
+                                const std::unordered_set<int64_t>& values) {
+  ConstraintBlock block;
+  block.name = "c";
+  block.constraints.push_back(constraint);
+  solver.AddConstraintBlock(block);
+  for (int i = 0; i < 20; ++i) {
+    std::unordered_set<int64_t> drawn;
+    for (size_t k = 0; k < values.size(); ++k) {
+      ASSERT_TRUE(solver.Solve());
+      drawn.insert(solver.GetValue("x"));
+    }
+    EXPECT_EQ(drawn, values);
+  }
+}
+
+TEST(RandcModifierCyclic, AConstraintNamingItOnlyInABranchShapesTheCycle) {
+  ConstraintSolver solver(5);
+  solver.AddVariable(MakeRandc("x", 0, 7));
+  ExpectEachPairOfDrawsHolds(solver, NestedRangeOfX(true), {4, 5});
+}
+
+TEST(RandcModifierCyclic, AConstraintNamingItOnlyInAnElseShapesTheCycle) {
+  ConstraintSolver solver(5);
+  solver.AddVariable(MakeRandc("x", 0, 7));
+  ExpectEachPairOfDrawsHolds(solver, NestedRangeOfX(false), {2, 3});
+}
+
+TEST(RandcModifierCyclic, ADisabledVariableInItsConstraintLeavesTheCycle) {
+  ConstraintSolver solver(5);
+  solver.AddVariable(MakeRandc("x", 0, 7));
+  RandVariable y;
+  y.name = "y";
+  y.enabled = false;
+  solver.AddVariable(y);
+  ConstraintExpr constraint = NestedRangeOfX(true);
+  constraint.ref_vars = {"x", "y"};
+  ExpectEachPairOfDrawsHolds(solver, constraint, {4, 5});
 }
 
 TEST(RandcModifierCyclicFromSource,

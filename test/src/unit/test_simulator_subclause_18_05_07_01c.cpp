@@ -92,16 +92,10 @@ std::string Body(const char* decls, const std::string& items) {
 const char* const kGuardedRise = "foreach (a[i]) (i < 2) -> a[i] < a[i + 1];";
 const char* const kRises = "o.a[0] < o.a[1] && o.a[1] < o.a[2]";
 
-std::string HeldTwice(const std::string& body, const std::string& check) {
-  std::string src = Tally("", body, "", "o.randomize()", check);
-  src.replace(src.find("n < 16"), 6, "n < 2");
-  return CountHeld(src);
-}
-
 TEST(ForeachConstraintCases, AGuardedIndexPastTheEndIsNotCreated) {
   EXPECT_EQ(Held(Body(kThree, kGuardedRise), kRises), kAll);
-  EXPECT_EQ(HeldTwice(Body(kThreeDynamic, kGuardedRise), kRises), "2\n");
-  EXPECT_EQ(HeldTwice(Body(kThreeQueue, kGuardedRise), kRises), "2\n");
+  EXPECT_EQ(Held(Body(kThreeDynamic, kGuardedRise), kRises), kAll);
+  EXPECT_EQ(Held(Body(kThreeQueue, kGuardedRise), kRises), kAll);
 }
 
 const char* const kHandleGuard =

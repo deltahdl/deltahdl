@@ -36,27 +36,21 @@ void ConstraintSolver::PruneRefusedRandcValues(
   }
 }
 
-static void CollectNamed(const ConstraintExpr& c,
-                         std::vector<std::string>& out) {
-  if (!c.var_name.empty()) out.push_back(c.var_name);
-  out.insert(out.end(), c.ref_vars.begin(), c.ref_vars.end());
-  for (const auto& sub : c.sub_constraints) CollectNamed(sub, out);
-  for (const auto& sub : c.else_constraints) CollectNamed(sub, out);
+static bool AnyNameIs(const ConstraintExpr& c,
+                      const std::function<bool(const std::string&)>& pred) {
+  auto holds = [&pred](const ConstraintExpr& sub) {
+    return AnyNameIs(sub, pred);
+  };
+  return pred(c.var_name) ||
+         std::any_of(c.ref_vars.begin(), c.ref_vars.end(), std::cref(pred)) ||
+         std::any_of(c.sub_constraints.begin(), c.sub_constraints.end(),
+                     holds) ||
+         std::any_of(c.else_constraints.begin(), c.else_constraints.end(),
+                     holds);
 }
 
 static bool ConstraintNames(const ConstraintExpr& c, const std::string& name) {
-  if (c.var_name == name) return true;
-  if (std::find(c.ref_vars.begin(), c.ref_vars.end(), name) !=
-      c.ref_vars.end()) {
-    return true;
-  }
-  for (const auto& sub : c.sub_constraints) {
-    if (ConstraintNames(sub, name)) return true;
-  }
-  for (const auto& sub : c.else_constraints) {
-    if (ConstraintNames(sub, name)) return true;
-  }
-  return false;
+  return AnyNameIs(c, [&name](const std::string& n) { return n == name; });
 }
 
 bool ConstraintSolver::RandcValueAdmissible(
@@ -101,11 +95,10 @@ bool ConstraintSolver::ConstrainsAlone(const ConstraintExpr& c,
                                        const std::string& name) const {
   if (c.kind == ConstraintKind::kSoft || !ConstraintNames(c, name))
     return false;
-  std::vector<std::string> named;
-  CollectNamed(c, named);
-  return std::none_of(named.begin(), named.end(), [&](const std::string& n) {
+  return !AnyNameIs(c, [&](const std::string& n) {
+    if (n == name) return false;
     auto vit = variables_.find(n);
-    return n != name && vit != variables_.end() && vit->second.enabled;
+    return vit != variables_.end() && vit->second.enabled;
   });
 }
 
