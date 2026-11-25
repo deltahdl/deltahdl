@@ -19,5 +19,5 @@ Run every command that can take more than about a minute as a background Bash ca
 - Give a command that might not end a time limit as well, such as `perl -e 'alarm 60; exec @ARGV' <command>`; macOS has no `timeout` command.
 - Send the output to a file under the scratchpad, and read that file once the notification arrives.
 - Never follow a background command with a foreground wait: no `sleep`, no `until` loop, and no rereading of its output file until it fills. Any of these blocks the session again.
-- While it runs, do nothing but wait, per [waiting-while-anything-runs-in-the-background](waiting-while-anything-runs-in-the-background.md).
+- While it runs, do nothing but wait, except for what the user instructs, per [waiting-while-anything-runs-in-the-background](waiting-while-anything-runs-in-the-background.md).
 - A turn made of many short foreground calls also holds the reminders back until it ends. Split long work at its natural boundaries, such as after a build starts or after a batch of edits, rather than running it all in one turn.

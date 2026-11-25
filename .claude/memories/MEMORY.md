@@ -46,6 +46,9 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Tests
 
+- [Every LRM rule has been swept for tests](every-lrm-rule-has-been-swept.md) — each case of IEEE 1800-2023 already has a test, plain if it passes and `DISABLED_` if not; start from those.
+- [Searching for a test before adding one](searching-for-a-test-before-adding-one.md) — search all of `test/`, open what is found and trace its code; add only what it would not catch.
+- [A test is deleted only with a yes](a-test-is-deleted-only-with-a-yes.md) — show the user what it asserts, what the standard requires and what still shows each correct case; an issue asking is not a yes.
 - [Test-driven development](test-driven-development.md) — tests first, each seen to fail for its issue's reason before the fix; a test lands in the same commit as its code, and no src line lands uncovered.
 - [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.
@@ -70,7 +73,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [A push starts a run per workflow](a-push-starts-a-run-per-workflow.md) — one commit can start several runs and `--limit 1` picks one; watch every run the commit lists.
 - [Watching a CI run](watching-a-ci-run.md) — `gh run watch <id> --interval 60 --exit-status` in the background; the default poll trips the secondary rate limit.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute, a CI watch included, runs with `run_in_background: true`.
-- [Waiting while anything runs in the background](waiting-while-anything-runs-in-the-background.md) — a background command is its turn's last call; until its notification, nothing but waiting, for the issue in hand or any other.
+- [Waiting while anything runs in the background](waiting-while-anything-runs-in-the-background.md) — a background command is its turn's last call; until its notification, nothing but waiting, except what the user instructs, done at once.
 - [Fixing a red run after a push](fixing-a-red-run.md) — fix your push's red run, caused or inherited, in a push of its own first; red only on `assert-coverage` holds nothing up.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.
@@ -78,6 +81,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Scripts and CI mechanisms
 
 - [Failing loudly](failing-loudly-in-orchestrators.md) — an orchestrator under `scripts/` raises or exits non-zero; it never skips and carries on.
+- [A reminder states one matter](a-reminder-states-one-matter.md) — each autopilot reminder holds one indivisible matter and fires every 10 minutes; two matters make two reminders.
 - [Positive prompts](positive-prompts.md) — write a skill's instructions or an autopilot reminder as the action wanted, not the one forbidden.
 - [CI shows all output](ci-shows-all-output.md) — every step prints all its tools say: no quiet flags, no /dev/null.
 - [CI toolchain versions](ci-toolchain-versions.md) — LLVM's major is install-llvm's default, moved in its own commit; platform-named jobs pin their image; the rest floats; Actions tags stay at their major.
@@ -104,6 +108,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Talking with the user
 
+- [What the user instructs is done](what-the-user-instructs-is-done.md) — in full and at once; no memory, reminder, background command or CI run holds it back.
 - [One point per message](one-point-per-message.md) — one point or one decision per message, in plain words; say what each named thing is and whether it exists or is proposed.
 
 ## The notes themselves
