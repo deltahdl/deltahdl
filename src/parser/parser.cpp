@@ -612,7 +612,10 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     in_cu_scope_param_ = true;
     ParseParamDecl(items);
     in_cu_scope_param_ = false;
-    for (auto* item : items) unit->cu_items.push_back(item);
+    for (auto* item : items) {
+      DeclareAsTypedef(*item);
+      unit->cu_items.push_back(item);
+    }
     return true;
   }
 

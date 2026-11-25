@@ -30,12 +30,6 @@ namespace delta {
 
 namespace {
 
-bool DeclaresTypeParam(const ModuleItem& item) {
-  return item.kind == ModuleItemKind::kParamDecl &&
-         item.data_type.kind == DataTypeKind::kVoid &&
-         item.typedef_type.kind != DataTypeKind::kImplicit;
-}
-
 const ModuleItem* TypeParamItem(const std::vector<ModuleItem*>& items,
                                 std::string_view name) {
   for (const ModuleItem* item : items) {
@@ -464,8 +458,11 @@ void JudgeRestriction(const ModuleItem& item, const LocalTypeNames& locals,
   for (auto it = locals.rbegin(); it != locals.rend(); ++it) {
     if (NamesLocal(*bound, *it)) bound = it->bound;
   }
-  ReportTypeOutsideRestriction({item.name, item.forward_type_kind}, *bound,
-                               item.loc, walk.restriction, walk.diag);
+  const DataTypeKind kRestriction = item.kind == ModuleItemKind::kTypedef
+                                        ? item.type_param_restriction
+                                        : item.forward_type_kind;
+  ReportTypeOutsideRestriction({item.name, kRestriction}, *bound, item.loc,
+                               walk.restriction, walk.diag);
 }
 
 void DeclareTypeName(const ModuleItem& item, bool is_param,
@@ -509,7 +506,7 @@ void WalkStmt(Stmt* s, LocalTypeNames& locals, const PrefixWalk& walk) {
   const ModuleItem* item = s->decl_item;
   if (s->kind == StmtKind::kBlockItemDecl && item != nullptr &&
       item->kind == ModuleItemKind::kTypedef) {
-    DeclareTypeName(*item, false, locals, walk);
+    DeclareTypeName(*item, DeclaresTypeParam(*item), locals, walk);
   } else if (s->kind == StmtKind::kVarDecl && s->var_is_param &&
              item != nullptr && DeclaresTypeParam(*item)) {
     DeclareTypeName(*item, true, locals, walk);
@@ -555,11 +552,7 @@ void WalkGenerateBlocks(const ModuleItem& item, const LocalTypeNames& locals,
 void WalkScopeItem(const ModuleItem& item, LocalTypeNames& locals,
                    const PrefixWalk& walk) {
   if (item.kind == ModuleItemKind::kTypedef) {
-    DeclareTypeName(item, false, locals, walk);
-    return;
-  }
-  if (DeclaresTypeParam(item)) {
-    DeclareTypeName(item, true, locals, walk);
+    DeclareTypeName(item, DeclaresTypeParam(item), locals, walk);
     return;
   }
   JudgeItemSelections(item, locals, walk);

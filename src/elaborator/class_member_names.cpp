@@ -29,17 +29,14 @@ void AddOwnMemberNames(const ClassDecl& cls,
   const ScopeMap kNoScope;
   for (const auto& [name, value] : cls.params) names.insert(name);
   names.insert(cls.type_param_names.begin(), cls.type_param_names.end());
-  for (const ClassMember* member : cls.members) {
-    names.insert(member->name);
-    const DataType& type = member->typedef_item != nullptr
-                               ? member->typedef_item->typedef_type
-                               : member->data_type;
+  for (const ClassMember* member : cls.members) names.insert(member->name);
+  ForEachEnumTypeOfClass(cls, [&](std::string_view, const DataType& type) {
     for (const EnumMember& constant : type.enum_members) {
       for (std::string& name : EnumMemberDeclaredNames(constant, kNoScope)) {
         names.insert(*generated.insert(std::move(name)).first);
       }
     }
-  }
+  });
 }
 
 std::vector<std::pair<std::string_view, std::string_view>> BaseNames(

@@ -1,5 +1,6 @@
 #include "simulator/class_enum_members.h"
 
+#include <cstddef>
 #include <string>
 #include <utility>
 
@@ -33,27 +34,39 @@ static const DataType* DeclaredEnumOf(const ClassTypeInfo* info,
   return type != nullptr && !type->enum_members.empty() ? type : nullptr;
 }
 
+static void CollectEnumMembers(ClassTypeInfo* info, const DataType& decl_type,
+                               std::string key, SimContext& ctx, Arena& arena) {
+  EnumTypeInfo type;
+  type.type_name = *arena.Create<std::string>(std::move(key));
+  type.width = EvalTypeWidth(decl_type);
+  type.is_4state = Is4stateType(decl_type, TypedefMap{});
+  type.is_signed = IsSignedType(decl_type, TypedefMap{});
+  for (const RtlirEnumMember& m :
+       FoldEnumMembers(decl_type.enum_members, ScopeMap{}, arena)) {
+    EnumMemberInfo member = EnumMemberInfoOf(m, type.width, ctx, arena);
+    info->enum_members[std::string(m.name)] = member.value;
+    info->enum_literal_shapes[std::string(m.name)] = {type.width,
+                                                      type.is_signed};
+    type.members.push_back(member);
+  }
+  if (ctx.FindEnumType(type.type_name) == nullptr)
+    ctx.RegisterEnumType(type.type_name, type);
+}
+
 void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
                              SimContext& ctx, Arena& arena) {
+  for (std::size_t i = 0; i < cls->param_types.size(); ++i) {
+    if (cls->param_types[i].enum_members.empty()) continue;
+    CollectEnumMembers(
+        info, cls->param_types[i],
+        std::string(info->name) + "::" + std::string(cls->params[i].first), ctx,
+        arena);
+  }
   for (const auto* member : cls->members) {
     std::string key;
     const DataType* decl_type = DeclaredEnumOf(info, member, key);
-    if (decl_type == nullptr) continue;
-    EnumTypeInfo type;
-    type.type_name = *arena.Create<std::string>(std::move(key));
-    type.width = EvalTypeWidth(*decl_type);
-    type.is_4state = Is4stateType(*decl_type, TypedefMap{});
-    type.is_signed = IsSignedType(*decl_type, TypedefMap{});
-    for (const RtlirEnumMember& m :
-         FoldEnumMembers(decl_type->enum_members, ScopeMap{}, arena)) {
-      EnumMemberInfo member = EnumMemberInfoOf(m, type.width, ctx, arena);
-      info->enum_members[std::string(m.name)] = member.value;
-      info->enum_literal_shapes[std::string(m.name)] = {type.width,
-                                                        type.is_signed};
-      type.members.push_back(member);
-    }
-    if (ctx.FindEnumType(type.type_name) == nullptr)
-      ctx.RegisterEnumType(type.type_name, type);
+    if (decl_type != nullptr)
+      CollectEnumMembers(info, *decl_type, std::move(key), ctx, arena);
   }
 }
 

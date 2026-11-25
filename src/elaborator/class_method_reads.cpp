@@ -92,9 +92,7 @@ void UnitDeclaredNames::AddItems(const std::vector<ModuleItem*>& items) {
       names_.insert(specify->param_name);
     }
     AddEnumerations(item->data_type);
-    if (item->kind == ModuleItemKind::kTypedef) {
-      AddEnumerations(item->typedef_type);
-    }
+    AddEnumerations(item->typedef_type);
     if (item->kind == ModuleItemKind::kClassDecl &&
         item->class_decl != nullptr) {
       AddClass(item->class_decl);
@@ -106,6 +104,7 @@ void UnitDeclaredNames::AddScope(const ModuleDecl* scope) {
   names_.insert(scope->name);
   for (const PortDecl& port : scope->ports) names_.insert(port.name);
   for (const auto& [name, value] : scope->params) names_.insert(name);
+  for (const DataType& type : scope->param_types) AddEnumerations(type);
   names_.insert(scope->type_param_names.begin(), scope->type_param_names.end());
   AddItems(scope->items);
 }
@@ -113,6 +112,7 @@ void UnitDeclaredNames::AddScope(const ModuleDecl* scope) {
 void UnitDeclaredNames::AddClass(const ClassDecl* cls) {
   names_.insert(cls->name);
   for (const auto& [name, value] : cls->params) names_.insert(name);
+  for (const DataType& type : cls->param_types) AddEnumerations(type);
   names_.insert(cls->type_param_names.begin(), cls->type_param_names.end());
   for (const ClassMember* m : cls->members) {
     if (!m->name.empty()) names_.insert(m->name);

@@ -291,6 +291,19 @@ bool ActualSizesIntegralProperty(const DataType& actual, SimContext& ctx) {
   return item == nullptr || item->unpacked_dims.empty();
 }
 
+std::string_view ActualLayoutKey(const ClassTypeInfo& spec,
+                                 std::string_view param, const DataType& actual,
+                                 SimContext& ctx) {
+  if (actual.packed_dim_left != nullptr) return {};
+  const bool kInPlace = !actual.struct_members.empty();
+  auto* key = ctx.GetArena().Create<std::string>(
+      kInPlace ? std::string(spec.name) + "::" + std::string(param)
+               : TypeChainKey(actual));
+  if (kInPlace) RegisterTypeLayout(*key, &actual, ctx, ctx.GetArena());
+  return ctx.FindStructType(*key) != nullptr ? std::string_view(*key)
+                                             : std::string_view{};
+}
+
 void SizeTypeParamProperties(ClassTypeInfo* spec,
                              const std::vector<DataType>& actuals,
                              SimContext& ctx) {
@@ -310,6 +323,8 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
     prop.is_signed = DeclaredTypeIsSigned(*actual, ctx);
     if (actual->kind != DataTypeKind::kNamed)
       prop.is_4state = DeclaredTypeIs4State(*actual, ctx);
+    std::string_view layout = ActualLayoutKey(*spec, pname, *actual, ctx);
+    if (!layout.empty()) prop.type_name = layout;
   }
 }
 

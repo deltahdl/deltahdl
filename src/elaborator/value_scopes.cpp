@@ -72,6 +72,7 @@ template <typename Decl>
 void DeclareParamPorts(const Decl& decl, NameScope& scope) {
   for (std::size_t i = 0; i < decl.params.size(); ++i) {
     const std::string_view kName = decl.params[i].first;
+    DeclareEnumConstants(decl.param_types[i], scope);
     if (decl.type_param_names.contains(kName)) {
       DeclareOther(kName, scope);
     } else {

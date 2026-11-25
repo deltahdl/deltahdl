@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <string>
+
 #include "fixture_parser.h"
 #include "helpers_parser_verify.h"
 #include "helpers_reported_error.h"
@@ -203,6 +205,27 @@ TEST(TypeParameterParsing, HierarchicalNameAsAPortListTypeDefaultIsReported) {
   EXPECT_FALSE(Parse("typedef logic [5:0] w6_t;\n"
                      "module t #(parameter type T = w6_t) (); endmodule\n")
                    .has_errors);
+}
+
+TEST(TypeParameterParsing, TypeWrittenInPlaceForAValueParameterIsReported) {
+  for (const char* type : {"enum { A }", "struct packed { bit a; }",
+                           "union packed { bit a; bit b; }"}) {
+    SCOPED_TRACE(type);
+    auto header = [&](const std::string& kind) {
+      return Parse("module m #(parameter " + kind + " P = " + type +
+                   ") ();\nendmodule\n");
+    };
+    auto body = [&](const std::string& kind) {
+      return Parse("module m;\n  parameter " + kind + " P = " + type +
+                   ";\nendmodule\n");
+    };
+    EXPECT_TRUE(
+        ReportedError(header("int").diags, "expected expression", 1, "11.2"));
+    EXPECT_TRUE(
+        ReportedError(body("int").diags, "expected expression", 2, "11.2"));
+    EXPECT_FALSE(header("type").has_errors);
+    EXPECT_FALSE(body("type").has_errors);
+  }
 }
 
 }  // namespace

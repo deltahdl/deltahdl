@@ -299,6 +299,8 @@ void DeclareEnumConstants(const DataType& type, DataScope& scope) {
 }
 
 void DeclareModuleVars(const ModuleDecl& decl, DataScope& scope) {
+  for (const DataType& type : decl.param_types)
+    DeclareEnumConstants(type, scope);
   for (const auto* ports : {&decl.ports, &decl.port_expr_objects}) {
     for (const PortDecl& port : *ports) {
       scope.module_vars[port.name] =

@@ -461,6 +461,16 @@ static void ResolveParamPortTypeRef(
   if (has_param_type) resolve(const_cast<DataType&>(decl->param_types[i]));
 }
 
+void Elaborator::DeclareTypeParamPortEnums(const ModuleDecl& decl,
+                                           std::size_t i,
+                                           const RtlirParamDecl& param,
+                                           const ParamList& params,
+                                           RtlirModule* mod) {
+  if (!param.is_type_param) return;
+  DeclareTypeParamEnums(decl.param_types[i], param,
+                        FindParamOverride(params, param.name) != nullptr, mod);
+}
+
 void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                                         const ParamList& params,
                                         RtlirModule* mod) {
@@ -487,6 +497,7 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
         has_param_type ? &decl->param_types[i] : nullptr;
     const bool kUnpacked = decl->param_port_unpacked_dims.count(pname) != 0;
     ApplyParamOverride(pd, kAssigns, pname, typedefs_, arena_);
+    DeclareTypeParamPortEnums(*decl, i, pd, params, mod);
     ReportInstanceOverrideType(pd, kAssigns, {kShapeTables, scope, unit_},
                                diag_);
     CheckDollarOverride(kAssigns, {pname, nullptr, param_type, kUnpacked},

@@ -518,6 +518,12 @@ std::string_view Parser::TryParseAssertionItemLabel() {
   return label_tok.text;
 }
 
+static void DeclareTypeParamsAsTypedefs(const std::vector<ModuleItem*>& items,
+                                        std::size_t first) {
+  for (std::size_t i = first; i < items.size(); ++i)
+    DeclareAsTypedef(*items[i]);
+}
+
 void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   const SourceLoc kAttrLoc = CurrentLoc();
   auto attrs = ParseAttributes();
@@ -539,6 +545,7 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
         "a parameter declaration is not an item of a checker; a checker "
         "takes an elaboration-time constant through a formal argument");
     ParseParamDecl(items);
+    if (InPackageBody()) DeclareTypeParamsAsTypedefs(items, before);
   } else if (Check(TokenKind::kKwDefparam)) {
     RejectInCheckerBody("a defparam statement is not an item of a checker");
     RejectInProgramBody(CurrentLoc(),

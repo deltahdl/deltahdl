@@ -301,6 +301,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   if (!item->unpacked_dims.empty()) pd.unpacked_dims = &item->unpacked_dims;
   if (is_type) {
     ResolveBodyTypeParam(item, pd, mod);
+    DeclareTypeParamEnums(item->typedef_type, pd, pd.from_override, mod);
   } else {
     EmitBareEnumMembers(item, mod);
   }

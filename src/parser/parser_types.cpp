@@ -673,6 +673,8 @@ DataTypeKind Parser::ParseTypeParamRestriction() {
 }
 
 DataType Parser::ParseTypeAssignmentValue() {
+  DataType in_place;
+  if (TryParseInlineAggregateType(in_place)) return in_place;
   if (!Check(TokenKind::kIdentifier) || !AtScopedTypeName())
     return ParseDataType();
   DataType named = ParseNamedType();

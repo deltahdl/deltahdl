@@ -283,6 +283,7 @@ static void NotePortParams(const FoundClass& found, ClassQuery& query,
     const SpecArg* arg = cls->localparam_port_names.count(name) != 0
                              ? nullptr
                              : ArgFor(found.spec, i, name);
+    NoteEnumConstants(cls->param_types[i], into);
     if (cls->type_param_names.count(name) != 0) {
       into.classes.insert_or_assign(
           name, TypeParamClass(cls->param_types[i], arg, found.spec.where));
@@ -778,6 +779,7 @@ void NoteModuleParams(const ModuleDecl* decl, const InstanceParams& instance,
   for (size_t i = 0; i < decl->params.size(); ++i) {
     const auto& [name, value] = decl->params[i];
     NoteInstanceParam(name, instance, scope);
+    NoteEnumConstants(decl->param_types[i], scope);
     if (decl->type_param_names.count(name) != 0) continue;
     const bool kKnown =
         decl->localparam_port_names.count(name) != 0 ||

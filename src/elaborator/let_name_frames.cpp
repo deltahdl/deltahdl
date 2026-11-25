@@ -389,6 +389,8 @@ void DeclareImplicitNets(NameFrame& frame,
 void DeclareHeader(NameFrame& frame, const ModuleDecl& decl) {
   for (const PortDecl& port : decl.ports) DeclareOther(frame, port.name);
   for (const auto& param : decl.params) DeclareOther(frame, param.first);
+  for (const DataType& type : decl.param_types)
+    DeclareEnumLiterals(frame, type);
   for (std::string_view name : decl.type_param_names) DeclareOther(frame, name);
 }
 

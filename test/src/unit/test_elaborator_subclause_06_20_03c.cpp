@@ -128,4 +128,125 @@ TEST(BodyTypeParameter, SpecializationTakesAPackageTypeAndNoVariable) {
                             9, "23.10.2.1"));
 }
 
+constexpr std::string_view kEnumRestrictedItems[] = {
+    "module t #(type enum T = @) (); endmodule\n",
+    "module t; parameter type enum T = @; endmodule\n",
+    "module t; if (1) begin : g localparam type enum T = @; end endmodule\n",
+    "module t; initial begin localparam type enum T = @; end endmodule\n",
+    ("module t;\n"
+     "  function void f(); localparam type enum T = @; endfunction\n"
+     "endmodule\n"),
+    ("interface i; parameter type enum T = @; endinterface\n"
+     "module t; i u(); endmodule\n"),
+    "program t; parameter type enum T = @; endprogram\n",
+    ("class K #(type enum T = @); endclass\n"
+     "module t; K #() k; endmodule\n"),
+    ("class K; localparam type enum T = @; endclass\n"
+     "module t; K k; endmodule\n"),
+    ("package p; localparam type enum T = @; endpackage\n"
+     "module t; endmodule\n"),
+    "parameter type enum T = @;\nmodule t; endmodule\n",
+};
+
+std::string WithTypeWritten(std::string_view item, std::string_view type) {
+  std::string src(item);
+  src.replace(src.find('@'), 1, type);
+  return src;
+}
+
+TEST(InPlaceTypeParameterElab, StructureForAnEnumerationParameterIsReported) {
+  for (const auto& item : kEnumRestrictedItems) {
+    std::string src = WithTypeWritten(item, "struct packed { bit a; }");
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "type parameter 'T' is assigned a type that does "
+                              "not conform to the required enum kind",
+                              LineHolding(src, "type enum T"), "6.20.3"));
+  }
+}
+
+TEST(InPlaceTypeParameterElab, EnumerationForAnEnumerationParameterIsAccepted) {
+  for (const auto& item : kEnumRestrictedItems) {
+    std::string src = WithTypeWritten(item, "enum { A, B }");
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+constexpr std::string_view kEnumDefaultItems[] = {
+    "module t #(type T = @) (); endmodule\n",
+    "module t; parameter type T = @; endmodule\n",
+    "interface i #(type T = @) (); endinterface module t; i u(); endmodule\n",
+    ("interface i; localparam type T = @; endinterface\n"
+     "module t; i u(); endmodule\n"),
+    "program t #(type T = @) (); endprogram\n",
+};
+
+TEST(InPlaceTypeParameterElab, EnumerationConstantsWithOneValueAreReported) {
+  for (const auto& item : kEnumDefaultItems) {
+    std::string src = WithTypeWritten(item, "enum { A = 1, B = 1 }");
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "duplicate enum member value 1", 1, "6.19"));
+  }
+}
+
+TEST(InPlaceTypeParameterElab, EnumerationConstantsOfTheirOwnAreAccepted) {
+  for (const auto& item : kEnumDefaultItems) {
+    std::string src = WithTypeWritten(item, "enum { A = 1, B = 2 }");
+    SCOPED_TRACE(src);
+    ElabFixture f;
+    ElaborateSrc(src, f);
+    EXPECT_FALSE(f.diag.HasErrors());
+  }
+}
+
+TEST(InPlaceTypeParameterElab, EnumerationConstantsAreNotNamedOutside) {
+  const std::string kSrc =
+      "module m #(type T = enum { A, B }) ();\n"
+      "  int x = B;\n"
+      "endmodule\n"
+      "class K #(type T = enum { C, D });\n"
+      "  int x = D;\n"
+      "endclass\n"
+      "module t;\n"
+      "  m u();\n"
+      "  K #() k;\n"
+      "  int y = B;\n"
+      "  int z = D;\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f, "t");
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {2, 5}) EXPECT_FALSE(ErrorOnLine(diags, kLine));
+  EXPECT_TRUE(ReportedError(diags, "reference to unresolved identifier 'B'", 10,
+                            "23.9"));
+  EXPECT_TRUE(ReportedError(diags, "reference to unresolved identifier 'D'", 11,
+                            "23.9"));
+}
+
+TEST(InPlaceTypeParameterElab, IntegerForAnEnumerationVariableIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t #(type T = enum { A, B }) ();\n"
+      "  localparam type U = enum { C, D };\n"
+      "  T v;\n"
+      "  U w;\n"
+      "  initial v = B;\n"
+      "  initial w = D;\n"
+      "  initial v = 1;\n"
+      "  initial w = 1;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {5, 6}) EXPECT_FALSE(ErrorOnLine(diags, kLine));
+  for (const int kLine : {7, 8}) EXPECT_TRUE(ErrorOnLine(diags, kLine));
+}
+
 }  // namespace

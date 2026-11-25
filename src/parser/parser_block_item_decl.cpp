@@ -234,6 +234,12 @@ Stmt* BlockItemDeclStmt(Arena& arena, ModuleItem* item, SourceLoc loc,
   return s;
 }
 
+bool IsAggregateWrittenInPlace(const DataType& type) {
+  return type.kind == DataTypeKind::kEnum ||
+         type.kind == DataTypeKind::kStruct ||
+         type.kind == DataTypeKind::kUnion;
+}
+
 }  // namespace
 
 void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
@@ -273,6 +279,11 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
     std::vector<ModuleItem*> param_items;
     ParseParamDecl(param_items);
     for (auto* param : param_items) {
+      if (IsAggregateWrittenInPlace(param->typedef_type)) {
+        DeclareAsTypedef(*param);
+        stmts.push_back(BlockItemDeclStmt(arena_, param, param->loc, attrs));
+        continue;
+      }
       auto* s = arena_.Create<Stmt>();
       s->kind = StmtKind::kVarDecl;
       s->range.start = param->loc;

@@ -602,6 +602,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void TrackEnumVariable(const ModuleItem* item);
   void EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod);
+  void DeclareTypeParamPortEnums(const ModuleDecl& decl, std::size_t i,
+                                 const RtlirParamDecl& param,
+                                 const ParamList& params, RtlirModule* mod);
+  void DeclareTypeParamEnums(const DataType& written,
+                             const RtlirParamDecl& param, bool overridden,
+                             RtlirModule* mod);
   void EmitInPlaceEnumMembers(const DataType& type, std::string_view key,
                               SourceLoc loc, RtlirModule* mod);
 

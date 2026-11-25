@@ -144,9 +144,7 @@ void ForEachEnumTypeIn(const DataType& type, const EnumTypeVisitor& fn) {
 }
 
 void ForEachEnumTypeOfItem(const ModuleItem* item, const EnumTypeVisitor& fn) {
-  ForEachEnumTypeIn(item->kind == ModuleItemKind::kTypedef ? item->typedef_type
-                                                           : item->data_type,
-                    fn);
+  ForEachEnumTypeIn(TypeWrittenIn(*item), fn);
 }
 
 void ForEachEnumTypeOfClass(const ClassDecl& cls, const EnumTypeVisitor& fn) {

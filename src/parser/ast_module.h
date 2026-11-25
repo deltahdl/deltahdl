@@ -436,7 +436,28 @@ struct ModuleItem {
   bool inst_param_assignment_written = false;
 
   SourceLoc inst_port_attr_loc;
+
+  DataTypeKind type_param_restriction = DataTypeKind::kImplicit;
 };
+
+inline bool DeclaresTypeParam(const ModuleItem& item) {
+  return item.data_type.kind == DataTypeKind::kVoid &&
+         item.typedef_type.kind != DataTypeKind::kImplicit;
+}
+
+inline bool DeclareAsTypedef(ModuleItem& item) {
+  if (!DeclaresTypeParam(item)) return false;
+  item.kind = ModuleItemKind::kTypedef;
+  item.type_param_restriction =
+      std::exchange(item.forward_type_kind, DataTypeKind::kImplicit);
+  return true;
+}
+
+inline const DataType& TypeWrittenIn(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kTypedef || DeclaresTypeParam(item)
+             ? item.typedef_type
+             : item.data_type;
+}
 
 enum class ModuleDeclKind : uint8_t {
   kModule,

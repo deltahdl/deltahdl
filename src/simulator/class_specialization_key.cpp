@@ -150,6 +150,11 @@ std::string ClassKey(ClassTypeInfo* cls, const DataType& type,
   return std::string(spec->package) + "::" + std::string(spec->name);
 }
 
+std::string PlaceKey(const SourceLoc& at) {
+  return "@" + std::to_string(at.file_id) + ":" + std::to_string(at.line) +
+         ":" + std::to_string(at.column);
+}
+
 std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
   const DataType* step = &type;
   const ModuleItem* declared = nullptr;
@@ -162,10 +167,10 @@ std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
     declared = item;
     step = &item->typedef_type;
   }
-  if (declared == nullptr) return TypeChainKey(type);
-  const SourceLoc kAt = declared->loc;
-  return std::string(declared->name) + "@" + std::to_string(kAt.file_id) + ":" +
-         std::to_string(kAt.line) + ":" + std::to_string(kAt.column);
+  if (declared != nullptr)
+    return std::string(declared->name) + PlaceKey(declared->loc);
+  return step->decl_loc.IsValid() ? PlaceKey(step->decl_loc)
+                                  : TypeChainKey(type);
 }
 
 }  // namespace

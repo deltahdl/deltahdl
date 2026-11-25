@@ -71,8 +71,7 @@ void ForEachDeclaredEnumMember(
 }
 
 const DataType& DeclaredTypeOf(const ModuleItem* item) {
-  return item->kind == ModuleItemKind::kTypedef ? item->typedef_type
-                                                : item->data_type;
+  return TypeWrittenIn(*item);
 }
 
 const DataType& MemberDeclaredType(const ClassMember* m) {

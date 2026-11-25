@@ -378,11 +378,6 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
   return false;
 }
 
-static bool IsLocalTypeParam(const ModuleItem* item) {
-  return item->data_type.kind == DataTypeKind::kVoid && item->is_localparam &&
-         item->typedef_type.kind != DataTypeKind::kImplicit;
-}
-
 void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
                                         ClassMember* member) {
   std::vector<ModuleItem*> param_items;
@@ -390,10 +385,8 @@ void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
   for (size_t i = 0; i < param_items.size(); ++i) {
     auto* m = (i == 0) ? member : arena_.Create<ClassMember>();
     m->name = param_items[i]->name;
-    if (IsLocalTypeParam(param_items[i])) {
-      param_items[i]->kind = ModuleItemKind::kTypedef;
-      m->type_param_restriction = std::exchange(
-          param_items[i]->forward_type_kind, DataTypeKind::kImplicit);
+    if (DeclareAsTypedef(*param_items[i])) {
+      m->type_param_restriction = param_items[i]->type_param_restriction;
       m->kind = ClassMemberKind::kTypedef;
       m->typedef_item = param_items[i];
       members.push_back(m);

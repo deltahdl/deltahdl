@@ -394,6 +394,16 @@ void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
   EmitInPlaceEnumMembers(item->data_type, item->name, item->loc, mod);
 }
 
+void Elaborator::DeclareTypeParamEnums(const DataType& written,
+                                       const RtlirParamDecl& param,
+                                       bool overridden, RtlirModule* mod) {
+  if (written.kind == DataTypeKind::kEnum)
+    ValidateEnumDecl(written, param.loc, true);
+  const std::string_view kKey =
+      overridden ? EnumTypeKey(param.name, "default", arena_) : param.name;
+  EmitInPlaceEnumMembers(written, kKey, param.loc, mod);
+}
+
 void Elaborator::EmitInPlaceEnumMembers(const DataType& type,
                                         std::string_view key, SourceLoc loc,
                                         RtlirModule* mod) {
@@ -585,12 +595,14 @@ std::unordered_set<std::string_view> ExplicitImportNames(
 
 std::unordered_set<std::string_view> ShadowingNames(const ModuleDecl* decl) {
   auto names = ExplicitImportNames(decl->items);
-  for (const ModuleItem* item : decl->items) {
-    ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
-      for (const EnumMember& member : type.enum_members)
-        names.insert(member.name);
-    });
-  }
+  const EnumTypeVisitor kShadow = [&](std::string_view, const DataType& type) {
+    for (const EnumMember& member : type.enum_members)
+      names.insert(member.name);
+  };
+  for (const DataType& type : decl->param_types)
+    ForEachEnumTypeIn(type, kShadow);
+  for (const ModuleItem* item : decl->items)
+    ForEachEnumTypeOfItem(item, kShadow);
   return names;
 }
 
