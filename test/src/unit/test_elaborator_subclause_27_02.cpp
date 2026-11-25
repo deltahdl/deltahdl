@@ -78,8 +78,7 @@ TEST(GenerateBlockLocalparam, CaseGenerateParameterTreatedAsLocalparam) {
   EXPECT_TRUE(p->is_localparam);
 }
 
-TEST(GenerateBlockLocalparam,
-     DISABLED_DefparamOfAGenerateBlockParameterIsReported) {
+TEST(GenerateBlockLocalparam, DefparamOfAGenerateBlockParameterIsReported) {
   ElabFixture f;
   ElaborateSrc(
       "module c;\n"

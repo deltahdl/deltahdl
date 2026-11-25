@@ -322,7 +322,8 @@ TEST_F(MembersOfASpecialization, ItsConstraintsComeInDeclarationOrder) {
 
 constexpr const char* kParametersOfASpecialization =
     "module top;\n"
-    "  class C #(int W = 4, localparam int K = 1, type T = int);\n"
+    "  class C #(int W = 4, localparam int K = 1,\n"
+    "            parameter type T = int);\n"
     "    parameter int P = 1;\n"
     "    localparam int L = 2;\n"
     "    parameter type PT = int;\n"

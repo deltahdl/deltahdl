@@ -74,52 +74,49 @@ TEST(GenerateBlockContentSim, InterfaceAndProgramGenerateBlocksHoldItems) {
 }
 
 TEST(GenerateBlockContentSim,
-     ADefparamLeavesAGenerateBlockParameterAsDeclared) {
+     ADefparamLeavesAGenerateBlockParameterOfTheSameNameAsDeclared) {
   SimFixture f;
   EXPECT_EQ(
       RunCapture("module c;\n"
-                 "  parameter int B = 1;\n"
+                 "  parameter int P = 1;\n"
                  "  if (1) begin : g\n"
                  "    parameter int P = 3;\n"
                  "  end\n"
                  "  for (genvar k = 0; k < 1; k++) begin : h\n"
                  "    parameter int P = 4;\n"
                  "  end\n"
-                 "  initial $display(\"m %0d %0d %0d\", B, g.P, h[0].P);\n"
+                 "  initial $display(\"m %0d %0d %0d\", P, g.P, h[0].P);\n"
                  "endmodule\n"
                  "interface ii;\n"
-                 "  parameter int B = 1;\n"
+                 "  parameter int P = 1;\n"
                  "  if (1) begin : g\n"
                  "    parameter int P = 3;\n"
                  "  end\n"
-                 "  initial $display(\"i %0d %0d\", B, g.P);\n"
+                 "  initial $display(\"i %0d %0d\", P, g.P);\n"
                  "endinterface\n"
                  "module top;\n"
                  "  c u();\n"
                  "  ii v();\n"
-                 "  defparam u.B = 5;\n"
-                 "  defparam u.g.P = 6;\n"
-                 "  defparam u.h[0].P = 6;\n"
-                 "  defparam v.B = 7;\n"
-                 "  defparam v.g.P = 8;\n"
+                 "  defparam u.P = 5;\n"
+                 "  defparam v.P = 7;\n"
                  "endmodule\n",
                  f),
       "m 5 3 4\ni 7 3\n");
 }
 
-TEST(GenerateBlockContentSim, ADefparamLeavesAProgramGenerateBlockParameter) {
+TEST(GenerateBlockContentSim,
+     ADefparamLeavesAProgramGenerateBlockParameterOfTheSameName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program pp;\n"
-                       "  parameter int B = 1;\n"
+                       "  parameter int P = 1;\n"
                        "  if (1) begin : g\n"
                        "    parameter int P = 3;\n"
                        "  end\n"
-                       "  initial $display(\"p %0d %0d\", B, g.P);\n"
+                       "  initial $display(\"p %0d %0d\", P, g.P);\n"
                        "endprogram\n"
                        "module top;\n"
                        "  pp w();\n"
-                       "  defparam w.B = 7;\n"
-                       "  defparam w.g.P = 8;\n"
+                       "  defparam w.P = 7;\n"
                        "endmodule\n",
                        f),
             "p 7 3\n");
