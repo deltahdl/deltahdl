@@ -289,6 +289,48 @@ const ClassMember* PropertyNamed(const ClassDecl& cls, const Expr& ref,
   return owned.member;
 }
 
+void ForEachDistExpr(const std::vector<ConstraintDistRef>& refs,
+                     const std::function<void(const Expr*)>& fn) {
+  for (const ConstraintDistRef& ref : refs) {
+    fn(ref.target);
+    for (const ConstraintDistItem& item : ref.items) {
+      for (const Expr* e :
+           {item.value, item.lo, item.hi, item.tolerance, item.weight}) {
+        fn(e);
+      }
+    }
+  }
+}
+
+void ResolveConstraintPrefixTypeRefs(const ClassMember& block,
+                                     const TypeRefResolver& resolve,
+                                     Arena& arena) {
+  static const DataType kLoopVariable = [] {
+    DataType type;
+    type.kind = DataTypeKind::kInt;
+    type.is_signed = true;
+    return type;
+  }();
+  static const std::vector<Expr*> kNoUnpackedDims;
+  auto in_expr = [&](const Expr* e) {
+    ResolvePrefixTypeRefs(e, block.loc, {}, resolve, arena);
+  };
+  for (const ConstraintForeachRef& ref : block.constraint_foreach_refs) {
+    std::vector<ProceduralLocal> loop_variables;
+    loop_variables.reserve(ref.loop_vars.size());
+    for (std::string_view name : ref.loop_vars)
+      loop_variables.push_back({name, &kLoopVariable, &kNoUnpackedDims});
+    for (const Expr* e : ref.body)
+      ResolvePrefixTypeRefs(e, ref.loc, loop_variables, resolve, arena);
+  }
+  for (const auto* exprs :
+       {&block.constraint_exprs, &block.constraint_soft_exprs}) {
+    for (const Expr* e : *exprs) in_expr(e);
+  }
+  ForEachDistExpr(block.constraint_dist_refs, in_expr);
+  ForEachDistExpr(block.constraint_soft_dist_refs, in_expr);
+}
+
 std::vector<ProceduralLocal> PropertiesInScope(const ClassDecl& cls,
                                                const CompilationUnit& unit) {
   std::vector<const ClassDecl*> chain = {&cls};
@@ -571,6 +613,10 @@ class ClassTypeRefs {
   void ResolveDeclaration(ClassMember& m, const TypeRefResolver& in_class) {
     if (m.kind == ClassMemberKind::kTypedef) {
       ResolveTypedefTypeRef(*m.typedef_item, {}, in_class, arena_);
+      return;
+    }
+    if (m.kind == ClassMemberKind::kConstraint) {
+      ResolveConstraintPrefixTypeRefs(m, in_class, arena_);
       return;
     }
     if (m.kind != ClassMemberKind::kProperty) return;
