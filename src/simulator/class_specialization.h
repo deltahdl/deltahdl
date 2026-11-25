@@ -34,6 +34,10 @@ std::vector<DataType> ActualsUnderSpecialization(
     const ClassTypeInfo* holder, const std::vector<DataType>& written,
     SimContext& ctx);
 
+ClassTypeInfo* SpecializationUnderOwnParams(
+    const ClassTypeInfo* info, ClassTypeInfo* generic,
+    const std::vector<DataType>& written, SimContext& ctx, Arena& arena);
+
 ClassTypeInfo* ClassNamedByTypeParam(std::string_view name, SimContext& ctx,
                                      Arena& arena);
 

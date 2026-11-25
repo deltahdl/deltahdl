@@ -456,6 +456,7 @@ static void RegisterTypeDeclarations(const RtlirDesign* design,
   const CompilationUnit* unit = design->compilation_unit;
   if (unit == nullptr) return;
   RegisterTypedefItems(unit->cu_items, {}, ctx);
+  RegisterTypedefItems(unit->cu_items, "$unit", ctx);
   RegisterUnitCovergroups(unit->cu_items, {}, ctx);
   if (!design->compilation_units.empty()) {
     ForEachUnitScope(design, ctx.GetArena(),

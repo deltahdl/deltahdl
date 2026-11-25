@@ -9,6 +9,7 @@
 #include "simulator/class_object.h"
 #include "simulator/eval_array.h"
 #include "simulator/eval_array_class_assoc.h"
+#include "simulator/eval_function_internal.h"
 #include "simulator/eval_struct_property.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -192,7 +193,9 @@ struct MemberNewBase {
 static MemberNewBase MemberNewBaseClass(const Expr* base_expr,
                                         std::string_view field, SimContext& ctx,
                                         Arena& arena) {
-  std::string_view base = base_expr->text;
+  std::string_view base = base_expr->kind == ExprKind::kMemberAccess
+                              ? ScopedClassKey(base_expr, arena)
+                              : base_expr->text;
   auto base_type = ctx.GetVariableClassType(base);
   if (!base_type.empty()) {
     const Variable* var = ctx.FindVariable(base);
@@ -215,11 +218,6 @@ bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->rhs || stmt->rhs->kind != ExprKind::kCall) return false;
   if (stmt->rhs->text != "new") return false;
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kMemberAccess) return false;
-  const Expr* holder = stmt->lhs->lhs;
-  if (!holder || (holder->kind != ExprKind::kIdentifier &&
-                  holder->kind != ExprKind::kSelect)) {
-    return false;
-  }
   if (!stmt->lhs->rhs || stmt->lhs->rhs->kind != ExprKind::kIdentifier)
     return false;
   MemberNewBase base =

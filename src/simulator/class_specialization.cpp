@@ -92,9 +92,11 @@ std::string_view GenericNameOf(std::string_view name) {
   return name.substr(0, name.find("#("));
 }
 
-ClassTypeInfo* BaseUnderOwnParams(const ClassTypeInfo* info,
-                                  ClassTypeInfo* base, SimContext& ctx,
-                                  Arena& arena) {
+}  // namespace
+
+ClassTypeInfo* SpecializationUnderOwnParams(
+    const ClassTypeInfo* info, ClassTypeInfo* generic,
+    const std::vector<DataType>& written, SimContext& ctx, Arena& arena) {
   const ClassDecl* decl = info->decl;
   if (!info->package.empty()) ctx.PushScope(info->package);
   ctx.PushScope();
@@ -108,11 +110,19 @@ ClassTypeInfo* BaseUnderOwnParams(const ClassTypeInfo* info,
     ShapeClassParamLocal(decl, i, local, ctx, arena);
   }
   ClassTypeInfo* spec = SpecializationOf(
-      base, ActualsUnderSpecialization(info, decl->base_class_type_params, ctx),
-      ctx, arena);
+      generic, ActualsUnderSpecialization(info, written, ctx), ctx, arena);
   ctx.PopScope();
   if (!info->package.empty()) ctx.PopScope();
   return spec;
+}
+
+namespace {
+
+ClassTypeInfo* BaseUnderOwnParams(const ClassTypeInfo* info,
+                                  ClassTypeInfo* base, SimContext& ctx,
+                                  Arena& arena) {
+  return SpecializationUnderOwnParams(
+      info, base, info->decl->base_class_type_params, ctx, arena);
 }
 
 void BindSpecializationBase(ClassTypeInfo* spec,

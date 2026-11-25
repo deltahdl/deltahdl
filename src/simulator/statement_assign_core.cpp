@@ -483,8 +483,8 @@ static bool TryDispatchNewAssign(const Stmt* stmt, SimContext& ctx,
          TryClassArrayNewAssign(stmt, ctx, arena) ||
          TryClassNewAssign(stmt, ctx, arena) ||
          TryTypedClassNewAssign(stmt, ctx, arena) ||
-         TryMemberClassNewAssign(stmt, ctx, arena) ||
-         TryStructMemberClassNewAssign(stmt, ctx, arena);
+         TryStructMemberClassNewAssign(stmt, ctx, arena) ||
+         TryMemberClassNewAssign(stmt, ctx, arena);
 }
 
 static std::optional<std::vector<Logic4Vec>> DeconstructedElements(

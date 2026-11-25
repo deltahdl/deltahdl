@@ -68,9 +68,8 @@ static bool TryStaticClassNewAssign(const Stmt* stmt,
                                    ? method_cls->StaticPropertyOwner(field_name)
                                    : nullptr;
   if (owner == nullptr) return false;
-  auto field_type = MemberClassTypeName(owner, field_name);
-  if (field_type.empty() || ctx.FindClassType(field_type) == nullptr)
-    return false;
+  auto field_type = PropertyClassName(nullptr, owner, field_name, ctx);
+  if (field_type.empty()) return false;
   Logic4Vec handle =
       EvalClassNew(field_type, stmt->rhs, ctx, arena, stmt->rhs->range.start);
   owner->static_properties[std::string(field_name)] = handle;

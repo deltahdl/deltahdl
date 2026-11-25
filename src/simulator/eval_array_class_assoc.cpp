@@ -16,6 +16,7 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/declared_class_key.h"
 #include "simulator/eval_array_element_assoc.h"
 #include "simulator/eval_call_result.h"
@@ -79,21 +80,45 @@ std::string_view TypeParamNamedBy(const ClassDecl* decl,
   return {};
 }
 
+static std::string_view PackageQualifiedClassKey(std::string_view key,
+                                                 std::string_view package,
+                                                 SimContext& ctx) {
+  if (package.empty() || key.empty()) return key;
+  auto* qualified = ctx.GetArena().Create<std::string>(
+      std::string(package).append("::").append(key));
+  return ctx.FindClassType(*qualified) != nullptr ? *qualified : key;
+}
+
+static std::string_view DeclaredPropertyClassKey(const DataType& type,
+                                                 const ClassTypeInfo* declaring,
+                                                 SimContext& ctx) {
+  Arena& arena = ctx.GetArena();
+  std::string_view package = declaring->package;
+  if (!package.empty()) ctx.PushScope(package);
+  std::string_view key = PackageQualifiedClassKey(
+      DeclaredClassKeyInScope(type, declaring, ctx, arena), package, ctx);
+  if (!key.empty() && !type.type_params.empty()) {
+    key = SpecializationUnderOwnParams(declaring, ctx.FindClassType(key),
+                                       type.type_params, ctx, arena)
+              ->name;
+  }
+  if (!package.empty()) ctx.PopScope();
+  return key;
+}
+
 std::string_view PropertyClassName(const ClassObject* obj,
                                    const ClassTypeInfo* from,
                                    std::string_view field, SimContext& ctx) {
   PropertyDeclaration decl = FindPropertyDeclaration(from, field);
   if (decl.member == nullptr) return {};
-  Arena& arena = ctx.GetArena();
-  std::string_view key = DeclaredClassKeyInScope(decl.member->data_type,
-                                                 decl.declaring, ctx, arena);
+  const DataType& type = decl.member->data_type;
+  std::string_view key = DeclaredPropertyClassKey(type, decl.declaring, ctx);
   if (!key.empty()) return key;
-  std::string_view name = decl.member->data_type.type_name;
   const ClassDecl* cls = decl.declaring->decl;
-  if (name.empty() || cls->type_param_names.count(name) == 0) return {};
-  const DataType* bound = TypeParamActual(obj, cls, name);
+  if (cls->type_param_names.count(type.type_name) == 0) return {};
+  const DataType* bound = TypeParamActual(obj, cls, type.type_name);
   if (bound == nullptr || bound->kind != DataTypeKind::kNamed) return {};
-  return DeclaredClassKeyInScope(*bound, decl.declaring, ctx, arena);
+  return DeclaredPropertyClassKey(*bound, decl.declaring, ctx);
 }
 
 bool PropertyIsArray(const ClassTypeInfo* from, std::string_view field,

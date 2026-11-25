@@ -230,8 +230,7 @@ TEST(ClassSim,
   LowerRunAndCheck(f, design, {{"r11", 4660u}, {"r12", 4660u}, {"r13", 4660u}});
 }
 
-TEST(ClassSim,
-     DISABLED_NewIntoASpecializationPropertyBuildsThatSpecialization) {
+TEST(ClassSim, NewIntoASpecializationPropertyBuildsThatSpecialization) {
   SimFixture f;
   auto* design = ElaborateSrc(kSpecializationPropertyNewSrc, f);
   LowerRunAndCheck(f, design,
@@ -409,8 +408,7 @@ TEST(
        {"r24", 120u},  {"r25", 22136u}});
 }
 
-TEST(ClassSim,
-     DISABLED_NewIntoASpecializationPropertyOfAModuleOrPackageClassBuildsIt) {
+TEST(ClassSim, NewIntoASpecializationPropertyOfAModuleOrPackageClassBuildsIt) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "package pk;\n"
@@ -487,6 +485,130 @@ TEST(ClassSim,
                     {"r12", 4660u},
                     {"r13", 4660u},
                     {"r14", 4660u}});
+}
+
+TEST(ClassSim, NewIntoAStaticPropertyThroughAPackageOrAnOuterClassBuildsIt) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class W #(int N = 1); int m = 4; int w[N]; endclass\n"
+      "package pk;\n"
+      "  class C; int m = 6; endclass\n"
+      "  class PH; static C c; static W#(3) w; endclass\n"
+      "endpackage\n"
+      "class O; class N; static O o; static W#(5) w; endclass int k = 8; "
+      "endclass\n"
+      "module top;\n"
+      "  int r1, r2, r3, r4;\n"
+      "  initial begin\n"
+      "    pk::PH::c = new; r1 = pk::PH::c.m;\n"
+      "    pk::PH::w = new; r2 = $size(pk::PH::w.w);\n"
+      "    O::N::o = new; r3 = O::N::o.k;\n"
+      "    O::N::w = new; r4 = $size(O::N::w.w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 6u}, {"r2", 3u}, {"r3", 8u}, {"r4", 5u}});
+}
+
+TEST(ClassSim, NewIntoAPackageClassPropertyTakesThePackagesOwnClass) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package pk;\n"
+      "  class K; int m = 7; endclass\n"
+      "  class KH; K a; K b[2]; static K c; endclass\n"
+      "endpackage\n"
+      "class K; int m = 1; endclass\n"
+      "module top;\n"
+      "  pk::KH h = new;\n"
+      "  int r1, r2, r3;\n"
+      "  initial begin\n"
+      "    h.a = new; r1 = h.a.m;\n"
+      "    h.b[1] = new; r2 = h.b[1].m;\n"
+      "    pk::KH::c = new; r3 = pk::KH::c.m;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 7u}, {"r3", 7u}});
+}
+
+TEST(ClassSim,
+     NewIntoAPropertyInAMethodOrThroughAHandleBuildsTheSpecialization) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class W #(int N = 1); int w[N]; endclass\n"
+      "package pk;\n"
+      "  class C; int m = 6; endclass\n"
+      "  class G #(type T = C);\n"
+      "    T a;\n"
+      "    static T s;\n"
+      "    int n;\n"
+      "    function void fill(); a = new; endfunction\n"
+      "    function new(); n = 3; endfunction\n"
+      "  endclass\n"
+      "  class H; W#(2) w; static W#(3) sw; static function void fill(); sw = "
+      "new; endfunction endclass\n"
+      "endpackage\n"
+      "class D; int m = 9; endclass\n"
+      "typedef enum {A, B, C} e_t;\n"
+      "class Q;\n"
+      "  static semaphore s;\n"
+      "  int q[$];\n"
+      "  e_t e = B;\n"
+      "  static function void fill(); s = new(4); endfunction\n"
+      "  function new(); q.push_back(int'(e.next())); endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  import pk::*;\n"
+      "  pk::G g = new;\n"
+      "  pk::G#(D) d = new;\n"
+      "  pk::H h[2];\n"
+      "  class O; pk::H h; endclass\n"
+      "  O o;\n"
+      "  Q held = new;\n"
+      "  int r1, r2, r3, r4, r5, r6, r7, r8;\n"
+      "  initial begin\n"
+      "    g.fill(); r1 = g.a.m;\n"
+      "    d.a = new; r2 = d.a.m;\n"
+      "    h[1] = new; h[1].w = new; r3 = $size(h[1].w.w);\n"
+      "    pk::H::fill(); r4 = $size(pk::H::sw.w);\n"
+      "    r5 = d.n;\n"
+      "    o = new; o.h = new; o.h.w = new; r6 = $size(o.h.w.w);\n"
+      "    Q::fill(); r7 = Q::s.try_get(4);\n"
+      "    r8 = held.q[0];\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design,
+                   {{"r1", 6u},
+                    {"r2", 9u},
+                    {"r3", 2u},
+                    {"r4", 3u},
+                    {"r5", 3u},
+                    {"r6", 2u},
+                    {"r7", 1u},
+                    {"r8", 2u}});
+}
+
+TEST(ClassSim, NewIntoAPropertyOfAPackagesHandleBuildsTheSpecialization) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "class W #(int N = 1); int w[N]; endclass\n"
+      "package pk;\n"
+      "  class H; W#(2) w; endclass\n"
+      "  H h;\n"
+      "endpackage\n"
+      "module top;\n"
+      "  import pk::H;\n"
+      "  pk::H own = new;\n"
+      "  int r1;\n"
+      "  initial begin\n"
+      "    pk::h = own;\n"
+      "    pk::h.w = new;\n"
+      "    r1 = $size(own.w.w);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(f, design, {{"r1", 2u}});
 }
 
 }  // namespace
