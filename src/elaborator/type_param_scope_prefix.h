@@ -53,6 +53,10 @@ void ReportPortTypeParamErrors(const ModuleDecl& decl,
                                const TypeParamRestrictionScope& restriction,
                                DiagEngine& diag);
 
+void ReportClassTypeParamErrors(const ClassDecl& cls,
+                                const TypeParamRestrictionScope& scope,
+                                DiagEngine& diag);
+
 void ReportUnitScopeTypeParamErrors(const TypeParamRestrictionScope& scope,
                                     DiagEngine& diag);
 

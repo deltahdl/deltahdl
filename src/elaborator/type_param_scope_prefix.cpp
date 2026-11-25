@@ -661,6 +661,13 @@ void ReportPortTypeParamErrors(const ModuleDecl& decl,
   }
 }
 
+void ReportClassTypeParamErrors(const ClassDecl& cls,
+                                const TypeParamRestrictionScope& scope,
+                                DiagEngine& diag) {
+  ReportClassTypeParamsOutsideRestrictions(cls, scope, diag);
+  WalkClass(cls, {nullptr, scope, diag});
+}
+
 void ReportUnitScopeTypeParamErrors(const TypeParamRestrictionScope& scope,
                                     DiagEngine& diag) {
   const PrefixWalk kWalk{nullptr, scope, diag};

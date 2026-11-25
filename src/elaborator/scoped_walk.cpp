@@ -429,11 +429,13 @@ void ScopedWalk::WalkClass(const ClassDecl& cls) {
 
 void ScopedWalk::WalkGenerate(const ModuleItem& item, const NameScope& outer) {
   WalkExpr(item.gen_cond, outer);
+  NameScope loop{&outer};
+  if (item.gen_init != nullptr) DeclareOther(item.gen_init->lhs->text, loop);
   for (const GenerateCaseItem& arm : item.gen_case_items) {
     WalkExprs(arm.patterns, outer);
     WalkGenerateBlock(arm.body, outer);
   }
-  WalkGenerateBlock(item.gen_body, outer);
+  WalkGenerateBlock(item.gen_body, loop);
   if (item.gen_else != nullptr) WalkGenerate(*item.gen_else, outer);
 }
 

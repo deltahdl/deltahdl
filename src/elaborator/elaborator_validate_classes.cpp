@@ -607,6 +607,7 @@ void ElaboratorClassRules::ValidateForwardClassTypedefs() {
   for (const auto* item : unit_->cu_items) {
     if (item->kind != ModuleItemKind::kTypedef) continue;
     if (item->typedef_type.kind != DataTypeKind::kImplicit) continue;
+    if (item->typedef_type.type_ref_expr != nullptr) continue;
     if (!ForwardClassTypedefIsResolved(item, unit_)) {
       diag_.Error(item->loc,
                   std::format("forward typedef '{}' is never resolved by a "

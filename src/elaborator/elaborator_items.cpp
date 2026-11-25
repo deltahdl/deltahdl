@@ -329,9 +329,12 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   type_ref_mod_ = mod;
   WalkItemExprsForTypeRefArg(item);
   FoldItemTypeRefCompares(item, kFold);
-  ReportItemTypeParamErrors(*item,
-                            {mod->params, typedefs_, class_names_, unit_},
-                            {typedefs_, unit_, class_names_}, diag_);
+  auto report_type_params = [&] {
+    ReportItemTypeParamErrors(*item,
+                              {mod->params, typedefs_, class_names_, unit_},
+                              {typedefs_, unit_, class_names_}, diag_);
+  };
+  report_type_params();
   if (ElaborateDeclItem(item, mod)) return;
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
@@ -344,6 +347,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
           FoldTypeRefComparesOfStmt(s, kFold);
         });
       });
+  report_type_params();
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachBlockLet(item->body, elaborate_let);
   for (const Stmt* s : item->func_body_stmts) ForEachBlockLet(s, elaborate_let);
@@ -359,26 +363,42 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   if (!gen_block_path_.empty()) {
     mod->gen_block_classes.push_back({item->class_decl, gen_block_path_});
   }
-  RegisterClassTypedefKeys(item->class_decl, item->class_decl->name,
-                           {unit_, typedefs_, td_array_dims_, arena_});
   const ScopeMap kModuleScope = BuildParamScope(mod);
-  RegisterModuleClassParams(item->class_decl, {kModuleScope, specparam_names_},
-                            cu_param_scope_, arena_, diag_);
-  ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
+  auto register_names = [&] {
+    RegisterClassTypedefKeys(item->class_decl, item->class_decl->name,
+                             {unit_, typedefs_, td_array_dims_, arena_});
+    RegisterModuleClassParams(item->class_decl,
+                              {kModuleScope, specparam_names_}, cu_param_scope_,
+                              arena_, diag_);
+  };
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
+  const TypeRefResolver kAmongLocals = ResolverAmongLocals(mod, resolve);
+  ResolveClassTypeNames(
+      *item->class_decl,
+      [&](DataType& dt, SourceLoc loc,
+          std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
+        diag_.PushSuppress();
+        register_names();
+        diag_.PopSuppress();
+        return kAmongLocals(dt, loc, locals);
+      },
+      unit_, arena_);
+  register_names();
+  ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
   const TypeRefCompareFolder kFold = RecordingInto(
       mod, {},
       [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
-  ResolveClassTypeRefs(*item->class_decl, ResolverAmongLocals(mod, resolve),
-                       unit_, arena_,
+  ResolveClassTypeRefs(*item->class_decl, kAmongLocals, unit_, arena_,
                        [&](Stmt* s, std::span<const ProceduralLocal> locals) {
                          InLocals(locals, [&] {
                            CheckDynamicElementArgsOfStmt(s, mod);
                            FoldTypeRefComparesOfStmt(s, kFold);
                          });
                        });
+  ReportClassTypeParamErrors(*item->class_decl,
+                             {typedefs_, unit_, class_names_}, diag_);
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachClassBodyItem(item->class_decl, [&](const ModuleItem* method) {
     for (const Stmt* s : method->func_body_stmts)

@@ -29,11 +29,12 @@ void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
                          const TypeRefResolver& resolve_outer) {
-  const Expr* ref = dt.type_ref_expr;
-  if (ref == nullptr) return;
+  if (dt.type_ref_expr == nullptr) return;
+  const Expr* operand = TypeRefOperand(dt.type_ref_expr);
   auto local = std::find_if(
       locals.rbegin(), locals.rend(), [&](const ProceduralLocal& l) {
-        return ref->kind == ExprKind::kIdentifier && l.name == ref->text;
+        return operand != nullptr && operand->kind == ExprKind::kIdentifier &&
+               l.name == operand->text;
       });
   const std::vector<Expr*> kTaken = local == locals.rend()
                                         ? resolve_outer(dt, loc, locals)
@@ -83,6 +84,15 @@ void ResolveFormalTypeRefs(ModuleItem* item,
   }
 }
 
+void ResolveTypedefTypeRef(ModuleItem& item,
+                           const std::vector<ProceduralLocal>& locals,
+                           const TypeRefResolver& resolve, Arena& arena) {
+  ResolveLocalTypeRef(item.typedef_type, item.unpacked_dims, item.loc, locals,
+                      resolve);
+  ResolveLocalIndexTypeRefs(item.unpacked_dims, item.loc, locals, resolve,
+                            arena);
+}
+
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena,
                            const ProceduralStmtVisitor& visit) {
@@ -91,6 +101,11 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
       s->decl_item->kind == ModuleItemKind::kLetDecl) {
     std::vector<ProceduralLocal> in_let = locals;
     ResolveFormalTypeRefs(s->decl_item, in_let, resolve_outer, arena);
+    return;
+  }
+  if (s->kind == StmtKind::kBlockItemDecl &&
+      s->decl_item->kind == ModuleItemKind::kTypedef) {
+    ResolveTypedefTypeRef(*s->decl_item, locals, resolve_outer, arena);
     return;
   }
   if (s->kind != StmtKind::kVarDecl) {
@@ -192,15 +207,6 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
       arena);
 }
 
-static void ResolveTypedefTypeRef(ModuleItem& item,
-                                  const TypeRefResolver& resolve,
-                                  Arena& arena) {
-  const std::vector<Expr*> kTaken = resolve(item.typedef_type, item.loc, {});
-  item.unpacked_dims.insert(item.unpacked_dims.end(), kTaken.begin(),
-                            kTaken.end());
-  ResolveItemIndexTypeRefs(item, resolve, arena);
-}
-
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve,
                               const CompilationUnit* unit, Arena& arena,
@@ -208,7 +214,7 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
   for (ModuleItem* item : items) {
     switch (item->kind) {
       case ModuleItemKind::kTypedef:
-        ResolveTypedefTypeRef(*item, resolve, arena);
+        ResolveTypedefTypeRef(*item, {}, resolve, arena);
         break;
       case ModuleItemKind::kNettypeDecl:
         resolve(item->typedef_type, item->loc, {});
@@ -258,6 +264,10 @@ void AdoptReferencedType(DataType& dt, const DataType& type) {
   dt.type_ref_expr = nullptr;
 }
 
+const Expr* TypeRefOperand(const Expr* written) {
+  return written->kind == ExprKind::kTypeRef ? written->lhs : written;
+}
+
 void ResolveProceduralTypeRefs(ModuleItem* item,
                                const TypeRefResolver& resolve_outer,
                                Arena& arena,
@@ -271,47 +281,140 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
   }
 }
 
+static bool HeaderRefersToAType(const ClassDecl& cls) {
+  return std::ranges::any_of(cls.param_types, [](const DataType& type) {
+    return type.type_ref_expr != nullptr;
+  });
+}
+
+static const std::vector<Expr*>* HeaderUnpackedDims(const ClassDecl& cls,
+                                                    std::string_view name) {
+  static const std::vector<Expr*> kNone;
+  const auto kDims = cls.param_port_unpacked_dims.find(name);
+  return kDims == cls.param_port_unpacked_dims.end() ? &kNone : &kDims->second;
+}
+
+static std::vector<ProceduralLocal> ResolveHeaderTypeRefs(
+    ClassDecl& cls, const TypeRefResolver& resolve_outer, Arena& arena) {
+  std::vector<ProceduralLocal> values;
+  const bool kRefers = HeaderRefersToAType(cls);
+  for (size_t i = 0; i < cls.params.size(); ++i) {
+    const auto& [name, value] = cls.params[i];
+    const SourceLoc kLoc = cls.param_port_locs[i];
+    auto resolve_header_type = [&](DataType& type) {
+      if (type.type_ref_expr != nullptr) resolve_outer(type, kLoc, values);
+    };
+    if (cls.type_param_names.contains(name)) {
+      resolve_header_type(cls.param_types[i]);
+      continue;
+    }
+    DataType* type = &cls.param_types[i];
+    if (type->kind == DataTypeKind::kImplicit) {
+      if (!kRefers) continue;
+      type = arena.Create<DataType>(*type);
+      if (type->type_ref_expr == nullptr) type->type_ref_expr = value;
+      resolve_header_type(*type);
+    }
+    values.push_back({name, type, HeaderUnpackedDims(cls, name)});
+  }
+  return values;
+}
+
+namespace {
+
+class ClassTypeRefs {
+ public:
+  ClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
+                const CompilationUnit* unit, Arena& arena)
+      : cls_(cls),
+        resolve_outer_(resolve_outer),
+        unit_(unit),
+        arena_(arena),
+        names_(NamesInScope(
+            SelfHandles(cls, arena),
+            NamesInScope(ResolveHeaderTypeRefs(cls, resolve_outer, arena),
+                         PropertiesInScope(cls, *unit)))) {}
+
+  const std::vector<ProceduralLocal>& Names() const { return names_; }
+
+  std::vector<Expr*> Resolve(DataType& dt, SourceLoc loc,
+                             std::span<const ProceduralLocal> locals) const {
+    const Expr* operand = TypeRefOperand(dt.type_ref_expr);
+    const ClassMember* property =
+        operand == nullptr ? nullptr : PropertyNamed(cls_, *operand, unit_);
+    if (property == nullptr)
+      return resolve_outer_(dt, loc, NamesInScope(names_, locals));
+    DataType type = property->data_type;
+    std::vector<Expr*> dims = property->unpacked_dims;
+    if (type.type_ref_expr != nullptr) {
+      const std::vector<Expr*> kTaken = resolve_outer_(type, loc, names_);
+      dims.insert(dims.end(), kTaken.begin(), kTaken.end());
+    }
+    AdoptReferencedType(dt, type);
+    return dims;
+  }
+
+  void ResolveDeclaration(ClassMember& m, const TypeRefResolver& in_class) {
+    if (m.kind == ClassMemberKind::kTypedef) {
+      ResolveTypedefTypeRef(*m.typedef_item, {}, in_class, arena_);
+      return;
+    }
+    if (m.kind != ClassMemberKind::kProperty) return;
+    ResolveLocalTypeRef(m.data_type, m.unpacked_dims, m.loc, {}, in_class);
+    ResolveLocalIndexTypeRefs(m.unpacked_dims, m.loc, {}, in_class, arena_);
+  }
+
+ private:
+  ClassDecl& cls_;
+  const TypeRefResolver& resolve_outer_;
+  const CompilationUnit* unit_;
+  Arena& arena_;
+  std::vector<ProceduralLocal> names_;
+};
+
+}  // namespace
+
+void ResolveClassTypeNames(ClassDecl& cls, const TypeRefResolver& resolve_outer,
+                           const CompilationUnit* unit, Arena& arena) {
+  ClassTypeRefs refs(cls, resolve_outer, unit, arena);
+  const TypeRefResolver kInClass =
+      [&](DataType& dt, SourceLoc loc,
+          std::span<const ProceduralLocal> locals) {
+        return refs.Resolve(dt, loc, locals);
+      };
+  for (ClassMember* m : cls.members) {
+    if (m->kind == ClassMemberKind::kTypedef || cls.params.empty())
+      refs.ResolveDeclaration(*m, kInClass);
+    if (m->kind == ClassMemberKind::kClassDecl)
+      ResolveClassTypeNames(*m->nested_class, kInClass, unit, arena);
+  }
+}
+
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
                           const CompilationUnit* unit, Arena& arena,
                           const ProceduralStmtVisitor& visit) {
-  const std::vector<ProceduralLocal> kProperties =
-      NamesInScope(SelfHandles(cls, arena), PropertiesInScope(cls, *unit));
+  ClassTypeRefs refs(cls, resolve_outer, unit, arena);
   const TypeRefResolver kInClass =
       [&](DataType& dt, SourceLoc loc,
-          std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {
-    const Expr* ref = dt.type_ref_expr;
-    if (ref == nullptr) return {};
-    if (const ClassMember* property = PropertyNamed(cls, *ref, unit)) {
-      AdoptReferencedType(dt, property->data_type);
-      return property->unpacked_dims;
-    }
-    return resolve_outer(dt, loc, NamesInScope(kProperties, locals));
-  };
+          std::span<const ProceduralLocal> locals) {
+        return refs.Resolve(dt, loc, locals);
+      };
   ProceduralStmtVisitor in_class;
   if (visit) {
     in_class = [&](Stmt* s, std::span<const ProceduralLocal> locals) {
-      visit(s, NamesInScope(kProperties, locals));
+      visit(s, NamesInScope(refs.Names(), locals));
     };
   }
   for (ClassMember* m : cls.members) {
     switch (m->kind) {
-      case ClassMemberKind::kProperty:
-        ResolveLocalTypeRef(m->data_type, m->unpacked_dims, m->loc, {},
-                            kInClass);
-        ResolveTypeRefIndexDims(
-            m->unpacked_dims,
-            [&](DataType& type) { kInClass(type, m->loc, {}); }, arena);
-        break;
       case ClassMemberKind::kMethod:
         ResolveProceduralTypeRefs(m->method, kInClass, arena, in_class);
-        break;
-      case ClassMemberKind::kTypedef:
-        ResolveItemIndexTypeRefs(*m->typedef_item, kInClass, arena);
         break;
       case ClassMemberKind::kClassDecl:
         ResolveClassTypeRefs(*m->nested_class, kInClass, unit, arena, in_class);
         break;
       default:
+        refs.ResolveDeclaration(*m, kInClass);
         break;
     }
   }
@@ -361,6 +464,28 @@ void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
       [&](ClassDecl& cls) {
         package = nullptr;
         ResolveClassTypeRefs(cls, kInScope, unit, arena, kVisit);
+      });
+}
+
+void ResolveUnitScopeTypeNames(
+    CompilationUnit* unit, Arena& arena,
+    const std::function<void(const PackageDecl*)>& enter,
+    const TypeRefResolver& resolve) {
+  ForEachUnitScope(
+      unit,
+      [&](const PackageDecl* pkg, const std::vector<ModuleItem*>& items) {
+        enter(pkg);
+        for (ModuleItem* item : items) {
+          if (item->kind == ModuleItemKind::kTypedef) {
+            ResolveTypedefTypeRef(*item, {}, resolve, arena);
+          } else if (item->kind == ModuleItemKind::kClassDecl) {
+            ResolveClassTypeNames(*item->class_decl, resolve, unit, arena);
+          }
+        }
+      },
+      [&](ClassDecl& cls) {
+        enter(nullptr);
+        ResolveClassTypeNames(cls, resolve, unit, arena);
       });
 }
 

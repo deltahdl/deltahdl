@@ -279,7 +279,8 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
     std::vector<ModuleItem*> param_items;
     ParseParamDecl(param_items);
     for (auto* param : param_items) {
-      if (IsAggregateWrittenInPlace(param->typedef_type)) {
+      if (SetByTypeReference(*param) ||
+          IsAggregateWrittenInPlace(param->typedef_type)) {
         DeclareAsTypedef(*param);
         stmts.push_back(BlockItemDeclStmt(arena_, param, param->loc, attrs));
         continue;

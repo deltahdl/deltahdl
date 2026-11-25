@@ -445,8 +445,18 @@ inline bool DeclaresTypeParam(const ModuleItem& item) {
          item.typedef_type.kind != DataTypeKind::kImplicit;
 }
 
+inline bool SetByTypeReference(const ModuleItem& item) {
+  return item.data_type.kind == DataTypeKind::kVoid &&
+         item.init_expr != nullptr &&
+         item.init_expr->kind == ExprKind::kTypeRef;
+}
+
 inline bool DeclareAsTypedef(ModuleItem& item) {
-  if (!DeclaresTypeParam(item)) return false;
+  if (SetByTypeReference(item)) {
+    item.typedef_type.type_ref_expr = std::exchange(item.init_expr, nullptr);
+  } else if (!DeclaresTypeParam(item)) {
+    return false;
+  }
   item.kind = ModuleItemKind::kTypedef;
   item.type_param_restriction =
       std::exchange(item.forward_type_kind, DataTypeKind::kImplicit);

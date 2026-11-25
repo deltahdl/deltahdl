@@ -114,6 +114,9 @@ class ElaboratorOperationRules : public ElaboratorData {
   std::optional<DataType> UnitCallType(const Expr* call) const;
   void ValidateUnitScopeTypeRefArgs();
   void ElaborateUnitScopeProcedures();
+  std::vector<Expr*> ResolveUnitScopeTypeRef(
+      DataType& dt, std::span<const ProceduralLocal> locals);
+  void TypeUnitScopeNames(const std::function<void()>& register_names);
   bool InOperandScope(
       const RtlirModule* mod,
       const std::function<void(const ExprTypeScope&)>& use) const;

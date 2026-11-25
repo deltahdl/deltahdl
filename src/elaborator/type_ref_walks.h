@@ -35,6 +35,11 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
                                Arena& arena,
                                const ProceduralStmtVisitor& visit = {});
 
+const Expr* TypeRefOperand(const Expr* written);
+
+void ResolveClassTypeNames(ClassDecl& cls, const TypeRefResolver& resolve_outer,
+                           const CompilationUnit* unit, Arena& arena);
+
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
                           const CompilationUnit* unit, Arena& arena,
                           const ProceduralStmtVisitor& visit = {});
@@ -48,6 +53,11 @@ struct UnitScopeTypeRef {
 
 void ResolveUnitScopeTypeRefs(CompilationUnit* unit, Arena& arena,
                               std::vector<UnitScopeTypeRef>& written);
+
+void ResolveUnitScopeTypeNames(
+    CompilationUnit* unit, Arena& arena,
+    const std::function<void(const PackageDecl*)>& enter,
+    const TypeRefResolver& resolve);
 
 void ResolveUnitScopeProcedureTypeRefs(
     CompilationUnit* unit, Arena& arena,

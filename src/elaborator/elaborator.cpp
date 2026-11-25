@@ -29,6 +29,7 @@
 #include "elaborator/sdf_annotate_calls.h"
 #include "elaborator/specialization_type_arguments.h"
 #include "elaborator/time_literal_scale.h"
+#include "elaborator/type_parameter_values.h"
 #include "elaborator/unit_hier_names_from_root.h"
 #include "elaborator/unit_param_values.h"
 #include "elaborator/unit_scope_order.h"
@@ -359,6 +360,8 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateSpecifyBlocks();
 
   ReportViewportsContainingNothing(*unit_, diag_);
+
+  ReportTypeParametersSetToNoTypes(*unit_, diag_);
 
   RegisterCuScopeItems();
 

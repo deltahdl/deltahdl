@@ -275,6 +275,27 @@ void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
 void ValueScopes::DeclareItems(const std::vector<ModuleItem*>& items,
                                NameScope& scope) {
   for (const ModuleItem* item : items) DeclareItem(*item, scope);
+  for (const ModuleItem* item : items) DeclareImplicitNets(*item, scope);
+}
+
+void ValueScopes::DeclareImplicitNets(const ModuleItem& item,
+                                      NameScope& scope) const {
+  DeclareImplicitNet(item.assign_lhs, scope);
+  for (const Expr* terminal : item.gate_terminals)
+    DeclareImplicitNet(terminal, scope);
+  for (const auto& [port, actual] : item.inst_ports)
+    DeclareImplicitNet(actual, scope);
+}
+
+void ValueScopes::DeclareImplicitNet(const Expr* net, NameScope& scope) const {
+  if (net == nullptr) return;
+  if (net->kind == ExprKind::kConcatenation) {
+    for (const Expr* element : net->elements)
+      DeclareImplicitNet(element, scope);
+  } else if (net->kind == ExprKind::kIdentifier &&
+             !Declares(net->text, scope)) {
+    DeclareOther(net->text, scope);
+  }
 }
 
 void ValueScopes::DeclareStmts(const std::vector<Stmt*>& stmts,

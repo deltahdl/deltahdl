@@ -9,6 +9,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/scoped_walk.h"
 #include "elaborator/type_spelled_by.h"
 #include "elaborator/value_scopes.h"
@@ -59,9 +60,41 @@ void ReportTypeParamAssignedNoType(const TypeParameterOf& param, SourceLoc loc,
       Subclause("6.20.3"));
 }
 
+static bool NamesNothing(std::string_view prefix, std::string_view name,
+                         const ValueScopes& scopes, const NameScope& scope) {
+  if (!prefix.empty()) return scopes.PackageLacks(prefix, name);
+  return name != "this" && !scopes.Declares(name, scope);
+}
+
+static bool NamesNothing(const Expr* operand, const ValueScopes& scopes,
+                         const NameScope& scope) {
+  if (operand == nullptr) return false;
+  switch (operand->kind) {
+    case ExprKind::kIdentifier:
+      return NamesNothing(operand->scope_prefix, operand->text, scopes, scope);
+    case ExprKind::kMemberAccess:
+      return operand->is_scope_resolution &&
+             operand->lhs->kind == ExprKind::kIdentifier &&
+             NamesNothing(operand->lhs->text, operand->rhs->text, scopes,
+                          scope);
+    case ExprKind::kUnary:
+    case ExprKind::kBinary:
+    case ExprKind::kTernary:
+    case ExprKind::kConcatenation:
+    case ExprKind::kReplicate:
+    case ExprKind::kSelect:
+      return AnyExprChild(operand, [&](const Expr* child) {
+        return NamesNothing(child, scopes, scope);
+      });
+    default:
+      return false;
+  }
+}
+
 bool WritesNoType(const Expr& written, const ValueScopes& scopes,
                   const NameScope& scope) {
-  if (written.kind == ExprKind::kTypeRef) return false;
+  if (written.kind == ExprKind::kTypeRef)
+    return NamesNothing(written.lhs, scopes, scope);
   const DataType kSpelled = TypeSpelledBy(&written);
   if (kSpelled.kind == DataTypeKind::kImplicit) return true;
   return WritesNoType(kSpelled, scopes, scope);
@@ -110,7 +143,8 @@ class TypeParameterValueWalk : public ScopedWalk {
   void VisitParameter(const ModuleItem& param,
                       const NameScope& scope) override {
     if (param.data_type.kind != DataTypeKind::kVoid) return;
-    if (param.typedef_type.kind == DataTypeKind::kImplicit) {
+    if (param.typedef_type.kind == DataTypeKind::kImplicit &&
+        param.typedef_type.type_ref_expr == nullptr) {
       JudgeValue(param, param.init_expr, scope);
     } else if (WritesNoType(param.typedef_type, Scopes(), scope)) {
       ReportTypeParamSetToNoType(param.name, param.loc, diag_);

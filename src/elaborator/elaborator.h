@@ -129,6 +129,7 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateSpecifyBlocks();
 
   void RegisterCuScopeItems();
+  void RegisterUnitScopeNames();
 
   void ResolveExternModules();
 

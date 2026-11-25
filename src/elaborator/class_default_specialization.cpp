@@ -69,9 +69,9 @@ const WrittenArgument* ArgumentFor(const WrittenArguments& args,
 
 bool HasDefault(const ClassDecl& cls, std::size_t index) {
   const auto& [name, value] = cls.params[index];
-  return cls.type_param_names.contains(name)
-             ? cls.param_types.at(index).kind != DataTypeKind::kImplicit
-             : value != nullptr;
+  if (!cls.type_param_names.contains(name)) return value != nullptr;
+  const DataType& type = cls.param_types.at(index);
+  return type.kind != DataTypeKind::kImplicit || type.type_ref_expr != nullptr;
 }
 
 std::string_view ParameterLeftWithoutValue(const ClassDecl& cls,

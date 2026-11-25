@@ -119,6 +119,8 @@ class ValueScopes {
 
   bool Declares(std::string_view name, const NameScope& scope) const;
 
+  bool PackageLacks(std::string_view package, std::string_view name) const;
+
   MethodResult MethodOn(const ScopedValue& receiver, std::string_view name,
                         bool has_with) const;
 
@@ -132,6 +134,10 @@ class ValueScopes {
 
   void DeclareClassMember(const ClassMember& member, NameScope& scope);
 
+  void DeclareImplicitNets(const ModuleItem& item, NameScope& scope) const;
+
+  void DeclareImplicitNet(const Expr* net, NameScope& scope) const;
+
   void DeclareImport(const ImportItem& import, NameScope& scope) const;
 
   ValueSymbol Find(std::string_view name, const NameScope& scope) const;
@@ -141,8 +147,6 @@ class ValueScopes {
 
   const ValueSymbol* FindInClass(std::string_view name,
                                  const ClassDecl& cls) const;
-
-  bool PackageLacks(std::string_view package, std::string_view name) const;
 
   const ClassDecl* BaseOf(const ClassDecl& cls) const;
 

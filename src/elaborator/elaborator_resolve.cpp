@@ -504,6 +504,21 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
   TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
                                      &type_ref_compare_);
+  ResolveUnitScopeTypeRefs(unit_, arena_, unit_scope_type_refs_);
+  diag_.PushSuppress();
+  TypeUnitScopeNames([this] { RegisterUnitScopeNames(); });
+  diag_.PopSuppress();
+  RegisterUnitScopeNames();
+  CheckClassParamDollarValues(unit_, {typedefs_, td_array_dims_, class_names_},
+                              diag_);
+  CheckUnitDollarOperands(*unit_, diag_);
+  ResolveUnitScopeFormalTypes(unit_, typedefs_, arena_);
+  all_typedefs_ = typedefs_;
+  all_cu_param_scope_ = cu_param_scope_;
+  all_td_array_dims_ = td_array_dims_;
+}
+
+void Elaborator::RegisterUnitScopeNames() {
   CuScope cu_scope{cu_scope_names_,
                    typedefs_,
                    aggregate_typedef_names_,
@@ -512,7 +527,6 @@ void Elaborator::RegisterCuScopeItems() {
                    cu_param_scope_,
                    diag_,
                    arena_};
-  ResolveUnitScopeTypeRefs(unit_, arena_, unit_scope_type_refs_);
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   RegisterPackageNettypes(
       unit_, typedefs_,
@@ -546,13 +560,6 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterAnonymousProgramNames(unit_, anonymous_program_names_);
   RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
-  CheckClassParamDollarValues(unit_, {typedefs_, td_array_dims_, class_names_},
-                              diag_);
-  CheckUnitDollarOperands(*unit_, diag_);
-  ResolveUnitScopeFormalTypes(unit_, typedefs_, arena_);
-  all_typedefs_ = typedefs_;
-  all_cu_param_scope_ = cu_param_scope_;
-  all_td_array_dims_ = td_array_dims_;
 }
 
 static bool CellClauseSelects(std::string_view src_lib,

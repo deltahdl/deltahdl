@@ -136,10 +136,15 @@ void ReportTypeOutsideRestriction(const RestrictedTypeParam& param,
 
 void ReportClassTypeParamsOutsideRestrictions(
     const TypeParamRestrictionScope& scope, DiagEngine& diag) {
-  for (const ClassDecl* cls : AllClassDecls(scope.unit)) {
-    ReportClassHeaderDefaults(*cls, scope, diag);
-    ReportClassBodyDefaults(*cls, scope, diag);
-  }
+  for (const ClassDecl* cls : AllClassDecls(scope.unit))
+    ReportClassTypeParamsOutsideRestrictions(*cls, scope, diag);
+}
+
+void ReportClassTypeParamsOutsideRestrictions(
+    const ClassDecl& cls, const TypeParamRestrictionScope& scope,
+    DiagEngine& diag) {
+  ReportClassHeaderDefaults(cls, scope, diag);
+  ReportClassBodyDefaults(cls, scope, diag);
 }
 
 void ReportSpecializationOutsideRestrictions(

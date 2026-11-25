@@ -30,6 +30,10 @@ void ReportTypeOutsideRestriction(const RestrictedTypeParam& param,
 void ReportClassTypeParamsOutsideRestrictions(
     const TypeParamRestrictionScope& scope, DiagEngine& diag);
 
+void ReportClassTypeParamsOutsideRestrictions(
+    const ClassDecl& cls, const TypeParamRestrictionScope& scope,
+    DiagEngine& diag);
+
 void ReportSpecializationOutsideRestrictions(
     const DataType& written, SourceLoc loc,
     const TypeParamRestrictionScope& scope, DiagEngine& diag);

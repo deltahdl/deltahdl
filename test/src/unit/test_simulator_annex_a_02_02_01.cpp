@@ -605,8 +605,7 @@ TEST(NetAndVariableTypeSimulation, AnIncompleteScopeChainNamesTheNestedType) {
   LowerRunAndCheck(f, design, {{"r", 33u}});
 }
 
-TEST(NetAndVariableTypeSimulation,
-     DISABLED_AnIncompleteScopeChainInATypeReference) {
+TEST(NetAndVariableTypeSimulation, AnIncompleteScopeChainInATypeReference) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "typedef class C;\n"
