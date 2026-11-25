@@ -80,41 +80,92 @@ void ResolveLocalIndexTypeRefs(std::vector<Expr*>& dims, SourceLoc loc,
       arena);
 }
 
-void ResolvePrefixArgumentTypeRefs(
-    const Expr* e, const std::function<void(DataType&)>& resolve,
-    Arena& arena) {
-  if (e == nullptr) return;
-  if (e->has_param_spec) {
-    for (Expr*& element : const_cast<Expr*>(e)->elements) {
-      if (element == nullptr || element->kind != ExprKind::kTypeRef) continue;
-      std::vector<DataType> args(1);
-      args.front().type_ref_expr = element;
-      ResolveTypeRefArguments(args, resolve);
-      if (args.front().type_ref_expr != nullptr) continue;
-      auto* resolved = arena.Create<Expr>(*element);
-      resolved->lhs = nullptr;
-      resolved->type_value = arena.Create<DataType>(args.front());
-      element = resolved;
-    }
+void ResolvePrefixArguments(Expr& prefix,
+                            const std::function<void(DataType&)>& resolve,
+                            Arena& arena) {
+  for (Expr*& element : prefix.elements) {
+    if (element == nullptr || element->kind != ExprKind::kTypeRef) continue;
+    std::vector<DataType> args(1);
+    args.front().type_ref_expr = element;
+    ResolveTypeRefArguments(args, resolve);
+    if (args.front().type_ref_expr != nullptr) continue;
+    auto* resolved = arena.Create<Expr>(*element);
+    resolved->lhs = nullptr;
+    resolved->type_value = arena.Create<DataType>(args.front());
+    element = resolved;
   }
-  auto in_expr = [&](const Expr* sub) {
-    ResolvePrefixArgumentTypeRefs(sub, resolve, arena);
-  };
-  ForEachExprChild(e, in_expr);
-  if (e->property_actual != nullptr)
-    ForEachTreeSlot(e->property_actual, in_expr);
 }
+
+void ResolveConstraintPrefixTypeRefs(const ClassMember& block, SourceLoc loc,
+                                     const std::vector<ProceduralLocal>& locals,
+                                     const TypeRefResolver& resolve,
+                                     Arena& arena);
 
 void ResolvePrefixTypeRefs(const Expr* e, SourceLoc loc,
                            const std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena) {
-  ResolvePrefixArgumentTypeRefs(
-      e,
-      [&](DataType& arg) {
-        std::vector<Expr*> taken_dims;
-        ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
-      },
-      arena);
+  if (e == nullptr) return;
+  if (e->has_param_spec) {
+    ResolvePrefixArguments(
+        *const_cast<Expr*>(e),
+        [&](DataType& arg) {
+          std::vector<Expr*> taken_dims;
+          ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
+        },
+        arena);
+  }
+  auto in_expr = [&](const Expr* sub) {
+    ResolvePrefixTypeRefs(sub, loc, locals, resolve_outer, arena);
+  };
+  ForEachExprChild(e, in_expr);
+  if (e->property_actual != nullptr)
+    ForEachTreeSlot(e->property_actual, in_expr);
+  if (e->inline_constraint != nullptr)
+    ResolveConstraintPrefixTypeRefs(*e->inline_constraint, loc, locals,
+                                    resolve_outer, arena);
+}
+
+void ForEachDistExpr(const std::vector<ConstraintDistRef>& refs,
+                     const std::function<void(const Expr*)>& fn) {
+  for (const ConstraintDistRef& ref : refs) {
+    fn(ref.target);
+    for (const ConstraintDistItem& item : ref.items) {
+      for (const Expr* e :
+           {item.value, item.lo, item.hi, item.tolerance, item.weight}) {
+        fn(e);
+      }
+    }
+  }
+}
+
+void ResolveConstraintPrefixTypeRefs(const ClassMember& block, SourceLoc loc,
+                                     const std::vector<ProceduralLocal>& locals,
+                                     const TypeRefResolver& resolve,
+                                     Arena& arena) {
+  static const DataType kLoopVariable = [] {
+    DataType type;
+    type.kind = DataTypeKind::kInt;
+    type.is_signed = true;
+    return type;
+  }();
+  static const std::vector<Expr*> kNoUnpackedDims;
+  auto in_expr = [&](const Expr* e) {
+    ResolvePrefixTypeRefs(e, loc, locals, resolve, arena);
+  };
+  for (const ConstraintForeachRef& ref : block.constraint_foreach_refs) {
+    std::vector<ProceduralLocal> in_loop = locals;
+    in_loop.reserve(locals.size() + ref.loop_vars.size());
+    for (std::string_view name : ref.loop_vars)
+      in_loop.push_back({name, &kLoopVariable, &kNoUnpackedDims});
+    for (const Expr* e : ref.body)
+      ResolvePrefixTypeRefs(e, ref.loc, in_loop, resolve, arena);
+  }
+  for (const auto* exprs :
+       {&block.constraint_exprs, &block.constraint_soft_exprs}) {
+    for (const Expr* e : *exprs) in_expr(e);
+  }
+  ForEachDistExpr(block.constraint_dist_refs, in_expr);
+  ForEachDistExpr(block.constraint_soft_dist_refs, in_expr);
 }
 
 void ResolveStmtPrefixTypeRefs(Stmt* s,
@@ -287,48 +338,6 @@ const ClassMember* PropertyNamed(const ClassDecl& cls, const Expr& ref,
   }
   if (owned.owner != &cls && !owned.owner->params.empty()) return nullptr;
   return owned.member;
-}
-
-void ForEachDistExpr(const std::vector<ConstraintDistRef>& refs,
-                     const std::function<void(const Expr*)>& fn) {
-  for (const ConstraintDistRef& ref : refs) {
-    fn(ref.target);
-    for (const ConstraintDistItem& item : ref.items) {
-      for (const Expr* e :
-           {item.value, item.lo, item.hi, item.tolerance, item.weight}) {
-        fn(e);
-      }
-    }
-  }
-}
-
-void ResolveConstraintPrefixTypeRefs(const ClassMember& block,
-                                     const TypeRefResolver& resolve,
-                                     Arena& arena) {
-  static const DataType kLoopVariable = [] {
-    DataType type;
-    type.kind = DataTypeKind::kInt;
-    type.is_signed = true;
-    return type;
-  }();
-  static const std::vector<Expr*> kNoUnpackedDims;
-  auto in_expr = [&](const Expr* e) {
-    ResolvePrefixTypeRefs(e, block.loc, {}, resolve, arena);
-  };
-  for (const ConstraintForeachRef& ref : block.constraint_foreach_refs) {
-    std::vector<ProceduralLocal> loop_variables;
-    loop_variables.reserve(ref.loop_vars.size());
-    for (std::string_view name : ref.loop_vars)
-      loop_variables.push_back({name, &kLoopVariable, &kNoUnpackedDims});
-    for (const Expr* e : ref.body)
-      ResolvePrefixTypeRefs(e, ref.loc, loop_variables, resolve, arena);
-  }
-  for (const auto* exprs :
-       {&block.constraint_exprs, &block.constraint_soft_exprs}) {
-    for (const Expr* e : *exprs) in_expr(e);
-  }
-  ForEachDistExpr(block.constraint_dist_refs, in_expr);
-  ForEachDistExpr(block.constraint_soft_dist_refs, in_expr);
 }
 
 std::vector<ProceduralLocal> PropertiesInScope(const ClassDecl& cls,
@@ -616,7 +625,7 @@ class ClassTypeRefs {
       return;
     }
     if (m.kind == ClassMemberKind::kConstraint) {
-      ResolveConstraintPrefixTypeRefs(m, in_class, arena_);
+      ResolveConstraintPrefixTypeRefs(m, m.loc, {}, in_class, arena_);
       return;
     }
     if (m.kind != ClassMemberKind::kProperty) return;
