@@ -1,5 +1,7 @@
 #include "simulator/eval_instance_task.h"
 
+#include <algorithm>
+#include <iterator>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -13,6 +15,7 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_assoc_class_handles.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_class_array_handles.h"
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_hier.h"
@@ -320,6 +323,8 @@ static const Expr* ParenFreeCall(const Expr* name, SimContext& ctx) {
     call->callee = name->text;
     call->lhs = arena.Create<Expr>(*name);
     call->range = name->range;
+    call->with_expr = name->with_expr;
+    call->lhs->with_expr = nullptr;
     it->second = call;
   }
   return it->second;
@@ -336,9 +341,31 @@ static bool TryEvalParenFreeRandomize(const Expr* expr, SimContext& ctx,
          TryEvalRandomizeMethodCall(call, ctx, arena, out);
 }
 
+static bool NamesMethodCalledBare(std::string_view name) {
+  constexpr std::string_view kNames[] = {
+      "size",    "num",     "sum",     "product", "and",    "or",     "xor",
+      "len",     "toupper", "tolower", "atoi",    "atohex", "atooct", "atobin",
+      "atoreal", "first",   "last",    "next",    "prev",   "name"};
+  return std::ranges::find(kNames, name) != std::ranges::end(kNames);
+}
+
+static bool TryEvalBareMethodOfCallResult(const Expr* expr, SimContext& ctx,
+                                          Arena& arena, Logic4Vec& out) {
+  if (!ReceiverStartsAtCall(expr) || !NamesMethodCalledBare(expr->rhs->text)) {
+    return false;
+  }
+  const Expr* call = ParenFreeCall(expr, ctx);
+  CallResultReceiverScope receiver(call, ctx, arena);
+  if (!TryBuiltinMethodOfCallResult(call, ctx, arena, out)) {
+    out = EvalMemberAccess(expr, ctx, arena);
+  }
+  return true;
+}
+
 bool TryEvalParenFreeMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   if (TryEvalParenFreeRandomize(expr, ctx, arena, out)) return true;
+  if (TryEvalBareMethodOfCallResult(expr, ctx, arena, out)) return true;
   if (!CallableWithoutParens(MethodNamedAsAValue(expr, ctx, arena))) {
     return false;
   }

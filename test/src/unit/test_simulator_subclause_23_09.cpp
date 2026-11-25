@@ -840,4 +840,40 @@ TEST(PathHeadPrecedence, AnInstanceIsChosenOverALikeNamedChecker) {
             "2\n");
 }
 
+TEST(ScopeRulesSim, AnOperatorWritesThePropertyThatHidesAModuleVariable) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  int n = 100;\n"
+      "  class C;\n"
+      "    int n = 0;\n"
+      "    function void run();\n"
+      "      int k;\n"
+      "      n++;\n"
+      "      ++n;\n"
+      "      k = (n += 5);\n"
+      "      n += k;\n"
+      "      n--;\n"
+      "    endfunction\n"
+      "    function int local_();\n"
+      "      int n;\n"
+      "      n = 40;\n"
+      "      n++;\n"
+      "      return (n += 1);\n"
+      "    endfunction\n"
+      "  endclass\n"
+      "  C o = new;\n"
+      "  int r;\n"
+      "  initial begin\n"
+      "    o.run();\n"
+      "    r = o.local_();\n"
+      "    n++;\n"
+      "    n += 1;\n"
+      "    $display(\"%0d %0d %0d\", o.n, r, n);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "13 42 102\n");
+}
+
 }  // namespace

@@ -473,6 +473,34 @@ TEST(DottedNameElaboration, AMemberOfAnUndeclaredPropertyIsReportedOnce) {
   EXPECT_EQ(f.diag.ErrorCount(), 1U);
 }
 
+TEST(DottedNameElaboration,
+     AMethodOfAnArraySliceIsAcceptedAndOfAPartSelectIsNot) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module top;\n"
+      "  typedef int iq_t[$];\n"
+      "  int q[$], d[], a[4], r[$], x;\n"
+      "  iq_t tq;\n"
+      "  logic [7:0] v, w[2];\n"
+      "  initial begin\n"
+      "    r = q[0:1].min();\n"
+      "    r = d[0:1].max();\n"
+      "    r = a[1:2].unique();\n"
+      "    x = tq[0:1].size() + a[2+:2].sum();\n"
+      "    x = v[3:0].size();\n"
+      "    x = w[0][3:0].size();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
+  for (int line : {11, 12}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "'size' is not a built-in method of the integral "
+                              "or real value",
+                              line, "23.7"));
+  }
+}
+
 TEST(DottedNameElaboration, AMemberOfAStdMethodsIntResultIsReported) {
   ElabFixture f;
   ElaborateSrc(

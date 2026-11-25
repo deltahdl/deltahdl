@@ -127,6 +127,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_extern_modules.cpp
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
+    elaborator/implicit_variable_calls.cpp
     elaborator/subroutine_instance_copy.cpp
     elaborator/type_ref_compare_fold.cpp
     elaborator/elaborator_node_attributes.cpp
@@ -286,6 +287,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/type_param_restriction.cpp
     elaborator/type_eval_aggregate.cpp
     elaborator/uwire_drivers.cpp
+    elaborator/value_scopes.cpp
     elaborator/viewport_resolution.cpp
     elaborator/const_eval.cpp
     elaborator/const_eval_aggregate_param.cpp

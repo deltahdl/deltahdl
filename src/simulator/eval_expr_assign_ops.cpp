@@ -39,6 +39,11 @@ static Variable* WholeVariableOfMember(const Expr* lhs, SimContext& ctx) {
   return ResolveLhsVariable(lhs, ctx);
 }
 
+static Variable* NamedVariable(const Expr* name, SimContext& ctx) {
+  return NameDenotesVariable(name->text, ctx) ? ctx.FindVariable(name->text)
+                                              : nullptr;
+}
+
 static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
                               SimContext& ctx, Arena& arena) {
   if (lhs->kind == ExprKind::kSelect) {
@@ -54,7 +59,7 @@ static void WriteIncDecTarget(const Expr* lhs, Logic4Vec& new_val,
     return;
   }
   if (lhs->kind != ExprKind::kIdentifier) return;
-  auto* var = ctx.FindVariable(lhs->text);
+  auto* var = NamedVariable(lhs, ctx);
   if (var == nullptr) {
     TryFuncClassPropertyWrite(lhs, new_val, ctx, arena);
     return;
@@ -143,7 +148,7 @@ Logic4Vec EvalCompoundAssign(const Expr* expr, SimContext& ctx, Arena& arena) {
     yield_width = whole->value.width;
     StoreOperatorResult(whole, result);
   } else if (expr->lhs->kind == ExprKind::kIdentifier) {
-    auto* var = ctx.FindVariable(expr->lhs->text);
+    auto* var = NamedVariable(expr->lhs, ctx);
     if (var) {
       result = ConvertRealOnAssign(result, expr->lhs, *var, ctx, arena);
       StoreOperatorResult(var, result);

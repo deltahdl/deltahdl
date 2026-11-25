@@ -57,6 +57,11 @@ class CallResultReceiverScope {
 
 bool StartsAtHeldCall(const Expr* side);
 
+bool ReceiverStartsAtCall(const Expr* access);
+
+bool TryEvalReturnedValueMethod(const Expr* call, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out);
+
 bool SelectsNamedMember(const Expr* expr);
 
 void RecordReturnedAggregate(const Expr* returned, SimContext& ctx,

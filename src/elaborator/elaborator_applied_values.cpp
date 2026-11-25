@@ -218,7 +218,7 @@ const ClassDecl* ClassNamed(const DataScope& scope, const DeclaredVar& var,
 const Expr& SelectRoot(const Expr& e, std::size_t& selects) {
   const Expr* root = &e;
   while (root->kind == ExprKind::kSelect && root->base != nullptr) {
-    ++selects;
+    if (root->index_end == nullptr) ++selects;
     root = root->base;
   }
   return *root;

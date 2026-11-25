@@ -152,6 +152,9 @@ bool ResolveThroughNullHandle(const MethodCallParts& parts,
 
 void ReportNullHandleCall(std::string_view method_name, SourceLoc loc,
                           SimContext& ctx);
+bool TryBuiltinMethodOfCallResult(const Expr* call, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out);
+
 Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
                             SimContext& ctx, Arena& arena);
 

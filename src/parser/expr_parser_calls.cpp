@@ -218,6 +218,7 @@ Expr* Parser::ParseMethodTail(Expr* root) {
     ParseAttributes();
     if (Check(TokenKind::kLParen)) root = ParseCallExpr(root);
     root = ParseWithClause(root);
+    while (AtSelectBracket()) root = ParseSelectExpr(root);
   }
   return root;
 }

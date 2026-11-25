@@ -18,6 +18,7 @@
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/covergroup_instance.h"
+#include "simulator/eval_array.h"
 #include "simulator/eval_array_class_queue.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_hier.h"
@@ -263,6 +264,11 @@ void CallResultReceiverScope::Release() {
   reg.held_base = outer_base_;
   reg.held_aggregate = std::move(outer_aggregate_);
   base_ = nullptr;
+}
+
+bool ReceiverStartsAtCall(const Expr* access) {
+  return SelectsNamedMember(access) &&
+         CallReceiverStartsAt(access->lhs) != nullptr;
 }
 
 bool StartsAtHeldCall(const Expr* side) {
@@ -567,6 +573,27 @@ bool TryEvalCallResultMember(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+bool TryEvalReturnedValueMethod(const Expr* call, SimContext& ctx, Arena& arena,
+                                Logic4Vec& out) {
+  std::optional<ReturnedAggregate> returned;
+  Logic4Vec value =
+      EvalWithReturnedAggregate(call->lhs->lhs, ctx, arena, returned);
+  if (returned) {
+    return TryReturnedAggregateMethod(*returned, call->lhs->rhs->text, arena,
+                                      out);
+  }
+  if (!value.is_string) return false;
+  return TryEvalStringMethodOnValue(value, call, ctx, arena, out);
+}
+
+static bool TryReadLocatorAsAValue(const Expr* call, SimContext& ctx,
+                                   Arena& arena, Logic4Vec& out) {
+  std::vector<Logic4Vec> elements;
+  if (!TryCollectLocatorResult(call, ctx, arena, elements)) return false;
+  out = MakeLogic4VecVal(arena, 32, 0);
+  return true;
+}
+
 bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   if (expr == nullptr || expr->kind != ExprKind::kCall ||
@@ -590,6 +617,7 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
   InstanceMethodInfo info;
   info.obj = ctx.GetClassObject(handle.ToUint64());
   if (info.obj == nullptr) {
+    if (TryReadLocatorAsAValue(expr, ctx, arena, out)) return true;
     ReportNullHandleCall(access->rhs->text, access->rhs->range.start, ctx);
     return false;
   }

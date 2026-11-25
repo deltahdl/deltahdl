@@ -5,6 +5,7 @@
 #include "elaborator/elaborator_class_constraints.h"
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/implicit_variable_calls.h"
 #include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
 
@@ -95,6 +96,7 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 void ElaboratorClassRules::ValidateClassMethodReads() {
   ReportClassMethodUnresolved(unit_, diag_);
   ReportClassMethodCalls(*unit_, diag_);
+  ReportBareCallsAsImplicitVariables(*unit_, diag_);
   ValidateUnitClassCallArgs(*unit_, diag_);
 }
 

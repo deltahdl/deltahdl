@@ -449,6 +449,12 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }
 
+bool TryBuiltinMethodOfCallResult(const Expr* call, SimContext& ctx,
+                                  Arena& arena, Logic4Vec& out) {
+  return TryBuiltinMethodCall(call, ctx, arena, out) ||
+         TryEvalReturnedValueMethod(call, ctx, arena, out);
+}
+
 static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;

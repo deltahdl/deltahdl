@@ -294,7 +294,21 @@ TEST(BuiltinMethodSim, ImplicitVariableWithParenthesesIsTheResult) {
   EXPECT_EQ(out, "1 66 3\n");
 }
 
-TEST(BuiltinMethodSim, DISABLED_LastCallOfAChainWithoutParenthesesIsCalled) {
+TEST(BuiltinMethodSim, ImplicitVariableOfAnUnnamedValuesMethodIsTheResult) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  string s = \"abcde\";\n"
+      "  initial $display(\"%0d %0d %0d\", $sformatf(\"%0d\", "
+      "12345).len()[2],\n"
+      "                   (s).len()[1], (q).min()[0]);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 1\n");
+}
+
+TEST(BuiltinMethodSim, LastCallOfAChainWithoutParenthesesIsCalled) {
   SimFixture f;
   auto out = RunCapture(
       "module m;\n"
@@ -303,6 +317,89 @@ TEST(BuiltinMethodSim, DISABLED_LastCallOfAChainWithoutParenthesesIsCalled) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "3\n");
+}
+
+TEST(BuiltinMethodSim, LastBareCallOnEachReceiversResultIsCalled) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  int d[] = '{5, 5, 6};\n"
+      "  int fx[4] = '{7, 7, 7, 8};\n"
+      "  int aa[string] = '{\"a\": 1, \"b\": 1};\n"
+      "  string s = \"aB\";\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d %0d %0d\", q.unique().size, d.unique().size,\n"
+      "             fx.unique().size, aa.unique().size);\n"
+      "    $display(\"%0d %0d\", q.find() with (item > 1).size,\n"
+      "             q.unique_index().size);\n"
+      "    $display(\"%0d %0d %0d\", q.unique().sum, q.unique().product,\n"
+      "             q.unique().unique().size);\n"
+      "    $display(\"%0d %s %s\", s.toupper().len, s.toupper().tolower,\n"
+      "             s.tolower().toupper);\n"
+      "    $display(\"%0d\", q.unique().sum with (item * 2));\n"
+      "    $display(\"%0d\", q.unique().unique().size());\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "3 2 2 1\n2 3\n6 6 3\n2 ab AB\n12\n3\n");
+}
+
+TEST(BuiltinMethodSim, LastBareCallOnAFunctionsResultIsCalledOnce) {
+  SimFixture f;
+  auto out = RunCapture(
+      "typedef int iq_t[$];\n"
+      "class C;\n"
+      "  int q[$] = {3, 1, 2, 1};\n"
+      "  int calls = 0;\n"
+      "  function iq_t getq(); calls++; return q; endfunction\n"
+      "  function string gets(); calls++; return \"xyz\"; endfunction\n"
+      "  function C me(); calls++; return this; endfunction\n"
+      "  function int inside_(); return getq().size; endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  C o = new;\n"
+      "  int calls = 0;\n"
+      "  function automatic string fs(); calls++; return \"abcd\"; "
+      "endfunction\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d\", fs().len, calls);\n"
+      "    $display(\"%0d %0d\", o.getq().size, o.calls);\n"
+      "    $display(\"%0d %0d\", o.gets().len, o.calls);\n"
+      "    $display(\"%0d %0d\", o.me().getq().size, o.calls);\n"
+      "    $display(\"%0d %0d\", o.me().q.size, o.calls);\n"
+      "    $display(\"%0d %0d\", o.inside_(), o.calls);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 1\n4 1\n3 2\n4 4\n4 5\n4 6\n");
+}
+
+TEST(BuiltinMethodSim, MemberOfACallsResultNamedAsAMethodIsRead) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module m;\n"
+      "  typedef struct {int size; int len; int sum;} st_t;\n"
+      "  class C;\n"
+      "    int size = 5;\n"
+      "    int num = 6;\n"
+      "  endclass\n"
+      "  C c = new;\n"
+      "  int calls = 0;\n"
+      "  function automatic st_t fst();\n"
+      "    st_t r;\n"
+      "    calls++;\n"
+      "    r.size = 7; r.len = 8; r.sum = 9;\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "  function automatic C fc(); calls++; return c; endfunction\n"
+      "  initial begin\n"
+      "    $display(\"%0d %0d %0d\", fst().size, fst().len, fst().sum);\n"
+      "    $display(\"%0d %0d %0d\", fc().size, fc().num, calls);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "7 8 9\n5 6 5\n");
 }
 
 }  // namespace
