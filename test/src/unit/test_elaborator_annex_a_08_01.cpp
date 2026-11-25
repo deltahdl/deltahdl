@@ -88,7 +88,7 @@ std::vector<uint32_t> ErrorLinesOfCondition(const std::string& condition) {
   ElabFixture f;
   ElaborateSrc(
       "module m(input a, b, c, input [1:0] n, output y);\n"
-      "  localparam K = 2;\n"
+      "  specparam K = 2;\n"
       "  specify\n"
       "    if (" +
           condition +

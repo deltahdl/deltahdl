@@ -10,8 +10,8 @@ namespace {
 TEST(TimingCheckFlagElaboration, ConstantFlagsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      "module m #(parameter EB = 1) (input clk1, clk2);\n"
-      "  localparam RA = 0;\n"
+      "module m(input clk1, clk2);\n"
+      "  specparam EB = 1, RA = 0;\n"
       "  specparam sp_ra = 1;\n"
       "  specify\n"
       "    specparam sp_eb = 0;\n"

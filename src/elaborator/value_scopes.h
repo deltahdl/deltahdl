@@ -45,6 +45,8 @@ enum class SymbolKind : std::uint8_t {
   kValue,
 };
 
+enum class ConstantKind : std::uint8_t { kNone, kParameter, kSpecparam };
+
 struct ValueSymbol {
   SymbolKind kind = SymbolKind::kOther;
   const DataType* type = nullptr;
@@ -54,6 +56,7 @@ struct ValueSymbol {
   std::string_view module = {};
   ScopedValue value = {};
   std::string_view mode = {};
+  ConstantKind constant = ConstantKind::kNone;
 };
 
 struct MethodResult {
@@ -92,6 +95,11 @@ class ValueScopes {
   void DeclareStmts(const std::vector<Stmt*>& stmts, NameScope& scope);
 
   ScopedValue ValueOf(const Expr& e, const NameScope& scope) const;
+
+  ConstantKind ConstantNamedBy(const Expr& name, const NameScope& scope) const;
+
+  ConstantKind ConstantNamed(std::string_view name,
+                             const NameScope& scope) const;
 
   MethodResult MethodOn(const ScopedValue& receiver, std::string_view name,
                         bool has_with) const;

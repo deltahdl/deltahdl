@@ -533,7 +533,7 @@ std::string ConditionSource(const std::string& condition) {
   return "module m(input [1:0] a, input b, inout [1:0] io, output [1:0] y,\n"
          "         output reg r);\n"
          "  parameter P = 1;\n"
-         "  localparam LP = 0;\n"
+         "  localparam LP = 0; specparam SP = 1;\n"
          "  logic [3:0] g;\n"
          "  wire [3:0] w;\n"
          "  specify\n"
@@ -558,6 +558,16 @@ void ExpectConditionReported(const std::string& condition,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 8, "30.4.4.1"));
 }
 
+void ExpectParameterReported(const std::string& condition,
+                             const std::string& name) {
+  ElabFixture f;
+  ElaborateSrc(ConditionSource(condition), f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter '" + name + "' may not be used inside a specify block", 8,
+      "6.20.5"));
+}
+
 TEST(OperatorElaboration, LocalVariableBitSelectOperandElaborates) {
   ExpectConditionAccepted("g[0]");
 }
@@ -578,12 +588,13 @@ TEST(OperatorElaboration, LocalNetIndexedPartSelectOperandElaborates) {
   ExpectConditionAccepted("w[1+:2]");
 }
 
-TEST(OperatorElaboration, ModuleParameterOperandElaborates) {
-  ExpectConditionAccepted("b && P");
+TEST(OperatorElaboration, ParameterOperandIsRejected) {
+  ExpectParameterReported("b && P", "P");
+  ExpectParameterReported("b || LP", "LP");
 }
 
-TEST(OperatorElaboration, LocalParameterOperandElaborates) {
-  ExpectConditionAccepted("b || LP");
+TEST(OperatorElaboration, SpecparamOperandElaborates) {
+  ExpectConditionAccepted("b && SP");
 }
 
 TEST(OperatorElaboration, InoutPortBitSelectOperandElaborates) {

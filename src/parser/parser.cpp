@@ -587,6 +587,7 @@ void Parser::ReportUnexpectedTopLevelToken() {
         "a clocking block cannot stand at the top level of a compilation unit");
     return;
   }
+  if (TryRejectSpecparamDecl()) return;
   diag_.Error(CurrentLoc(), "expected top-level declaration",
               Subclause("3.12.1"));
   Consume();

@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstddef>
+#include <string>
+#include <vector>
+
+#include "common/diagnostic.h"
 #include "fixture_parser.h"
 #include "fixture_program.h"
 #include "fixture_specify.h"
@@ -184,6 +189,67 @@ TEST(SpecparamParsing, SpecparamInTheModuleBodyAndASpecifyBlockIsAccepted) {
       "module t;\n"
       "  specparam a = 2, b = a * 3.5;\n"
       "  specify specparam c = b; endspecify\n"
+      "endmodule\n");
+  EXPECT_FALSE(r.has_errors);
+}
+
+std::size_t ErrorsIn(const std::vector<Diagnostic>& diags) {
+  std::size_t errors = 0;
+  for (const Diagnostic& diag : diags) {
+    if (diag.severity == DiagSeverity::kError) ++errors;
+  }
+  return errors;
+}
+
+TEST(SpecparamParsing, SpecparamInAClassOrTheCompilationUnitIsReported) {
+  for (const char* src : {
+           "class C;\n  specparam d = 1;\n  int x;\nendclass\n",
+           "class C;\n  specparam [7:0] d = 1, e = 2:3:4;\nendclass\n",
+           "virtual class C #(int P = 1);\n  specparam d = P;\nendclass\n",
+           "interface class C;\n  specparam d = 1;\nendclass\n",
+           "class C; class D;\n  specparam d = 1;\nendclass endclass\n",
+           "module t; class C;\n  specparam d = 1;\nendclass endmodule\n",
+           "package p; class C;\n  specparam d = 1;\nendclass endpackage\n",
+           "int x;\nspecparam d = 1;\nmodule t; endmodule\n",
+           "int x;\nspecparam [7:0] d = 1, e = 2:3:4;\nmodule t; endmodule\n",
+           "module t; endmodule\nspecparam PATHPULSE$ = (1, 2);\n",
+       }) {
+    SCOPED_TRACE(src);
+    auto r = Parse(src);
+    EXPECT_TRUE(ReportedError(r.diags,
+                              "specparam declaration must appear inside a "
+                              "module or a specify block",
+                              2, "6.20.5"));
+    EXPECT_EQ(ErrorsIn(r.diags), 1u);
+  }
+}
+
+TEST(SpecparamParsing, ParameterDeclaredInASpecifyBlockIsReported) {
+  for (const char* declaration :
+       {"parameter p = 1;", "localparam p = 1;", "parameter int p = 1, q = 2;",
+        "localparam [3:0] p = 1;", "parameter type T = int;",
+        "localparam type T = logic [3:0];"}) {
+    SCOPED_TRACE(declaration);
+    auto r = Parse("module t(input a, output b);\n  specify\n    " +
+                   std::string(declaration) +
+                   "\n    (a => b) = 5;\n  endspecify\nendmodule\n");
+    EXPECT_TRUE(ReportedError(
+        r.diags, "parameter declaration must appear outside a specify block", 3,
+        "6.20.5"));
+    EXPECT_EQ(ErrorsIn(r.diags), 1u);
+  }
+}
+
+TEST(SpecparamParsing, ParameterDeclaredBesideASpecifyBlockIsAccepted) {
+  auto r = Parse(
+      "module t(input a, output b);\n"
+      "  parameter int p = 1;\n"
+      "  localparam type T = int;\n"
+      "  specify\n"
+      "    specparam s = p;\n"
+      "    (a => b) = s;\n"
+      "  endspecify\n"
+      "  localparam [3:0] q = 1;\n"
       "endmodule\n");
   EXPECT_FALSE(r.has_errors);
 }

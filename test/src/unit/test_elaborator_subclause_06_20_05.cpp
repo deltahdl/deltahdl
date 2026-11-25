@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <utility>
 
 #include "common/diagnostic.h"
 #include "elaborator/rtlir.h"
@@ -522,6 +523,152 @@ TEST(SpecparamElaboration, ParameterValueNamingAParameterIsAcceptedEverywhere) {
       if (diag.severity == DiagSeverity::kError)
         ADD_FAILURE() << "line " << diag.loc.line << ": " << diag.message;
     }
+  }
+}
+
+constexpr const char* kParameterPrelude =
+    "package pk; parameter int PK = 1, PW = 1; endpackage\n"
+    "parameter int CU = 1;\n"
+    "class K; localparam int CP = 1; int q; endclass\n"
+    "module m import pk::PK; import pk::*; #(parameter int PP = 1,\n"
+    "    parameter type T = int, localparam int PL = 1)\n"
+    "  (input [3:0] a, input c, e, output [3:0] b, output d);\n"
+    "  parameter int P = 1; localparam int L = 1; specparam sp = 1;\n"
+    "  function logic odd(int v); return v[0]; endfunction\n"
+    "  reg n; wire [3:0] dc;\n"
+    "  specify\n";
+
+constexpr uint32_t kSpecifyItemLine = 11;
+
+void ExpectParameterReportedInSpecify(const std::string& item,
+                                      const std::string& name) {
+  SCOPED_TRACE(item);
+  ElabFixture f;
+  ElaborateSrc(kParameterPrelude + item + "\n  endspecify\nendmodule\n", f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter '" + name + "' may not be used inside a specify block",
+      kSpecifyItemLine, "6.20.5"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+}
+
+TEST(SpecparamElaboration, ParameterUsedInASpecifyBlockIsReported) {
+  const char* const kItems[] = {
+      "(a[P:0] => b[1:0]) = 5;",
+      "(a[1:P] => b[0]) = 5;",
+      "(a[P] => b[0]) = 5;",
+      "(a[P+:1] => b[0]) = 5;",
+      "(a[2-:P] => b[0]) = 5;",
+      "(a[0], a[P] *> b[0]) = 5;",
+      "(a[0] => b[P]) = 5;",
+      "(c *> b[0], b[P]) = 5;",
+      "(posedge c => (d : a[P])) = 5;",
+      "(posedge c => (d +: P)) = 5;",
+      "if (P) (a => b) = 5;",
+      "if (c && P) (a => b) = 5;",
+      "if (a[P]) (c => d) = 5;",
+      "if (odd(P)) (c => d) = 5;",
+      "if (c) (posedge e => (b[P] : c)) = 5;",
+      "ifnone (a[P] => b[0]) = 5;",
+      "pulsestyle_onevent b[P];",
+      "pulsestyle_ondetect b[P];",
+      "showcancelled b[P];",
+      "noshowcancelled b[P];",
+      "specparam [P:0] t = 5;",
+      "specparam [3:P] t = 5;",
+      "$setup(a[P], posedge c, 1);",
+      "$setup(c, posedge a[P], 1);",
+      "$hold(posedge c &&& P, d, 1);",
+      "$hold(posedge c, e &&& (e == P), 1);",
+      "$setuphold(posedge c, e, 1, 2, n, P);",
+      "$setuphold(posedge c, e, 1, 2, n, , P);",
+      "$setuphold(posedge c, e, 1, 2, n, , , dc[P]);",
+      "$recrem(posedge c, e, 1, 2, n, , , , dc[P]);",
+      "$timeskew(posedge c, posedge e, 5, , P);",
+      "$timeskew(posedge c, posedge e, 5, , , P + 1);",
+      "$fullskew(posedge c, posedge e, 5, 6, , , 0:P:2);",
+      "(a => b) = odd(P);",
+      "$setup(e, posedge c, odd(P));",
+  };
+  for (const char* item : kItems) ExpectParameterReportedInSpecify(item, "P");
+}
+
+TEST(SpecparamElaboration, EachKindOfParameterUsedInASpecifyBlockIsReported) {
+  const std::pair<const char*, const char*> kKinds[] = {
+      {"P", "P"},           {"L", "L"},         {"PP", "PP"},
+      {"PL", "PL"},         {"PK", "PK"},       {"PW", "PW"},
+      {"pk::PW", "PW"},     {"CU", "CU"},       {"$unit::CU", "CU"},
+      {"K::CP", "CP"},      {"(0 + L)", "L"},   {"{L, 1'b1}", "L"},
+      {"(1 ? L : 0)", "L"}, {"-L", "L"},        {"L'(1)", "L"},
+      {"T'(1)", "T"},       {"{L{1'b1}}", "L"},
+  };
+  for (const auto& [operand, name] : kKinds) {
+    ExpectParameterReportedInSpecify(
+        "(a[" + std::string(operand) + "] => b[0]) = 5;", name);
+  }
+}
+
+TEST(SpecparamElaboration, ScopedParameterInASpecifyDelayIsReported) {
+  for (const char* item :
+       {"(a => b) = pk::PW;", "(a => b) = (1, 2 + pk::PW);",
+        "(a => b) = 1:pk::PW:3;", "$setup(e, posedge c, pk::PW);",
+        "(a => b) = -pk::PW;", "(a => b) = sp ? pk::PW : 1;",
+        "(a => b) = sp[pk::PW];", "(a => b) = {sp, pk::PW};",
+        "(a => b) = {2{pk::PW}};", "(a => b) = '{pk::PW};"}) {
+    ExpectParameterReportedInSpecify(item, "PW");
+  }
+  ExpectParameterReportedInSpecify("specparam CU = 2; (a => b) = $unit::CU;",
+                                   "CU");
+}
+
+TEST(SpecparamElaboration, ParameterInANestedModuleSpecifyBlockIsReported) {
+  const std::string kHead =
+      "module o;\n"
+      "  parameter int P = 1;\n"
+      "  module i(input [3:0] a, output [3:0] b);\n"
+      "    specparam sp = 1;\n"
+      "    specify\n";
+  const std::string kTail = " endspecify\n  endmodule\nendmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kHead + "(a[P] => b[0]) = 5;" + kTail, f);
+  EXPECT_TRUE(ReportedError(
+      f.diag.Diagnostics(),
+      "parameter 'P' may not be used inside a specify block", 6, "6.20.5"));
+  EXPECT_EQ(f.diag.ErrorCount(), 1u);
+  ElabFixture g;
+  ElaborateSrc(kHead + "(a[sp] => b[0]) = 5;" + kTail, g);
+  EXPECT_FALSE(g.has_errors);
+}
+
+TEST(SpecparamElaboration, SpecparamUsedInASpecifyBlockIsAccepted) {
+  const char* const kItems[] = {
+      "(a[sp:0] => b[1:0]) = 5;",
+      "(a[sp] => b[0]) = 5;",
+      "(a[sp+:1] => b[0]) = sp;",
+      "(a[0] => b[sp]) = 5;",
+      "(posedge c => (d : a[sp])) = 5;",
+      "if (sp) (a => b) = 5;",
+      "if (c && sp) (a => b) = 5;",
+      "if (a[sp]) (c => d) = 5;",
+      "if (odd(sp)) (c => d) = 5;",
+      "pulsestyle_onevent b[sp];",
+      "specparam [sp:0] t = 5;",
+      "specparam t = P + L + PP + PL + PK + PW + CU + pk::PW;",
+      "specparam t = P:L:PP, u = K::CP, PATHPULSE$ = (P, L);",
+      "specparam PW = 2; (a[PW] => b[0]) = PW;",
+      "specparam CU = 2; if (a[CU]) (c => d) = CU;",
+      "$setup(a[sp], posedge c, sp);",
+      "$hold(posedge c &&& sp, e, 1);",
+      "$setuphold(posedge c, e, 1, 2, n, sp, sp, dc[sp]);",
+      "$timeskew(posedge c, posedge e, 5, , sp, sp + 1);",
+  };
+  for (const char* item : kItems) {
+    SCOPED_TRACE(item);
+    ElabFixture f;
+    ElaborateSrc(
+        std::string(kParameterPrelude) + item + "\n  endspecify\nendmodule\n",
+        f);
+    EXPECT_FALSE(f.has_errors);
   }
 }
 

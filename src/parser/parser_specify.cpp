@@ -110,6 +110,7 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     ParseSpecparamInSpecify(items);
     return;
   }
+  if (TryRejectParamDeclInSpecify()) return;
 
   if (Check(TokenKind::kSystemIdentifier) &&
       IsTimingCheckName(CurrentToken().text)) {

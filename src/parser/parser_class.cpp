@@ -481,6 +481,7 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
         "interface, a checker or a program body can");
     return;
   }
+  if (TryRejectSpecparamDecl()) return;
   auto* member = arena_.Create<ClassMember>();
   member->loc = CurrentLoc();
   member->attrs = std::move(attrs);

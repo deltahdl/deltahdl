@@ -201,6 +201,33 @@ bool Parser::TryRejectBodyPortDecl() {
   return true;
 }
 
+void Parser::ReportMisplacedSpecparam() {
+  diag_.Error(CurrentLoc(),
+              "specparam declaration must appear inside a module or a specify "
+              "block",
+              Subclause("6.20.5"));
+}
+
+bool Parser::TryRejectSpecparamDecl() {
+  if (!Check(TokenKind::kKwSpecparam)) return false;
+  ReportMisplacedSpecparam();
+  std::vector<ModuleItem*> discarded;
+  ParseSpecparamDecl(discarded);
+  return true;
+}
+
+bool Parser::TryRejectParamDeclInSpecify() {
+  if (!Check(TokenKind::kKwParameter) && !Check(TokenKind::kKwLocalparam)) {
+    return false;
+  }
+  diag_.Error(CurrentLoc(),
+              "parameter declaration must appear outside a specify block",
+              Subclause("6.20.5"));
+  std::vector<ModuleItem*> discarded;
+  ParseParamDecl(discarded);
+  return true;
+}
+
 bool Parser::TryParseSpecifyItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwSpecify)) {
     if (InGenerateBlock() || in_generate_region_) {
@@ -222,10 +249,7 @@ bool Parser::TryParseSpecifyItem(std::vector<ModuleItem*>& items) {
                   "or region",
                   GenerateItemRule(InGenerateBlock()));
     } else if (!InModuleBody() && !in_anonymous_program_) {
-      diag_.Error(CurrentLoc(),
-                  "specparam declaration must appear inside a module or a "
-                  "specify block",
-                  Subclause("6.20.5"));
+      ReportMisplacedSpecparam();
     }
     ParseSpecparamDecl(items);
     return true;

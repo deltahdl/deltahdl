@@ -71,7 +71,7 @@ std::vector<uint32_t> ErrorLinesOf(const std::string& check) {
       "  wire [3:0] dc;\n"
       "  wire dd;\n"
       "  integer i;\n"
-      "  localparam K = 1;\n"
+      "  specparam K = 1;\n"
       "  specify\n"
       "    " +
           check +

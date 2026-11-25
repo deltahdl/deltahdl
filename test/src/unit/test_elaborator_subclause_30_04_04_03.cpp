@@ -156,11 +156,11 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
 }
 
 TEST(EdgeSensitiveStateDependentPathElaboration,
-     DuplicateParameterIndexPathIsIllegal) {
+     DuplicateSpecparamIndexPathIsIllegal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m(input clk, input c, output [3:0] q);\n"
-      "  localparam SEL = 1;\n"
+      "  specparam SEL = 1;\n"
       "  reg d;\n"
       "  specify\n"
       "    if (c) (posedge clk => (q[SEL] : d)) = (10, 5);\n"

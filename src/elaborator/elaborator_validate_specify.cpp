@@ -15,6 +15,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_specify_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/specify_parameter_uses.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -785,6 +786,7 @@ void Elaborator::ValidateSpecifyBlocks() {
   check_modules(unit_->modules);
   check_modules(unit_->interfaces);
   check_modules(unit_->programs);
+  ReportParametersUsedInSpecifyBlocks(*unit_, diag_);
 }
 
 }  // namespace delta

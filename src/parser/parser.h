@@ -122,6 +122,9 @@ class Parser {
   void FilterPackageItems(std::vector<ModuleItem*>& items, size_t before);
   bool TryRejectBodyPortDecl();
   bool TryParseSpecifyItem(std::vector<ModuleItem*>& items);
+  void ReportMisplacedSpecparam();
+  bool TryRejectSpecparamDecl();
+  bool TryRejectParamDeclInSpecify();
   ModuleItem* ParseExternTfDeclaration(SourceLoc extern_loc);
   bool AtMisplacedMethodQualifier();
   void RejectMisplacedMethodQualifier(std::vector<ModuleItem*>& items);

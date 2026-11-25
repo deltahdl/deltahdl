@@ -11,6 +11,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -50,6 +51,11 @@ void DeclareEnumConstants(const DataType& type, NameScope& scope) {
   }
 }
 
+void DeclareSpecparam(std::string_view name, NameScope& scope) {
+  scope.names.try_emplace(name).first->second.constant =
+      ConstantKind::kSpecparam;
+}
+
 template <typename Decl>
 void DeclareParamPorts(const Decl& decl, NameScope& scope) {
   for (std::size_t i = 0; i < decl.params.size(); ++i) {
@@ -64,6 +70,7 @@ void DeclareParamPorts(const Decl& decl, NameScope& scope) {
                       : kDims->second.size(),
                   scope);
     }
+    scope.names[kName].constant = ConstantKind::kParameter;
   }
 }
 
@@ -130,6 +137,8 @@ void ValueScopes::DeclareClassMember(const ClassMember& member,
                   scope);
       scope.names[member.name].mode =
           member.is_rand || member.is_randc ? "rand_mode" : "";
+      scope.names[member.name].constant =
+          member.is_param ? ConstantKind::kParameter : ConstantKind::kNone;
       break;
     case ClassMemberKind::kMethod:
       DeclareFunction(*member.method, scope);
@@ -181,9 +190,22 @@ void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
   DeclareEnumConstants(item.data_type, scope);
   DeclareEnumConstants(item.typedef_type, scope);
   switch (item.kind) {
+    case ModuleItemKind::kParamDecl:
+      DeclareData(item.name, item.data_type, item.unpacked_dims.size(), scope);
+      scope.names[item.name].constant = ConstantKind::kParameter;
+      break;
+    case ModuleItemKind::kSpecparam:
+      DeclareSpecparam(item.name, scope);
+      break;
+    case ModuleItemKind::kSpecifyBlock:
+      for (const SpecifyItem* specify : item.specify_items) {
+        if (specify->kind == SpecifyItemKind::kSpecparam) {
+          DeclareSpecparam(specify->param_name, scope);
+        }
+      }
+      break;
     case ModuleItemKind::kVarDecl:
     case ModuleItemKind::kNetDecl:
-    case ModuleItemKind::kParamDecl:
       DeclareData(item.name, item.data_type, item.unpacked_dims.size(), scope);
       break;
     case ModuleItemKind::kFunctionDecl:
@@ -336,6 +358,16 @@ ValueSymbol ValueScopes::SymbolNamedBy(const Expr& e,
   }
   return MemberOfClass(ClassOfSymbol(SymbolNamedBy(*e.lhs, scope)),
                        e.rhs->text);
+}
+
+ConstantKind ValueScopes::ConstantNamedBy(const Expr& name,
+                                          const NameScope& scope) const {
+  return SymbolNamedBy(name, scope).constant;
+}
+
+ConstantKind ValueScopes::ConstantNamed(std::string_view name,
+                                        const NameScope& scope) const {
+  return Find(name, scope).constant;
 }
 
 ValueSymbol ValueScopes::MemberOfClass(const ClassDecl* cls,

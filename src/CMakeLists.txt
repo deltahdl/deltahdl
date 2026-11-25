@@ -128,6 +128,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/elaborator_type_facts.cpp
     elaborator/elaborator_items.cpp
     elaborator/implicit_variable_calls.cpp
+    elaborator/specify_parameter_uses.cpp
     elaborator/subroutine_instance_copy.cpp
     elaborator/type_ref_compare_fold.cpp
     elaborator/elaborator_node_attributes.cpp

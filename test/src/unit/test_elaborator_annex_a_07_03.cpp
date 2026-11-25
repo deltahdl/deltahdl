@@ -278,7 +278,7 @@ TEST(SpecifyTerminalElaboration,
 
 TEST(SpecifyTerminalElaboration, AConstantPathTerminalSelectIsAccepted) {
   const std::string kHead =
-      "module m(input [3:0] a, output [3:0] y); localparam K = 1;";
+      "module m(input [3:0] a, output [3:0] y); specparam K = 1;";
   for (const char* path :
        {"(a[K] => y[0]) = 2;", "(a[0] => y[K]) = 2;", "(a[K:0] *> y[0]) = 2;",
         "(a[K+:2] *> y[1:0]) = 2;", "(a[0+:K] *> y[K-:1]) = 2;"}) {
