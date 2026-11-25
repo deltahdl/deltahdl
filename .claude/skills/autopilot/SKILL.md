@@ -24,7 +24,7 @@ Every `start` form creates these.
 | `2,12,22,32,42,52 * * * *` | `REMINDER: ~/IEEE 1800.2-2020.pdf is the source of truth for UVM.` |
 | `3,13,23,33,43,53 * * * *` | `REMINDER: Every section of ~/IEEE 1800-2023.pdf has been swept and a test written for each case of each rule it states: a plain name passes, and DISABLED_ marks what deltahdl does not yet do, so take a case's test to be under test/ already.` |
 | `4,14,24,34,44,54 * * * *` | `REMINDER: Before proposing or adding a test, search all of test/ for one that already shows the case, open it, trace the code it runs, and add yours once you can name what it would catch that the existing one would not.` |
-| `5,15,25,35,45,55 * * * *` | `REMINDER: Before deleting or weakening a test, or committing such a change, tell the user which test it is, what it asserts, what the standard requires and which remaining test shows each of its correct cases, and wait for their yes; an issue asking for it is not a yes.` |
+| `5,15,25,35,45,55 * * * *` | `REMINDER: Before deleting or weakening a test, establish what it asserts, what the standard requires and which remaining test shows each of its correct cases, and say so in the commit that removes it.` |
 | `6,16,26,36,46,56 * * * *` | `REMINDER: While anything runs in the background, whether a CI run, a build, a test run, the pre-push check or any other command, only wait until its notification arrives, except for what the user instructs, which is done in full at once.` |
 | `7,17,27,37,47,57 * * * *` | `REMINDER: Start a background command as the last call of a turn.` |
 | `8,18,28,38,48,58 * * * *` | `REMINDER: A case of the rule an issue in hand documents is part of that issue's fix, never a new issue.` |

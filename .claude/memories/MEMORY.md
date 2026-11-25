@@ -48,7 +48,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 - [Every LRM rule has been swept for tests](every-lrm-rule-has-been-swept.md) — each case of IEEE 1800-2023 already has a test, plain if it passes and `DISABLED_` if not; start from those.
 - [Searching for a test before adding one](searching-for-a-test-before-adding-one.md) — search all of `test/`, open what is found and trace its code; add only what it would not catch.
-- [A test is deleted only with a yes](a-test-is-deleted-only-with-a-yes.md) — show the user what it asserts, what the standard requires and what still shows each correct case; an issue asking is not a yes.
+- [A deleted test leaves its cases shown](a-deleted-test-leaves-its-cases-shown.md) — establish what it asserts, what the standard requires and what still shows each correct case; the commit says so.
 - [Test-driven development](test-driven-development.md) — tests first, each seen to fail for its issue's reason before the fix; a test lands in the same commit as its code, and no src line lands uncovered.
 - [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — test and fix every allowed and forbidden form of the rule, everywhere and with every operand, in one commit.

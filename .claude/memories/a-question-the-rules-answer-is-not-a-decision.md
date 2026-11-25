@@ -27,7 +27,6 @@ An issue is labelled 'needs decision' only for a question that the autopilot ski
 - **Rules over items nest.** A rule stated over items applies again to every nested item that fits its terms (§6.24.3's greedy rule inside a dynamic array of strings).
 - **An unranked clash.** Read what each clause says it selects, which usually settles the order (§33.4.1.3 to §33.4.1.5 for a cell clause against an inherited liblist).
 - **A shall outranks an example and a can** ([shall-outranks-examples-and-can](shall-outranks-examples-and-can.md)).
-- **Deleting or weakening a test** is the one question left to a person even when the rules answer it ([a-test-is-deleted-only-with-a-yes](a-test-is-deleted-only-with-a-yes.md)).
 - **A concern the standard does not raise** does not make a shall optional: the shall is implemented, and the concern, if worth keeping, is filed as its own issue.
 - **A choice among conforming implementations** is not a decision for a person: strike every option that breaks a shall and pick from what is left, after reading the clause each constraint is credited to (§23.3.3.7, not §23.3.3.3, permits the inout-port merge).
 

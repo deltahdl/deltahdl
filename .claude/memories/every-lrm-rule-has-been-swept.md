@@ -15,5 +15,5 @@ Every section of IEEE 1800-2023 has been read for the rules it states, and a tes
 
 - Expect a case's test to be in `test/src/unit/` already, and look for it first ([searching-for-a-test-before-adding-one](searching-for-a-test-before-adding-one.md)).
 - A fix starts from the `DISABLED_` tests of its rule and takes the prefix off each one it makes pass ([lrm-tests-issues-are-tests-only](lrm-tests-issues-are-tests-only.md)).
-- A test may predate the sweep and assert what the standard does not give. The clause decides ([lrm-source-of-truth](lrm-source-of-truth.md)), and the user decides whether it goes ([a-test-is-deleted-only-with-a-yes](a-test-is-deleted-only-with-a-yes.md)).
+- A test may predate the sweep and assert what the standard does not give. The clause decides ([lrm-source-of-truth](lrm-source-of-truth.md)), and such a test goes as [a-deleted-test-leaves-its-cases-shown](a-deleted-test-leaves-its-cases-shown.md) says.
 - A case the sweep left without a test is a finding ([a-rule-conforms-only-when-tests-show-it](a-rule-conforms-only-when-tests-show-it.md)). A difference only deltahdl's own storage makes, such as a value wider than 64 bits, is not a case unless the rule names it.
