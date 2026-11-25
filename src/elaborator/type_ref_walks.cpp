@@ -29,6 +29,10 @@ void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
                          const TypeRefResolver& resolve_outer) {
+  ResolveTypeRefArguments(dt, [&](DataType& arg) {
+    std::vector<Expr*> taken_dims;
+    ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
+  });
   if (dt.type_ref_expr == nullptr) return;
   const Expr* operand = TypeRefOperand(dt.type_ref_expr);
   auto local = std::find_if(
@@ -302,6 +306,8 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
   std::vector<ProceduralLocal> locals;
   locals.reserve(item->func_args.size());
   ResolveFormalTypeRefs(item, locals, resolve_outer, arena);
+  ResolveLocalTypeRef(item->return_type, item->return_array_dims, item->loc,
+                      locals, resolve_outer);
   ResolveTypeRefsInStmt(item->body, locals, resolve_outer, arena, visit);
   for (auto* s : item->func_body_stmts) {
     ResolveTypeRefsInStmt(s, locals, resolve_outer, arena, visit);

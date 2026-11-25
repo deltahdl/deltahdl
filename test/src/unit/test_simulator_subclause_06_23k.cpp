@@ -25,7 +25,8 @@ constexpr std::string_view kClasses =
     "  class K; int m = 5; endclass\n"
     "  class X #(type T = int); T v; endclass\n"
     "endpackage\n"
-    "class X #(type T = int); T v; endclass\n"
+    "class X #(type T = int); T v;"
+    " function int w(); return $bits(v); endfunction endclass\n"
     "class Z #(int W = 1, type T = int); T v; logic [W-1:0] w; endclass\n";
 
 constexpr int kFirstLine = 14;
@@ -50,6 +51,9 @@ constexpr Place kPlaces[] = {
      "  for (genvar i = 0; i < 1; i++) begin : g\n",
      "  end\nendmodule\n"},
 };
+
+constexpr Place kModuleAndGeneratePlaces[] = {kPlaces[0], kPlaces[1],
+                                              kPlaces[3], kPlaces[4]};
 
 void ExpectInEachPlace(std::string_view items, std::string_view printed) {
   for (const Place& place : kPlaces) {
@@ -279,6 +283,210 @@ TEST(SpecializationTypedefTypeRefArgumentSim, TypesALocalAFormalAndAProperty) {
   }
 }
 
+TEST(ProceduralSpecializationTypeRefArgumentSim, NamesTheScopesOrABlocksOwn) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  initial begin\n"
+      "    logic [3:0] l;\n"
+      "    X #(type(n)) a;\n"
+      "    X #(type(l)) b;\n"
+      "    a = new;\n"
+      "    b = new;\n"
+      "    a.v = 300;\n"
+      "    b.v = 300;\n"
+      "    $display(\"%0d %0d %0d %0d\", $bits(a.v), a.v, $bits(b.v), b.v);\n"
+      "  end\n",
+      "7 44 4 12\n");
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, StandsInEachProcedure) {
+  for (const Place& place : kModuleAndGeneratePlaces) {
+    SCOPED_TRACE(place.open);
+    SimFixture f;
+    EXPECT_EQ(RunCaptureThroughFinals(
+                  ElaborateSrc,
+                  std::string(kClasses)
+                      .append(place.open)
+                      .append("  logic [6:0] n;\n"
+                              "  bit go;\n"
+                              "  always @(go) begin\n"
+                              "    automatic X #(type(n)) a = new;\n"
+                              "    $display(\"%0d\", $bits(a.v));\n"
+                              "  end\n"
+                              "  initial begin\n"
+                              "    fork\n"
+                              "      begin\n"
+                              "        automatic X #(type(n)) a = new;\n"
+                              "        $display(\"%0d\", $bits(a.v));\n"
+                              "      end\n"
+                              "    join\n"
+                              "    go = 1;\n"
+                              "  end\n"
+                              "  final begin\n"
+                              "    automatic X #(type(n)) a = new;\n"
+                              "    $display(\"%0d\", $bits(a.v));\n"
+                              "  end\n")
+                      .append(place.close),
+                  f),
+              "7\n7\n7\n");
+  }
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, StandsInATaskOrFunction) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  task tk(logic [4:0] p);\n"
+      "    automatic X #(type(n)) a = new;\n"
+      "    automatic X #(type(p)) b = new;\n"
+      "    $display(\"%0d %0d\", $bits(a.v), $bits(b.v));\n"
+      "  endtask\n"
+      "  function int f(logic [4:0] p);\n"
+      "    logic [2:0] l;\n"
+      "    X #(type(n)) a;\n"
+      "    X #(type(p)) b;\n"
+      "    X #(type(l)) c;\n"
+      "    a = new;\n"
+      "    b = new;\n"
+      "    c = new;\n"
+      "    return $bits(a.v) * 100 + $bits(b.v) * 10 + $bits(c.v);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    tk(0);\n"
+      "    $display(\"%0d\", f(0));\n"
+      "  end\n",
+      "7 5\n753\n");
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, TypesAFormalAndAReturn) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  X #(logic [6:0]) x = new;\n"
+      "  function int f(X #(type(n)) a); return $bits(a.v); endfunction\n"
+      "  function X #(type(n)) g(X #(logic [6:0]) a); g = a; endfunction\n"
+      "  function X #(type(n)) h();\n"
+      "    X #(type(n)) a;\n"
+      "    a = new;\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "  task tk(input X #(type(n)) a, output X #(type(n)) b);\n"
+      "    b = a;\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    X #(logic [6:0]) y;\n"
+      "    tk(x, y);\n"
+      "    y.v = 300;\n"
+      "    $display(\"%0d %0d\", f(x), y.v);\n"
+      "    y = g(x);\n"
+      "    y.v = 300;\n"
+      "    $display(\"%0d\", y.v);\n"
+      "    y = h();\n"
+      "    $display(\"%0d\", y.w());\n"
+      "  end\n",
+      "7 44\n44\n7\n");
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, TypesALocalTypedef) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  task tk;\n"
+      "    logic [4:0] l;\n"
+      "    typedef X #(type(l)) yt;\n"
+      "    yt b;\n"
+      "    b = new;\n"
+      "    $display(\"%0d\", $bits(b.v));\n"
+      "  endtask\n"
+      "  initial begin\n"
+      "    typedef X #(type(n)) xt;\n"
+      "    xt a;\n"
+      "    a = new;\n"
+      "    $display(\"%0d\", $bits(a.v));\n"
+      "    tk;\n"
+      "  end\n",
+      "7\n5\n");
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, NamesTheLocalThatHides) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  initial begin\n"
+      "    X #(type(n)) a;\n"
+      "    begin\n"
+      "      logic [2:0] n;\n"
+      "      X #(type(n)) b;\n"
+      "      b = new;\n"
+      "      $display(\"%0d\", $bits(b.v));\n"
+      "    end\n"
+      "    a = new;\n"
+      "    $display(\"%0d\", $bits(a.v));\n"
+      "  end\n",
+      "3\n7\n");
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, NamesEachOtherOperand) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  localparam logic [2:0] L = 1;\n"
+      "  initial begin\n"
+      "    automatic pk::K k = new;\n"
+      "    X #(type(n + 10'd0)) a;\n"
+      "    X #(.T(type(L))) b;\n"
+      "    X #(type(pk::w9)) c;\n"
+      "    X #(.T(type(pk::t))) d;\n"
+      "    X #(type(k)) e;\n"
+      "    X #(type(logic [5:0])) g;\n"
+      "    Z #(3, type(n)) h;\n"
+      "    a = new;\n"
+      "    b = new;\n"
+      "    c = new;\n"
+      "    d = new;\n"
+      "    e = new;\n"
+      "    g = new;\n"
+      "    h = new;\n"
+      "    e.v = k;\n"
+      "    $display(\"%0d %0d %0d %0d\", $bits(a.v), $bits(b.v), $bits(c.v),\n"
+      "             $bits(d.v));\n"
+      "    $display(\"%0d %0d %0d %0d\", e.v.m, $bits(g.v), $bits(h.v),\n"
+      "             $bits(h.w));\n"
+      "  end\n",
+      "10 3 9 12\n5 6 7 3\n");
+}
+
+TEST(ProceduralSpecializationTypeRefArgumentSim, StandsInAPackageOrTheUnit) {
+  EXPECT_EQ(Printed("package p2;\n"
+                    "  logic [6:0] n;\n"
+                    "  function int f(X #(type(n)) a);\n"
+                    "    logic [3:0] l;\n"
+                    "    X #(type(n)) b;\n"
+                    "    X #(type(l)) c;\n"
+                    "    b = a;\n"
+                    "    c = new;\n"
+                    "    return $bits(b.v) * 10 + $bits(c.v);\n"
+                    "  endfunction\n"
+                    "endpackage\n"
+                    "logic [4:0] m;\n"
+                    "function X #(type(m)) g();\n"
+                    "  X #(type(m)) a;\n"
+                    "  a = new;\n"
+                    "  return a;\n"
+                    "endfunction\n"
+                    "task tk(logic [2:0] q);\n"
+                    "  automatic X #(type(m)) a = new;\n"
+                    "  automatic X #(type(q)) b = new;\n"
+                    "  $display(\"%0d %0d\", $bits(a.v), $bits(b.v));\n"
+                    "endtask\n"
+                    "module top;\n"
+                    "  initial begin\n"
+                    "    X #(logic [4:0]) y;\n"
+                    "    automatic X #(logic [6:0]) x = new;\n"
+                    "    $display(\"%0d\", p2::f(x));\n"
+                    "    tk(0);\n"
+                    "    y = g();\n"
+                    "    $display(\"%0d\", y.w());\n"
+                    "  end\n"
+                    "endmodule\n"),
+            "74\n5 3\n5\n");
+}
+
 TEST(PackageTypeTypeRefSim, DeclaresAVariableALocalAFormalAndAProperty) {
   ExpectInEachPlace(
       "  var type(pk::t) a;\n"
@@ -386,7 +594,9 @@ TEST(SpecializationTypeRefArgumentElab, HierarchicalOperandIsReported) {
   for (const Place& place : kModulePlaces) {
     for (std::string_view declaration :
          {"X #(type(top.u.v)) a;", "X #(type(s.v)) a;",
-          "typedef X #(type(top.u.v)) a;", "typedef X #(type(s.v)) a;"}) {
+          "typedef X #(type(top.u.v)) a;", "typedef X #(type(s.v)) a;",
+          "initial begin X #(type(top.u.v)) a; end",
+          "initial begin X #(type(s.v)) a; end"}) {
       SCOPED_TRACE(std::string(place.open).append(declaration));
       const bool kHierarchical = declaration.contains("top.u.v");
       SimFixture f;
@@ -413,7 +623,9 @@ TEST(SpecializationTypeRefArgumentElab, OperandThatNamesNothingIsReported) {
   for (const Place& place : kPlaces) {
     for (std::string_view declaration :
          {"X #(type(pk::w9)) a;", "X #(type(nosuch)) a;",
-          "typedef X #(type(pk::w9)) a;", "typedef X #(type(nosuch)) a;"}) {
+          "typedef X #(type(pk::w9)) a;", "typedef X #(type(nosuch)) a;",
+          "initial begin X #(type(pk::w9)) a; end",
+          "initial begin X #(type(nosuch)) a; end"}) {
       SCOPED_TRACE(std::string(place.open).append(declaration));
       const bool kNames = declaration.contains("pk::w9");
       SimFixture f;
