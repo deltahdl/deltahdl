@@ -6,7 +6,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
-#include "helpers_reported_error.h"
+#include "helpers_type_ref_operand.h"
 
 using namespace delta;
 
@@ -157,26 +157,6 @@ TEST(ScopePrefixTypeRefConstraintSim, TakesEachOperand) {
       "10 3 9 12 6 2 73 34\n");
 }
 
-void ExpectOneReport(const std::string& source, std::string_view operand,
-                     uint32_t line) {
-  SCOPED_TRACE(source);
-  SimFixture f;
-  ElaborateSrc(source, f);
-  EXPECT_EQ(f.diag.Diagnostics().size(), operand == "pk::w9" ? 0U : 1U);
-  if (operand == "nosuch") {
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "parameter value assignment for type parameter "
-                              "'T' of 'X' does not name a type",
-                              line, "6.20.3"));
-  } else if (operand == "u.hv") {
-    EXPECT_TRUE(
-        ReportedError(f.diag.Diagnostics(),
-                      "type operator argument uses a hierarchical reference, "
-                      "which the type operator does not accept",
-                      line, "6.23"));
-  }
-}
-
 TEST(ScopePrefixTypeRefConstraintElab,
      OperandNamesATypeWithoutAHierarchicalName) {
   for (std::string_view block :
@@ -197,7 +177,7 @@ TEST(ScopePrefixTypeRefConstraintElab,
           std::ranges::count(
               std::string_view(kSource).substr(0, kSource.find(text)), '\n') +
           1);
-      ExpectOneReport(kSource, operand, kLine);
+      ExpectTypeRefOperandReport(kSource, operand, kLine);
     }
   }
 }
