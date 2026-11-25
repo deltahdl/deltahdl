@@ -335,12 +335,14 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
                               {typedefs_, unit_, class_names_}, diag_);
   };
   report_type_params();
+  const TypeRefResolver kAmongLocals =
+      ResolverAmongLocals(mod, [this, mod](DataType& dt, SourceLoc loc) {
+        ResolveTypeRef(dt, loc, mod);
+      });
+  ResolveItemPrefixTypeRefs(*item, kAmongLocals, arena_);
   if (ElaborateDeclItem(item, mod)) return;
-  auto resolve = [&](DataType& dt, SourceLoc loc) {
-    ResolveTypeRef(dt, loc, mod);
-  };
   ResolveProceduralTypeRefs(
-      item, ResolverAmongLocals(mod, resolve), arena_,
+      item, kAmongLocals, arena_,
       [&](Stmt* s, std::span<const ProceduralLocal> locals) {
         InLocals(locals, [&] {
           CheckDynamicElementArgsOfStmt(s, mod);

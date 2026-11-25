@@ -620,4 +620,31 @@ TEST(AssignmentDelaySim, ARhsValueEqualToThePendingOneKeepsThePendingEvent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+TEST(AssignmentDelaySim, ADelayedDriverOfAGenerateBlockIsUnknownUntilItDrives) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module top;\n"
+                 "wire a, b;\n"
+                 "assign #7 a = 1;\n"
+                 "buf #7 (b, 1'b1);\n"
+                 "for (genvar i = 0; i < 2; i++) begin : g\n"
+                 "  wire a, b;\n"
+                 "  wire [1:0] c;\n"
+                 "  assign #(i + 2) a = 1;\n"
+                 "  buf #(i + 2) (b, 1'b1);\n"
+                 "  assign #(i + 2) c[i] = 1;\n"
+                 "end\n"
+                 "initial begin\n"
+                 "  #1 $display(\"%b %b %b %b %b %b %b %b\", a, b, g[0].a,\n"
+                 "              g[0].b, g[0].c, g[1].a, g[1].b,\n"
+                 "              g[1].c);\n"
+                 "  #4 $display(\"%b %b %b %b %b %b %b %b\", a, b, g[0].a,\n"
+                 "              g[0].b, g[0].c, g[1].a, g[1].b,\n"
+                 "              g[1].c);\n"
+                 "end\n"
+                 "endmodule\n",
+                 f),
+      "x x x x zx x x xz\nx x 1 1 z1 1 1 1z\n");
+}
+
 }  // namespace

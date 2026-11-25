@@ -16,6 +16,7 @@
 #include "simulator/awaiters.h"
 #include "simulator/contassign_delay.h"
 #include "simulator/contassign_strength.h"
+#include "simulator/deferred_caller.h"
 #include "simulator/evaluation.h"
 #include "simulator/exec_task.h"
 #include "simulator/interconnect_drive.h"
@@ -196,7 +197,7 @@ static void ApplyContAssignToVariable(const ContAssignParams& params,
   auto* var = ctx.FindVariable(params.lhs->text);
   if (var == nullptr) return;
   if (!var->cont_assign_reevaluate) {
-    var->cont_assign_reevaluate = [params, &ctx, &arena]() {
+    var->cont_assign_reevaluate = [params = params, &ctx, &arena]() {
       ApplyContAssignToVariable(params, EvalContAssignRhs(params, ctx, arena),
                                 ctx, arena);
     };
@@ -596,9 +597,16 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
     co_await AnyChangeAwaiter{ctx, read_vars, nullptr, passes_strength};
   }
 }
-static int64_t PresetDelayedDriver(const ContAssignParams& p, SimContext& ctx,
+static int64_t PresetDelayedDriver(const ContAssignParams& p,
+                                   const Process& owner, SimContext& ctx,
                                    Arena& arena) {
   if (p.delays.rise == nullptr) return -1;
+  Process stand_in;
+  stand_in.stand_in = true;
+  stand_in.inst_prefix = owner.inst_prefix;
+  stand_in.gen_prefixes = owner.gen_prefixes;
+  stand_in.saved_scope_stack = owner.saved_scope_stack;
+  CallerStandIn in_owner(&stand_in, ctx);
   ContAssignDriver drv = MakeContAssignDriver(p.lhs, ctx);
   if (drv.net == nullptr || drv.net->resolved == nullptr) return -1;
   RefreshContAssignDriverBits(drv, p.lhs, ctx, arena);
@@ -640,7 +648,7 @@ void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
   cap.inst_prefix = inst_prefix_;
   cap.interconnect_load = ca.interconnect_load;
   cap.interconnect_source = ca.interconnect_source;
-  cap.preset_driver = PresetDelayedDriver(cap, ctx_, arena_);
+  cap.preset_driver = PresetDelayedDriver(cap, *p, ctx_, arena_);
   cap.module_path_port = ca.module_path_port;
   cap.path_delayed_at_connection = path_delayed_ports_.contains(
       inst_prefix_ + std::string(ContAssignTargetName(ca.lhs)));

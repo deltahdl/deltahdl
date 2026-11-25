@@ -158,7 +158,6 @@ std::vector<DataType> SpelledActuals(const ClassDecl* decl,
       continue;
     }
     DataType type = TypeSpelledBy(actual.type_ref_expr);
-    if (type.kind == DataTypeKind::kImplicit) continue;
     type.param_arg_name = actual.param_arg_name;
     actual = type;
   }

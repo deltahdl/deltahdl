@@ -76,27 +76,6 @@ void ResolveLocalIndexTypeRefs(std::vector<Expr*>& dims, SourceLoc loc,
       arena);
 }
 
-void ResolveFormalTypeRefs(ModuleItem* item,
-                           std::vector<ProceduralLocal>& locals,
-                           const TypeRefResolver& resolve_outer, Arena& arena) {
-  for (auto& arg : item->func_args) {
-    ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
-                        resolve_outer);
-    ResolveLocalIndexTypeRefs(arg.unpacked_dims, item->loc, locals,
-                              resolve_outer, arena);
-    locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
-  }
-}
-
-void ResolveTypedefTypeRef(ModuleItem& item,
-                           const std::vector<ProceduralLocal>& locals,
-                           const TypeRefResolver& resolve, Arena& arena) {
-  ResolveLocalTypeRef(item.typedef_type, item.unpacked_dims, item.loc, locals,
-                      resolve);
-  ResolveLocalIndexTypeRefs(item.unpacked_dims, item.loc, locals, resolve,
-                            arena);
-}
-
 void ResolvePrefixArgumentTypeRefs(
     const Expr* e, const std::function<void(DataType&)>& resolve,
     Arena& arena) {
@@ -119,20 +98,48 @@ void ResolvePrefixArgumentTypeRefs(
   });
 }
 
+void ResolvePrefixTypeRefs(const Expr* e, SourceLoc loc,
+                           const std::vector<ProceduralLocal>& locals,
+                           const TypeRefResolver& resolve_outer, Arena& arena) {
+  ResolvePrefixArgumentTypeRefs(
+      e,
+      [&](DataType& arg) {
+        std::vector<Expr*> taken_dims;
+        ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
+      },
+      arena);
+}
+
 void ResolveStmtPrefixTypeRefs(Stmt* s,
                                const std::vector<ProceduralLocal>& locals,
                                const TypeRefResolver& resolve_outer,
                                Arena& arena) {
   ForEachChildExpr(s, [&](const Expr* e) {
-    ResolvePrefixArgumentTypeRefs(
-        e,
-        [&](DataType& arg) {
-          std::vector<Expr*> taken_dims;
-          ResolveLocalTypeRef(arg, taken_dims, s->range.start, locals,
-                              resolve_outer);
-        },
-        arena);
+    ResolvePrefixTypeRefs(e, s->range.start, locals, resolve_outer, arena);
   });
+}
+
+void ResolveFormalTypeRefs(ModuleItem* item,
+                           std::vector<ProceduralLocal>& locals,
+                           const TypeRefResolver& resolve_outer, Arena& arena) {
+  for (auto& arg : item->func_args) {
+    ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
+                        resolve_outer);
+    ResolveLocalIndexTypeRefs(arg.unpacked_dims, item->loc, locals,
+                              resolve_outer, arena);
+    ResolvePrefixTypeRefs(arg.default_value, item->loc, locals, resolve_outer,
+                          arena);
+    locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
+  }
+}
+
+void ResolveTypedefTypeRef(ModuleItem& item,
+                           const std::vector<ProceduralLocal>& locals,
+                           const TypeRefResolver& resolve, Arena& arena) {
+  ResolveLocalTypeRef(item.typedef_type, item.unpacked_dims, item.loc, locals,
+                      resolve);
+  ResolveLocalIndexTypeRefs(item.unpacked_dims, item.loc, locals, resolve,
+                            arena);
 }
 
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
@@ -143,6 +150,8 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
       s->decl_item->kind == ModuleItemKind::kLetDecl) {
     std::vector<ProceduralLocal> in_let = locals;
     ResolveFormalTypeRefs(s->decl_item, in_let, resolve_outer, arena);
+    ResolvePrefixTypeRefs(s->decl_item->init_expr, s->decl_item->loc, in_let,
+                          resolve_outer, arena);
     return;
   }
   if (s->kind == StmtKind::kBlockItemDecl &&
@@ -357,10 +366,31 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
   ResolveFormalTypeRefs(item, locals, resolve_outer, arena);
   ResolveLocalTypeRef(item->return_type, item->return_array_dims, item->loc,
                       locals, resolve_outer);
+  if (item->kind == ModuleItemKind::kLetDecl) {
+    ResolvePrefixTypeRefs(item->init_expr, item->loc, locals, resolve_outer,
+                          arena);
+  }
   ResolveTypeRefsInStmt(item->body, locals, resolve_outer, arena, visit);
   for (auto* s : item->func_body_stmts) {
     ResolveTypeRefsInStmt(s, locals, resolve_outer, arena, visit);
   }
+}
+
+void ResolveItemPrefixTypeRefs(const ModuleItem& item,
+                               const TypeRefResolver& resolve, Arena& arena) {
+  if (item.kind == ModuleItemKind::kLetDecl) return;
+  auto in_expr = [&](const Expr* e) {
+    ResolvePrefixTypeRefs(e, item.loc, {}, resolve, arena);
+  };
+  for (const Expr* e :
+       {item.init_expr, item.assign_lhs, item.assign_rhs, item.assign_delay,
+        item.assign_delay_fall, item.assign_delay_decay, item.net_delay,
+        item.net_delay_fall, item.net_delay_decay, item.gate_delay,
+        item.gate_delay_fall, item.gate_delay_decay}) {
+    in_expr(e);
+  }
+  for (const Expr* terminal : item.gate_terminals) in_expr(terminal);
+  for (const auto& [port, actual] : item.inst_ports) in_expr(actual);
 }
 
 static bool HeaderRefersToAType(const ClassDecl& cls) {
@@ -462,6 +492,7 @@ class ClassTypeRefs {
     if (m.kind != ClassMemberKind::kProperty) return;
     ResolveLocalTypeRef(m.data_type, m.unpacked_dims, m.loc, {}, in_class);
     ResolveLocalIndexTypeRefs(m.unpacked_dims, m.loc, {}, in_class, arena_);
+    ResolvePrefixTypeRefs(m.init_expr, m.loc, {}, in_class, arena_);
   }
 
  private:
