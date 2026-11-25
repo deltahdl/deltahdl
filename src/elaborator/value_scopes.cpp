@@ -476,6 +476,7 @@ std::optional<ScopedValue> ValueScopes::StructMemberOf(
   written.kind = kFound->type_kind;
   written.type_name = kFound->type_name;
   written.scope_name = kFound->scope_name;
+  written.outer_scope_names = kFound->outer_scope_names;
   written.packed_dim_left = kFound->packed_dim_left;
   written.extra_packed_dims = kFound->extra_packed_dims;
   ScopedValue value = Resolve(written, kDims, *holder.where);

@@ -23,6 +23,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/type_site_lookup.h"
+#include "elaborator/type_spelled_by.h"
 #include "elaborator/unpacked_array_type.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -126,6 +127,7 @@ static void ResolveMemberTypeRefs(
     m.extra_packed_dims = type.extra_packed_dims;
     m.type_name = type.type_name;
     m.scope_name = type.scope_name;
+    m.outer_scope_names = type.outer_scope_names;
     m.nested_type = arena.Create<DataType>(type);
   }
 }
@@ -135,8 +137,9 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
     return false;
   }
-  if (ref->lhs == nullptr || ref->lhs->kind != ExprKind::kIdentifier) {
-    return false;
+  if (ref->lhs->kind != ExprKind::kIdentifier || ref->lhs->has_param_spec) {
+    AdoptReferencedType(dt, TypeSpelledBy(ref));
+    return true;
   }
   if (ref->rhs == nullptr || ref->rhs->kind != ExprKind::kIdentifier) {
     return false;

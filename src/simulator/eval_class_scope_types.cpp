@@ -3,11 +3,10 @@
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
-#include <utility>
 #include <vector>
 
 #include "common/arena.h"
-#include "elaborator/type_eval.h"
+#include "elaborator/type_spelled_by.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -29,32 +28,6 @@ static const Expr* SpecializationElement(const Expr& base, size_t pos,
   if (pos >= base.elements.size()) return nullptr;
   bool named = pos < base.arg_names.size() && !base.arg_names[pos].empty();
   return named ? nullptr : base.elements[pos];
-}
-
-static bool IsPackedDimension(const Expr* expr) {
-  return expr != nullptr && expr->kind == ExprKind::kSelect &&
-         expr->index != nullptr && expr->index_end != nullptr &&
-         !expr->is_part_select_plus && !expr->is_part_select_minus;
-}
-
-DataType TypeSpelledBy(const Expr* elem) {
-  if (elem->kind == ExprKind::kTypeRef && elem->type_value != nullptr)
-    return *elem->type_value;
-  std::vector<std::pair<Expr*, Expr*>> dims;
-  const Expr* head = elem;
-  for (; IsPackedDimension(head); head = head->base)
-    dims.insert(dims.begin(), {head->index, head->index_end});
-  if (head == nullptr || head->kind != ExprKind::kIdentifier) return {};
-  DataType dt = TypeNameToDataType(head->text);
-  if (dims.empty()) return dt;
-  if (dt.packed_dim_left != nullptr)
-    dims.push_back({dt.packed_dim_left, dt.packed_dim_right});
-  dims.insert(dims.end(), dt.extra_packed_dims.begin(),
-              dt.extra_packed_dims.end());
-  dt.packed_dim_left = dims.front().first;
-  dt.packed_dim_right = dims.front().second;
-  dt.extra_packed_dims.assign(dims.begin() + 1, dims.end());
-  return dt;
 }
 
 static void BindSpecializationTypeActuals(const ClassTypeInfo* spec,

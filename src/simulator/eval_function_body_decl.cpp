@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/arena.h"
 #include "common/types.h"
@@ -32,14 +33,15 @@ namespace delta {
 static std::string_view NamedLayoutKey(const DataType& type, SimContext& ctx) {
   std::string_view name = type.type_name;
   if (name.empty()) return {};
-  auto key_in = [&](std::string_view scope) -> std::string_view {
-    auto* key = ctx.GetArena().Create<std::string>(std::string(scope) +
-                                                   "::" + std::string(name));
-    return ctx.FindStructType(*key) != nullptr ? std::string_view(*key)
-                                               : std::string_view{};
+  auto layout_key = [&](std::string key) -> std::string_view {
+    if (ctx.FindStructType(key) == nullptr) return {};
+    return *ctx.GetArena().Create<std::string>(std::move(key));
+  };
+  auto key_in = [&](std::string_view scope) {
+    return layout_key(std::string(scope) + "::" + std::string(name));
   };
   if (!type.scope_name.empty())
-    return type.type_params.empty() ? key_in(type.scope_name)
+    return type.type_params.empty() ? layout_key(TypeChainKey(type))
                                     : std::string_view{};
   if (ctx.FindStructType(name) != nullptr) return name;
   std::string_view specialized;

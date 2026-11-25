@@ -10,6 +10,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/types.h"
+#include "elaborator/assoc_index_type.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/typename_writer.h"
 #include "parser/ast_expr.h"
@@ -177,17 +178,13 @@ static std::string ClassScopedTypeKey(const ClassTypeInfo* cls,
 std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
   const Expr* rhs = expr->rhs;
   if (expr->text.empty()) {
-    if (rhs == nullptr || rhs->kind != ExprKind::kMemberAccess ||
-        !rhs->is_scope_resolution || rhs->lhs == nullptr ||
-        rhs->rhs == nullptr || rhs->lhs->kind != ExprKind::kIdentifier ||
-        rhs->rhs->kind != ExprKind::kIdentifier)
-      return {};
+    if (rhs == nullptr || rhs->kind != ExprKind::kMemberAccess) return {};
     if (rhs->lhs->text == "local") {
       const ClassObject* caller = ctx.ConstraintCallerThis();
       return ClassScopedTypeKey(caller != nullptr ? caller->type : nullptr,
                                 rhs->rhs->text, ctx);
     }
-    return std::string(rhs->lhs->text) + "::" + std::string(rhs->rhs->text);
+    return ScopedTypeKey(rhs);
   }
   return ClassScopedTypeKey(ctx.CurrentMethodClass(), expr->text, ctx);
 }

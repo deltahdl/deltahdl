@@ -114,6 +114,7 @@ void TaggedContextWalk::CheckTaggedValue(const Expr* e,
   written.kind = member.type_kind;
   written.type_name = member.type_name;
   written.scope_name = member.scope_name;
+  written.outer_scope_names = member.outer_scope_names;
   const DataType* type = member.nested_type ? member.nested_type : &written;
   CheckTagged(e->lhs, type);
   const DataType* resolved = Resolve(type);

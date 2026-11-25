@@ -285,6 +285,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/scope_value_type.cpp
     elaborator/type_ref_dynamic_element.cpp
     elaborator/type_ref_walks.cpp
+    elaborator/type_spelled_by.cpp
     elaborator/type_eval.cpp
     elaborator/type_match.cpp
     elaborator/type_eval_named.cpp

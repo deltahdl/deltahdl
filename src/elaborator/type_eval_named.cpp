@@ -171,6 +171,7 @@ const DataType* MemberNamedType(const StructMember& m,
   named.kind = m.type_kind;
   named.type_name = m.type_name;
   named.scope_name = m.scope_name;
+  named.outer_scope_names = m.outer_scope_names;
   return FindNamedType(named, typedefs);
 }
 
@@ -191,10 +192,12 @@ void SizeClassHandleMembers(
     written.kind = m.type_kind;
     written.type_name = m.type_name;
     written.scope_name = m.scope_name;
+    written.outer_scope_names = m.outer_scope_names;
     const DataType& end = LastTypeInChain(written, typedefs);
     if (!class_names.contains(end.type_name)) continue;
     m.type_name = end.type_name;
     m.scope_name = end.scope_name;
+    m.outer_scope_names = end.outer_scope_names;
     m.resolved_width = kClassMemberHandleWidth;
   }
 }

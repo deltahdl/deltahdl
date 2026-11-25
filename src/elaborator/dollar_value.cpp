@@ -396,6 +396,7 @@ static const DataType* StructMemberType(const StructMember& member,
   made.packed_dim_left = member.packed_dim_left;
   made.type_name = member.type_name;
   made.scope_name = member.scope_name;
+  made.outer_scope_names = member.outer_scope_names;
   made.type_params = member.type_params;
   return &made;
 }

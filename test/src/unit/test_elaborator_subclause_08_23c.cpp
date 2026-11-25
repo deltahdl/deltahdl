@@ -344,4 +344,42 @@ TEST(ClassScopeResolutionAccess,
                             "6.18"));
 }
 
+TEST(ClassScopeResolutionAccess, PackageClassTypeIsJudgedAsANetDataType) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class C; typedef byte two; typedef logic [7:0] four; endclass\n"
+      "endpackage\n"
+      "class C; typedef logic two; typedef int four; endclass\n"
+      "module c(input p::C::two a, input p::C::four b);\n"
+      "endmodule\n"
+      "module top;\n"
+      "  wire p::C::two x;\n"
+      "  wire p::C::four y;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, "net data type must be 4-state", 8, "6.7.1"));
+  EXPECT_FALSE(ErrorOnLine(diags, 9));
+}
+
+TEST(ClassScopeResolutionAccess,
+     TypeReferenceToNoTypeOfAPackageClassIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package p;\n"
+      "  class C; typedef byte b; endclass\n"
+      "endpackage\n"
+      "module top;\n"
+      "  var type(p::C::b) x;\n"
+      "  var type(p::C::nope) y;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_FALSE(ErrorOnLine(diags, 5));
+  EXPECT_TRUE(
+      ReportedError(diags, "class 'C' declares no type 'nope'", 6, "8.23"));
+}
+
 }  // namespace

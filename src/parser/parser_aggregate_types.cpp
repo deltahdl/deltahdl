@@ -21,6 +21,7 @@ void ApplyMemberType(StructMember& member, const DataType& member_type) {
   member.extra_packed_dims = member_type.extra_packed_dims;
   member.type_name = member_type.type_name;
   member.scope_name = member_type.scope_name;
+  member.outer_scope_names = member_type.outer_scope_names;
   member.type_params = member_type.type_params;
 }
 

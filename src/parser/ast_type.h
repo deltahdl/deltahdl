@@ -81,6 +81,7 @@ struct StructMember {
   const DataType* nested_type = nullptr;
   uint32_t resolved_width = 0;
   std::vector<DataType> type_params;
+  std::vector<std::string_view> outer_scope_names;
 };
 
 struct DataType {

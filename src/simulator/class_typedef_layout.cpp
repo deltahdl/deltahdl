@@ -93,6 +93,7 @@ uint32_t FoldedMemberWidth(const StructMember& m, const ScopeMap& scope,
   written.kind = m.type_kind;
   written.type_name = m.type_name;
   written.scope_name = m.scope_name;
+  written.outer_scope_names = m.outer_scope_names;
   written.packed_dim_left = m.packed_dim_left;
   written.packed_dim_right = m.packed_dim_right;
   written.extra_packed_dims = m.extra_packed_dims;

@@ -29,6 +29,7 @@ DataType MemberType(const StructMember& member) {
   type.kind = member.type_kind;
   type.type_name = member.type_name;
   type.scope_name = member.scope_name;
+  type.outer_scope_names = member.outer_scope_names;
   type.type_params = member.type_params;
   type.packed_dim_left = member.packed_dim_left;
   type.packed_dim_right = member.packed_dim_right;

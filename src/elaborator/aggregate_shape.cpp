@@ -37,6 +37,7 @@ DataType MemberWrittenType(const StructMember& m) {
   type.extra_packed_dims = m.extra_packed_dims;
   type.type_name = m.type_name;
   type.scope_name = m.scope_name;
+  type.outer_scope_names = m.outer_scope_names;
   return type;
 }
 

@@ -54,6 +54,7 @@ SitedType MemberType(const CompilationUnit& unit, const TypeSite& site,
   DataType written;
   written.type_name = member.type_name;
   written.scope_name = member.scope_name;
+  written.outer_scope_names = member.outer_scope_names;
   const FoundItem kDef = TypedefOf(unit, site, written);
   if (kDef.item == nullptr) return {};
   return ThroughTypedefsAt(unit, {&kDef.item->typedef_type, kDef.site,

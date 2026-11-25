@@ -95,7 +95,9 @@ static uint64_t UserSystemFunctionBits(const Expr* arg) {
 Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
-  auto* arg = expr->args[0];
+  const Expr* arg = expr->args[0];
+  if (arg->kind == ExprKind::kTypeRef && arg->type_value == nullptr)
+    arg = arg->lhs;
   if (arg->type_value != nullptr) {
     return MakeLogic4VecVal(arena, 32,
                             DeclaredTypeWidth(*arg->type_value, ctx));

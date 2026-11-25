@@ -33,11 +33,6 @@ namespace delta {
 static bool IsXChar(char c) { return c == 'x' || c == 'X'; }
 static bool IsZChar(char c) { return c == 'z' || c == 'Z' || c == '?'; }
 
-static std::string TypeTableKey(const DataType& type) {
-  if (type.scope_name.empty()) return std::string(type.type_name);
-  return std::string(type.scope_name) + "::" + std::string(type.type_name);
-}
-
 static const DataType* ClassTypedefType(const ClassDecl& decl,
                                         std::string_view name) {
   for (const ClassMember* m : decl.members) {
@@ -167,6 +162,7 @@ uint32_t NamedMemberWidth(const StructMember& m, SimContext& ctx) {
   own.kind = m.type_kind;
   own.type_name = m.type_name;
   own.scope_name = m.scope_name;
+  own.outer_scope_names = m.outer_scope_names;
   own.packed_dim_left = m.packed_dim_left;
   own.packed_dim_right = m.packed_dim_right;
   own.extra_packed_dims = m.extra_packed_dims;
@@ -198,7 +194,7 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
   uint32_t width = EvalTypeWidth(type);
   if (width != 0) return width;
   if (type.kind != DataTypeKind::kNamed) return 0;
-  uint32_t base = ctx.FindTypeWidth(TypeTableKey(type));
+  uint32_t base = ctx.FindTypeWidth(TypeChainKey(type));
   if (base == 0 && type.scope_name.empty())
     base = MethodClassTypedefWidth(type.type_name, ctx);
   if (base == 0) return SpecializedTypedefWidth(type, ctx);
@@ -208,13 +204,13 @@ uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx) {
 
 bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kNamed)
-    return ctx.FindTypeSigned(TypeTableKey(type));
+    return ctx.FindTypeSigned(TypeChainKey(type));
   return IsSignedType(type, {});
 }
 
 DataTypeKind DeclaredTypeKind(const DataType& type, const SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed) return type.kind;
-  return ctx.FindTypeKind(TypeTableKey(type));
+  return ctx.FindTypeKind(TypeChainKey(type));
 }
 
 static bool IsTwoStateIntegerKind(DataTypeKind kind) {
@@ -236,6 +232,7 @@ static bool MemberIs4State(const StructMember& m, const SimContext& ctx) {
   own.kind = m.type_kind;
   own.type_name = m.type_name;
   own.scope_name = m.scope_name;
+  own.outer_scope_names = m.outer_scope_names;
   return DeclaredTypeIs4State(own, ctx);
 }
 
@@ -246,7 +243,7 @@ bool DeclaredTypeIs4State(const DataType& type, const SimContext& ctx) {
         [&](const StructMember& m) { return MemberIs4State(m, ctx); });
   }
   if (type.kind != DataTypeKind::kNamed) return Is4stateType(type, {});
-  std::string key = TypeTableKey(type);
+  std::string key = TypeChainKey(type);
   if (const EnumTypeInfo* e = ctx.FindEnumType(key)) return e->is_4state;
   if (const StructTypeInfo* s = ctx.FindStructType(key);
       s != nullptr && s->is_packed)
@@ -258,7 +255,7 @@ static std::optional<PackedRange> DeclaredTypeRange(const DataType& type,
                                                     const SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed || type.packed_dim_left != nullptr)
     return std::nullopt;
-  return ctx.FindTypeRange(TypeTableKey(type));
+  return ctx.FindTypeRange(TypeChainKey(type));
 }
 
 void RecordDeclaredRange(const DataType& type, Variable* v, SimContext& ctx,
@@ -276,7 +273,7 @@ void RecordDeclaredRange(const DataType& type, Variable* v, SimContext& ctx,
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kString) return true;
   return type.kind == DataTypeKind::kNamed &&
-         ctx.FindTypeKind(TypeTableKey(type)) == DataTypeKind::kString;
+         ctx.FindTypeKind(TypeChainKey(type)) == DataTypeKind::kString;
 }
 
 static bool IsRealKind(DataTypeKind kind) {
@@ -287,7 +284,7 @@ static bool IsRealKind(DataTypeKind kind) {
 bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx) {
   if (IsRealKind(type.kind)) return true;
   return type.kind == DataTypeKind::kNamed &&
-         IsRealKind(ctx.FindTypeKind(TypeTableKey(type)));
+         IsRealKind(ctx.FindTypeKind(TypeChainKey(type)));
 }
 
 Logic4Vec ToDeclaredReal(const Logic4Vec& value, const DataType* type,

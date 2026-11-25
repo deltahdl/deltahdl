@@ -203,6 +203,11 @@ struct ClassTypedefTables {
   Arena& arena;
 };
 
+void RegisterScopedClassTypedefKeys(const ClassDecl* cls,
+                                    std::string_view scope,
+                                    TypedefScopes scopes,
+                                    const ClassTypedefTables& tables);
+
 void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
                               const ClassTypedefTables& tables);
 

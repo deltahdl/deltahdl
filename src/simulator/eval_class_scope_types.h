@@ -11,8 +11,6 @@ struct DataType;
 struct Expr;
 class SimContext;
 
-DataType TypeSpelledBy(const Expr* elem);
-
 void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
                                SimContext& ctx, Arena& arena);
 

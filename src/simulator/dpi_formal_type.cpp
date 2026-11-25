@@ -203,6 +203,7 @@ DataType MemberType(const StructMember& member) {
   type.extra_packed_dims = member.extra_packed_dims;
   type.type_name = member.type_name;
   type.scope_name = member.scope_name;
+  type.outer_scope_names = member.outer_scope_names;
   return type;
 }
 

@@ -457,6 +457,7 @@ static bool Is4stateMember(const StructMember& m, const TypedefMap& typedefs) {
   own.kind = m.type_kind;
   own.type_name = m.type_name;
   own.scope_name = m.scope_name;
+  own.outer_scope_names = m.outer_scope_names;
   return Is4stateType(own, typedefs);
 }
 

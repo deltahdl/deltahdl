@@ -29,16 +29,11 @@
 
 namespace delta {
 
-static std::string TypeTableKey(const DataType& type) {
-  if (type.scope_name.empty()) return std::string(type.type_name);
-  return std::string(type.scope_name) + "::" + std::string(type.type_name);
-}
-
 uint32_t SimParamTypeWidth(const DataType& type, const ScopeMap& scope,
                            const SimContext& ctx) {
   uint32_t width = DeclaredParamTypeWidth(type, scope);
   if (width != 0 || type.kind != DataTypeKind::kNamed) return width;
-  std::string key = TypeTableKey(type);
+  std::string key = TypeChainKey(type);
   const StructTypeInfo* aggregate = ctx.FindStructType(key);
   bool packed_aggregate = aggregate != nullptr && aggregate->is_packed;
   if (!packed_aggregate && !IsIntegralType(ctx.FindTypeKind(key))) return 0;
@@ -50,7 +45,7 @@ uint32_t SimParamTypeWidth(const DataType& type, const ScopeMap& scope,
 bool SimParamTypeIsSigned(const DataType& type, const SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed || type.packed_dim_left != nullptr)
     return type.is_signed;
-  return ctx.FindTypeSigned(TypeTableKey(type));
+  return ctx.FindTypeSigned(TypeChainKey(type));
 }
 
 static const DataType* ParamType(const ClassDecl* decl, size_t i) {

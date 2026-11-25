@@ -27,6 +27,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_ref_compare_fold.h"
 #include "elaborator/type_ref_walks.h"
+#include "elaborator/type_spelled_by.h"
 #include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -46,8 +47,7 @@ static std::optional<DataType> ScopedTypeRefType(const DataType& dt,
     if (!spec->unpacked_dims.empty()) return std::nullopt;
     return spec->type;
   }
-  auto it = typedefs.find(std::string(dt.scope_name) +
-                          "::" + std::string(dt.type_name));
+  auto it = typedefs.find(TypeChainKey(dt));
   if (it != typedefs.end()) return it->second;
   const DataType* in_class =
       FindClassScopedTypedefType(dt.scope_name, dt.type_name, unit);
@@ -73,14 +73,12 @@ static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
     return *op->type_value;
   }
   if (!op->text.empty()) return TypeNameToDataType(op->text);
-  if (op->lhs && op->lhs->kind == ExprKind::kIdentifier)
+  if (op->lhs->kind == ExprKind::kIdentifier)
     return TypeNameToDataType(op->lhs->text);
-  if (!IsScopedTypeName(op->lhs)) return std::nullopt;
-  DataType dt;
-  dt.kind = DataTypeKind::kNamed;
-  dt.scope_name = op->lhs->lhs->text;
-  dt.type_name = op->lhs->rhs->text;
-  return dt;
+  if (op->lhs->kind != ExprKind::kMemberAccess) return std::nullopt;
+  DataType spelled = TypeSpelledBy(op->lhs);
+  if (spelled.kind != DataTypeKind::kNamed) return std::nullopt;
+  return spelled;
 }
 
 static bool IsBareName(const DataType& dt) {

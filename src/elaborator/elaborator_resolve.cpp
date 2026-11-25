@@ -251,6 +251,22 @@ static void MarkPackageStagedArrays(CompilationUnit* unit) {
   }
 }
 
+static void RegisterPackageClassTypedefs(const PackageDecl& pkg,
+                                         const ClassTypedefTables& tables) {
+  TypedefScopes scopes;
+  for (const ModuleItem* item : pkg.items) {
+    if (item->kind == ModuleItemKind::kTypedef) {
+      EnterTypedefScope(scopes, *item, pkg.name);
+    } else if (item->kind == ModuleItemKind::kClassDecl) {
+      RegisterScopedClassTypedefKeys(
+          item->class_decl,
+          *tables.arena.Create<std::string>(std::string(pkg.name) +
+                                            "::" + std::string(item->name)),
+          scopes, tables);
+    }
+  }
+}
+
 void RegisterClassTypedefs(
     CompilationUnit* unit, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
@@ -258,6 +274,9 @@ void RegisterClassTypedefs(
   const ClassTypedefTables kTables{unit, typedefs, td_array_dims, arena};
   for (auto* cls : unit->classes) {
     RegisterClassTypedefKeys(cls, cls->name, kTables);
+  }
+  for (const PackageDecl* pkg : unit->packages) {
+    RegisterPackageClassTypedefs(*pkg, kTables);
   }
 }
 
@@ -374,26 +393,41 @@ void RegisterAnonymousProgramNames(
 
 }  // namespace
 
-static TypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
-                                            const CompilationUnit* unit) {
-  std::vector<const ClassDecl*> bases;
-  for (const ClassDecl* base = FindBaseClass(cls, unit); base != nullptr;
-       base = FindBaseClass(base, unit)) {
-    bases.push_back(base);
-  }
-  TypedefScopes scopes;
-  for (auto base = bases.rbegin(); base != bases.rend(); ++base) {
-    for (const auto* m : (*base)->members) {
-      if (m->kind == ClassMemberKind::kTypedef)
-        EnterTypedefScope(scopes, *m->typedef_item, (*base)->name);
+static std::string_view ClassScopeKey(const ClassDecl* cls,
+                                      const ClassTypedefTables& tables) {
+  for (const PackageDecl* pkg : tables.unit->packages) {
+    for (const ModuleItem* item : pkg->items) {
+      if (item->class_decl == cls) {
+        return *tables.arena.Create<std::string>(std::string(pkg->name) +
+                                                 "::" + std::string(cls->name));
+      }
     }
   }
-  return scopes;
+  return cls->name;
 }
 
-void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
-                              const ClassTypedefTables& tables) {
-  TypedefScopes scopes = InheritedTypedefScopes(cls, tables.unit);
+static void EnterInheritedTypedefScopes(const ClassDecl* cls,
+                                        const ClassTypedefTables& tables,
+                                        TypedefScopes& scopes) {
+  std::vector<const ClassDecl*> bases;
+  for (const ClassDecl* base = FindBaseClass(cls, tables.unit); base != nullptr;
+       base = FindBaseClass(base, tables.unit)) {
+    bases.push_back(base);
+  }
+  for (auto base = bases.rbegin(); base != bases.rend(); ++base) {
+    const std::string_view kScope = ClassScopeKey(*base, tables);
+    for (const auto* m : (*base)->members) {
+      if (m->kind == ClassMemberKind::kTypedef)
+        EnterTypedefScope(scopes, *m->typedef_item, kScope);
+    }
+  }
+}
+
+void RegisterScopedClassTypedefKeys(const ClassDecl* cls,
+                                    std::string_view scope,
+                                    TypedefScopes scopes,
+                                    const ClassTypedefTables& tables) {
+  EnterInheritedTypedefScopes(cls, tables, scopes);
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr) {
       std::string_view key = RegisterScopedTypedef(
@@ -407,9 +441,14 @@ void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
                m->nested_class != nullptr) {
       auto* nested = tables.arena.Create<std::string>(
           std::string(scope) + "::" + std::string(m->nested_class->name));
-      RegisterClassTypedefKeys(m->nested_class, *nested, tables);
+      RegisterScopedClassTypedefKeys(m->nested_class, *nested, scopes, tables);
     }
   }
+}
+
+void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
+                              const ClassTypedefTables& tables) {
+  RegisterScopedClassTypedefKeys(cls, scope, {}, tables);
 }
 
 UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,

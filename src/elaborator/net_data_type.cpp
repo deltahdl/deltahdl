@@ -216,6 +216,7 @@ static bool IsLegalNettypeMember(const StructMember& m,
   own.kind = m.type_kind;
   own.type_name = m.type_name;
   own.scope_name = m.scope_name;
+  own.outer_scope_names = m.outer_scope_names;
   return IsLegalNettypeDataType(own, tables);
 }
 
@@ -243,9 +244,7 @@ std::string NamedTypeKey(std::string_view scope, std::string_view name) {
   return std::string(scope) + "::" + std::string(name);
 }
 
-std::string NamedTypeKey(const DataType& type) {
-  return NamedTypeKey(type.scope_name, type.type_name);
-}
+std::string NamedTypeKey(const DataType& type) { return TypeChainKey(type); }
 
 static bool NamesStdClass(const DataType& type) {
   if (type.scope_name != "std") return false;

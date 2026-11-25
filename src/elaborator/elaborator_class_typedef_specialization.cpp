@@ -74,7 +74,11 @@ bool GivesArgument(const DataType* arg) {
 
 DataType TypeParamActual(const ClassDecl* cls, size_t index,
                          const DataType* arg) {
-  if (GivesArgument(arg)) return *arg;
+  if (GivesArgument(arg)) {
+    DataType actual = *arg;
+    if (actual.kind == DataTypeKind::kNamed) actual.type_ref_expr = nullptr;
+    return actual;
+  }
   if (index < cls->param_types.size()) return cls->param_types[index];
   return {};
 }
@@ -218,6 +222,7 @@ void SetMemberType(StructMember& m, const SpecializedClassType& spec,
   m.extra_packed_dims = type.extra_packed_dims;
   m.type_name = type.type_name;
   m.scope_name = type.scope_name;
+  m.outer_scope_names = type.outer_scope_names;
   bool whole = type.kind == DataTypeKind::kStruct ||
                type.kind == DataTypeKind::kUnion ||
                type.kind == DataTypeKind::kEnum;

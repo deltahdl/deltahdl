@@ -12,6 +12,7 @@
 #include "common/types.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_spelled_by.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"

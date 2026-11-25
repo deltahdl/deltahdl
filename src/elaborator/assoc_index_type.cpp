@@ -8,6 +8,7 @@
 #include "common/source_loc.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_spelled_by.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
@@ -23,6 +24,7 @@ static bool StructMemberContainsRealType(const StructMember& m,
   named.kind = m.type_kind;
   named.type_name = m.type_name;
   named.scope_name = m.scope_name;
+  named.outer_scope_names = m.outer_scope_names;
   const DataType* resolved = FindNamedType(named, tds);
   if (resolved != nullptr && ContainsRealType(*resolved, tds, depth + 1))
     return true;
@@ -48,7 +50,7 @@ std::string ScopedTypeKey(const Expr* dim) {
   if (dim->kind != ExprKind::kMemberAccess || !dim->is_scope_resolution) {
     return {};
   }
-  return std::string(dim->lhs->text) + "::" + std::string(dim->rhs->text);
+  return TypeChainKey(TypeSpelledBy(dim));
 }
 
 static bool IsRealIndexType(const Expr* dim, const TypedefMap& typedefs) {
