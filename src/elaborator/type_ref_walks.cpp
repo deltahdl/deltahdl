@@ -97,6 +97,44 @@ void ResolveTypedefTypeRef(ModuleItem& item,
                             arena);
 }
 
+void ResolvePrefixArgumentTypeRefs(
+    const Expr* e, const std::function<void(DataType&)>& resolve,
+    Arena& arena) {
+  if (e == nullptr) return;
+  if (e->has_param_spec) {
+    for (Expr*& element : const_cast<Expr*>(e)->elements) {
+      if (element == nullptr || element->kind != ExprKind::kTypeRef) continue;
+      std::vector<DataType> args(1);
+      args.front().type_ref_expr = element;
+      ResolveTypeRefArguments(args, resolve);
+      if (args.front().type_ref_expr != nullptr) continue;
+      auto* resolved = arena.Create<Expr>(*element);
+      resolved->lhs = nullptr;
+      resolved->type_value = arena.Create<DataType>(args.front());
+      element = resolved;
+    }
+  }
+  ForEachExprChild(e, [&](const Expr* child) {
+    ResolvePrefixArgumentTypeRefs(child, resolve, arena);
+  });
+}
+
+void ResolveStmtPrefixTypeRefs(Stmt* s,
+                               const std::vector<ProceduralLocal>& locals,
+                               const TypeRefResolver& resolve_outer,
+                               Arena& arena) {
+  ForEachChildExpr(s, [&](const Expr* e) {
+    ResolvePrefixArgumentTypeRefs(
+        e,
+        [&](DataType& arg) {
+          std::vector<Expr*> taken_dims;
+          ResolveLocalTypeRef(arg, taken_dims, s->range.start, locals,
+                              resolve_outer);
+        },
+        arena);
+  });
+}
+
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena,
                            const ProceduralStmtVisitor& visit) {
@@ -115,6 +153,7 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
   if (s->kind != StmtKind::kVarDecl) {
     const size_t kOuter = locals.size();
     DeclareForLoopLocals(s, locals, resolve_outer);
+    ResolveStmtPrefixTypeRefs(s, locals, resolve_outer, arena);
     if (visit) visit(s, locals);
     ForEachChildStmt(s, [&](Stmt* const& sub) {
       ResolveTypeRefsInStmt(sub, locals, resolve_outer, arena, visit);
@@ -126,6 +165,7 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                       locals, resolve_outer);
   ResolveLocalIndexTypeRefs(s->var_unpacked_dims, s->range.start, locals,
                             resolve_outer, arena);
+  ResolveStmtPrefixTypeRefs(s, locals, resolve_outer, arena);
   if (visit) visit(s, locals);
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }

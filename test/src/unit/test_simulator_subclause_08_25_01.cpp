@@ -725,4 +725,35 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 7u}, {"r3", 9u}});
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     StaticPropertyWrittenBehindAPackageIsTheSpecializations) {
+  SimFixture f;
+  auto* design = ElaborateSrc(
+      "package p;\n"
+      "  class C #(type T = int);\n"
+      "    static int s;\n"
+      "    static int t;\n"
+      "    static function int get(); return s; endfunction\n"
+      "  endclass\n"
+      "endpackage\n"
+      "module m;\n"
+      "  int r1, r2, r3, r4, r5;\n"
+      "  initial begin\n"
+      "    p::C#(byte)::s = 3;\n"
+      "    p::C#(byte)::s++;\n"
+      "    p::C#(byte)::t <= 6;\n"
+      "    p::C#(int)::s = 9;\n"
+      "    #1;\n"
+      "    r1 = p::C#(byte)::s;\n"
+      "    r2 = p::C#(byte)::get();\n"
+      "    r3 = p::C#(byte)::t;\n"
+      "    r4 = p::C#(int)::s;\n"
+      "    r5 = p::C#(int)::t;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  LowerRunAndCheck(
+      f, design, {{"r1", 4u}, {"r2", 4u}, {"r3", 6u}, {"r4", 9u}, {"r5", 0u}});
+}
+
 }  // namespace

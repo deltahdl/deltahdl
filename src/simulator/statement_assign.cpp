@@ -451,11 +451,11 @@ static FieldTarget ResolveExpressionFieldTarget(const Expr* lhs,
                                                 bool* handled) {
   FieldTarget target = ResolveVirtualInterfaceField(lhs, ctx, report, handled);
   if (*handled) return target;
+  target = ResolveSpecializationStaticField(lhs, ctx, handled);
+  if (*handled) return target;
   target = ResolvePackageClassStaticField(lhs, ctx, handled);
   if (*handled) return target;
   target = ResolveStaticHandleField(lhs, ctx, handled);
-  if (*handled) return target;
-  target = ResolveSpecializationStaticField(lhs, ctx, handled);
   if (*handled) return target;
   const ClassTypeInfo* declared = nullptr;
   ClassObject* obj =
