@@ -31,6 +31,8 @@ struct AssertionTextScan {
   int braces = 0;
   std::vector<int> patterns;
   bool in_attribute = false;
+  int specialization = 0;
+  int type_operand = 0;
 
   void CountArgToken(const Token& t) {
     if (open.empty() || parens < open.back().depth) return;
@@ -72,7 +74,7 @@ struct AssertionTextScan {
 
   void Identifier(const Token& t, const Token& next) {
     if (prev.Is(TokenKind::kDot) || prev.Is(TokenKind::kColonColon) ||
-        IsPatternKey(next)) {
+        IsPatternKey(next) || type_operand > 0) {
       return;
     }
     if (prev.Is(TokenKind::kHashHash)) {
@@ -98,6 +100,10 @@ struct AssertionTextScan {
   void OpenParen(const Token& t) {
     CountArgToken(t);
     ++parens;
+    if (specialization == 0 && prev.Is(TokenKind::kHash))
+      specialization = parens;
+    if (specialization > 0 && type_operand == 0 && prev.Is(TokenKind::kKwType))
+      type_operand = parens;
     if (prev.Is(TokenKind::kIdentifier) && !prev2.Is(TokenKind::kDot) &&
         !prev2.Is(TokenKind::kColonColon)) {
       open.push_back({prev.text, parens, 0, 0, {}});
@@ -111,6 +117,8 @@ struct AssertionTextScan {
     } else {
       CountArgToken(t);
     }
+    if (type_operand == parens) type_operand = 0;
+    if (specialization == parens) specialization = 0;
     --parens;
   }
 

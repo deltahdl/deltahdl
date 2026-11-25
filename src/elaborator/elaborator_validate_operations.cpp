@@ -434,14 +434,24 @@ bool ElaboratorOperationRules::TypeRefArgUsesDynamicElement(
   return selects;
 }
 
+bool ElaboratorOperationRules::TypeRefArgIsReported(const Expr* inner) const {
+  const SourceLoc& at = inner->range.start;
+  return reported_type_ref_args_.contains({at.file_id, at.line, at.column});
+}
+
+void ElaboratorOperationRules::MarkTypeRefArgReported(const Expr* inner) {
+  const SourceLoc& at = inner->range.start;
+  reported_type_ref_args_.insert({at.file_id, at.line, at.column});
+}
+
 void ElaboratorOperationRules::ReportDynamicElementArg(const Expr* inner,
                                                        SourceLoc loc,
                                                        const RtlirModule* mod) {
-  if (reported_type_ref_args_.contains(inner) ||
-      !TypeRefArgUsesDynamicElement(inner, mod)) {
+  if (!TypeRefArgUsesDynamicElement(inner, mod) ||
+      TypeRefArgIsReported(inner)) {
     return;
   }
-  reported_type_ref_args_.insert(inner);
+  MarkTypeRefArgReported(inner);
   diag_.Error(loc,
               "type operator argument shall not reference elements of "
               "dynamic objects",
@@ -450,9 +460,9 @@ void ElaboratorOperationRules::ReportDynamicElementArg(const Expr* inner,
 
 bool ElaboratorOperationRules::ReportHierarchicalArg(const Expr* inner,
                                                      SourceLoc loc) {
-  if (!inner || reported_type_ref_args_.contains(inner)) return true;
+  if (!inner || TypeRefArgIsReported(inner)) return true;
   if (!TypeRefArgHasMemberAccess(inner)) return false;
-  reported_type_ref_args_.insert(inner);
+  MarkTypeRefArgReported(inner);
   diag_.Error(loc,
               "type operator argument uses a hierarchical reference, which "
               "the type operator does not accept",

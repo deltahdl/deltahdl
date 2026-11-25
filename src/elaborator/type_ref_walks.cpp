@@ -9,17 +9,21 @@
 
 #include "common/arena.h"
 #include "common/source_loc.h"
+#include "elaborator/assertion_body_slots.h"
 #include "elaborator/assoc_index_type.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/type_eval.h"
 #include "elaborator/type_ref_dynamic_element.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
+#include "parser/parser_data_decl_internal.h"
 
 namespace delta {
 
@@ -93,9 +97,12 @@ void ResolvePrefixArgumentTypeRefs(
       element = resolved;
     }
   }
-  ForEachExprChild(e, [&](const Expr* child) {
-    ResolvePrefixArgumentTypeRefs(child, resolve, arena);
-  });
+  auto in_expr = [&](const Expr* sub) {
+    ResolvePrefixArgumentTypeRefs(sub, resolve, arena);
+  };
+  ForEachExprChild(e, in_expr);
+  if (e->property_actual != nullptr)
+    ForEachTreeSlot(e->property_actual, in_expr);
 }
 
 void ResolvePrefixTypeRefs(const Expr* e, SourceLoc loc,
@@ -114,9 +121,80 @@ void ResolveStmtPrefixTypeRefs(Stmt* s,
                                const std::vector<ProceduralLocal>& locals,
                                const TypeRefResolver& resolve_outer,
                                Arena& arena) {
-  ForEachChildExpr(s, [&](const Expr* e) {
+  auto in_expr = [&](const Expr* e) {
     ResolvePrefixTypeRefs(e, s->range.start, locals, resolve_outer, arena);
-  });
+  };
+  ForEachChildExpr(s, in_expr);
+  in_expr(s->assert_disable_iff);
+  ForEachEventSlot(s->assert_clock, in_expr);
+  if (s->assert_sequence != nullptr)
+    ForEachBodySlot(s->assert_sequence->seq_linear, in_expr);
+  if (s->assert_property != nullptr)
+    ForEachTreeSlot(s->assert_property, in_expr);
+}
+
+const DataType* UntypedFormal(std::string_view name, Arena& arena) {
+  auto* type = arena.Create<DataType>();
+  auto* operand = arena.Create<Expr>();
+  operand->kind = ExprKind::kIdentifier;
+  operand->text = name;
+  type->type_ref_expr = operand;
+  return type;
+}
+
+const DataType* AssertionLocalType(const SeqLocalDecl& local, Arena& arena) {
+  auto* type = arena.Create<DataType>(local.named_type);
+  if (type->kind == DataTypeKind::kImplicit) {
+    type->kind =
+        TokenToTypeKind(local.type_kw).value_or(DataTypeKind::kImplicit);
+    type->is_signed = local.signing == TokenKind::kEof
+                          ? IsImplicitlySigned(type->kind)
+                          : local.signing == TokenKind::kKwSigned;
+  }
+  if (!local.packed_dims.empty()) {
+    type->packed_dim_left = local.packed_dims.front().first;
+    type->packed_dim_right = local.packed_dims.front().second;
+    type->extra_packed_dims.assign(local.packed_dims.begin() + 1,
+                                   local.packed_dims.end());
+  }
+  return type;
+}
+
+std::vector<ProceduralLocal> NamesOfAssertionDecl(const ModuleItem& decl,
+                                                  Arena& arena) {
+  static const std::vector<Expr*> kNoUnpackedDims;
+  std::vector<ProceduralLocal> names;
+  for (size_t i = 0; i < decl.prop_formals.size(); ++i) {
+    const std::string_view kName = decl.prop_formals[i];
+    const DataType* type = decl.prop_formal_types[i];
+    if (type == nullptr) type = UntypedFormal(kName, arena);
+    names.push_back({kName, type, &decl.prop_formal_unpacked_dims[i]});
+  }
+  for (const auto* locals : {&decl.prop_locals, &decl.seq_linear.locals}) {
+    for (const SeqLocalDecl& local : *locals) {
+      names.push_back(
+          {local.name, AssertionLocalType(local, arena), &kNoUnpackedDims});
+    }
+  }
+  return names;
+}
+
+void ResolveAssertionDeclPrefixTypeRefs(ModuleItem& decl,
+                                        const TypeRefResolver& resolve,
+                                        Arena& arena) {
+  const std::vector<ProceduralLocal> kNames = NamesOfAssertionDecl(decl, arena);
+  auto in_expr = [&](const Expr* e) {
+    ResolvePrefixTypeRefs(e, decl.loc, kNames, resolve, arena);
+  };
+  in_expr(decl.prop_body_expr);
+  in_expr(decl.prop_disable_iff);
+  for (const Expr* actual : decl.prop_formal_defaults) in_expr(actual);
+  for (const SeqLocalDecl& local : decl.prop_locals) in_expr(local.init);
+  ForEachEventSlot(decl.prop_clock, in_expr);
+  ForEachEventSlot(decl.seq_clock, in_expr);
+  ForEachBodySlot(decl.seq_linear, in_expr);
+  if (decl.prop_body_tree != nullptr)
+    ForEachTreeSlot(decl.prop_body_tree, in_expr);
 }
 
 void ResolveFormalTypeRefs(ModuleItem* item,
@@ -376,9 +454,12 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
   }
 }
 
-void ResolveItemPrefixTypeRefs(const ModuleItem& item,
-                               const TypeRefResolver& resolve, Arena& arena) {
+void ResolveItemPrefixTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
+                               Arena& arena) {
   if (item.kind == ModuleItemKind::kLetDecl) return;
+  ResolveAssertionDeclPrefixTypeRefs(item, resolve, arena);
+  for (ModuleItem* decl : item.clocking_decls)
+    ResolveAssertionDeclPrefixTypeRefs(*decl, resolve, arena);
   auto in_expr = [&](const Expr* e) {
     ResolvePrefixTypeRefs(e, item.loc, {}, resolve, arena);
   };
@@ -389,6 +470,9 @@ void ResolveItemPrefixTypeRefs(const ModuleItem& item,
         item.gate_delay_fall, item.gate_delay_decay}) {
     in_expr(e);
   }
+  in_expr(item.assert_expr);
+  ForEachEventSlot(item.sensitivity, in_expr);
+  ForEachEventSlot(item.clocking_event, in_expr);
   for (const Expr* terminal : item.gate_terminals) in_expr(terminal);
   for (const auto& [port, actual] : item.inst_ports) in_expr(actual);
 }

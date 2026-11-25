@@ -35,8 +35,8 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
                                Arena& arena,
                                const ProceduralStmtVisitor& visit = {});
 
-void ResolveItemPrefixTypeRefs(const ModuleItem& item,
-                               const TypeRefResolver& resolve, Arena& arena);
+void ResolveItemPrefixTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
+                               Arena& arena);
 
 const Expr* TypeRefOperand(const Expr* written);
 

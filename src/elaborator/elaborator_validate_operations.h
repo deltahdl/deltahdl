@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <set>
 #include <span>
 #include <string_view>
+#include <tuple>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -173,7 +175,9 @@ class ElaboratorOperationRules : public ElaboratorData {
   std::vector<UnitScopeTypeRef> unit_scope_type_refs_;
   std::vector<TypeRefCompareResult> unit_type_ref_compares_;
   bool type_ref_in_unit_procedure_ = false;
-  std::unordered_set<const Expr*> reported_type_ref_args_;
+  std::set<std::tuple<uint32_t, uint32_t, uint32_t>> reported_type_ref_args_;
+  bool TypeRefArgIsReported(const Expr* inner) const;
+  void MarkTypeRefArgReported(const Expr* inner);
   TypeRefResolver ResolverAmongLocals(
       const RtlirModule* mod,
       std::function<void(DataType&, SourceLoc)> resolve);

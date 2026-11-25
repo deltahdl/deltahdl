@@ -554,7 +554,7 @@ static SimCoroutine MakeContAssignCoroutine(ContAssignParams params,
   bool passes_strength = WatchDataInputStrength(params, ctx);
 
   ContAssignDriver drv = MakeContAssignDriver(params.lhs, ctx);
-  if (params.preset_driver >= 0 && drv.net != nullptr) {
+  if (params.preset_driver >= 0) {
     drv.driver_idx = static_cast<size_t>(params.preset_driver);
     drv.first = false;
   }
