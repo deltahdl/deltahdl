@@ -120,14 +120,17 @@ std::optional<SpecializationBindings> BindSpecialization(
   return bound;
 }
 
-Expr* IntLiteral(int64_t value, Arena& arena) {
+}  // namespace
+
+static Expr* IntLiteral(int64_t value, Arena& arena) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
   e->int_val = value;
   return e;
 }
 
-Expr* FoldedBound(const Expr* bound, const ScopeMap& scope, Arena& arena) {
+static Expr* FoldedBound(const Expr* bound, const ScopeMap& scope,
+                         Arena& arena) {
   auto value = ConstEvalInt(bound, scope);
   return value ? IntLiteral(*value, arena) : nullptr;
 }
@@ -146,6 +149,8 @@ bool FoldPackedDims(DataType& type, const ScopeMap& scope, Arena& arena) {
   }
   return true;
 }
+
+namespace {
 
 bool IsAssociativeDim(const Expr* dim) {
   return (dim->kind == ExprKind::kIdentifier && dim->text == "*") ||

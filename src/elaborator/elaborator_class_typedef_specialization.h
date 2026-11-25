@@ -34,6 +34,8 @@ void ResolveClassScopedFormalTypes(ModuleItem& item,
                                    const ScopeMap& module_scope,
                                    const TypedefMap& typedefs, Arena& arena);
 
+bool FoldPackedDims(DataType& type, const ScopeMap& scope, Arena& arena);
+
 struct ClassSpecialization {
   const ClassDecl* cls = nullptr;
   const std::vector<DataType>* args = nullptr;

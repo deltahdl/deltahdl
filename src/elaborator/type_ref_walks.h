@@ -37,6 +37,11 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
 
 const Expr* TypeRefOperand(const Expr* written);
 
+bool WritesTypeRefArgument(const DataType& type);
+
+void ResolveTypeRefArguments(DataType& type,
+                             const std::function<void(DataType&)>& resolve);
+
 void ResolveClassTypeNames(ClassDecl& cls, const TypeRefResolver& resolve_outer,
                            const CompilationUnit* unit, Arena& arena);
 

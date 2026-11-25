@@ -414,7 +414,9 @@ static ModuleItem* DeclarationOfInstance(ModuleItem* item,
       std::ranges::any_of(mod.params, [&](const RtlirParamDecl& param) {
         return param.is_type_param && param.name == type.type_name;
       });
-  return kNamesTypeParam ? arena.Create<ModuleItem>(*item) : item;
+  return kNamesTypeParam || WritesTypeRefArgument(type)
+             ? arena.Create<ModuleItem>(*item)
+             : item;
 }
 
 bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
@@ -426,7 +428,9 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNetDecl(item, mod);
       return true;
     case ModuleItemKind::kVarDecl:
-      ElaborateVarDecl(DeclarationOfInstance(item, *mod, arena_), mod);
+      ElaborateVarDecl(ResolveArgumentTypeRefs(
+                           DeclarationOfInstance(item, *mod, arena_), mod),
+                       mod);
       return true;
     case ModuleItemKind::kContAssign:
       ElaborateContAssign(item, mod);

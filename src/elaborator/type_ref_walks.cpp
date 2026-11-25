@@ -268,6 +268,33 @@ const Expr* TypeRefOperand(const Expr* written) {
   return written->kind == ExprKind::kTypeRef ? written->lhs : written;
 }
 
+static bool IsTypeRefArgument(const DataType& arg) {
+  return arg.type_ref_expr != nullptr &&
+         arg.type_ref_expr->kind == ExprKind::kTypeRef;
+}
+
+bool WritesTypeRefArgument(const DataType& type) {
+  return std::ranges::any_of(type.type_params, [](const DataType& arg) {
+    return IsTypeRefArgument(arg) || WritesTypeRefArgument(arg);
+  });
+}
+
+void ResolveTypeRefArguments(DataType& type,
+                             const std::function<void(DataType&)>& resolve) {
+  for (DataType& arg : type.type_params) {
+    if (IsTypeRefArgument(arg)) {
+      const Expr& ref = *arg.type_ref_expr;
+      DataType referenced;
+      referenced.type_ref_expr = ref.lhs;
+      if (ref.type_value != nullptr) referenced = *ref.type_value;
+      resolve(referenced);
+      referenced.param_arg_name = arg.param_arg_name;
+      arg = referenced;
+    }
+    ResolveTypeRefArguments(arg, resolve);
+  }
+}
+
 void ResolveProceduralTypeRefs(ModuleItem* item,
                                const TypeRefResolver& resolve_outer,
                                Arena& arena,

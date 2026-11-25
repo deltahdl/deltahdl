@@ -36,6 +36,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/type_parameter_values.h"
+#include "elaborator/type_ref_walks.h"
 #include "elaborator/virtual_interface_target.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -481,6 +482,15 @@ std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
       item->unpacked_dims,
       [&](DataType& type) { ResolveTypeRef(type, item->loc, mod); }, arena_);
   return adopted_enumeration;
+}
+
+ModuleItem* Elaborator::ResolveArgumentTypeRefs(ModuleItem* item,
+                                                const RtlirModule* mod) {
+  ResolveTypeRefArguments(item->data_type, [&](DataType& type) {
+    ResolveTypeRef(type, item->loc, mod);
+    FoldPackedDims(type, BuildParamScope(mod), arena_);
+  });
+  return item;
 }
 
 void Elaborator::ReportSpecializationErrors(const DataType& written,

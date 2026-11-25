@@ -132,6 +132,11 @@ static void ResolveMemberTypeRefs(
   }
 }
 
+static bool DeclaresAType(const ModuleItem& item) {
+  return item.kind == ModuleItemKind::kTypedef ||
+         item.kind == ModuleItemKind::kClassDecl;
+}
+
 static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
                                  const TypeRefScope& scope) {
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
@@ -159,8 +164,10 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
       scope.unit, ref->rhs->text,
       [&](std::string_view package) { return package == prefix; });
   if (pkg == nullptr) return false;
-  AdoptReferencedType(dt, ScopeValueType(*ItemNamed(pkg->items, ref->rhs->text),
-                                         pkg->items, scope.arena));
+  const ModuleItem& item = *ItemNamed(pkg->items, ref->rhs->text);
+  AdoptReferencedType(dt, DeclaresAType(item)
+                              ? TypeSpelledBy(ref)
+                              : ScopeValueType(item, pkg->items, scope.arena));
   return true;
 }
 
