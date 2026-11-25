@@ -6,6 +6,8 @@
 
 #include "common/source_loc.h"
 #include "elaborator/scoped_walk.h"
+#include "elaborator/std_package.h"
+#include "elaborator/type_parameter_values.h"
 #include "elaborator/type_spelled_by.h"
 #include "elaborator/value_scopes.h"
 #include "parser/ast_class.h"
@@ -77,24 +79,18 @@ class TypeArgumentReader : public ScopedWalk {
     for (std::size_t i = 0; i < arguments.size(); ++i) {
       const bool kGivesAType = cls == nullptr
                                    ? TakesOneType(named)
-                                   : GivesAType(*cls, arguments[i], i);
+                                   : AssignsTypeParameter(cls, arguments[i], i);
       if (kGivesAType) Read(arguments[i], scope);
     }
-  }
-
-  static bool GivesAType(const ClassDecl& cls, const DataType& argument,
-                         std::size_t index) {
-    if (!argument.param_arg_name.empty()) {
-      return cls.type_param_names.contains(argument.param_arg_name);
-    }
-    return index < cls.params.size() &&
-           cls.type_param_names.contains(cls.params[index].first);
   }
 
   void Read(const DataType& argument, const NameScope& scope) const {
     if (argument.type_ref_expr == nullptr) return;
     DataType type = TypeSpelledBy(argument.type_ref_expr);
-    if (type.scope_name.empty() || !Scopes().NamesType(type, scope)) return;
+    if (type.scope_name.empty()) return;
+    const bool kNamesAClassOfStd =
+        type.scope_name == "std" && IsStdPackageSystemType(type.type_name);
+    if (!kNamesAClassOfStd && !Scopes().NamesType(type, scope)) return;
     type.param_arg_name = argument.param_arg_name;
     const_cast<DataType&>(argument) = type;
   }

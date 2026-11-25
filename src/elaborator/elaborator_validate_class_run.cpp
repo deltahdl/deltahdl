@@ -10,6 +10,7 @@
 #include "elaborator/specparam_uses.h"
 #include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
+#include "elaborator/type_parameter_values.h"
 
 namespace delta {
 
@@ -23,6 +24,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   ReportClassSpecializationsWithoutValues(*unit_, diag_);
 
   ReportClassSpecializationAssignments(*unit_, diag_);
+
+  ReportTypeParametersSetToNoTypes(*unit_, diag_);
 
   ReportMisusedSpecparams(*unit_, diag_);
 

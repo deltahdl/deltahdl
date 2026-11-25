@@ -58,6 +58,12 @@ class ScopedWalk {
 
   virtual void VisitRange(const Expr&, const NameScope&) {}
 
+  virtual void VisitModule(const ModuleDecl&, const NameScope&) {}
+
+  virtual void VisitParameter(const ModuleItem&, const NameScope&) {}
+
+  virtual void VisitInstance(const ModuleItem&, const NameScope&) {}
+
   const ValueScopes& Scopes() const { return scopes_; }
 
  private:

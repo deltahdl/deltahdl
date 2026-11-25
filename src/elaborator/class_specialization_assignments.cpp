@@ -9,6 +9,8 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/scoped_walk.h"
+#include "elaborator/type_parameter_values.h"
+#include "elaborator/type_spelled_by.h"
 #include "elaborator/value_scopes.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -29,11 +31,11 @@ AssignmentNames NamesOf(const std::vector<DataType>& assignments) {
   return names;
 }
 
-AssignmentNames NamesOfLast(const DataType& type) {
+std::vector<DataType> AssignmentsOfLast(const DataType& type) {
   if (type.scope_param_assignment_written && !type.param_assignment_written) {
     return {};
   }
-  return NamesOf(type.type_params);
+  return type.type_params;
 }
 
 class SpecializationAssignmentWalk : public ScopedWalk {
@@ -47,29 +49,29 @@ class SpecializationAssignmentWalk : public ScopedWalk {
     const Site kSite{e.range.start, scope};
     if (e.kind == ExprKind::kMemberAccess) {
       if (e.lhs->kind != ExprKind::kIdentifier) return;
-      JudgeNamed(e.lhs->text, e.rhs->text, e.arg_names, kSite);
+      JudgeNamed(e.lhs->text, e.rhs->text, SpecializationArguments(e), kSite);
     } else {
-      JudgeNamed(e.scope_prefix, e.text, e.arg_names, kSite);
+      JudgeNamed(e.scope_prefix, e.text, SpecializationArguments(e), kSite);
     }
   }
 
   void VisitType(const DataType& type, SourceLoc loc,
                  const NameScope& scope) override {
     for (const DataType& specialized : type.specialized_scopes) {
-      Judge(specialized, NamesOf(specialized.type_params), {loc, scope});
+      Judge(specialized, specialized.type_params, {loc, scope});
     }
     if (type.kind == DataTypeKind::kNamed) {
-      Judge(type, NamesOfLast(type), {loc, scope});
+      Judge(type, AssignmentsOfLast(type), {loc, scope});
     }
   }
 
   void VisitClass(const ClassDecl& cls, const NameScope& scope) override {
     const Site kHeader{cls.range.start, *scope.outer};
-    JudgeNamed(cls.base_class_scope, cls.base_class,
-               NamesOf(cls.base_class_type_params), kHeader);
+    JudgeNamed(cls.base_class_scope, cls.base_class, cls.base_class_type_params,
+               kHeader);
     for (const auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {
       for (const InterfaceRef& ref : *refs) {
-        JudgeNamed(ref.scope, ref.name, NamesOf(ref.type_params), kHeader);
+        JudgeNamed(ref.scope, ref.name, ref.type_params, kHeader);
       }
     }
   }
@@ -80,23 +82,37 @@ class SpecializationAssignmentWalk : public ScopedWalk {
   };
 
   void JudgeNamed(std::string_view scope_name, std::string_view name,
-                  const AssignmentNames& names, const Site& site) {
+                  const std::vector<DataType>& assignments, const Site& site) {
     DataType named;
     named.kind = DataTypeKind::kNamed;
     named.scope_name = scope_name;
     named.type_name = name;
-    Judge(named, names, site);
+    Judge(named, assignments, site);
   }
 
-  void Judge(const DataType& named, const AssignmentNames& names,
+  void Judge(const DataType& named, const std::vector<DataType>& assignments,
              const Site& site) {
-    if (names.empty()) return;
+    if (assignments.empty()) return;
     const ClassDecl* cls = Scopes().ClassDeclaredAs(named, site.scope);
     if (cls == nullptr) return;
-    if (names.front().empty()) {
-      JudgeCount(*cls, names.size(), site.loc);
+    const AssignmentNames kNames = NamesOf(assignments);
+    if (kNames.front().empty()) {
+      JudgeCount(*cls, kNames.size(), site.loc);
     } else {
-      JudgeNames(*cls, names, site.loc);
+      JudgeNames(*cls, kNames, site.loc);
+    }
+    JudgeValues(*cls, assignments, site);
+  }
+
+  void JudgeValues(const ClassDecl& cls,
+                   const std::vector<DataType>& assignments, const Site& site) {
+    for (std::size_t i = 0; i < assignments.size(); ++i) {
+      const DataType& assigned = assignments[i];
+      if (AssignsTypeParameter(&cls, assigned, i) &&
+          WritesNoType(assigned, Scopes(), site.scope)) {
+        ReportTypeParamAssignedNoType(
+            {AssignedParameter(cls, assigned, i), cls.name}, site.loc, diag_);
+      }
     }
   }
 

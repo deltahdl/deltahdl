@@ -17,6 +17,7 @@
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_parameter_values.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -668,13 +669,16 @@ static ScopeMap ScopeParamValues(const ClassScope& scope,
 struct OverrideNames {
   std::unordered_set<std::string_view> formals;
   std::unordered_set<std::string_view> non_integral;
+  const CompilationUnit* unit = nullptr;
 };
 
 static void ReportNonConstantSpecializationArgs(
     std::string_view base_name, const std::vector<DataType>& type_params,
     const ScopeMap& scope, const OverrideNames& names, DiagEngine& diag) {
-  for (const auto& dt : type_params) {
-    if (!dt.type_name.empty() || dt.type_ref_expr == nullptr) continue;
+  const ClassDecl* base = FindClassDecl(base_name, names.unit);
+  for (size_t i = 0; i < type_params.size(); ++i) {
+    const DataType& dt = type_params[i];
+    if (!WritesValueArgument(base, dt, i)) continue;
     const Expr* e = dt.type_ref_expr;
     if (IsConstantClassParamValue(e, scope)) continue;
     if (e->kind == ExprKind::kIdentifier && names.non_integral.count(e->text))
@@ -693,7 +697,7 @@ static void ValidateSpecializationArgsInInheritance(const ClassDecl* cls,
                                                     const ScopeMap& scope,
                                                     DiagEngine& diag) {
   OverrideNames names{ClassParamNames(cls),
-                      NonIntegralParamNames(where.items, scope)};
+                      NonIntegralParamNames(where.items, scope), where.unit};
   ReportNonConstantSpecializationArgs(
       cls->base_class, cls->base_class_type_params, scope, names, diag);
   for (const auto& iref : cls->extends_interfaces)

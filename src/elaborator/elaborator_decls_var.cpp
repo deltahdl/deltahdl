@@ -1,4 +1,5 @@
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <format>
@@ -34,6 +35,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_scope_prefix.h"
+#include "elaborator/type_parameter_values.h"
 #include "elaborator/virtual_interface_target.h"
 #include "lexer/token.h"
 #include "parser/ast_design.h"
@@ -76,10 +78,13 @@ void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
 }
 
 static void ValidateSpecializationArgsConstant(const ModuleItem* item,
+                                               const ClassDecl* cls,
                                                const ScopeMap& scope,
                                                DiagEngine& diag) {
-  for (const auto& tp : item->data_type.type_params) {
-    if (!tp.type_name.empty() || tp.type_ref_expr == nullptr) continue;
+  const std::vector<DataType>& args = item->data_type.type_params;
+  for (size_t i = 0; i < args.size(); ++i) {
+    const DataType& tp = args[i];
+    if (!WritesValueArgument(cls, tp, i)) continue;
     if (IsConstantClassParamValue(tp.type_ref_expr, scope)) continue;
     diag.Error(tp.type_ref_expr->range.start,
                std::format("class '{}' parameter override is not a constant "
@@ -136,7 +141,8 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
     ReportSpecializationOverrideMismatches(item->data_type, item->loc, unit_,
                                            typedefs_, diag_);
     ReportSpecializationBaseNotClass(item->data_type, item->loc, *unit_, diag_);
-    ValidateSpecializationArgsConstant(item, scope, diag_);
+    ValidateSpecializationArgsConstant(
+        item, FindClassDecl(item->data_type.type_name, unit_), scope, diag_);
     ValidateWeakReferenceTypeParam(item, typedefs_, class_names_, diag_);
   }
   if (item->data_type.kind == DataTypeKind::kEnum && writes_its_type) {

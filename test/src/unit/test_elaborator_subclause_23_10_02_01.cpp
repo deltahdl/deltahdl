@@ -348,7 +348,7 @@ TEST(BodyParameterAssignment, BodyTypeParameterAssignedAValueIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "parameter value assignment for type parameter "
                             "'T' of 'm' does not name a type",
-                            6, "23.10.2"));
+                            6, "6.20.3"));
 }
 
 TEST(BodyParameterAssignment,

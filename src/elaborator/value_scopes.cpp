@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "elaborator/std_package.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -84,6 +85,20 @@ void DeclareParamPorts(const Decl& decl, NameScope& scope) {
                   scope);
     }
     scope.names[kName].constant = ConstantKind::kParameter;
+  }
+}
+
+bool DeclaresNoData(ModuleItemKind kind) {
+  switch (kind) {
+    case ModuleItemKind::kTaskDecl:
+    case ModuleItemKind::kPropertyDecl:
+    case ModuleItemKind::kSequenceDecl:
+    case ModuleItemKind::kClockingBlock:
+    case ModuleItemKind::kNettypeDecl:
+    case ModuleItemKind::kLetDecl:
+      return true;
+    default:
+      return false;
   }
 }
 
@@ -236,6 +251,8 @@ void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
       break;
     case ModuleItemKind::kNestedModuleDecl:
       DeclareModule(*item.nested_module_decl, scope);
+      scope.names[item.nested_module_decl->name].nested_module =
+          item.nested_module_decl;
       break;
     case ModuleItemKind::kModuleInst:
       scope.names[item.inst_name] = {SymbolKind::kInstance,
@@ -247,7 +264,9 @@ void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
       break;
     default:
       if (!item.name.empty() && item.method_class.empty()) {
-        scope.names.try_emplace(item.name);
+        const SymbolKind kKind = DeclaresNoData(item.kind) ? SymbolKind::kNoData
+                                                           : SymbolKind::kOther;
+        scope.names.try_emplace(item.name, ValueSymbol{kKind});
       }
       break;
   }
@@ -312,6 +331,46 @@ bool ValueScopes::NamesType(const DataType& named,
                             const NameScope& scope) const {
   const ValueSymbol kNamed = FindQualified(named, scope);
   return kNamed.kind == SymbolKind::kType || kNamed.kind == SymbolKind::kClass;
+}
+
+bool ValueScopes::NamesNoType(const DataType& named,
+                              const NameScope& scope) const {
+  const ValueSymbol kNamed = FindQualified(named, scope);
+  switch (kNamed.kind) {
+    case SymbolKind::kType:
+    case SymbolKind::kClass:
+      return false;
+    case SymbolKind::kOther:
+      break;
+    default:
+      return true;
+  }
+  if (kNamed.constant == ConstantKind::kSpecparam ||
+      kNamed.nested_module != nullptr) {
+    return true;
+  }
+  if (named.scope_name.empty()) {
+    return !Declares(named.type_name, scope) &&
+           module_names_.contains(named.type_name);
+  }
+  return named.outer_scope_names.empty() &&
+         PackageLacks(named.scope_name, named.type_name);
+}
+
+bool ValueScopes::PackageLacks(std::string_view package,
+                               std::string_view name) const {
+  if (package == "std") return !IsStdPackageSystemType(name);
+  const auto kPackage = packages_.find(package);
+  return kPackage != packages_.end() && kPackage->second.wildcards.empty() &&
+         !kPackage->second.names.contains(name);
+}
+
+const ModuleDecl* ValueScopes::ModuleDeclared(std::string_view name,
+                                              const NameScope& scope) const {
+  const ModuleDecl* nested = Find(name, scope).nested_module;
+  if (nested != nullptr) return nested;
+  const auto kFound = module_names_.find(name);
+  return kFound == module_names_.end() ? nullptr : kFound->second;
 }
 
 const ClassDecl* ValueScopes::BaseOf(const ClassDecl& cls) const {

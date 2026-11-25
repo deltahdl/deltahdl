@@ -26,6 +26,7 @@
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
+#include "elaborator/type_parameter_values.h"
 #include "elaborator/unpacked_array_type.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
@@ -99,15 +100,6 @@ std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
   return FoldDeclaredParamValue(value, type, scope);
 }
 
-void ReportTypeParamSetToNoType(std::string_view name, SourceLoc loc,
-                                DiagEngine& diag) {
-  diag.Error(loc,
-             std::format("type parameter '{}' can only be set to a data "
-                         "type, not a value expression",
-                         name),
-             Subclause("6.20.3"));
-}
-
 void ResolveConstantValue(RtlirParamDecl& pd, const Expr* init,
                           const DataType& type, const ScopeMap& scope) {
   if (TryFoldRealParamValue(pd, init, type, scope)) return;
@@ -169,11 +161,7 @@ std::optional<AssignedTypeParam> AssignedTypeParamType(
   }
   const SourceLoc kLoc = ovr->value_expr->range.start;
   if (ovr->assigned_type->written.kind == DataTypeKind::kImplicit) {
-    diag.Error(kLoc,
-               std::format("parameter value assignment for type parameter '{}' "
-                           "of '{}' does not name a type",
-                           item->name, mod->name),
-               Subclause("23.10.2"));
+    ReportTypeParamAssignedNoType({item->name, mod->name}, kLoc, diag);
     return std::nullopt;
   }
   pd.from_override = true;

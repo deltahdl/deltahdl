@@ -29,6 +29,7 @@
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/simple_bit_vector.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_parameter_values.h"
 #include "elaborator/unpacked_array_type.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"

@@ -43,6 +43,7 @@ enum class SymbolKind : std::uint8_t {
   kClass,
   kInstance,
   kValue,
+  kNoData,
 };
 
 enum class ConstantKind : std::uint8_t { kNone, kParameter, kSpecparam };
@@ -58,6 +59,7 @@ struct ValueSymbol {
   std::string_view mode = {};
   ConstantKind constant = ConstantKind::kNone;
   const Expr* module_specparam = nullptr;
+  const ModuleDecl* nested_module = nullptr;
 };
 
 struct MethodResult {
@@ -93,6 +95,11 @@ class ValueScopes {
                                    const NameScope& scope) const;
 
   bool NamesType(const DataType& named, const NameScope& scope) const;
+
+  bool NamesNoType(const DataType& named, const NameScope& scope) const;
+
+  const ModuleDecl* ModuleDeclared(std::string_view name,
+                                   const NameScope& scope) const;
 
   void DeclareItems(const std::vector<ModuleItem*>& items, NameScope& scope);
 
@@ -134,6 +141,8 @@ class ValueScopes {
 
   const ValueSymbol* FindInClass(std::string_view name,
                                  const ClassDecl& cls) const;
+
+  bool PackageLacks(std::string_view package, std::string_view name) const;
 
   const ClassDecl* BaseOf(const ClassDecl& cls) const;
 

@@ -265,6 +265,7 @@ void ScopedWalk::WalkStmt(const Stmt* stmt, const NameScope& outer) {
   scopes_.DeclareStmts(stmt->fork_stmts, scope);
   DeclareLoopNames(*stmt, scope);
   if (stmt->kind == StmtKind::kVarDecl) {
+    if (stmt->var_is_param) VisitParameter(*stmt->decl_item, scope);
     WalkDeclaredType(stmt->var_decl_type, stmt->range.start, scope);
     VisitRanges(stmt->var_unpacked_dims, scope);
   }
@@ -444,6 +445,7 @@ void ScopedWalk::WalkGenerateBlock(const std::vector<ModuleItem*>& items,
 }
 
 void ScopedWalk::WalkInstance(const ModuleItem& item, const NameScope& scope) {
+  VisitInstance(item, scope);
   for (const auto& [name, value] : item.inst_params) WalkExpr(value, scope);
   for (const auto& [name, value] : item.inst_ports) WalkExpr(value, scope);
   for (const auto& [left, right] : item.inst_dims) {
@@ -500,6 +502,7 @@ void ScopedWalk::WalkSpecify(const SpecifyItem& item, const NameScope& scope) {
 }
 
 void ScopedWalk::WalkItem(const ModuleItem& item, const NameScope& scope) {
+  VisitParameter(item, scope);
   WalkAttributes(item.attrs, scope);
   WalkDeclaredType(item.data_type, item.loc, scope);
   WalkDeclaredType(item.typedef_type, item.loc, scope);
@@ -536,6 +539,7 @@ void ScopedWalk::WalkItems(const std::vector<ModuleItem*>& items,
 
 void ScopedWalk::WalkModule(const ModuleDecl& decl) {
   const NameScope& scope = scopes_.ModuleScope(decl);
+  VisitModule(decl, scope);
   WalkDeclaredTypes(decl.param_types, decl.range.start, scope);
   WalkParamPorts(decl.param_port_unpacked_dims, scope);
   for (const auto& [name, value] : decl.params) WalkExpr(value, scope);

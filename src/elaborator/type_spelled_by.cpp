@@ -19,19 +19,7 @@ bool IsPackedDimension(const Expr* e) {
 
 void TakeSpecialization(const Expr& name, DataType& type) {
   type.param_assignment_written = name.has_param_spec;
-  if (!name.has_param_spec) return;
-  type.type_params.clear();
-  for (std::size_t i = 0; i < name.elements.size(); ++i) {
-    Expr* const kValue = name.elements[i];
-    DataType arg;
-    if (kValue != nullptr) arg = TypeSpelledBy(kValue);
-    const bool kMayBeASelectedValue =
-        arg.kind == DataTypeKind::kNamed && kValue->kind == ExprKind::kSelect;
-    if (arg.kind == DataTypeKind::kImplicit || kMayBeASelectedValue)
-      arg.type_ref_expr = kValue;
-    arg.param_arg_name = name.arg_names[i];
-    type.type_params.push_back(arg);
-  }
+  if (name.has_param_spec) type.type_params = SpecializationArguments(name);
 }
 
 DataType SpecializedScope(const DataType& path) {
@@ -79,6 +67,23 @@ DataType HeadSpelledBy(const Expr& head) {
 }
 
 }  // namespace
+
+std::vector<DataType> SpecializationArguments(const Expr& name) {
+  std::vector<DataType> arguments;
+  arguments.reserve(name.elements.size());
+  for (std::size_t i = 0; i < name.elements.size(); ++i) {
+    Expr* const kValue = name.elements[i];
+    DataType arg;
+    if (kValue != nullptr) arg = TypeSpelledBy(kValue);
+    const bool kMayBeASelectedValue =
+        arg.kind == DataTypeKind::kNamed && kValue->kind == ExprKind::kSelect;
+    if (arg.kind == DataTypeKind::kImplicit || kMayBeASelectedValue)
+      arg.type_ref_expr = kValue;
+    arg.param_arg_name = name.arg_names[i];
+    arguments.push_back(arg);
+  }
+  return arguments;
+}
 
 DataType TypeSpelledBy(const Expr* written) {
   std::vector<std::pair<Expr*, Expr*>> dims;

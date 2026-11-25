@@ -11,6 +11,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_restriction.h"
+#include "elaborator/type_parameter_values.h"
 #include "elaborator/unpacked_array_type.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -117,11 +118,8 @@ static std::optional<ChildTypeParamBinding> ResolveChildTypeParam(
     if (assigned.written.kind != DataTypeKind::kImplicit) {
       return ChildTypeParamBinding{std::move(assigned), ov};
     }
-    diag.Error(item->loc,
-               std::format("parameter value assignment for type parameter '{}' "
-                           "of '{}' does not name a type",
-                           pname, child_decl->name),
-               Subclause("23.10.2"));
+    ReportTypeParamAssignedNoType({pname, child_decl->name}, ov->range.start,
+                                  diag);
     return std::nullopt;
   }
   if (TypeParamPortHasDefault(child_decl->param_types.at(i))) {

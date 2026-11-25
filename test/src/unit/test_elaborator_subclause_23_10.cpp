@@ -533,7 +533,7 @@ TEST(ParameterOverride, ClassScopedOverrideNamingNoTypeOfTheClassIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "parameter value assignment for type parameter 'T' "
                             "of 'child' does not name a type",
-                            8, "23.10.2"));
+                            8, "6.20.3"));
   EXPECT_EQ(f.diag.Diagnostics().size(), 1u);
 }
 

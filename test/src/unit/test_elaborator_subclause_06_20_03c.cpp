@@ -28,11 +28,10 @@ constexpr std::string_view kNotADataType = "can only be set to a data type";
 
 constexpr HierarchicalTypeValue kHierarchicalTypeValues[] = {
     {"module t; ifc i(); c #(.T(i.w6_t)) u(); endmodule\n", kNotAType,
-     "23.10.2"},
-    {"module t; ifc i(); c #(i.w6_t) u(); endmodule\n", kNotAType, "23.10.2"},
-    {"module t; ifc i(); j #(i.w6_t) jj(); endmodule\n", kNotAType, "23.10.2"},
-    {"module t; ifc i(); K #(i.w6_t) k; endmodule\n",
-     "parameter override is not a constant expression", "23.10.2"},
+     "6.20.3"},
+    {"module t; ifc i(); c #(i.w6_t) u(); endmodule\n", kNotAType, "6.20.3"},
+    {"module t; ifc i(); j #(i.w6_t) jj(); endmodule\n", kNotAType, "6.20.3"},
+    {"module t; ifc i(); K #(i.w6_t) k; endmodule\n", kNotAType, "6.20.3"},
     {"module t; ifc i(); localparam type L = i.w6_t; endmodule\n",
      kNotADataType, "6.20.3"},
     {"module t; ifc i(); parameter type P = i.w6_t; endmodule\n", kNotADataType,

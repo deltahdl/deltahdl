@@ -369,7 +369,7 @@ TEST(TypeRefOverrideSim, OperandThatNamesNothingIsReported) {
                               "parameter value assignment for type parameter "
                               "'T' of '" +
                                   std::string(child) + "' does not name a type",
-                              20, "23.10.2"));
+                              20, "6.20.3"));
   }
 }
 
@@ -482,7 +482,7 @@ TEST(TypeParameterSim, ValueIsNoOverrideAndAForwardTypedefIs) {
                               "parameter value assignment for type parameter "
                               "'T' of '" +
                                   std::string(child) + "' does not name a type",
-                              21, "23.10.2"),
+                              21, "6.20.3"),
                 !kNamesType);
       EXPECT_EQ(f.has_errors, !kNamesType);
     }

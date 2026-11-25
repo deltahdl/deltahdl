@@ -30,9 +30,6 @@ std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
                                                   const DataType& type,
                                                   const ScopeMap& scope);
 
-void ReportTypeParamSetToNoType(std::string_view name, SourceLoc loc,
-                                DiagEngine& diag);
-
 void ResolveConstantValue(RtlirParamDecl& pd, const Expr* init,
                           const DataType& type, const ScopeMap& scope);
 
