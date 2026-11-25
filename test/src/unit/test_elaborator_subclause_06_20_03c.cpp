@@ -105,4 +105,27 @@ TEST(BodyTypeParameter, InstanceOverrideOfABodyTypeParameterIsAccepted) {
   ExpectVariableWidth(SoleChildInstance(design), "x", 8u);
 }
 
+TEST(BodyTypeParameter, SpecializationTakesAPackageTypeAndNoVariable) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk; typedef logic [11:0] t; int v; endpackage\n"
+      "class X #(type T = int); T v; endclass\n"
+      "module top;\n"
+      "  int v;\n"
+      "  X #(pk::t) a;\n"
+      "  X #(.T(pk::t)) b;\n"
+      "  X #(v) c;\n"
+      "  X #(pk::v) d;\n"
+      "  X #(pk::t, pk::t) e;\n"
+      "endmodule\n",
+      f, "top");
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {5, 6}) EXPECT_FALSE(ErrorOnLine(diags, kLine));
+  for (const int kLine : {7, 8}) EXPECT_TRUE(ErrorOnLine(diags, kLine));
+  EXPECT_TRUE(ReportedError(diags,
+                            "too many positional parameter overrides for "
+                            "class 'X': 2 provided, 1 allowed",
+                            9, "23.10.2.1"));
+}
+
 }  // namespace

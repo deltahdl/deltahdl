@@ -92,6 +92,8 @@ class ValueScopes {
   const ClassDecl* ClassDeclaredAs(const DataType& named,
                                    const NameScope& scope) const;
 
+  bool NamesType(const DataType& named, const NameScope& scope) const;
+
   void DeclareItems(const std::vector<ModuleItem*>& items, NameScope& scope);
 
   void DeclareItem(const ModuleItem& item, NameScope& scope);

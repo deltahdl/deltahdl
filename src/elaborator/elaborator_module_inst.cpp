@@ -30,6 +30,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_spelled_by.h"
 #include "elaborator/uwire_drivers.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -62,9 +63,7 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
                                               const CompilationUnit* unit,
                                               DiagEngine& diag, SourceLoc loc) {
   DataType dt;
-  if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kIdentifier) {
-    return dt;
-  }
+  if (expr->lhs->kind != ExprKind::kIdentifier) return TypeSpelledBy(expr);
   if (expr->rhs == nullptr || expr->rhs->kind != ExprKind::kIdentifier) {
     return dt;
   }

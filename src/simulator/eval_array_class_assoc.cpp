@@ -153,16 +153,28 @@ const ModuleItem* ClassScopeTypedefItem(const ClassTypeInfo* from,
   return nullptr;
 }
 
+static const ClassTypeInfo* ScopeClassOf(const DataType& type,
+                                         SimContext& ctx) {
+  DataType scope;
+  scope.kind = DataTypeKind::kNamed;
+  scope.type_name = type.scope_name;
+  if (!type.outer_scope_names.empty()) {
+    scope.scope_name = type.outer_scope_names.back();
+    scope.outer_scope_names.assign(type.outer_scope_names.begin(),
+                                   type.outer_scope_names.end() - 1);
+  }
+  return ctx.FindClassType(TypeChainKey(scope));
+}
+
 const ModuleItem* TypedefItemSeenFrom(const DataType& type,
                                       const ClassTypeInfo* from,
                                       SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed) return nullptr;
   std::string_view name = type.type_name;
   if (!type.scope_name.empty()) {
-    if (const ClassTypeInfo* cls = ctx.FindClassType(type.scope_name))
+    if (const ClassTypeInfo* cls = ScopeClassOf(type, ctx))
       return ClassScopeTypedefItem(cls, name);
-    return ctx.FindTypedefItem(std::string(type.scope_name) +
-                               "::" + std::string(name));
+    return ctx.FindTypedefItem(TypeChainKey(type));
   }
   if (const ModuleItem* item = ClassScopeTypedefItem(from, name)) return item;
   if (from != nullptr && !from->package.empty()) {

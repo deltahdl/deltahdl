@@ -27,6 +27,7 @@
 #include "elaborator/pending_generate.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sdf_annotate_calls.h"
+#include "elaborator/specialization_type_arguments.h"
 #include "elaborator/time_literal_scale.h"
 #include "elaborator/unit_hier_names_from_root.h"
 #include "elaborator/unit_param_values.h"
@@ -346,6 +347,7 @@ void Elaborator::RunPreElaborationValidations() {
   ValidateAnonymousProgramHierRefs();
 
   ValidatePackageItems();
+  ReadScopedTypeArguments(*unit_);
   ReportDataUsedAboveItsDeclaration(*unit_, diag_);
   ReportReferencesBeforePackages(unit_, diag_);
   ValidatePackageReferences();

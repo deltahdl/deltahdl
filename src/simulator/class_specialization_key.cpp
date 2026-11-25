@@ -8,11 +8,15 @@
 #include <utility>
 #include <vector>
 
+#include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/class_object.h"
+#include "simulator/class_specialization.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
@@ -138,6 +142,32 @@ std::string IntegralTypeKey(const DataType& builtin,
   return key + *bounds;
 }
 
+std::string ClassKey(ClassTypeInfo* cls, const DataType& type,
+                     SimContext& ctx) {
+  const ClassTypeInfo* spec =
+      SpecializationOf(cls, type.type_params, ctx, ctx.GetArena());
+  if (spec->package.empty()) return std::string(spec->name);
+  return std::string(spec->package) + "::" + std::string(spec->name);
+}
+
+std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
+  const DataType* step = &type;
+  const ModuleItem* declared = nullptr;
+  for (size_t hops = 0; hops <= ctx.TypeDeclarationCount(); ++hops) {
+    if (step->kind != DataTypeKind::kNamed) break;
+    if (ClassTypeInfo* cls = ctx.FindClassType(TypeChainKey(*step)))
+      return ClassKey(cls, *step, ctx);
+    const ModuleItem* item = TypedefItemSeenFrom(*step, nullptr, ctx);
+    if (item == nullptr) break;
+    declared = item;
+    step = &item->typedef_type;
+  }
+  if (declared == nullptr) return TypeChainKey(type);
+  const SourceLoc kAt = declared->loc;
+  return std::string(declared->name) + "@" + std::to_string(kAt.file_id) + ":" +
+         std::to_string(kAt.line) + ":" + std::to_string(kAt.column);
+}
+
 }  // namespace
 
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
@@ -148,7 +178,7 @@ std::string TypeActualKey(const ClassDecl* decl, size_t i,
   if (type == nullptr) return {};
   PackedDims dims;
   const DataType* builtin = BuiltinTypedefTarget(*type, ctx, dims);
-  if (builtin == nullptr) return std::string(type->type_name);
+  if (builtin == nullptr) return DeclaredTypeKey(*type, ctx);
   if (const auto kForm = IntegralKindForm(builtin->kind)) {
     return IntegralTypeKey(*builtin, *kForm, dims,
                            DeclaredTypeWidth(*type, ctx), ctx);

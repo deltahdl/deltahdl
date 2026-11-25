@@ -131,6 +131,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/scoped_walk.cpp
     elaborator/specify_parameter_uses.cpp
     elaborator/specparam_paths.cpp
+    elaborator/specialization_type_arguments.cpp
     elaborator/specparam_uses.cpp
     elaborator/specparam_values.cpp
     elaborator/subroutine_instance_copy.cpp

@@ -70,8 +70,11 @@ DataType InPackageScope(const DataType& type, const PackageDecl& package) {
   DataType scoped = type;
   if (!IsBareTypeName(type)) return scoped;
   for (const ModuleItem* item : package.items) {
-    if (item->kind == ModuleItemKind::kTypedef &&
-        item->name == type.type_name) {
+    const bool kDeclaresIt = item->kind == ModuleItemKind::kClassDecl
+                                 ? item->class_decl->name == type.type_name
+                                 : item->kind == ModuleItemKind::kTypedef &&
+                                       item->name == type.type_name;
+    if (kDeclaresIt) {
       scoped.scope_name = package.name;
     }
   }

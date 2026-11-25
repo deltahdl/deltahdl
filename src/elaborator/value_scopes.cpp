@@ -37,12 +37,24 @@ void DeclareFunction(const ModuleItem& function, NameScope& scope) {
   scope.names.insert_or_assign(function.name, symbol);
 }
 
-void DeclareTypedef(const ModuleItem& def, NameScope& scope) {
-  if (def.forward_type_kind != DataTypeKind::kImplicit) return;
+void DeclareType(const ModuleItem& def, NameScope& scope) {
   ValueSymbol symbol =
       DataSymbol(def.typedef_type, def.unpacked_dims.size(), scope);
   symbol.kind = SymbolKind::kType;
   scope.names.insert_or_assign(def.name, symbol);
+}
+
+void DeclareTypedef(const ModuleItem& def, NameScope& scope) {
+  if (def.forward_type_kind == DataTypeKind::kImplicit) DeclareType(def, scope);
+}
+
+void DeclareBodyParameter(const ModuleItem& param, NameScope& scope) {
+  if (param.data_type.kind == DataTypeKind::kVoid) {
+    DeclareType(param, scope);
+  } else {
+    DeclareData(param.name, param.data_type, param.unpacked_dims.size(), scope);
+  }
+  scope.names[param.name].constant = ConstantKind::kParameter;
 }
 
 void DeclareEnumConstants(const DataType& type, NameScope& scope) {
@@ -191,8 +203,7 @@ void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
   DeclareEnumConstants(item.typedef_type, scope);
   switch (item.kind) {
     case ModuleItemKind::kParamDecl:
-      DeclareData(item.name, item.data_type, item.unpacked_dims.size(), scope);
-      scope.names[item.name].constant = ConstantKind::kParameter;
+      DeclareBodyParameter(item, scope);
       break;
     case ModuleItemKind::kSpecparam:
       DeclareSpecparam(item.name, scope);
@@ -294,6 +305,12 @@ const ClassDecl* ValueScopes::ClassNamed(std::string_view name,
 const ClassDecl* ValueScopes::ClassDeclaredAs(const DataType& named,
                                               const NameScope& scope) const {
   return FindQualified(named, scope).cls;
+}
+
+bool ValueScopes::NamesType(const DataType& named,
+                            const NameScope& scope) const {
+  const ValueSymbol kNamed = FindQualified(named, scope);
+  return kNamed.kind == SymbolKind::kType || kNamed.kind == SymbolKind::kClass;
 }
 
 const ClassDecl* ValueScopes::BaseOf(const ClassDecl& cls) const {

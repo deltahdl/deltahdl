@@ -438,4 +438,43 @@ TEST(ClassConstraintElaboration,
   }
 }
 
+TEST(ClassConstraintElaboration,
+     WeakReferenceToAPackageTypeIsReportedUnlessItNamesAClass) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package pk;\n"
+      "  typedef logic [3:0] t; typedef byte u; typedef u ut;\n"
+      "  int n; class J; endclass class K; typedef byte b; endclass\n"
+      "  typedef K kt;\n"
+      "endpackage\n"
+      "class Q;\n"
+      "  weak_reference #(pk::K) a;\n"
+      "  weak_reference #(pk::kt) b;\n"
+      "  weak_reference #(pk::t) c;\n"
+      "endclass\n"
+      "module m;\n"
+      "  weak_reference #(pk::K) d;\n"
+      "  weak_reference #(pk::kt) e;\n"
+      "  weak_reference #(pk::K::b) g;\n"
+      "  function void f1(weak_reference #(pk::K) h); endfunction\n"
+      "  function void f2(weak_reference #(pk::t) i); endfunction\n"
+      "  initial begin\n"
+      "    weak_reference #(pk::kt) j;\n"
+      "    weak_reference #(pk::K::b) k;\n"
+      "    weak_reference #($unit::Q) l;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (const int kLine : {9, 14, 16, 19}) {
+    EXPECT_TRUE(ReportedError(
+        diags, "weak_reference needs a class type as its type parameter", kLine,
+        "8.30.1"))
+        << kLine;
+  }
+  for (const int kLine : {7, 8, 12, 13, 15, 18, 20}) {
+    EXPECT_FALSE(ErrorOnLine(diags, kLine)) << kLine;
+  }
+}
+
 }  // namespace
