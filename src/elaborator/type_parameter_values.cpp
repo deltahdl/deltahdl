@@ -99,7 +99,7 @@ class TypeParameterValueWalk : public ScopedWalk {
     JudgePorts(cls, scope);
     for (const ClassMember* member : cls.members) {
       if (member->is_param && member->data_type.kind == DataTypeKind::kVoid)
-        JudgeValue(*member, *member->init_expr, scope);
+        JudgeValue(*member, member->init_expr, scope);
     }
   }
 
@@ -111,7 +111,7 @@ class TypeParameterValueWalk : public ScopedWalk {
                       const NameScope& scope) override {
     if (param.data_type.kind != DataTypeKind::kVoid) return;
     if (param.typedef_type.kind == DataTypeKind::kImplicit) {
-      JudgeValue(param, *param.init_expr, scope);
+      JudgeValue(param, param.init_expr, scope);
     } else if (WritesNoType(param.typedef_type, Scopes(), scope)) {
       ReportTypeParamSetToNoType(param.name, param.loc, diag_);
     }
@@ -148,9 +148,9 @@ class TypeParameterValueWalk : public ScopedWalk {
   }
 
   template <typename Param>
-  void JudgeValue(const Param& param, const Expr& value,
+  void JudgeValue(const Param& param, const Expr* value,
                   const NameScope& scope) {
-    if (WritesNoType(value, Scopes(), scope))
+    if (value != nullptr && WritesNoType(*value, Scopes(), scope))
       ReportTypeParamSetToNoType(param.name, param.loc, diag_);
   }
 
