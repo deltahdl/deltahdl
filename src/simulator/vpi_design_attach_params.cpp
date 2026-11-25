@@ -222,8 +222,7 @@ void AttachScopeSpecParams(const RtlirModule* mod, const std::string& prefix,
 void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
                              const ParamAttach& with) {
   for (const ModuleItem* item : pkg.items) {
-    if (item == nullptr || item->kind != ModuleItemKind::kParamDecl) continue;
-    if (item->data_type.kind == DataTypeKind::kVoid) {
+    if (DeclaresTypeParam(*item)) {
       RtlirParamDecl param;
       param.name = item->name;
       param.loc = item->loc;
@@ -233,6 +232,7 @@ void AttachPackageParameters(const PackageDecl& pkg, VpiObject& scope,
       MakeTypeParameter(&scope, param, &item->typedef_type, with);
       continue;
     }
+    if (item->kind != ModuleItemKind::kParamDecl) continue;
     for (VpiObject* child : scope.children) {
       if (child->name == item->name && !VpiIsTypespecType(child->type)) {
         child->type = vpiParameter;

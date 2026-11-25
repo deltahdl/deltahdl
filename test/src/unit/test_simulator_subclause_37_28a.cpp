@@ -360,6 +360,16 @@ TEST_F(ParametersOfARun, APackagesTypeParameterIsATypeParameter) {
   EXPECT_EQ(vpi_get(vpiType, TypespecOf("pkg", "T")), vpiLogicTypespec);
 }
 
+TEST_F(ParametersOfARun, APackagesTypeParameterIsNoTypedef) {
+  Run("package pkg;\n"
+      "  typedef logic [3:0] t;\n"
+      "  parameter type T = logic [3:0];\n"
+      "endpackage\n"
+      "module top; endmodule\n");
+  EXPECT_EQ(NamesOf(vpiTypedef, vpi_handle_by_name(VpiText("pkg"), nullptr)),
+            (std::vector<std::string>{"t"}));
+}
+
 TEST_F(Parameter, OnlyAGenvarReferenceInAGenScopeIsALocalParam) {
   VpiObject scope;
   scope.type = vpiGenScope;

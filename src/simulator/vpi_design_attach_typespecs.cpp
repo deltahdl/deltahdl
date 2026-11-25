@@ -342,7 +342,7 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
                               const ScopeTypespecs& at) {
   TypespecsByName made;
   for (const ModuleItem* item : items) {
-    if (item->kind != ModuleItemKind::kTypedef ||
+    if (item->kind != ModuleItemKind::kTypedef || DeclaresTypeParam(*item) ||
         item->typedef_type.kind == DataTypeKind::kImplicit) {
       continue;
     }
