@@ -57,7 +57,7 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
                                              ScopeMap& values, SimContext& ctx,
                                              Arena& arena) {
   RegisterItemEnumConstantVariables(item, pkg.name, values, ctx, arena);
-  if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
+  if (item->kind != ModuleItemKind::kParamDecl) return;
   if (auto v = FoldPackageParamValue(*item, pkg, values, ctx))
     values[item->name] = *v;
 }

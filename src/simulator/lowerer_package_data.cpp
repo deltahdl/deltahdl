@@ -69,9 +69,8 @@ static void ShapePackageVariable(const ModuleItem* item, Variable* var,
 }
 
 static bool DeclaresPackageData(const ModuleItem* item) {
-  bool is_param = item->kind == ModuleItemKind::kParamDecl;
-  bool is_var = item->kind == ModuleItemKind::kVarDecl;
-  return is_var || (is_param && item->init_expr);
+  return item->kind == ModuleItemKind::kVarDecl ||
+         item->kind == ModuleItemKind::kParamDecl;
 }
 
 constexpr std::string_view kUnitScope = "$unit";

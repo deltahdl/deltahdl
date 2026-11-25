@@ -72,7 +72,7 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
   } else if (pi->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[name] = PackageTypedefType(*pi, pkg, scope.arena);
     if (!pi->unpacked_dims.empty()) scope.aggregate_typedefs.insert(name);
-  } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
+  } else if (pi->kind == ModuleItemKind::kParamDecl) {
     RegisterImportedParam(pi, pkg, name, scope);
   }
 }

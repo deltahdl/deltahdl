@@ -173,7 +173,7 @@ struct PackageRegistration {
 };
 
 void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
-  if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
+  if (item->kind != ModuleItemKind::kParamDecl) return;
   const DataType kType = InPackageScope(item->data_type, reg.pkg);
   RegisterUnitParamValue({reg.pkg.name, item->name, item->init_expr, kType,
                           item->unpacked_dims, reg.values});
@@ -311,7 +311,7 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
     scope.class_names.insert(item->class_decl->name);
     if (!item->class_decl->params.empty())
       scope.parameterized_classes.insert(item->class_decl->name);
-  } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
+  } else if (item->kind == ModuleItemKind::kParamDecl) {
     RegisterUnitParamValue({{},
                             item->name,
                             item->init_expr,
