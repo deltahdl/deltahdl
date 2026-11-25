@@ -486,10 +486,12 @@ std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
 
 ModuleItem* Elaborator::ResolveArgumentTypeRefs(ModuleItem* item,
                                                 const RtlirModule* mod) {
-  ResolveTypeRefArguments(item->data_type, [&](DataType& type) {
-    ResolveTypeRef(type, item->loc, mod);
-    FoldPackedDims(type, BuildParamScope(mod), arena_);
-  });
+  for (DataType* written : {&item->data_type, &item->typedef_type}) {
+    ResolveTypeRefArguments(*written, [&](DataType& type) {
+      ResolveTypeRef(type, item->loc, mod);
+      FoldPackedDims(type, BuildParamScope(mod), arena_);
+    });
+  }
   return item;
 }
 

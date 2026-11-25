@@ -175,6 +175,110 @@ TEST(SpecializationTypeRefArgumentSim, TypesAPackagesClassAndANestedArgument) {
       "7 44\n");
 }
 
+TEST(SpecializationTypedefTypeRefArgumentSim, NamesAVariableOrderedOrNamed) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  typedef X #(type(n)) at;\n"
+      "  typedef X #(.T(type(n))) bt;\n"
+      "  at a = new, d [2];\n"
+      "  bt b = new;\n"
+      "  X #(logic [6:0]) c;\n"
+      "  initial begin\n"
+      "    c = a;\n"
+      "    a.v = 300;\n"
+      "    d[1] = a;\n"
+      "    $display(\"%0d %0d %0d %0d\", $bits(a.v), $bits(b.v), c.v,\n"
+      "             d[1].v);\n"
+      "  end\n",
+      "7 7 44 44\n");
+}
+
+TEST(SpecializationTypedefTypeRefArgumentSim, NamesEachOtherOperand) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  localparam logic [2:0] L = 1;\n"
+      "  pk::K k = new;\n"
+      "  typedef X #(type(n + 10'd0)) at;\n"
+      "  typedef X #(.T(type(L))) bt;\n"
+      "  typedef X #(type(pk::w9)) ct;\n"
+      "  typedef X #(.T(type(pk::t))) dt;\n"
+      "  typedef X #(type(k)) et;\n"
+      "  typedef X #(type(logic [5:0])) ft;\n"
+      "  at a = new;\n"
+      "  bt b = new;\n"
+      "  ct c = new;\n"
+      "  dt d = new;\n"
+      "  et e = new;\n"
+      "  ft g = new;\n"
+      "  initial begin\n"
+      "    e.v = k;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", $bits(a.v), $bits(b.v),\n"
+      "             $bits(c.v), $bits(d.v), e.v.m, $bits(g.v));\n"
+      "  end\n",
+      "10 3 9 12 5 6\n");
+}
+
+TEST(SpecializationTypedefTypeRefArgumentSim, EachInstanceTakesItsOwn) {
+  EXPECT_EQ(Printed("module m #(int W = 4) ();\n"
+                    "  logic [W-1:0] n;\n"
+                    "  typedef X #(type(n)) xt;\n"
+                    "  typedef xt yt;\n"
+                    "  xt a = new;\n"
+                    "  yt b = new;\n"
+                    "  initial #W $display(\"%0d %0d %0d\", W, $bits(a.v),\n"
+                    "                      $bits(b.v));\n"
+                    "endmodule\n"
+                    "module top;\n"
+                    "  m u();\n"
+                    "  m #(6) w();\n"
+                    "  for (genvar i = 8; i < 10; i++) begin : g\n"
+                    "    logic [i-1:0] n;\n"
+                    "    typedef X #(type(n)) xt;\n"
+                    "    xt a = new;\n"
+                    "    initial #i $display(\"%0d %0d\", i, $bits(a.v));\n"
+                    "  end\n"
+                    "endmodule\n"),
+            "4 4 4\n6 6 6\n8 8\n9 9\n");
+}
+
+TEST(SpecializationTypedefTypeRefArgumentSim, NamesATypedefOrASpecialization) {
+  ExpectInEachPlace(
+      "  logic [6:0] n;\n"
+      "  typedef X #(type(n)) xt;\n"
+      "  typedef xt yt;\n"
+      "  typedef X #(X #(type(n))) zt;\n"
+      "  yt a = new;\n"
+      "  zt b = new;\n"
+      "  X #(logic [6:0]) c = new;\n"
+      "  initial begin\n"
+      "    b.v = c;\n"
+      "    b.v.v = 300;\n"
+      "    $display(\"%0d %0d\", $bits(a.v), b.v.v);\n"
+      "  end\n",
+      "7 44\n");
+}
+
+TEST(SpecializationTypedefTypeRefArgumentSim, TypesALocalAFormalAndAProperty) {
+  for (const Place& place : std::span(kPlaces).first(3)) {
+    SCOPED_TRACE(place.open);
+    EXPECT_EQ(
+        Printed(std::string(place.open)
+                    .append("  logic [6:0] n;\n"
+                            "  typedef X #(type(n)) xt;\n"
+                            "  class D; xt p = new; endclass\n"
+                            "  D d = new;\n"
+                            "  function int f(xt a); return a.v; endfunction\n"
+                            "  initial begin\n"
+                            "    automatic xt b = new;\n"
+                            "    b.v = 300;\n"
+                            "    $display(\"%0d %0d %0d %0d\", $bits(b.v),\n"
+                            "             b.v, f(b), $bits(d.p.v));\n"
+                            "  end\n")
+                    .append(place.close)),
+        "7 44 44 7\n");
+  }
+}
+
 TEST(PackageTypeTypeRefSim, DeclaresAVariableALocalAFormalAndAProperty) {
   ExpectInEachPlace(
       "  var type(pk::t) a;\n"
@@ -280,14 +384,18 @@ constexpr Place kModulePlaces[] = {
 
 TEST(SpecializationTypeRefArgumentElab, HierarchicalOperandIsReported) {
   for (const Place& place : kModulePlaces) {
-    for (bool hierarchical : {true, false}) {
-      SCOPED_TRACE(place.open);
+    for (std::string_view declaration :
+         {"X #(type(top.u.v)) a;", "X #(type(s.v)) a;",
+          "typedef X #(type(top.u.v)) a;", "typedef X #(type(s.v)) a;"}) {
+      SCOPED_TRACE(std::string(place.open).append(declaration));
+      const bool kHierarchical = declaration.contains("top.u.v");
       SimFixture f;
       ElaborateSrc(std::string(kClasses)
                        .append("module n; logic [4:0] v; endmodule\n")
                        .append(place.open)
-                       .append(hierarchical ? "\n X #(type(top.u.v)) a;\n"
-                                            : "\n X #(type(s.v)) a;\n")
+                       .append("\n")
+                       .append(declaration)
+                       .append("\n")
                        .append(place.close),
                    f);
       EXPECT_EQ(
@@ -295,21 +403,24 @@ TEST(SpecializationTypeRefArgumentElab, HierarchicalOperandIsReported) {
                         "type operator argument uses a hierarchical reference, "
                         "which the type operator does not accept",
                         kFirstLine + 2, "6.23"),
-          hierarchical);
-      EXPECT_EQ(f.has_errors, hierarchical);
+          kHierarchical);
+      EXPECT_EQ(f.has_errors, kHierarchical);
     }
   }
 }
 
 TEST(SpecializationTypeRefArgumentElab, OperandThatNamesNothingIsReported) {
   for (const Place& place : kPlaces) {
-    for (bool names : {false, true}) {
-      SCOPED_TRACE(place.open);
+    for (std::string_view declaration :
+         {"X #(type(pk::w9)) a;", "X #(type(nosuch)) a;",
+          "typedef X #(type(pk::w9)) a;", "typedef X #(type(nosuch)) a;"}) {
+      SCOPED_TRACE(std::string(place.open).append(declaration));
+      const bool kNames = declaration.contains("pk::w9");
       SimFixture f;
       ElaborateSrc(std::string(kClasses)
                        .append(place.open)
-                       .append(names ? "  X #(type(pk::w9)) a;\n"
-                                     : "  X #(type(nosuch)) a;\n")
+                       .append(declaration)
+                       .append("\n")
                        .append(place.close),
                    f);
       const auto kLine = kFirstLine + std::ranges::count(place.open, '\n');
@@ -317,8 +428,8 @@ TEST(SpecializationTypeRefArgumentElab, OperandThatNamesNothingIsReported) {
                               "parameter value assignment for type parameter "
                               "'T' of 'X' does not name a type",
                               static_cast<uint32_t>(kLine), "6.20.3"),
-                !names);
-      EXPECT_EQ(f.has_errors, !names);
+                !kNames);
+      EXPECT_EQ(f.has_errors, !kNames);
     }
   }
 }

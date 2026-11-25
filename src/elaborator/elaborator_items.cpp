@@ -406,17 +406,32 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   });
 }
 
-static ModuleItem* DeclarationOfInstance(ModuleItem* item,
-                                         const RtlirModule& mod, Arena& arena) {
+static bool NamesATypeParam(const DataType& type, const RtlirModule& mod) {
+  return type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
+         std::ranges::any_of(mod.params, [&](const RtlirParamDecl& param) {
+           return param.is_type_param && param.name == type.type_name;
+         });
+}
+
+static bool NamesATypedefOfANamedType(const DataType& type,
+                                      const TypedefMap& typedefs) {
+  const DataType* named = FindNamedType(type, typedefs);
+  return named != nullptr && named->kind == DataTypeKind::kNamed;
+}
+
+ModuleItem* Elaborator::DeclarationOfInstance(ModuleItem* item,
+                                              const RtlirModule& mod) {
   const DataType& type = item->data_type;
-  const bool kNamesTypeParam =
-      type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
-      std::ranges::any_of(mod.params, [&](const RtlirParamDecl& param) {
-        return param.is_type_param && param.name == type.type_name;
-      });
-  return kNamesTypeParam || WritesTypeRefArgument(type)
-             ? arena.Create<ModuleItem>(*item)
-             : item;
+  if (NamesATypeParam(type, mod) || WritesTypeRefArgument(type))
+    return arena_.Create<ModuleItem>(*item);
+  auto written = written_declarations_.find(item);
+  if (written != written_declarations_.end())
+    return arena_.Create<ModuleItem>(*written->second);
+  if (WritesTypeRefArgument(item->typedef_type) ||
+      NamesATypedefOfANamedType(type, typedefs_)) {
+    written_declarations_[item] = arena_.Create<ModuleItem>(*item);
+  }
+  return item;
 }
 
 bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
@@ -428,9 +443,8 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNetDecl(item, mod);
       return true;
     case ModuleItemKind::kVarDecl:
-      ElaborateVarDecl(ResolveArgumentTypeRefs(
-                           DeclarationOfInstance(item, *mod, arena_), mod),
-                       mod);
+      ElaborateVarDecl(
+          ResolveArgumentTypeRefs(DeclarationOfInstance(item, *mod), mod), mod);
       return true;
     case ModuleItemKind::kContAssign:
       ElaborateContAssign(item, mod);
@@ -442,7 +456,8 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateParamDecl(item, mod);
       return true;
     case ModuleItemKind::kTypedef:
-      ElaborateTypedef(item, mod);
+      ElaborateTypedef(
+          ResolveArgumentTypeRefs(DeclarationOfInstance(item, *mod), mod), mod);
       return true;
     case ModuleItemKind::kNettypeDecl:
       ElaborateNettypeDecl(item, mod);

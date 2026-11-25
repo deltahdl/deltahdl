@@ -425,6 +425,9 @@ class ElaboratorData {
   ScopeMap procedural_typedef_scope_;
 
   UnitParamValues unit_param_values_;
+
+  std::unordered_map<const ModuleItem*, const ModuleItem*>
+      written_declarations_;
 };
 
 }  // namespace delta
