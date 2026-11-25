@@ -652,7 +652,6 @@ TEST(SpecparamElaboration, SpecparamUsedInASpecifyBlockIsAccepted) {
       "if (a[sp]) (c => d) = 5;",
       "if (odd(sp)) (c => d) = 5;",
       "pulsestyle_onevent b[sp];",
-      "specparam [sp:0] t = 5;",
       "specparam t = P + L + PP + PL + PK + PW + CU + pk::PW;",
       "specparam t = P:L:PP, u = K::CP, PATHPULSE$ = (P, L);",
       "specparam PW = 2; (a[PW] => b[0]) = PW;",

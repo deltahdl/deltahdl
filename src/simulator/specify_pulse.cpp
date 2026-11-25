@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <bit>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -194,6 +195,19 @@ void SpecifyManager::RebuildGateDriversForSpecparam(
   }
 }
 
+namespace {
+
+uint32_t AnnotatedWidth(const Variable& storage, uint64_t value) {
+  constexpr uint32_t kIntegerWidth = 32;
+  if (storage.takes_value_range && !storage.is_real) {
+    return std::max(kIntegerWidth,
+                    static_cast<uint32_t>(std::bit_width(value)));
+  }
+  return storage.value.width;
+}
+
+}  // namespace
+
 void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
                                              const std::string& name,
                                              uint64_t value,
@@ -204,8 +218,7 @@ void SpecifyManager::ApplyAnnotatedSpecparam(std::string_view inst_prefix,
   std::string qualified = std::string(inst_prefix) + name;
   if (Variable* storage = specparam_ctx_->FindVariable(qualified);
       storage != nullptr) {
-    const uint32_t kWidth =
-        storage->value.width == 0 ? 32u : storage->value.width;
+    const uint32_t kWidth = AnnotatedWidth(*storage, value);
     storage->value = storage->is_real
                          ? MakeRealVec(*specparam_arena_, real_value, kWidth)
                          : MakeLogic4VecVal(*specparam_arena_, kWidth, value);
@@ -244,7 +257,7 @@ void StoreSpecparamValue(Variable& storage, const Logic4Vec& value,
     return;
   }
   storage.value = MakeLogic4VecVal(
-      arena, storage.value.width,
+      arena, storage.takes_value_range ? value.width : storage.value.width,
       value.is_real ? static_cast<uint64_t>(std::llround(kReal))
                     : value.ToUint64());
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <initializer_list>
+#include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -8,6 +10,7 @@
 
 namespace delta {
 
+struct Attribute;
 struct BinsOrOptions;
 struct BindDirective;
 struct ClassDecl;
@@ -25,7 +28,12 @@ struct ModuleDecl;
 struct ModuleItem;
 struct PropertyExprNode;
 struct SelectExpression;
+struct SeqCycleDelay;
 struct SeqLinearBody;
+struct SeqLocalDecl;
+struct SeqMatchAssign;
+struct SpecifyItem;
+struct SpecifyTerminal;
 struct Stmt;
 
 class ScopedWalk {
@@ -48,6 +56,8 @@ class ScopedWalk {
 
   virtual void VisitClass(const ClassDecl& cls, const NameScope& scope) = 0;
 
+  virtual void VisitRange(const Expr&, const NameScope&) {}
+
   const ValueScopes& Scopes() const { return scopes_; }
 
  private:
@@ -55,6 +65,17 @@ class ScopedWalk {
 
   void WalkEach(std::initializer_list<const Expr*> exprs,
                 const NameScope& scope);
+
+  void WalkAttributes(const std::vector<Attribute>& attrs,
+                      const NameScope& scope);
+
+  void WalkRanges(const std::vector<Expr*>& bounds, const NameScope& scope);
+
+  void VisitRanges(const std::vector<Expr*>& bounds, const NameScope& scope);
+
+  void WalkParamPorts(
+      const std::unordered_map<std::string_view, std::vector<Expr*>>& dims,
+      const NameScope& scope);
 
   void WalkWith(const Expr& call, const NameScope& scope);
 
@@ -70,14 +91,30 @@ class ScopedWalk {
 
   void WalkEvents(const std::vector<EventExpr>& events, const NameScope& scope);
 
+  void WalkDelay(const SeqCycleDelay& delay, const NameScope& scope);
+
+  void WalkTargets(const std::vector<SeqMatchAssign>& items,
+                   const NameScope& scope);
+
+  void WalkLocals(const std::vector<SeqLocalDecl>& locals, SourceLoc loc,
+                  NameScope& scope);
+
   void WalkSequence(const SeqLinearBody& body, const NameScope& scope);
 
   void WalkTree(const PropertyExprNode* tree, const NameScope& scope);
 
   void WalkType(const DataType& type, SourceLoc loc, const NameScope& scope);
 
+  void VisitTypeRanges(const DataType& type, const NameScope& scope);
+
+  void WalkDeclaredType(const DataType& type, SourceLoc loc,
+                        const NameScope& scope);
+
   void WalkTypes(const std::vector<DataType>& types, SourceLoc loc,
                  const NameScope& scope);
+
+  void WalkDeclaredTypes(const std::vector<DataType>& types, SourceLoc loc,
+                         const NameScope& scope);
 
   void WalkHeader(const ClassDecl& cls, const NameScope& scope);
 
@@ -94,8 +131,8 @@ class ScopedWalk {
 
   void WalkPropertyOrSequence(const ModuleItem& item, const NameScope& outer);
 
-  void WalkRanges(const std::vector<CovergroupValueRange>& ranges,
-                  const NameScope& scope);
+  void WalkValueRanges(const std::vector<CovergroupValueRange>& ranges,
+                       const NameScope& scope);
 
   void WalkBins(const BinsOrOptions& bins, const NameScope& scope);
 
@@ -119,6 +156,11 @@ class ScopedWalk {
   void WalkBind(const BindDirective& bind);
 
   void WalkClocking(const ModuleItem& item, const NameScope& scope);
+
+  void WalkSpecify(const SpecifyItem& item, const NameScope& scope);
+
+  void WalkTerminals(const std::vector<SpecifyTerminal>& terminals,
+                     const NameScope& scope);
 
   void WalkItem(const ModuleItem& item, const NameScope& scope);
 

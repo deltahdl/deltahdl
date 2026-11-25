@@ -151,15 +151,14 @@ static std::vector<std::string_view> AssociatedSignals(
   return out;
 }
 
-void Elaborator::ValidateClockingBlock(ModuleItem* item,
-                                       const RtlirModule* mod) {
+void Elaborator::ValidateClockingBlock(ModuleItem* item, RtlirModule* mod) {
   if (item->kind == ModuleItemKind::kClockingBlock && item->name.empty() &&
       !item->is_default_clocking && !item->is_global_clocking) {
     diag_.Error(item->loc, "non-default clocking block must have a name",
                 Subclause("14.3"));
   }
 
-  ScopeMap skew_scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  ScopeMap skew_scope = BuildConstantScope(mod);
   CheckClockingSkew(item->default_input_skew_delay, skew_scope,
                     "default input skew", diag_);
   CheckClockingSkew(item->default_output_skew_delay, skew_scope,

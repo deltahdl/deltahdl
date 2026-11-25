@@ -423,7 +423,7 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
   std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
   std::unordered_set<std::string> general_proc_lhs;
-  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  ScopeMap scope = BuildConstantScope(mod);
   CollectProcessLhsInfo(decl, {procs, cont_assign_lhs, general_proc_lhs},
                         &func_decls_, scope);
   CheckDriverConflicts(procs, cont_assign_lhs, general_proc_lhs, diag_);
@@ -494,7 +494,7 @@ static void CheckContProcElementMix(
 
 void Elaborator::CheckAggregateElementDrivers(const ModuleDecl* decl,
                                               RtlirModule* mod) {
-  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  ScopeMap scope = BuildConstantScope(mod);
   std::vector<ContTarget> conts;
   std::unordered_set<std::string> proc_prefixes;
   std::unordered_set<std::string> nets;

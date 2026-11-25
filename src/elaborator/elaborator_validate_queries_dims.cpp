@@ -524,54 +524,13 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
   ReportSpecparamInItems(decl->items, specparam_names_, diag_);
 }
 
-namespace {
-
-void CheckSpecparamInRange(
-    const Expr* range, SourceLoc loc,
-    const std::unordered_set<std::string_view>& specparam_names,
-    DiagEngine& diag) {
-  if (!range) return;
-  for (const auto& sp : specparam_names) {
-    if (ExprContainsIdent(range, sp)) {
-      diag.Error(loc,
-                 std::format("specparam '{}' may not appear in a "
-                             "declaration range specification",
-                             sp),
-                 Subclause("6.20.5"));
-      break;
-    }
-  }
-}
-
-void CheckDeclRangesForSpecparam(
-    const ModuleItem* item,
-    const std::unordered_set<std::string_view>& specparam_names,
-    DiagEngine& diag) {
-  CheckSpecparamInRange(item->data_type.packed_dim_left, item->loc,
-                        specparam_names, diag);
-  CheckSpecparamInRange(item->data_type.packed_dim_right, item->loc,
-                        specparam_names, diag);
-  for (const auto& [left, right] : item->data_type.extra_packed_dims) {
-    CheckSpecparamInRange(left, item->loc, specparam_names, diag);
-    CheckSpecparamInRange(right, item->loc, specparam_names, diag);
-  }
-  for (const auto* dim : item->unpacked_dims) {
-    CheckSpecparamInRange(dim, item->loc, specparam_names, diag);
-  }
-}
-
-}  // namespace
-
 static void ReportHierRefInDeclRange(const ModuleItem* item, DiagEngine& diag);
 
-void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
+void Elaborator::ValidateHierRefInDeclRange(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kNetDecl &&
         item->kind != ModuleItemKind::kVarDecl)
       continue;
-    if (!specparam_names_.empty()) {
-      CheckDeclRangesForSpecparam(item, specparam_names_, diag_);
-    }
     ReportHierRefInDeclRange(item, diag_);
   }
 }

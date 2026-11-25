@@ -30,6 +30,9 @@ std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
                                                   const DataType& type,
                                                   const ScopeMap& scope);
 
+void ResolveConstantValue(RtlirParamDecl& pd, const Expr* init,
+                          const DataType& type, const ScopeMap& scope);
+
 bool HasRealOperand(const Expr* expr);
 
 bool TakesItsTypeFromItsValue(const DataType& type);

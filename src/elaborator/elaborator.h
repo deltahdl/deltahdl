@@ -182,7 +182,7 @@ class Elaborator : public ElaboratorClassRules {
                                std::string_view typedef_name,
                                RtlirVariable& var);
   void ElaborateContAssign(ModuleItem* item, RtlirModule* mod);
-  void ValidateGeneratedItem(const ModuleItem* item, const RtlirModule& mod);
+  void ValidateGeneratedItem(const ModuleItem* item, RtlirModule& mod);
   void RecordProcTarget(std::string_view name, SourceLoc loc);
   void ReportForcesOverMixture(std::string_view declared,
                                std::string_view name);
@@ -231,7 +231,7 @@ class Elaborator : public ElaboratorClassRules {
   void CheckInstancePorts(RtlirModuleInst& inst, const ModuleItem* item,
                           RtlirModule* mod);
 
-  void CheckPrimitiveTerminals(const ModuleItem* item, const RtlirModule* mod);
+  void CheckPrimitiveTerminals(const ModuleItem* item, RtlirModule* mod);
 
   void ElaborateUdpInst(ModuleItem* item, RtlirModule* mod);
 
@@ -297,6 +297,16 @@ class Elaborator : public ElaboratorClassRules {
                            const std::vector<std::string_view>& scopes) const;
 
   ScopeMap BuildParamScope(const RtlirModule* mod) const;
+
+  ScopeMap BuildConstantScope(RtlirModule* mod) const;
+
+  ScopeMap UnitParamScope() const;
+
+  void BindModuleConstants(const RtlirModule& mod,
+                           const std::vector<std::string_view>& scopes,
+                           ScopeMap& scope) const;
+
+  void BindLoopConstants(ScopeMap& scope) const;
 
   bool RefersToUnboundedParam(const RtlirModule* mod,
                               std::string_view name) const;
@@ -516,7 +526,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidatePartSelectBounds(const ModuleDecl* decl);
 
-  void ValidateElabSystemTask(const ModuleItem* item, const RtlirModule* mod);
+  void ValidateElabSystemTask(const ModuleItem* item, RtlirModule* mod);
 
   void ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod);
 
@@ -532,7 +542,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateSpecparamInParams(const ModuleDecl* decl);
 
-  void ValidateSpecparamInDeclRange(const ModuleDecl* decl);
+  void ValidateHierRefInDeclRange(const ModuleDecl* decl);
 
   void ValidateValueParams(const ModuleDecl* decl, const RtlirModule* mod);
 
@@ -615,7 +625,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateSequenceEventArgs(const ModuleDecl* decl, RtlirModule* mod);
 
-  void ValidateClockingBlock(ModuleItem* item, const RtlirModule* mod);
+  void ValidateClockingBlock(ModuleItem* item, RtlirModule* mod);
 
   void ValidateNoFormalShadowedByBodyLocal(ModuleItem* item);
 
@@ -655,8 +665,7 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
   void ValidateFreeCheckerVariableAssignments(const ModuleDecl* decl);
   void ValidateCheckerVariableInitialAssignment(const ModuleDecl* decl);
-  void ValidateHierRefInstanceArray(const ModuleDecl* decl,
-                                    const RtlirModule* mod);
+  void ValidateHierRefInstanceArray(const ModuleDecl* decl, RtlirModule* mod);
   void CheckHierRefUndeclaredMember(
       const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
       const Expr* ma);

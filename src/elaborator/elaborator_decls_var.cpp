@@ -559,7 +559,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
 
   TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 
-  var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
+  var.attrs = ResolveAttributes(item->attrs, diag_, BuildConstantScope(mod));
   bool writes_its_type =
       adopted_array_typedef.empty() && adopted_enumeration.empty();
   ValidateVarDeclTypes(item, BuildParamScope(mod), writes_its_type);

@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <format>
 #include <functional>
@@ -20,7 +21,6 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
-#include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_node_attributes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/implication_operator_rules.h"
@@ -35,6 +35,7 @@
 #include "elaborator/rtlir_checker_site.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/sensitivity.h"
+#include "elaborator/specparam_values.h"
 #include "elaborator/subroutine_instance_copy.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_param_scope_prefix.h"
@@ -52,35 +53,23 @@
 
 namespace delta {
 
-uint32_t SpecparamWidth(const DataType& type, const Expr* init,
-                        const TypedefMap& typedefs) {
-  if (type.packed_dim_left != nullptr && type.packed_dim_right != nullptr) {
-    uint32_t w = EvalTypeWidth(type);
-    return w == 0 ? 32 : w;
-  }
-  if (init != nullptr) {
-    uint32_t w = InferExprWidth(init, typedefs);
-    return w == 0 ? 32 : w;
-  }
-  return 32;
-}
-
-bool SpecparamIsReal(const DataType& type, const Expr* init) {
-  if (type.packed_dim_left != nullptr && type.packed_dim_right != nullptr) {
-    return false;
-  }
-  return HasRealOperand(init);
+void SetSpecparamStorage(RtlirVariable& var, const RtlirModule& mod) {
+  const auto kSpecparam =
+      std::ranges::find(mod.specparams, var.name, &RtlirParamDecl::name);
+  const ParamStorageShape kShape = ParamStorageShapeOf(*kSpecparam);
+  var.is_real = kSpecparam->is_real_value;
+  var.is_signed = kShape.is_signed;
+  var.width = var.is_real ? 64 : kShape.width;
+  var.init_expr = kSpecparam->default_value;
+  var.takes_value_range = !kSpecparam->has_decl_range;
 }
 
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
-  var.name = ScopedName(item->name);
+  var.name = item->name;
   var.loc = item->loc;
-  var.width = SpecparamWidth(item->data_type, item->init_expr, typedefs_);
-  var.is_real = SpecparamIsReal(item->data_type, item->init_expr);
-  if (var.is_real) var.width = 64;
-  var.init_expr = item->init_expr;
-  var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
+  var.attrs = ResolveAttributes(item->attrs, diag_, BuildConstantScope(mod));
+  SetSpecparamStorage(var, *mod);
   mod->variables.push_back(var);
   mod->specparam_names.push_back(var.name);
 }
@@ -286,8 +275,8 @@ std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
 }  // namespace
 
 void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
-                                         const RtlirModule* mod) {
-  ScopeMap scope = BuildParamScope(mod);
+                                         RtlirModule* mod) {
+  ScopeMap scope = BuildConstantScope(mod);
   if (HasInstanceArrayRange(item)) {
     CheckGateInstanceArrayTerminalWidths(item, mod, scope, interconnect_names_,
                                          diag_);
@@ -331,7 +320,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   }
   DeclareInModuleNameSpace(ModuleNameSpaceEntry(item), item->loc);
   RecordNodeAttributes(*item, *mod, diag_,
-                       [&] { return BuildParamScope(mod); });
+                       [&] { return BuildConstantScope(mod); });
   ReportItemImplicationOperators(*item, diag_);
   const TypeRefCompareFolder kFold = RecordingInto(
       mod, InternedGenPrefix(),
@@ -517,7 +506,7 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
                              &kTasks};
   const ScopeMap kScope = BuildParamScope(mod);
   ReportProcedureParamTypes(item, mod, kScope);
-  AddProcess(kind, item, mod, kEnv, kScope);
+  AddProcess(kind, item, mod, kEnv, BuildConstantScope(mod));
   mod->processes.back().checker_instances = std::move(sites);
 }
 
@@ -541,7 +530,7 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kFinalBlock:
       ReportProcedureParamTypes(item, mod, BuildParamScope(mod));
       AddProcess(RtlirProcessKind::kFinal, item, mod, kNoInferenceEnv,
-                 BuildParamScope(mod));
+                 BuildConstantScope(mod));
       return true;
     case ModuleItemKind::kAlwaysBlock:
     case ModuleItemKind::kAlwaysCombBlock:
@@ -590,7 +579,8 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       }
       return true;
     case ModuleItemKind::kSpecifyBlock:
-      RegisterSpecifyBlockSpecparams(item, mod, typedefs_,
+      ResolveSpecparams(*mod, BuildParamScope(mod, {}), typedefs_);
+      RegisterSpecifyBlockSpecparams(item, mod,
                                      {specparam_names_, const_names_}, diag_);
       mod->specify_blocks.push_back(item);
       return true;

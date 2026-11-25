@@ -387,6 +387,17 @@ void Lowerer::LowerBlockScopedVarInit(std::string_view name,
   ctx_.SetLoweringGenPrefixes(nullptr);
 }
 
+static void RecordDeclaredForm(const RtlirVariable& var, Variable* v,
+                               Arena& arena) {
+  v->is_4state = var.is_4state;
+  v->declared_type = var.written_type != nullptr ? var.written_type : var.dtype;
+  v->declared_unpacked = *arena.Create<std::string>(UnpackedDimsText(var));
+  if (var.is_event) v->is_event = true;
+  if (var.is_signed) v->is_signed = true;
+  v->is_real = var.is_real;
+  v->takes_value_range = var.takes_value_range;
+}
+
 void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   uint32_t width = StorageWidth(var);
   auto* v = ctx_.CreateVariable(name, width);
@@ -399,13 +410,8 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   }
 
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
-  v->is_4state = var.is_4state;
-  v->declared_type = var.written_type != nullptr ? var.written_type : var.dtype;
-  v->declared_unpacked = *arena_.Create<std::string>(UnpackedDimsText(var));
-  if (var.is_event) v->is_event = true;
-  if (var.is_signed) v->is_signed = true;
+  RecordDeclaredForm(var, v, arena_);
   if (var.is_string) ctx_.RegisterStringVariable(name);
-  v->is_real = var.is_real;
   if (var.is_real) ctx_.RegisterRealVariable(name);
   RecordVcdDeclaration(name, var, ctx_);
   if (var.is_chandle) ctx_.RegisterChandleVariable(name);

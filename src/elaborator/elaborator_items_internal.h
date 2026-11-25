@@ -102,13 +102,9 @@ struct SpecparamNameSets {
   std::unordered_set<std::string_view>& constants;
 };
 void RegisterSpecifyBlockSpecparams(const ModuleItem* item, RtlirModule* mod,
-                                    const TypedefMap& typedefs,
                                     SpecparamNameSets names, DiagEngine& diag);
 
-uint32_t SpecparamWidth(const DataType& type, const Expr* init,
-                        const TypedefMap& typedefs);
-
-bool SpecparamIsReal(const DataType& type, const Expr* init);
+void SetSpecparamStorage(RtlirVariable& var, const RtlirModule& mod);
 
 void CheckCheckerBodyItemRules(const ModuleItem* item, const ModuleDecl* decl,
                                bool parent_is_checker, DiagEngine& diag);

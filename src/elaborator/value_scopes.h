@@ -57,6 +57,7 @@ struct ValueSymbol {
   ScopedValue value = {};
   std::string_view mode = {};
   ConstantKind constant = ConstantKind::kNone;
+  const Expr* module_specparam = nullptr;
 };
 
 struct MethodResult {
@@ -103,6 +104,11 @@ class ValueScopes {
 
   ConstantKind ConstantNamed(std::string_view name,
                              const NameScope& scope) const;
+
+  const Expr* ModuleSpecparamValue(std::string_view name,
+                                   const NameScope& scope) const;
+
+  bool Declares(std::string_view name, const NameScope& scope) const;
 
   MethodResult MethodOn(const ScopedValue& receiver, std::string_view name,
                         bool has_with) const;

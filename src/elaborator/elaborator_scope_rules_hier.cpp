@@ -26,6 +26,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -433,6 +434,9 @@ void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
   for (std::string_view name : {item->inst_name, item->gate_inst_name}) {
     Insert(name);
   }
+  for (const SpecifyItem* specify : item->specify_items) {
+    Insert(specify->param_name);
+  }
   AddEnumerations(item->data_type);
   if (item->kind == ModuleItemKind::kTypedef) {
     AddEnumerations(item->typedef_type);
@@ -787,13 +791,13 @@ void Elaborator::ValidateHierRefToImportedName(const ModuleDecl* decl,
 }
 
 void Elaborator::ValidateHierRefInstanceArray(const ModuleDecl* decl,
-                                              const RtlirModule* mod) {
+                                              RtlirModule* mod) {
   std::unordered_map<std::string_view, InstanceArrayBounds> arrayed =
       CollectInstanceArrayBounds(decl);
   std::unordered_set<std::string_view> loops = NamedLoopGenerateBlocks(decl);
   if (arrayed.empty() && loops.empty()) return;
 
-  ScopeMap module_params = mod ? BuildParamScope(mod) : ScopeMap{};
+  ScopeMap module_params = BuildConstantScope(mod);
   InstanceSelectWalk walk{
       diag_, arrayed, loops,
       ConstantScope{module_params, std::move(module_params)}};

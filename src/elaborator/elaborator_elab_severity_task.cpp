@@ -113,7 +113,7 @@ std::string FormatElabTaskMessage(const Expr* expr, size_t arg_start,
 }  // namespace
 
 void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
-                                        const RtlirModule* mod) {
+                                        RtlirModule* mod) {
   auto* expr = item->init_expr;
   if (!expr || expr->kind != ExprKind::kSystemCall) return;
 
@@ -126,7 +126,7 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
 
   size_t arg_start = CheckFatalFinishNumber(expr, is_fatal, diag_);
 
-  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
+  ScopeMap scope = BuildConstantScope(mod);
   for (const auto& [gname, gval] : gen_const_scope_) scope[gname] = gval;
   CheckElabTaskArgsConstant(expr, arg_start, name, scope, diag_);
 

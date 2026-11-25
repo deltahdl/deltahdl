@@ -99,6 +99,20 @@ std::optional<int64_t> FoldParamValueRoundingReal(const Expr* value,
   return FoldDeclaredParamValue(value, type, scope);
 }
 
+void ResolveConstantValue(RtlirParamDecl& pd, const Expr* init,
+                          const DataType& type, const ScopeMap& scope) {
+  if (TryFoldRealParamValue(pd, init, type, scope)) return;
+  std::optional<int64_t> val;
+  if (ParamExpectsIntegerValue(pd, type)) {
+    val = FoldRealValueAsInteger(init, scope);
+  }
+  if (!val) val = FoldParamValue(pd, init, scope);
+  if (!val) return;
+  pd.resolved_value = *val;
+  pd.is_resolved = true;
+  RecordResolvedHighWords(pd, init, scope);
+}
+
 namespace {
 
 void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
@@ -127,20 +141,10 @@ void PopulateValueParamInfo(
 
 void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
                             bool is_type, const ScopeMap& scope, Arena& arena) {
-  if (!is_type &&
-      TryFoldRealParamValue(pd, item->init_expr, item->data_type, scope))
-    return;
-  std::optional<int64_t> val;
-  if (!is_type && ParamExpectsIntegerValue(pd, item->data_type))
-    val = FoldRealValueAsInteger(item->init_expr, scope);
-  if (!val) val = FoldParamValue(pd, item->init_expr, scope);
-  if (val) {
-    pd.resolved_value = *val;
-    pd.is_resolved = true;
-    RecordResolvedHighWords(pd, item->init_expr, scope);
-  }
-  if (!is_type)
-    RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
+  if (is_type) return;
+  ResolveConstantValue(pd, item->init_expr, item->data_type, scope);
+  if (pd.is_real_value) return;
+  RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
 }
 
 bool ResolveTypeOperatorDefault(

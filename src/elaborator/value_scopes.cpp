@@ -196,6 +196,7 @@ void ValueScopes::DeclareItem(const ModuleItem& item, NameScope& scope) {
       break;
     case ModuleItemKind::kSpecparam:
       DeclareSpecparam(item.name, scope);
+      scope.names[item.name].module_specparam = item.init_expr;
       break;
     case ModuleItemKind::kSpecifyBlock:
       for (const SpecifyItem* specify : item.specify_items) {
@@ -373,6 +374,18 @@ ConstantKind ValueScopes::ConstantNamedBy(const Expr& name,
 ConstantKind ValueScopes::ConstantNamed(std::string_view name,
                                         const NameScope& scope) const {
   return Find(name, scope).constant;
+}
+
+const Expr* ValueScopes::ModuleSpecparamValue(std::string_view name,
+                                              const NameScope& scope) const {
+  return Find(name, scope).module_specparam;
+}
+
+bool ValueScopes::Declares(std::string_view name,
+                           const NameScope& scope) const {
+  const NameScope* at = &scope;
+  while (at != nullptr && FindHere(name, *at) == nullptr) at = at->outer;
+  return at != nullptr;
 }
 
 ValueSymbol ValueScopes::MemberOfClass(const ClassDecl* cls,

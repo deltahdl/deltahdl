@@ -496,7 +496,7 @@ std::string_view ResolveAliasNetScope(
 }  // namespace
 
 void Elaborator::ValidateAlias(const ModuleItem* item, RtlirModule* mod) {
-  ScopeMap param_scope = BuildParamScope(mod);
+  ScopeMap param_scope = BuildConstantScope(mod);
   for (const auto& [name, value] : gen_const_scope_) param_scope[name] = value;
   if (!CheckAliasOperandForms(item, diag_, param_scope)) return;
   std::vector<std::string_view> leaves;

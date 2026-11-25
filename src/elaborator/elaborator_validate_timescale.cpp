@@ -58,14 +58,14 @@ InstanceParams InstanceParamsOf(const RtlirModule& mod) {
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
                                            RtlirModule* mod) {
-  ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  replicate_multiplier_scope_ = scope;
-  streaming_slice_size_scope_ = scope;
-  array_query_dim_scope_ = scope;
-  array_arg_dim_scope_ = scope;
-  pla_ascending_scope_ = procedural_typedef_scope_ = scope;
+  const ScopeMap kScope = BuildConstantScope(mod);
+  replicate_multiplier_scope_ = kScope;
+  streaming_slice_size_scope_ = kScope;
+  array_query_dim_scope_ = kScope;
+  array_arg_dim_scope_ = kScope;
+  pla_ascending_scope_ = procedural_typedef_scope_ = kScope;
   for (const auto* item : decl->items) {
-    ValidateItemConstraints(item, *mod, scope);
+    ValidateItemConstraints(item, *mod, kScope);
   }
   using DeclCheck = void (Elaborator::*)(const ModuleDecl*);
   using PlainCheck = void (Elaborator::*)();
@@ -94,7 +94,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
       &Elaborator::ValidateForeachLoops,
       &Elaborator::ValidatePartSelectBounds,
       &Elaborator::ValidateSpecparamInParams,
-      &Elaborator::ValidateSpecparamInDeclRange,
+      &Elaborator::ValidateHierRefInDeclRange,
       &Elaborator::ValidateEnumAssignments,
       &Elaborator::ValidateConstAssignments,
       &Elaborator::ValidateArrayAssignments,
@@ -169,7 +169,7 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckNewPlacement(decl, diag_);
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   CheckInnerDeclaredTypes(
-      decl, {kShapeTables, &scope, diag_},
+      decl, {kShapeTables, &kScope, diag_},
       [this](std::string_view name) { return FindModuleInScope(name); },
       [this, mod](std::string_view name) {
         return mod != nullptr && VisibleCovergroup(name, mod, unit_) != nullptr;

@@ -130,6 +130,9 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/implicit_variable_calls.cpp
     elaborator/scoped_walk.cpp
     elaborator/specify_parameter_uses.cpp
+    elaborator/specparam_paths.cpp
+    elaborator/specparam_uses.cpp
+    elaborator/specparam_values.cpp
     elaborator/subroutine_instance_copy.cpp
     elaborator/type_ref_compare_fold.cpp
     elaborator/elaborator_node_attributes.cpp

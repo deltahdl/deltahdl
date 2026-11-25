@@ -28,6 +28,7 @@
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
+#include "elaborator/specparam_values.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
 #include "parser/ast_module.h"
@@ -428,7 +429,7 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateLhsPatternWidths(decl, mod);
   ValidateClockvarAccess(decl);
   ValidateClockingSignalTargets(decl);
-  ValidateCycleDelayCounts(decl, BuildParamScope(mod), diag_);
+  ValidateCycleDelayCounts(decl, BuildConstantScope(mod), diag_);
   ValidateCycleDelayDefaultClocking(decl);
   ValidateIntraAssignCycleDelay(decl);
   ValidateDuplicateDefaultClocking(decl);
@@ -514,7 +515,7 @@ void Elaborator::ElaborateItemsInOrder(const ModuleDecl* decl,
   for (auto* item : TimingCheckDelayedSignalItems(decl, arena_)) {
     ElaborateItem(item, mod);
   }
-  RecordModportAttributes(*mod, diag_, [&] { return BuildParamScope(mod); });
+  RecordModportAttributes(*mod, diag_, [&] { return BuildConstantScope(mod); });
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
@@ -575,6 +576,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
                                      &type_ref_compare_);
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
 
+  RecordSpecparams(decl->items, *mod, arena_);
   ElaborateItemsInOrder(decl, mod);
 
   ResolveModuleClassFormalTypes(mod->class_decls, typedefs_, arena_);

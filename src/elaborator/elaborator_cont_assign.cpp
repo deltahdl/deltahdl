@@ -360,7 +360,7 @@ void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
 bool Elaborator::ValidateContAssignLeaves(
     ModuleItem* item, RtlirModule* mod,
     const std::vector<ContTargetLeaf>& leaves) {
-  ScopeMap scope = BuildParamScope(mod);
+  ScopeMap scope = BuildConstantScope(mod);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   bool any_var = false;
   for (const ContTargetLeaf& leaf : leaves) {
@@ -381,9 +381,9 @@ void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag) {
 }
 
 void Elaborator::ValidateGeneratedItem(const ModuleItem* item,
-                                       const RtlirModule& mod) {
+                                       RtlirModule& mod) {
   CheckHighzStrengthPair(item, diag_);
-  ValidateItemRules(item, mod, BuildParamScope(&mod));
+  ValidateItemRules(item, mod, BuildConstantScope(&mod));
   if (!IsProceduralItemKind(item->kind)) return;
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets({}, {item->body}, targets);
@@ -526,7 +526,7 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3.3"));
   }
   ValidateGetpatternContAssign(item, mod);
-  ScopeMap scope = BuildParamScope(mod);
+  ScopeMap scope = BuildConstantScope(mod);
   const std::vector<ResolvedAttribute> kAttrs =
       ResolveAttributes(item->attrs, diag_, scope);
   if (item->assign_lhs->kind == ExprKind::kConcatenation) {

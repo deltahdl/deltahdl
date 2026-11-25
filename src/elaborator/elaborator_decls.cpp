@@ -576,7 +576,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   RecordNetArrayShape(item, net, mod);
   CarryNetArrayDims(item->name, net_array_info_, net);
 
-  net.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
+  net.attrs = ResolveAttributes(item->attrs, diag_, BuildConstantScope(mod));
   mod->nets.push_back(net);
 
   ValidateNetDriveStrength(item->data_type, net, diag_, item->loc);

@@ -501,6 +501,7 @@ void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
     if (item->kind == ModuleItemKind::kParamDecl && !item->name.empty())
       param_names.insert(item->name);
   }
+  param_names.insert(specparam_names_.begin(), specparam_names_.end());
 
   std::unordered_set<std::string_view> function_names;
   for (const auto& [fname, _] : func_decls_) function_names.insert(fname);

@@ -161,7 +161,7 @@ static void MarkSequenceClockEvents(
 void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
                                            RtlirModule* mod) {
   ValidateAssertionRules(decl, property_registry_, diag_);
-  const ScopeMap kParams = BuildParamScope(mod);
+  const ScopeMap kParams = BuildConstantScope(mod);
   ValidateAssertionExprRules(ModuleInUnit{*decl, *unit_}, mod, kParams,
                              property_registry_, diag_);
   std::unordered_set<std::string_view> unbounded;

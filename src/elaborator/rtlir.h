@@ -172,6 +172,7 @@ struct RtlirVariable {
   SourceLoc loc;
   std::string_view gen_block_prefix;
   GenBlockPrefixes gen_block_prefixes;
+  bool takes_value_range = false;
 };
 
 struct RtlirContAssign {
@@ -370,6 +371,7 @@ struct RtlirModule {
   const ModuleDecl* decl = nullptr;
   std::vector<TypeRefCompareResult> type_ref_compares;
   std::vector<RtlirEnumMember> enum_constants;
+  std::vector<RtlirParamDecl> specparams;
 };
 
 struct RtlirDesign : RtlirTypedefFacts {

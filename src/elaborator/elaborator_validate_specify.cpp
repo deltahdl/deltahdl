@@ -25,7 +25,6 @@
 namespace delta {
 
 void RegisterSpecifyBlockSpecparams(const ModuleItem* item, RtlirModule* mod,
-                                    const TypedefMap& typedefs,
                                     SpecparamNameSets names, DiagEngine& diag) {
   std::unordered_set<std::string_view> in_block;
   for (const auto* sp : item->specify_items) {
@@ -43,13 +42,7 @@ void RegisterSpecifyBlockSpecparams(const ModuleItem* item, RtlirModule* mod,
     RtlirVariable var;
     var.name = sp->param_name;
     var.loc = sp->loc;
-    DataType type;
-    type.packed_dim_left = sp->param_packed_left;
-    type.packed_dim_right = sp->param_packed_right;
-    var.width = SpecparamWidth(type, sp->param_value, typedefs);
-    var.is_real = SpecparamIsReal(type, sp->param_value);
-    if (var.is_real) var.width = 64;
-    var.init_expr = sp->param_value;
+    SetSpecparamStorage(var, *mod);
     mod->variables.push_back(var);
   }
 }

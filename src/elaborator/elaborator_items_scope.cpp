@@ -10,6 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/specparam_values.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_scope_order.h"
 #include "parser/ast_design.h"
@@ -20,33 +21,61 @@ namespace delta {
 
 ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
   ScopeMap scope = BuildParamScope(mod, gen_prefix_scopes_);
-  for (const auto& [name, value] : gen_loop_consts_)
-    BindDeclaredConstant(scope, name, value);
+  BindLoopConstants(scope);
   return scope;
 }
 
 ScopeMap Elaborator::BuildParamScope(
     const RtlirModule* mod, const std::vector<std::string_view>& scopes) const {
+  ScopeMap scope = UnitParamScope();
+  BindModuleConstants(*mod, scopes, scope);
+  return scope;
+}
+
+ScopeMap Elaborator::BuildConstantScope(RtlirModule* mod) const {
+  if (mod->specparams.empty()) return BuildParamScope(mod);
+  ResolveSpecparams(*mod, BuildParamScope(mod, {}), typedefs_);
+  ScopeMap scope = UnitParamScope();
+  for (const RtlirParamDecl& specparam : mod->specparams) {
+    if (!specparam.is_resolved) continue;
+    BindDeclaredConstant(scope, specparam.name, specparam.resolved_value);
+  }
+  BindModuleConstants(*mod, gen_prefix_scopes_, scope);
+  BindLoopConstants(scope);
+  return scope;
+}
+
+ScopeMap Elaborator::UnitParamScope() const {
   ScopeMap scope = cu_param_scope_;
   for (const auto& [name, val] : cu_param_scope_) {
     if (name.find('.') != std::string_view::npos) continue;
     auto* key = arena_.Create<std::string>("$unit::" + std::string(name));
     scope[*key] = val;
   }
-  for (const auto& entry : mod->enum_types) {
+  return scope;
+}
+
+void Elaborator::BindModuleConstants(
+    const RtlirModule& mod, const std::vector<std::string_view>& scopes,
+    ScopeMap& scope) const {
+  for (const auto& entry : mod.enum_types) {
     for (const auto& member : entry.second) {
       if (!ParamVisibleFromScopes(member.gen_block_prefix, scopes)) continue;
       BindDeclaredConstant(scope, member.name, member.value);
     }
   }
-  for (const auto& [name, value] : mod->constant_formals)
+  for (const auto& [name, value] : mod.constant_formals)
     BindDeclaredConstant(scope, name, value);
-  for (const auto& p : mod->params) {
+  for (const auto& p : mod.params) {
     if (!p.is_resolved) continue;
     if (!ParamVisibleFromScopes(p.gen_block_prefix, scopes)) continue;
     BindDeclaredConstant(scope, p.name, p.resolved_value);
   }
-  return scope;
+}
+
+void Elaborator::BindLoopConstants(ScopeMap& scope) const {
+  for (const auto& [name, value] : gen_loop_consts_)
+    BindDeclaredConstant(scope, name, value);
 }
 
 bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,

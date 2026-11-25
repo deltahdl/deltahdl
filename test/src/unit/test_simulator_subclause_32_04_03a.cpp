@@ -24,6 +24,9 @@ struct Design : SdfDesign {
     const ModuleDecl& mod = Top();
     mgr.BindDesignSpecparams(CollectDeclaredSpecparams(mod), f.ctx, f.arena);
     for (auto* item : mod.items) {
+      if (item->kind == ModuleItemKind::kSpecparam) {
+        mgr.RecordSpecparamInitializer("", item->name, item->init_expr);
+      }
       if (item->kind == ModuleItemKind::kGateInst) {
         mgr.AddPrimitiveDriversFromGate(*item, f.ctx, f.arena);
       }
@@ -41,6 +44,11 @@ struct Design : SdfDesign {
   uint64_t DesignValue(std::string_view name) {
     Variable* var = f.ctx.FindVariable(name);
     return var == nullptr ? 0 : var->value.ToUint64();
+  }
+
+  uint32_t DesignWidth(std::string_view name) {
+    Variable* var = f.ctx.FindVariable(name);
+    return var == nullptr ? 0 : var->value.width;
   }
 
   bool DesignHasStorage(std::string_view name) {
@@ -209,6 +217,68 @@ TEST(SdfLabelAnnotation, LabelReachesASpecparamDeclaredWithARange) {
   d.Annotate(SdfLabel("(ABSOLUTE (byte_delay 200))"));
 
   EXPECT_EQ(d.DesignValue("byte_delay"), 200u);
+}
+
+TEST(SdfLabelAnnotation, LabelWiderThanADeclaredRangeIsCutToTheRange) {
+  for (const char* declaration :
+       {"specparam [7:0] sp = 5;", "specparam [0:7] sp = 5;",
+        "specparam [8:1] sp = 5;",
+        "specify specparam [7:0] sp = 5; endspecify"}) {
+    SCOPED_TRACE(declaration);
+    Design d;
+    ASSERT_TRUE(
+        d.Build(std::string("module m;\n  ") + declaration + "\nendmodule\n"));
+    ASSERT_EQ(d.DesignValue("sp"), 5u);
+
+    d.Annotate(SdfLabel("(ABSOLUTE (sp 300))"));
+
+    EXPECT_EQ(d.DesignValue("sp"), 44u);
+    EXPECT_EQ(d.DesignWidth("sp"), 8u);
+
+    d.Annotate(SdfLabel("(INCREMENT (sp 250))"));
+
+    EXPECT_EQ(d.DesignValue("sp"), 38u);
+    EXPECT_EQ(d.DesignWidth("sp"), 8u);
+  }
+}
+
+TEST(SdfLabelAnnotation, LabelGivesARangelessSpecparamItsOwnRange) {
+  for (const char* declaration :
+       {"specparam sp = 4'd5;", "specparam sp = 1'b1 + 4'd4;",
+        "specify specparam sp = 4'd5; endspecify"}) {
+    SCOPED_TRACE(declaration);
+    Design d;
+    ASSERT_TRUE(
+        d.Build(std::string("module m;\n  ") + declaration + "\nendmodule\n"));
+    ASSERT_EQ(d.DesignValue("sp"), 5u);
+    ASSERT_EQ(d.DesignWidth("sp"), 4u);
+
+    d.Annotate(SdfLabel("(ABSOLUTE (sp 300))"));
+
+    EXPECT_EQ(d.DesignValue("sp"), 300u);
+    EXPECT_EQ(d.DesignWidth("sp"), 32u);
+
+    d.Annotate(SdfLabel("(INCREMENT (sp 11))"));
+
+    EXPECT_EQ(d.DesignValue("sp"), 311u);
+  }
+}
+
+TEST(SdfLabelAnnotation, LabelReachesARangelessSpecparamSetFromAnother) {
+  Design d;
+  ASSERT_TRUE(
+      d.Build("module m;\n"
+              "  specparam base = 4'd5;\n"
+              "  specparam same = base;\n"
+              "  specparam [3:0] cut = base;\n"
+              "endmodule\n"));
+  ASSERT_EQ(d.DesignValue("same"), 5u);
+
+  d.Annotate(SdfLabel("(ABSOLUTE (base 300))"));
+
+  EXPECT_EQ(d.DesignValue("base"), 300u);
+  EXPECT_EQ(d.DesignValue("same"), 300u);
+  EXPECT_EQ(d.DesignValue("cut"), 12u);
 }
 
 TEST(SdfLabelAnnotation,

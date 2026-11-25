@@ -70,22 +70,22 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   auto saved_interface_inst_types =
       std::exchange(interface_inst_types_, pg.interface_inst_types);
   auto saved_decl_path = std::exchange(module_decl_path_, pg.module_decl_path);
-  auto scope = BuildParamScope(pg.mod);
+  const ScopeMap kScope = BuildConstantScope(pg.mod);
   const std::size_t kFirstParam = pg.mod->params.size();
   switch (pg.item->kind) {
     case ModuleItemKind::kGenerateIf:
-      ElaborateGenerateIf(pg.item, pg.mod, scope);
+      ElaborateGenerateIf(pg.item, pg.mod, kScope);
       break;
     case ModuleItemKind::kGenerateCase:
-      ElaborateGenerateCase(pg.item, pg.mod, scope);
+      ElaborateGenerateCase(pg.item, pg.mod, kScope);
       break;
     case ModuleItemKind::kGenerateFor:
-      ElaborateGenerateFor(pg.item, pg.mod, scope);
+      ElaborateGenerateFor(pg.item, pg.mod, kScope);
       break;
     default:
       break;
   }
-  ValidateGenerateValueParams(pg.item, pg.mod, scope, diag_, arena_);
+  ValidateGenerateValueParams(pg.item, pg.mod, kScope, diag_, arena_);
   const TypeShapeTables kTables{typedefs_, td_array_dims_, class_names_};
   RecordParamDefaultMismatches(
       *pg.mod, kFirstParam, {kTables, BuildParamScope(pg.mod), unit_}, arena_);

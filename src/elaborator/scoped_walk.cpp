@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <initializer_list>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 #include "common/source_loc.h"
@@ -14,6 +15,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
@@ -59,6 +61,25 @@ void ScopedWalk::WalkEach(std::initializer_list<const Expr*> exprs,
   for (const Expr* e : exprs) WalkExpr(e, scope);
 }
 
+void ScopedWalk::VisitRanges(const std::vector<Expr*>& bounds,
+                             const NameScope& scope) {
+  for (const Expr* bound : bounds) {
+    if (bound != nullptr) VisitRange(*bound, scope);
+  }
+}
+
+void ScopedWalk::WalkRanges(const std::vector<Expr*>& bounds,
+                            const NameScope& scope) {
+  VisitRanges(bounds, scope);
+  WalkExprs(bounds, scope);
+}
+
+void ScopedWalk::WalkParamPorts(
+    const std::unordered_map<std::string_view, std::vector<Expr*>>& dims,
+    const NameScope& scope) {
+  for (const auto& [name, bounds] : dims) WalkRanges(bounds, scope);
+}
+
 void ScopedWalk::WalkWith(const Expr& call, const NameScope& scope) {
   NameScope with{&scope};
   scopes_.DeclareIterator(call, scope, with);
@@ -80,12 +101,18 @@ void ScopedWalk::WalkExpr(const Expr* e, const NameScope& scope) {
   if (e->type_value != nullptr) {
     WalkType(*e->type_value, e->range.start, scope);
   }
+  WalkAttributes(e->attrs, scope);
   if (e->with_expr != nullptr) WalkWith(*e, scope);
   if (e->inline_constraint != nullptr) WalkInlineConstraint(*e, scope);
   WalkTree(e->property_actual, scope);
   ForEachExprChild(e, [&](const Expr* child) {
     if (child != e->with_expr) WalkExpr(child, scope);
   });
+}
+
+void ScopedWalk::WalkAttributes(const std::vector<Attribute>& attrs,
+                                const NameScope& scope) {
+  for (const Attribute& attr : attrs) WalkExpr(attr.value, scope);
 }
 
 void ScopedWalk::WalkDist(const std::vector<ConstraintDistItem>& items,
@@ -119,11 +146,39 @@ void ScopedWalk::WalkEvents(const std::vector<EventExpr>& events,
   }
 }
 
+void ScopedWalk::WalkDelay(const SeqCycleDelay& delay, const NameScope& scope) {
+  WalkExpr(delay.min_expr, scope);
+  if (delay.max_expr != delay.min_expr) WalkExpr(delay.max_expr, scope);
+}
+
+void ScopedWalk::WalkTargets(const std::vector<SeqMatchAssign>& items,
+                             const NameScope& scope) {
+  for (const SeqMatchAssign& item : items) WalkExpr(item.target, scope);
+}
+
+void ScopedWalk::WalkLocals(const std::vector<SeqLocalDecl>& locals,
+                            SourceLoc loc, NameScope& scope) {
+  for (const SeqLocalDecl& local : locals) {
+    DeclareOther(local.name, scope);
+    WalkDeclaredType(local.named_type, loc, scope);
+    for (const auto& [left, right] : local.packed_dims) {
+      WalkRanges({left, right}, scope);
+    }
+    WalkExpr(local.init, scope);
+  }
+}
+
 void ScopedWalk::WalkSequence(const SeqLinearBody& body,
                               const NameScope& scope) {
   ForEachBody(body, [&](const SeqLinearBody& nested) {
     for (const auto& clock : nested.clocks) WalkEvents(clock, scope);
     WalkEvents(nested.clock_out, scope);
+    for (const SeqCycleDelay& delay : nested.delays) WalkDelay(delay, scope);
+    for (const SeqRepetition& count : nested.repetitions) {
+      WalkDelay(count, scope);
+    }
+    for (const auto& items : nested.match_items) WalkTargets(items, scope);
+    WalkTargets(nested.first_match_items, scope);
   });
   ForEachBodyExpr(body, [&](const Expr* e) { WalkExpr(e, scope); });
 }
@@ -131,7 +186,8 @@ void ScopedWalk::WalkSequence(const SeqLinearBody& body,
 void ScopedWalk::WalkTree(const PropertyExprNode* tree,
                           const NameScope& scope) {
   ForEachTreeNode(tree, [&](const PropertyExprNode& node) {
-    WalkExpr(node.boolean, scope);
+    WalkEach({node.boolean, node.range_min}, scope);
+    if (node.range_max != node.range_min) WalkExpr(node.range_max, scope);
     WalkEvents(node.clock, scope);
     for (const auto& values : node.case_values) WalkExprs(values, scope);
     if (node.sequence == nullptr) return;
@@ -161,7 +217,34 @@ void ScopedWalk::WalkType(const DataType& type, SourceLoc loc,
     WalkType(MemberType(member), loc, scope);
     WalkExprs(member.unpacked_dims, scope);
     WalkExpr(member.init_expr, scope);
+    WalkAttributes(member.attrs, scope);
   }
+}
+
+void ScopedWalk::VisitTypeRanges(const DataType& type, const NameScope& scope) {
+  VisitRanges({type.packed_dim_left, type.packed_dim_right}, scope);
+  for (const auto& [left, right] : type.extra_packed_dims) {
+    VisitRanges({left, right}, scope);
+  }
+  for (const DataType& specialized : type.specialized_scopes) {
+    VisitTypeRanges(specialized, scope);
+  }
+  for (const DataType& param : type.type_params) VisitTypeRanges(param, scope);
+  for (const StructMember& member : type.struct_members) {
+    VisitTypeRanges(MemberType(member), scope);
+    VisitRanges(member.unpacked_dims, scope);
+  }
+}
+
+void ScopedWalk::WalkDeclaredType(const DataType& type, SourceLoc loc,
+                                  const NameScope& scope) {
+  VisitTypeRanges(type, scope);
+  WalkType(type, loc, scope);
+}
+
+void ScopedWalk::WalkDeclaredTypes(const std::vector<DataType>& types,
+                                   SourceLoc loc, const NameScope& scope) {
+  for (const DataType& type : types) WalkDeclaredType(type, loc, scope);
 }
 
 void ScopedWalk::DeclareLoopNames(const Stmt& stmt, NameScope& scope) {
@@ -181,9 +264,11 @@ void ScopedWalk::WalkStmt(const Stmt* stmt, const NameScope& outer) {
   scopes_.DeclareStmts(stmt->fork_stmts, scope);
   DeclareLoopNames(*stmt, scope);
   if (stmt->kind == StmtKind::kVarDecl) {
-    WalkType(stmt->var_decl_type, stmt->range.start, scope);
+    WalkDeclaredType(stmt->var_decl_type, stmt->range.start, scope);
+    VisitRanges(stmt->var_unpacked_dims, scope);
   }
-  WalkTypes(stmt->for_init_types, stmt->range.start, scope);
+  WalkDeclaredTypes(stmt->for_init_types, stmt->range.start, scope);
+  WalkAttributes(stmt->attrs, scope);
   ForEachChildExpr(stmt, [&](const Expr* e) { WalkExpr(e, scope); });
   WalkExpr(stmt->assert_disable_iff, scope);
   WalkEvents(stmt->assert_clock, scope);
@@ -198,14 +283,14 @@ void ScopedWalk::WalkStmt(const Stmt* stmt, const NameScope& outer) {
 void ScopedWalk::WalkFormals(const std::vector<FunctionArg>& formals,
                              SourceLoc loc, const NameScope& scope) {
   for (const FunctionArg& formal : formals) {
-    WalkType(formal.data_type, loc, scope);
+    WalkDeclaredType(formal.data_type, loc, scope);
     WalkExpr(formal.default_value, scope);
-    WalkExprs(formal.unpacked_dims, scope);
+    WalkRanges(formal.unpacked_dims, scope);
   }
 }
 
 void ScopedWalk::WalkBody(const ModuleItem& item, const NameScope& outer) {
-  WalkType(item.return_type, item.loc, outer);
+  WalkDeclaredType(item.return_type, item.loc, outer);
   WalkFormals(item.func_args, item.loc, outer);
   NameScope scope{&outer};
   DeclareResult(item, scope);
@@ -235,11 +320,12 @@ void ScopedWalk::WalkPropertyOrSequence(const ModuleItem& item,
     }
   }
   for (const DataType* type : item.prop_formal_types) {
-    if (type != nullptr) WalkType(*type, item.loc, outer);
+    if (type != nullptr) WalkDeclaredType(*type, item.loc, outer);
   }
-  for (const SeqLocalDecl& local : item.prop_locals) {
-    DeclareOther(local.name, scope);
-    WalkExpr(local.init, scope);
+  WalkLocals(item.prop_locals, item.loc, scope);
+  WalkLocals(item.seq_linear.locals, item.loc, scope);
+  for (const auto& dims : item.prop_formal_unpacked_dims) {
+    WalkRanges(dims, outer);
   }
   WalkExprs(item.prop_formal_defaults, outer);
   WalkEvents(item.prop_clock, scope);
@@ -249,8 +335,8 @@ void ScopedWalk::WalkPropertyOrSequence(const ModuleItem& item,
   WalkSequence(item.seq_linear, scope);
 }
 
-void ScopedWalk::WalkRanges(const std::vector<CovergroupValueRange>& ranges,
-                            const NameScope& scope) {
+void ScopedWalk::WalkValueRanges(
+    const std::vector<CovergroupValueRange>& ranges, const NameScope& scope) {
   for (const CovergroupValueRange& range : ranges) {
     WalkEach({range.lo, range.hi}, scope);
   }
@@ -260,10 +346,10 @@ void ScopedWalk::WalkBins(const BinsOrOptions& bins, const NameScope& scope) {
   WalkEach({bins.option.value, bins.array_size, bins.with_expr, bins.set_expr,
             bins.iff},
            scope);
-  WalkRanges(bins.ranges, scope);
+  WalkValueRanges(bins.ranges, scope);
   for (const TransSet& set : bins.transitions) {
     for (const TransRangeList& step : set.steps) {
-      WalkRanges(step.items, scope);
+      WalkValueRanges(step.items, scope);
       WalkEach({step.repeat_lo, step.repeat_hi}, scope);
     }
   }
@@ -272,7 +358,7 @@ void ScopedWalk::WalkBins(const BinsOrOptions& bins, const NameScope& scope) {
 void ScopedWalk::WalkBinsSelection(const SelectExpression* select,
                                    const NameScope& scope) {
   if (select == nullptr) return;
-  WalkRanges(select->intersect, scope);
+  WalkValueRanges(select->intersect, scope);
   WalkEach({select->expr, select->matches}, scope);
   WalkBinsSelection(select->lhs, scope);
   WalkBinsSelection(select->rhs, scope);
@@ -309,13 +395,14 @@ void ScopedWalk::WalkCovergroup(const CovergroupDecl& group, SourceLoc loc,
 
 void ScopedWalk::WalkHeader(const ClassDecl& cls, const NameScope& scope) {
   VisitClass(cls, scope);
-  WalkTypes(cls.base_class_type_params, cls.range.start, scope);
+  WalkDeclaredTypes(cls.base_class_type_params, cls.range.start, scope);
   for (const auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {
     for (const InterfaceRef& ref : *refs) {
-      WalkTypes(ref.type_params, cls.range.start, scope);
+      WalkDeclaredTypes(ref.type_params, cls.range.start, scope);
     }
   }
-  WalkTypes(cls.param_types, cls.range.start, scope);
+  WalkDeclaredTypes(cls.param_types, cls.range.start, scope);
+  WalkParamPorts(cls.param_port_unpacked_dims, scope);
   for (const auto& [name, value] : cls.params) WalkExpr(value, scope);
   WalkExprs(cls.extends_args, scope);
 }
@@ -324,9 +411,10 @@ void ScopedWalk::WalkClass(const ClassDecl& cls) {
   const NameScope& scope = scopes_.ClassScope(cls);
   WalkHeader(cls, scope);
   for (const ClassMember* member : cls.members) {
-    WalkType(member->data_type, member->loc, scope);
+    WalkAttributes(member->attrs, scope);
+    WalkDeclaredType(member->data_type, member->loc, scope);
     if (member->typedef_item != nullptr) WalkItem(*member->typedef_item, scope);
-    WalkExprs(member->unpacked_dims, scope);
+    WalkRanges(member->unpacked_dims, scope);
     WalkExpr(member->init_expr, scope);
     WalkConstraints(member->constraint_items, scope);
     if (member->method != nullptr) WalkBody(*member->method, scope);
@@ -375,21 +463,53 @@ void ScopedWalk::WalkBind(const BindDirective& bind) {
 
 void ScopedWalk::WalkClocking(const ModuleItem& item, const NameScope& scope) {
   WalkEvents(item.clocking_event, scope);
+  WalkEach({item.default_input_skew_delay, item.default_output_skew_delay},
+           scope);
   for (const ClockingSignalDecl& signal : item.clocking_signals) {
-    WalkExpr(signal.hier_expr, scope);
+    WalkEach({signal.hier_expr, signal.skew_delay, signal.out_skew_delay},
+             scope);
   }
 }
 
+void ScopedWalk::WalkTerminals(const std::vector<SpecifyTerminal>& terminals,
+                               const NameScope& scope) {
+  for (const SpecifyTerminal& terminal : terminals) {
+    WalkEach({terminal.range_left, terminal.range_right}, scope);
+  }
+}
+
+void ScopedWalk::WalkSpecify(const SpecifyItem& item, const NameScope& scope) {
+  const SpecifyPathDecl& path = item.path;
+  WalkTerminals(path.src_ports, scope);
+  WalkTerminals(path.dst_ports, scope);
+  WalkTerminals(item.path_outputs, scope);
+  WalkEach({path.condition, path.data_source}, scope);
+  WalkExprs(path.delays, scope);
+  const TimingCheckDecl& check = item.timing_check;
+  WalkTerminals({check.ref_terminal, check.data_terminal}, scope);
+  WalkEach(
+      {check.ref_condition, check.data_condition, check.timestamp_cond,
+       check.timecheck_cond, check.delayed_ref_expr, check.delayed_data_expr,
+       check.event_based_flag, check.remain_active_flag},
+      scope);
+  WalkExprs(check.limits, scope);
+  WalkRanges({item.param_packed_left, item.param_packed_right}, scope);
+  WalkEach({item.param_value, item.pathpulse_reject, item.pathpulse_error},
+           scope);
+}
+
 void ScopedWalk::WalkItem(const ModuleItem& item, const NameScope& scope) {
-  WalkType(item.data_type, item.loc, scope);
-  WalkType(item.typedef_type, item.loc, scope);
-  WalkExprs(item.unpacked_dims, scope);
+  WalkAttributes(item.attrs, scope);
+  WalkDeclaredType(item.data_type, item.loc, scope);
+  WalkDeclaredType(item.typedef_type, item.loc, scope);
+  WalkRanges(item.unpacked_dims, scope);
   WalkEach({item.assign_lhs, item.assign_rhs, item.assign_delay,
             item.assign_delay_fall, item.assign_delay_decay, item.net_delay,
             item.net_delay_fall, item.net_delay_decay, item.gate_delay,
             item.gate_delay_fall, item.gate_delay_decay, item.assert_expr},
            scope);
   if (item.kind != ModuleItemKind::kLetDecl) WalkExpr(item.init_expr, scope);
+  WalkExprs(item.alias_nets, scope);
   WalkInstance(item, scope);
   WalkStmt(item.body, scope);
   WalkEvents(item.sensitivity, scope);
@@ -397,6 +517,9 @@ void ScopedWalk::WalkItem(const ModuleItem& item, const NameScope& scope) {
   WalkPropertyOrSequence(item, scope);
   WalkClocking(item, scope);
   WalkGenerate(item, scope);
+  for (const SpecifyItem* specify : item.specify_items) {
+    WalkSpecify(*specify, scope);
+  }
   if (item.class_decl != nullptr) WalkClass(*item.class_decl);
   if (item.covergroup != nullptr)
     WalkCovergroup(*item.covergroup, item.loc, scope);
@@ -412,12 +535,14 @@ void ScopedWalk::WalkItems(const std::vector<ModuleItem*>& items,
 
 void ScopedWalk::WalkModule(const ModuleDecl& decl) {
   const NameScope& scope = scopes_.ModuleScope(decl);
-  WalkTypes(decl.param_types, decl.range.start, scope);
+  WalkDeclaredTypes(decl.param_types, decl.range.start, scope);
+  WalkParamPorts(decl.param_port_unpacked_dims, scope);
   for (const auto& [name, value] : decl.params) WalkExpr(value, scope);
   for (const PortDecl& port : decl.ports) {
-    WalkType(port.data_type, port.loc, scope);
+    WalkAttributes(port.attrs, scope);
+    WalkDeclaredType(port.data_type, port.loc, scope);
     WalkEach({port.default_value, port.port_expr}, scope);
-    WalkExprs(port.unpacked_dims, scope);
+    WalkRanges(port.unpacked_dims, scope);
   }
   for (const ModportDecl* modport : decl.modports) {
     for (const ModportPort& port : modport->ports) {

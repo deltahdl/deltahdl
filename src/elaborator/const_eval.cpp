@@ -190,6 +190,9 @@ const RtlirParamDecl* RegisteredParamNamed(std::string_view name) {
       continue;
     return &param;
   }
+  for (const auto& specparam : mod->specparams) {
+    if (specparam.name == name) return &specparam;
+  }
   return nullptr;
 }
 

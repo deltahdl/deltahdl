@@ -13,6 +13,7 @@
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_specify.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -86,6 +87,9 @@ void UnitDeclaredNames::AddItems(const std::vector<ModuleItem*>& items) {
   for (const ModuleItem* item : items) {
     if (!item->name.empty() && !item->name_is_generated) {
       names_.insert(item->name);
+    }
+    for (const SpecifyItem* specify : item->specify_items) {
+      names_.insert(specify->param_name);
     }
     AddEnumerations(item->data_type);
     if (item->kind == ModuleItemKind::kTypedef) {

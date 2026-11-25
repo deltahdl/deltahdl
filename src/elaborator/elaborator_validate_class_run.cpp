@@ -7,6 +7,7 @@
 #include "elaborator/elaborator_validate_classes.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/implicit_variable_calls.h"
+#include "elaborator/specparam_uses.h"
 #include "elaborator/type_param_restriction.h"
 #include "elaborator/type_param_scope_prefix.h"
 
@@ -22,6 +23,8 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
   ReportClassSpecializationsWithoutValues(*unit_, diag_);
 
   ReportClassSpecializationAssignments(*unit_, diag_);
+
+  ReportMisusedSpecparams(*unit_, diag_);
 
   ReportBasesNamingNoClass(*unit_, diag_);
 

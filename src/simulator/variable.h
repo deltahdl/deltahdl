@@ -138,6 +138,8 @@ struct Variable {
     });
   }
 
+  bool takes_value_range = false;
+
   const Expr* proc_cont_rhs = nullptr;
 
   const Expr* assign_cont_rhs = nullptr;

@@ -540,7 +540,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
 
   CheckInstancePorts(inst, item, mod);
   CoerceDrivenInputPorts(inst, mod);
-  inst.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
+  inst.attrs = ResolveAttributes(item->attrs, diag_, BuildConstantScope(mod));
   if (item->inst_range_left && item->inst_range_right &&
       (!ConstEvalInt(item->inst_range_left, parent_scope) ||
        !ConstEvalInt(item->inst_range_right, parent_scope))) {
