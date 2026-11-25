@@ -39,7 +39,7 @@ const Expr* TypeRefOperand(const Expr* written);
 
 bool WritesTypeRefArgument(const DataType& type);
 
-void ResolveTypeRefArguments(DataType& type,
+void ResolveTypeRefArguments(std::vector<DataType>& args,
                              const std::function<void(DataType&)>& resolve);
 
 void ResolveClassTypeNames(ClassDecl& cls, const TypeRefResolver& resolve_outer,

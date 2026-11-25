@@ -66,7 +66,8 @@ class SpecializationAssignmentWalk : public ScopedWalk {
   }
 
   void VisitClass(const ClassDecl& cls, const NameScope& scope) override {
-    const Site kHeader{cls.range.start, *scope.outer};
+    const NameScope kParameters = ParametersOf(cls, scope);
+    const Site kHeader{cls.range.start, *scope.outer, &kParameters};
     JudgeNamed(cls.base_class_scope, cls.base_class, cls.base_class_type_params,
                kHeader);
     for (const auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {
@@ -79,7 +80,16 @@ class SpecializationAssignmentWalk : public ScopedWalk {
   struct Site {
     SourceLoc loc;
     const NameScope& scope;
+    const NameScope* arguments = nullptr;
   };
+
+  static NameScope ParametersOf(const ClassDecl& cls, const NameScope& scope) {
+    NameScope parameters;
+    parameters.outer = scope.outer;
+    for (const auto& [name, value] : cls.params)
+      parameters.names[name] = scope.names.at(name);
+    return parameters;
+  }
 
   void JudgeNamed(std::string_view scope_name, std::string_view name,
                   const std::vector<DataType>& assignments, const Site& site) {
@@ -106,10 +116,12 @@ class SpecializationAssignmentWalk : public ScopedWalk {
 
   void JudgeValues(const ClassDecl& cls,
                    const std::vector<DataType>& assignments, const Site& site) {
+    const NameScope& scope =
+        site.arguments == nullptr ? site.scope : *site.arguments;
     for (std::size_t i = 0; i < assignments.size(); ++i) {
       const DataType& assigned = assignments[i];
       if (AssignsTypeParameter(&cls, assigned, i) &&
-          WritesNoType(assigned, Scopes(), site.scope)) {
+          WritesNoType(assigned, Scopes(), scope)) {
         ReportTypeParamAssignedNoType(
             {AssignedParameter(cls, assigned, i), cls.name}, site.loc, diag_);
       }

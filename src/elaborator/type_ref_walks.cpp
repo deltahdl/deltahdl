@@ -29,7 +29,7 @@ void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
                          const TypeRefResolver& resolve_outer) {
-  ResolveTypeRefArguments(dt, [&](DataType& arg) {
+  ResolveTypeRefArguments(dt.type_params, [&](DataType& arg) {
     std::vector<Expr*> taken_dims;
     ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
   });
@@ -213,7 +213,7 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
 
 void ResolveItemArgumentTypeRefs(ModuleItem& item,
                                  const TypeRefResolver& resolve) {
-  ResolveTypeRefArguments(item.data_type, [&](DataType& arg) {
+  ResolveTypeRefArguments(item.data_type.type_params, [&](DataType& arg) {
     std::vector<Expr*> taken_dims;
     ResolveLocalTypeRef(arg, taken_dims, item.loc, {}, resolve);
   });
@@ -292,9 +292,9 @@ bool WritesTypeRefArgument(const DataType& type) {
   });
 }
 
-void ResolveTypeRefArguments(DataType& type,
+void ResolveTypeRefArguments(std::vector<DataType>& args,
                              const std::function<void(DataType&)>& resolve) {
-  for (DataType& arg : type.type_params) {
+  for (DataType& arg : args) {
     if (IsTypeRefArgument(arg)) {
       const Expr& ref = *arg.type_ref_expr;
       DataType referenced;
@@ -304,7 +304,7 @@ void ResolveTypeRefArguments(DataType& type,
       referenced.param_arg_name = arg.param_arg_name;
       if (referenced.type_ref_expr == nullptr) arg = referenced;
     }
-    ResolveTypeRefArguments(arg, resolve);
+    ResolveTypeRefArguments(arg.type_params, resolve);
   }
 }
 
@@ -362,6 +362,23 @@ static std::vector<ProceduralLocal> ResolveHeaderTypeRefs(
   return values;
 }
 
+static std::vector<ProceduralLocal> ResolveClassHeaderTypeRefs(
+    ClassDecl& cls, const TypeRefResolver& resolve_outer, Arena& arena) {
+  std::vector<ProceduralLocal> values =
+      ResolveHeaderTypeRefs(cls, resolve_outer, arena);
+  const auto kResolve = [&](DataType& arg) {
+    std::vector<Expr*> taken_dims;
+    ResolveLocalTypeRef(arg, taken_dims, cls.range.start, values,
+                        resolve_outer);
+  };
+  ResolveTypeRefArguments(cls.base_class_type_params, kResolve);
+  for (auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {
+    for (InterfaceRef& ref : *refs)
+      ResolveTypeRefArguments(ref.type_params, kResolve);
+  }
+  return values;
+}
+
 namespace {
 
 class ClassTypeRefs {
@@ -372,10 +389,11 @@ class ClassTypeRefs {
         resolve_outer_(resolve_outer),
         unit_(unit),
         arena_(arena),
-        names_(NamesInScope(
-            SelfHandles(cls, arena),
-            NamesInScope(ResolveHeaderTypeRefs(cls, resolve_outer, arena),
-                         PropertiesInScope(cls, *unit)))) {}
+        names_(
+            NamesInScope(ResolveClassHeaderTypeRefs(cls, resolve_outer, arena),
+                         PropertiesInScope(cls, *unit))) {
+    names_ = NamesInScope(SelfHandles(cls, arena), names_);
+  }
 
   const std::vector<ProceduralLocal>& Names() const { return names_; }
 
