@@ -475,10 +475,29 @@ static void ConstructClassNewInit(const ModuleItem* item, std::string_view pkg,
   ApplyClassParamOverrides(key, found->second->value.ToUint64(), ctx, arena);
 }
 
+static void RecordVariableSpecialization(const ModuleItem* item,
+                                         std::string_view variable,
+                                         SimContext& ctx) {
+  std::string_view cls = ctx.GetVariableClassType(variable);
+  if (cls.empty()) return;
+  RecordClassParamActuals(variable, cls, item->data_type.type_params, ctx);
+}
+
+static void RecordDataSpecialization(const ModuleItem* item,
+                                     std::string_view pkg, SimContext& ctx,
+                                     Arena& arena) {
+  if (item->kind != ModuleItemKind::kVarDecl) return;
+  RecordVariableSpecialization(
+      item, *arena.Create<std::string>(PackageDataKey(item, pkg)), ctx);
+  if (UnitScopes::IsUnitScope(pkg))
+    RecordVariableSpecialization(item, item->name, ctx);
+}
+
 static void ConstructScopeClassInits(const std::vector<ModuleItem*>& items,
                                      std::string_view pkg, SimContext& ctx,
                                      Arena& arena) {
   ctx.PushScope(pkg);
+  for (auto* item : items) RecordDataSpecialization(item, pkg, ctx, arena);
   for (auto* item : items) ConstructClassNewInit(item, pkg, ctx, arena);
   ctx.PopScope();
 }

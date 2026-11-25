@@ -52,6 +52,9 @@ constexpr Scope kScopes[] = {
 
 std::string Use(const Scope& scope, std::string_view body) {
   std::string text(body);
+  if (text.starts_with('#')) {
+    text.replace(0, 1, scope.name.empty() ? "" : "  import q::*;\n");
+  }
   for (std::size_t at = text.find('@'); at != std::string::npos;
        at = text.find('@')) {
     text.replace(at, 1, scope.name);
@@ -255,6 +258,56 @@ TEST(UnitClassPackageTypeRefElab, ClassScopedTypeIsAccepted) {
   }
 }
 
+TEST(UnitDeclarationTypeRefArgumentSim, VariableTakesEachOperand) {
+  ExpectFromEachScope(
+      "  X #(type(n)) a = new;\n"
+      "  X #(.T(type(n + 10'd0))) b = new;\n"
+      "  X #(type(L)) c = new;\n"
+      "  X #(type(pk::w9)) d = new;\n"
+      "  X #(.T(type(pk::t))) e = new;\n"
+      "  X #(type(logic [5:0])) g = new;\n"
+      "  Z #(3, type(n)) h = new;\n"
+      "  X #(type(k)) i = new;\n",
+      "  pk::K o = new;\n"
+      "  initial begin\n"
+      "    @i.v = o;\n"
+      "    $display(\"%0d %0d %0d %0d\", @a.w(), $bits(@a.v), @b.w(), "
+      "@c.w());\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", @d.w(), @e.w(), @g.w(), @h.w(),\n"
+      "             @i.v.m);\n"
+      "  end\n",
+      "7 7 10 3\n9 12 6 73 5\n");
+}
+
+TEST(UnitDeclarationTypeRefArgumentSim, TypedefTakesEachOperand) {
+  ExpectFromEachScope(
+      "  typedef X #(type(n)) at;\n"
+      "  typedef X #(.T(type(n + 10'd0))) bt;\n"
+      "  typedef X #(type(L)) ct;\n"
+      "  typedef X #(type(pk::w9)) dt;\n"
+      "  typedef X #(.T(type(pk::t))) et;\n"
+      "  typedef X #(type(logic [5:0])) gt;\n"
+      "  typedef Z #(3, type(n)) ht;\n"
+      "  typedef X #(type(k)) it;\n",
+      "#"
+      "  at a = new;\n"
+      "  bt b = new;\n"
+      "  ct c = new;\n"
+      "  dt d = new;\n"
+      "  et e = new;\n"
+      "  gt g = new;\n"
+      "  ht h = new;\n"
+      "  it i = new;\n"
+      "  pk::K o = new;\n"
+      "  initial begin\n"
+      "    i.v = o;\n"
+      "    $display(\"%0d %0d %0d %0d\", a.w(), $bits(a.v), b.w(), c.w());\n"
+      "    $display(\"%0d %0d %0d %0d %0d\", d.w(), e.w(), g.w(), h.w(),\n"
+      "             i.v.m);\n"
+      "  end\n",
+      "7 7 10 3\n9 12 6 73 5\n");
+}
+
 constexpr std::string_view kClassItems[] = {
     "X #(type(@)) a;",
     "static X #(type(@)) a;",
@@ -264,15 +317,20 @@ constexpr std::string_view kClassItems[] = {
     "class N; X #(type(@)) a; endclass",
 };
 
+constexpr std::string_view kScopeItems[] = {
+    "X #(type(@)) a;",
+    "X #(.T(type(@))) a = new;",
+    "typedef X #(type(@)) a;",
+};
+
 void ExpectOperandsJudged(const Scope& scope, std::string_view item) {
   for (std::string_view operand : {"pk::w9", "nosuch", "top.u.hv"}) {
     std::string text(item);
     text.replace(text.find('@'), 1, operand);
     const std::string kSource = std::string(scope.open)
                                     .append(kClasses)
-                                    .append("class P; ")
                                     .append(text)
-                                    .append(" endclass\n")
+                                    .append("\n")
                                     .append(scope.close)
                                     .append(
                                         "module z; logic [3:0] hv; endmodule\n"
@@ -299,7 +357,17 @@ void ExpectOperandsJudged(const Scope& scope, std::string_view item) {
 
 TEST(UnitClassTypeRefArgumentElab, OperandNamesATypeWithoutAHierarchicalName) {
   for (const Scope& scope : kScopes) {
-    for (std::string_view item : kClassItems) ExpectOperandsJudged(scope, item);
+    for (std::string_view item : kClassItems) {
+      ExpectOperandsJudged(
+          scope, std::string("class P; ").append(item).append(" endclass"));
+    }
+  }
+}
+
+TEST(UnitDeclarationTypeRefArgumentElab,
+     OperandNamesATypeWithoutAHierarchicalName) {
+  for (const Scope& scope : kScopes) {
+    for (std::string_view item : kScopeItems) ExpectOperandsJudged(scope, item);
   }
 }
 

@@ -211,6 +211,14 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
       arena);
 }
 
+void ResolveItemArgumentTypeRefs(ModuleItem& item,
+                                 const TypeRefResolver& resolve) {
+  ResolveTypeRefArguments(item.data_type, [&](DataType& arg) {
+    std::vector<Expr*> taken_dims;
+    ResolveLocalTypeRef(arg, taken_dims, item.loc, {}, resolve);
+  });
+}
+
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve,
                               const CompilationUnit* unit, Arena& arena,
@@ -224,6 +232,7 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
         resolve(item->typedef_type, item->loc, {});
         break;
       case ModuleItemKind::kVarDecl:
+        ResolveItemArgumentTypeRefs(*item, resolve);
         ResolveItemIndexTypeRefs(*item, resolve, arena);
         break;
       case ModuleItemKind::kFunctionDecl:
@@ -511,6 +520,8 @@ void ResolveUnitScopeTypeNames(
         for (ModuleItem* item : items) {
           if (item->kind == ModuleItemKind::kTypedef) {
             ResolveTypedefTypeRef(*item, {}, resolve, arena);
+          } else if (item->kind == ModuleItemKind::kVarDecl) {
+            ResolveItemArgumentTypeRefs(*item, resolve);
           } else if (item->kind == ModuleItemKind::kClassDecl) {
             ResolveClassTypeNames(*item->class_decl, resolve, unit, arena);
           }
