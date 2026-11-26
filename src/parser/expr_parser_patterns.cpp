@@ -37,7 +37,8 @@ Expr* Parser::ParseTypeRefExpr() {
   ref->range.start = loc;
 
   auto saved = lexer_.SavePos();
-  auto dtype = ParseDataType();
+  DataType dtype;
+  if (!TryParseInlineAggregateType(dtype)) dtype = ParseDataType();
   bool calls_scoped_method = dtype.kind == DataTypeKind::kNamed &&
                              !dtype.scope_name.empty() &&
                              Check(TokenKind::kLParen);
