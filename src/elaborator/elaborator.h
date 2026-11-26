@@ -615,7 +615,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateScopeRandomizeCalls(const ModuleDecl* decl);
 
-  void ValidateParameterizedMailboxCalls(const ModuleDecl* decl);
+  void ValidateParameterizedMailboxCalls(const ModuleDecl* decl,
+                                         const RtlirModule* mod);
 
   void ValidateStdClassMethodCalls(const ModuleDecl* decl);
 

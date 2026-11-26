@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -5,6 +6,7 @@
 #include "common/diagnostic.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -133,15 +135,22 @@ void CheckMailboxCallStmt(
   });
 }
 
+const DataType& ElaboratedType(const ModuleItem& item, const RtlirModule& mod) {
+  auto var = std::ranges::find(mod.variables, item.name, &RtlirVariable::name);
+  return var == mod.variables.end() ? item.data_type : *var->written_type;
+}
+
 }  // namespace
 
-void Elaborator::ValidateParameterizedMailboxCalls(const ModuleDecl* decl) {
+void Elaborator::ValidateParameterizedMailboxCalls(const ModuleDecl* decl,
+                                                   const RtlirModule* mod) {
   std::unordered_map<std::string_view, DataTypeKind> mbx_elem;
   std::unordered_map<std::string_view, DataTypeKind> var_kinds;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     var_kinds[item->name] = item->data_type.kind;
-    DataTypeKind ek = MailboxElementKind(item->data_type, typedefs_);
+    DataTypeKind ek =
+        MailboxElementKind(ElaboratedType(*item, *mod), typedefs_);
     if (MailboxTypeCategory(ek) >= 0) mbx_elem[item->name] = ek;
   }
   if (mbx_elem.empty()) return;
