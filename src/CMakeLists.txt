@@ -702,6 +702,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/unpacked_dim_reads.cpp
     elaborator/default_pattern_values.cpp
     elaborator/class_property_cont_assign.cpp
+    elaborator/class_property_driver_names.cpp
     elaborator/string_numeric_assign.cpp
     elaborator/instance_local_types.cpp
     elaborator/nettype_uses.cpp

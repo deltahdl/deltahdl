@@ -1,7 +1,13 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <span>
 #include <string>
+#include <string_view>
 
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -377,6 +383,108 @@ TEST(NetsAndVariables, ForceIsNoWriterUnderTheRule) {
              "    force v = a;\n"
              "  end\n"
              "endmodule\n"));
+}
+
+constexpr std::string_view kSpecializationStatics =
+    "package pk;\n"
+    "  class X #(type T = int); static int s; endclass\n"
+    "  class M; static int s; endclass\n"
+    "endpackage\n"
+    "package pj; class M; static int s; endclass endpackage\n"
+    "class X #(type T = int); static int s; endclass\n"
+    "class N #(int W = 1); static int s; endclass\n"
+    "class Y extends X#(byte); endclass\n"
+    "module m;\n";
+
+struct StaticDrivers {
+  std::string_view first;
+  std::string_view second;
+  std::string_view element;
+};
+
+std::string WithStaticDrivers(const StaticDrivers& drivers) {
+  return std::string(kSpecializationStatics)
+      .append("  ")
+      .append(drivers.first)
+      .append("\n  ")
+      .append(drivers.second)
+      .append("\nendmodule\n");
+}
+
+std::ptrdiff_t ErrorCount(const ElabFixture& f) {
+  return std::ranges::count_if(f.diag.Diagnostics(), [](const Diagnostic& d) {
+    return d.severity == DiagSeverity::kError;
+  });
+}
+
+struct DriverReport {
+  std::string_view before;
+  std::string_view after;
+  uint32_t line;
+  std::string_view subclause;
+};
+
+void ExpectEachReportedOnce(std::span<const StaticDrivers> each,
+                            const DriverReport& report) {
+  for (const StaticDrivers& drivers : each) {
+    const std::string kSrc = WithStaticDrivers(drivers);
+    SCOPED_TRACE(kSrc);
+    ElabFixture f;
+    ElabOk(kSrc, f);
+    const std::string kMessage =
+        std::string(report.before).append(drivers.element).append(report.after);
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, report.line,
+                              report.subclause));
+    EXPECT_EQ(ErrorCount(f), 1);
+  }
+}
+
+TEST(NetsAndVariables, StaticPropertiesOfTwoSpecializationsAreTwoVariables) {
+  const StaticDrivers kDrivers[] = {
+      {"assign X#(byte)::s = 4;", "assign X#(int)::s = 9;", ""},
+      {"assign X#(byte)::s = 4;", "initial X#(int)::s = 9;", ""},
+      {"assign N#(2)::s = 4;", "assign N#(3)::s = 9;", ""},
+      {"assign N#(2)::s = 4;", "initial N#(3)::s = 9;", ""},
+      {"assign pk::X#(byte)::s = 4;", "assign pk::X#(int)::s = 9;", ""},
+      {"assign pk::X#(byte)::s = 4;", "initial pk::X#(int)::s = 9;", ""},
+      {"assign pk::X#(byte)::s = 4;", "assign X#(byte)::s = 9;", ""},
+      {"assign Y::s = 4;", "initial X#(int)::s = 9;", ""},
+      {"assign pk::M::s = 4;", "assign pj::M::s = 9;", ""},
+      {"assign pk::M::s = 4;", "initial pj::M::s = 9;", ""},
+  };
+  for (const StaticDrivers& drivers : kDrivers) {
+    const std::string kSrc = WithStaticDrivers(drivers);
+    SCOPED_TRACE(kSrc);
+    EXPECT_TRUE(ElabOk(kSrc));
+  }
+}
+
+TEST(NetsAndVariables, TwoContinuousWritersOfOneSpecializationsStaticReported) {
+  const StaticDrivers kDrivers[] = {
+      {"assign X#(byte)::s = 4;", "assign X#(byte)::s = 5;", "X.s"},
+      {"assign N#(2)::s = 4;", "assign N#(1 + 1)::s = 5;", "N.s"},
+      {"assign X#()::s = 4;", "assign X#(int)::s = 5;", "X.s"},
+      {"assign pk::X#(byte)::s = 4;", "assign pk::X#(byte)::s = 5;", "pk.X.s"},
+      {"assign Y::s = 5;", "assign X#(byte)::s = 4;", "X.s"},
+      {"assign X#(byte)::s = 4;", "assign Y::s = 5;", "Y.s"},
+  };
+  ExpectEachReportedOnce(
+      kDrivers, {"multiple continuous assignments drive overlapping element '",
+                 "'", 11, "6.5"});
+}
+
+TEST(NetsAndVariables, ContinuousAndProceduralWritersOfOneStaticReported) {
+  const StaticDrivers kDrivers[] = {
+      {"assign X#(byte)::s = 4;", "initial X#(byte)::s = 5;", "X.s"},
+      {"assign N#(2)::s = 4;", "initial N#(1 + 1)::s = 5;", "N.s"},
+      {"assign X#()::s = 4;", "initial X#(int)::s = 5;", "X.s"},
+      {"assign Y::s = 4;", "initial X#(byte)::s = 5;", "Y.s"},
+  };
+  ExpectEachReportedOnce(kDrivers,
+                         {"element '",
+                          "' has both a continuous assignment and a procedural "
+                          "assignment",
+                          10, "10.3.2"});
 }
 
 }  // namespace

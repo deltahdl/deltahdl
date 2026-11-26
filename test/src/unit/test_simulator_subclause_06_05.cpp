@@ -203,4 +203,24 @@ TEST(NetsAndVariablesSim, VariableDrivesThePortNetOnTheOtherSide) {
   EXPECT_EQ(out, "1\n0\nx\n");
 }
 
+TEST(NetsAndVariablesSim, EachSpecializationsStaticTakesItsOwnDriver) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "package pk; class X #(type T = int); static int s; endclass endpackage\n"
+      "class X #(type T = int); static int s; endclass\n"
+      "class N #(int W = 1); static int s; endclass\n"
+      "module m;\n"
+      "  assign X#(byte)::s = 4;\n"
+      "  assign X#(int)::s = 9;\n"
+      "  assign N#(2)::s = 5;\n"
+      "  initial N#(3)::s = 7;\n"
+      "  assign pk::X#(byte)::s = 6;\n"
+      "  initial #1 $display(\"%0d %0d %0d %0d %0d\", X#(byte)::s, "
+      "X#(int)::s,\n"
+      "                     N#(2)::s, N#(3)::s, pk::X#(byte)::s);\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "4 9 5 7 6\n");
+}
+
 }  // namespace

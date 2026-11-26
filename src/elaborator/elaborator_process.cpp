@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <format>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -14,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/class_property_driver_names.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -157,16 +159,18 @@ static bool IsDeclaredLocal(std::string_view prefix,
   return std::ranges::find(locals, base) != locals.end();
 }
 
+using DriverPrefixer = std::function<std::string(const Expr*)>;
+
 static void CollectLhsPrefixesInScope(const Stmt* stmt,
                                       std::unordered_set<std::string>& out,
-                                      const ScopeMap& scope,
+                                      const DriverPrefixer& prefix_of,
                                       std::vector<std::string_view>& locals) {
   if (!stmt) return;
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign ||
       stmt->kind == StmtKind::kAssign) {
     if (stmt->lhs) {
-      std::string prefix = LongestStaticPrefix(stmt->lhs, scope);
+      std::string prefix = prefix_of(stmt->lhs);
       if (!prefix.empty() && !IsDeclaredLocal(prefix, locals))
         out.insert(std::move(prefix));
     }
@@ -174,16 +178,16 @@ static void CollectLhsPrefixesInScope(const Stmt* stmt,
   size_t pushed = PushForHeaderLocals(stmt, locals);
   pushed += PushBlockLocals(stmt, locals);
   ForEachChildStmt(stmt, [&](Stmt* const& sub) {
-    CollectLhsPrefixesInScope(sub, out, scope, locals);
+    CollectLhsPrefixesInScope(sub, out, prefix_of, locals);
   });
   locals.resize(locals.size() - pushed);
 }
 
 static void CollectStmtLhsPrefixes(const Stmt* stmt,
                                    std::unordered_set<std::string>& out,
-                                   const ScopeMap& scope) {
+                                   const DriverPrefixer& prefix_of) {
   std::vector<std::string_view> locals;
-  CollectLhsPrefixesInScope(stmt, out, scope, locals);
+  CollectLhsPrefixesInScope(stmt, out, prefix_of, locals);
 }
 
 static void CollectCallNamesExpr(const Expr* expr,
@@ -214,7 +218,7 @@ static std::vector<std::string_view> FunctionOwnNames(const ModuleItem& func) {
 
 static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
                                    std::unordered_set<std::string>& out,
-                                   const ScopeMap& scope) {
+                                   const DriverPrefixer& prefix_of) {
   std::unordered_set<std::string_view> pending;
   CollectCallNamesStmt(body, pending);
   std::unordered_set<std::string_view> visited;
@@ -227,7 +231,7 @@ static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
       if (it == funcs.end()) continue;
       std::vector<std::string_view> locals = FunctionOwnNames(*it->second);
       for (auto* s : it->second->func_body_stmts) {
-        CollectLhsPrefixesInScope(s, out, scope, locals);
+        CollectLhsPrefixesInScope(s, out, prefix_of, locals);
         CollectCallNamesStmt(s, next);
       }
     }
@@ -238,10 +242,10 @@ static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
 static void CollectProcedureLhsPrefixes(const Stmt* body,
                                         const FuncMap* func_map,
                                         std::unordered_set<std::string>& out,
-                                        const ScopeMap& scope) {
-  CollectStmtLhsPrefixes(body, out, scope);
+                                        const DriverPrefixer& prefix_of) {
+  CollectStmtLhsPrefixes(body, out, prefix_of);
   if (func_map && !func_map->empty())
-    CollectFuncLhsPrefixes(body, *func_map, out, scope);
+    CollectFuncLhsPrefixes(body, *func_map, out, prefix_of);
 }
 
 struct TrailingSelect {
@@ -305,11 +309,11 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
 }
 
 static ProcInfo MakeProcInfo(const ModuleItem* item, const FuncMap* func_map,
-                             const ScopeMap& scope) {
+                             const DriverPrefixer& prefix_of) {
   ProcInfo info;
   info.loc = item->loc;
   info.kind = item->kind;
-  CollectProcedureLhsPrefixes(item->body, func_map, info.lhs, scope);
+  CollectProcedureLhsPrefixes(item->body, func_map, info.lhs, prefix_of);
   return info;
 }
 
@@ -326,22 +330,22 @@ static std::vector<const Expr*> ContinuousTargets(const ModuleItem* item) {
 static void CollectProcessLhsInfo(const ModuleDecl* decl,
                                   const ProcessDriverSets& drivers,
                                   const FuncMap* func_map,
-                                  const ScopeMap& scope) {
+                                  const DriverPrefixer& prefix_of) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kAlwaysCombBlock ||
         item->kind == ModuleItemKind::kAlwaysLatchBlock ||
         item->kind == ModuleItemKind::kAlwaysFFBlock) {
-      drivers.procs.push_back(MakeProcInfo(item, func_map, scope));
+      drivers.procs.push_back(MakeProcInfo(item, func_map, prefix_of));
     }
     for (const Expr* target : ContinuousTargets(item)) {
-      std::string prefix = LongestStaticPrefix(target, scope);
+      std::string prefix = prefix_of(target);
       if (!prefix.empty()) drivers.cont_assign_lhs.insert(std::move(prefix));
     }
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kInitialBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
       CollectProcedureLhsPrefixes(item->body, func_map,
-                                  drivers.general_proc_lhs, scope);
+                                  drivers.general_proc_lhs, prefix_of);
     }
   }
 }
@@ -424,8 +428,9 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
   std::unordered_set<std::string> cont_assign_lhs;
   std::unordered_set<std::string> general_proc_lhs;
   ScopeMap scope = BuildConstantScope(mod);
-  CollectProcessLhsInfo(decl, {procs, cont_assign_lhs, general_proc_lhs},
-                        &func_decls_, scope);
+  CollectProcessLhsInfo(
+      decl, {procs, cont_assign_lhs, general_proc_lhs}, &func_decls_,
+      [&](const Expr* target) { return LongestStaticPrefix(target, scope); });
   CheckDriverConflicts(procs, cont_assign_lhs, general_proc_lhs, diag_);
 }
 
@@ -433,27 +438,32 @@ struct ContTarget {
   std::string prefix;
   bool aggregate;
   SourceLoc loc;
+  std::string written;
 };
 
 static void CollectAggregateDriverTargets(
-    const ModuleDecl* decl, const ScopeMap& scope,
+    const ModuleDecl* decl, ClassPropertyDriverNames& names,
     const std::unordered_set<std::string>& nets, std::vector<ContTarget>& conts,
     std::unordered_set<std::string>& proc_prefixes) {
+  const DriverPrefixer kPrefixOf = [&](const Expr* target) {
+    return names.DriverPrefix(target);
+  };
   for (const auto* item : decl->items) {
     for (const Expr* target : ContinuousTargets(item)) {
-      std::string prefix = LongestStaticPrefix(target, scope);
-      if (prefix.empty() ||
-          nets.contains(prefix.substr(0, prefix.find_first_of(".[")))) {
+      std::string written = names.WrittenPrefix(target);
+      if (written.empty() ||
+          nets.contains(written.substr(0, written.find_first_of(".[")))) {
         continue;
       }
-      bool aggregate = prefix.find('.') != std::string::npos ||
-                       prefix.find('[') != std::string::npos;
-      conts.push_back({std::move(prefix), aggregate, item->loc});
+      bool aggregate = written.find('.') != std::string::npos ||
+                       written.find('[') != std::string::npos;
+      conts.push_back(
+          {kPrefixOf(target), aggregate, item->loc, std::move(written)});
     }
     if (item->kind == ModuleItemKind::kInitialBlock ||
         item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
-      CollectStmtLhsPrefixes(item->body, proc_prefixes, scope);
+      CollectStmtLhsPrefixes(item->body, proc_prefixes, kPrefixOf);
     }
   }
 }
@@ -467,7 +477,7 @@ static void CheckOverlappingContTargets(const std::vector<ContTarget>& conts,
         diag.Error(conts[j].loc,
                    std::format("multiple continuous assignments drive "
                                "overlapping element '{}'",
-                               conts[j].prefix),
+                               conts[j].written),
                    Subclause("6.5"));
       }
     }
@@ -484,7 +494,7 @@ static void CheckContProcElementMix(
         diag.Error(ct.loc,
                    std::format("element '{}' has both a continuous assignment "
                                "and a procedural assignment",
-                               ct.prefix),
+                               ct.written),
                    Subclause("10.3.2"));
         break;
       }
@@ -504,7 +514,10 @@ void Elaborator::CheckAggregateElementDrivers(const ModuleDecl* decl,
       if (port.net_type != NetType::kNone) nets.emplace(port.name);
     }
   }
-  CollectAggregateDriverTargets(decl, scope, nets, conts, proc_prefixes);
+  ClassPropertyDriverNames names(
+      [this](const DataType& type) { return ClassTypeOf(type); },
+      {unit_, scope, typedefs_, arena_});
+  CollectAggregateDriverTargets(decl, names, nets, conts, proc_prefixes);
   CheckOverlappingContTargets(conts, diag_);
   CheckContProcElementMix(conts, proc_prefixes, diag_);
 }
