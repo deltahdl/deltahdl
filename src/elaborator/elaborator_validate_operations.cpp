@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <format>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <unordered_map>
@@ -14,6 +15,7 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/scope_value_type.h"
@@ -394,7 +396,14 @@ TypeRefResolver ElaboratorOperationRules::ResolverAmongLocals(
     std::vector<Expr*> taken;
     InLocals(locals, [&] {
       taken = TypeRefUnpackedDims(dt.type_ref_expr, mod);
-      resolve(dt, loc);
+      if (!dt.type_ref_expr->asks_for_object_member) {
+        resolve(dt, loc);
+      } else if (std::optional<DataType> type =
+                     TypeRefExprType(dt.type_ref_expr, mod)) {
+        AdoptExpressionType(dt, type, arena_);
+      } else {
+        dt.type_ref_expr->asks_for_object_member = false;
+      }
     });
     return taken;
   };

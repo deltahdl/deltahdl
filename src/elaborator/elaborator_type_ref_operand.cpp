@@ -667,6 +667,8 @@ std::vector<Expr*> ElaboratorOperationRules::ResolveUnitScopeTypeRef(
       AdoptReferencedType(dt, array->element);
     } else if (std::optional<DataType> type = TypeRefExprType(ref, nullptr)) {
       AdoptExpressionType(dt, type, arena_);
+    } else {
+      dt.type_ref_expr->asks_for_object_member = false;
     }
   });
   return taken;

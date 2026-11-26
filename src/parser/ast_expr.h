@@ -109,6 +109,7 @@ struct Expr {
   DataType* type_value = nullptr;
   std::vector<Attribute> attrs;
   Expr* stream_range = nullptr;
+  bool asks_for_object_member = false;
 };
 
 inline bool IsSimpleOperand(const Expr* e) {

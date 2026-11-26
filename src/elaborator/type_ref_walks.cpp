@@ -103,6 +103,10 @@ void ResolveConstraintPrefixTypeRefs(const ClassMember& block, SourceLoc loc,
                                      const TypeRefResolver& resolve,
                                      Arena& arena);
 
+TypeRefResolver ResolverInRandomizedObject(
+    const Expr& call, const std::vector<ProceduralLocal>& locals,
+    const TypeRefResolver& resolve_outer, Arena& arena);
+
 void ResolvePrefixTypeRefs(const Expr* e, SourceLoc loc,
                            const std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena) {
@@ -122,9 +126,11 @@ void ResolvePrefixTypeRefs(const Expr* e, SourceLoc loc,
   ForEachExprChild(e, in_expr);
   if (e->property_actual != nullptr)
     ForEachTreeSlot(e->property_actual, in_expr);
-  if (e->inline_constraint != nullptr)
-    ResolveConstraintPrefixTypeRefs(*e->inline_constraint, loc, locals,
-                                    resolve_outer, arena);
+  if (e->inline_constraint != nullptr) {
+    ResolveConstraintPrefixTypeRefs(
+        *e->inline_constraint, loc, {},
+        ResolverInRandomizedObject(*e, locals, resolve_outer, arena), arena);
+  }
 }
 
 void ForEachDistExpr(const std::vector<ConstraintDistRef>& refs,
@@ -382,6 +388,73 @@ std::vector<ProceduralLocal> NamesInScope(
   std::vector<ProceduralLocal> all(outer.begin(), outer.end());
   all.insert(all.end(), inner.begin(), inner.end());
   return all;
+}
+
+const Expr* RandomizedObject(const Expr& call, Arena& arena) {
+  const Expr* name = call.lhs;
+  if (name->kind == ExprKind::kMemberAccess)
+    return name->is_scope_resolution ? nullptr : name->lhs;
+  auto* self = arena.Create<Expr>();
+  self->kind = ExprKind::kIdentifier;
+  self->text = "this";
+  self->range = name->range;
+  return self;
+}
+
+Expr* LocalQualifiedName(const Expr& operand) {
+  if (operand.kind != ExprKind::kMemberAccess || !operand.is_scope_resolution ||
+      operand.lhs->text != "local") {
+    return nullptr;
+  }
+  return operand.rhs;
+}
+
+const Expr* ObjectMemberName(const Expr& operand, const Expr& call) {
+  const Expr* name = PropertyName(operand);
+  if (name == &operand && call.with_has_parens &&
+      !std::ranges::contains(call.with_restrict_ids, name->text)) {
+    return nullptr;
+  }
+  return name;
+}
+
+Expr* ObjectMemberProbe(const Expr& object, const Expr& name, Arena& arena) {
+  auto* access = arena.Create<Expr>();
+  access->kind = ExprKind::kMemberAccess;
+  access->lhs = const_cast<Expr*>(&object);
+  access->rhs = const_cast<Expr*>(&name);
+  access->range = name.range;
+  access->asks_for_object_member = true;
+  return access;
+}
+
+TypeRefResolver ResolverInRandomizedObject(
+    const Expr& call, const std::vector<ProceduralLocal>& locals,
+    const TypeRefResolver& resolve_outer, Arena& arena) {
+  const Expr* object = RandomizedObject(call, arena);
+  return
+      [&call, &locals, &resolve_outer, &arena, object](
+          DataType& dt, SourceLoc loc, std::span<const ProceduralLocal> inner) {
+        const std::vector<ProceduralLocal> kNames = NamesInScope(locals, inner);
+        const Expr* operand = TypeRefOperand(dt.type_ref_expr);
+        std::vector<Expr*> dims;
+        const Expr* member =
+            object == nullptr ? nullptr : ObjectMemberName(*operand, call);
+        if (Expr* local = LocalQualifiedName(*operand)) {
+          dt.type_ref_expr = local;
+        } else if (member != nullptr) {
+          DataType probe = dt;
+          probe.type_ref_expr = ObjectMemberProbe(*object, *member, arena);
+          dims = resolve_outer(probe, loc, kNames);
+          if (probe.type_ref_expr == nullptr) {
+            dt = probe;
+            return dims;
+          }
+          if (probe.type_ref_expr->asks_for_object_member) return dims;
+        }
+        ResolveLocalTypeRef(dt, dims, loc, kNames, resolve_outer);
+        return dims;
+      };
 }
 
 void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
