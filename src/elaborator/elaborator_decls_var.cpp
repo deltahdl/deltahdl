@@ -630,7 +630,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   bool writes_its_type =
       adopted_array_typedef.empty() && adopted_enumeration.empty();
   ValidateVarDeclTypes(item, BuildParamScope(mod), writes_its_type);
-  if (writes_its_type) EmitBareEnumMembers(item, mod);
+  EmitDeclarationEnumMembers(item, writes_its_type, mod);
   mod->variables.push_back(var);
   ValidateArrayInitPattern(item);
   ValidateStructInitPattern(item);

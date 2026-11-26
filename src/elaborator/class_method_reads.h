@@ -46,6 +46,7 @@ class ScopeNameSet {
  private:
   void AddEnumerations(const DataType& type);
   void AddImplicitNets(const Expr* e);
+  void AddItemEnumerations(const ModuleItem* item);
 
   std::unordered_set<std::string_view> names_;
   std::unordered_set<std::string_view> numbered_enum_names_;

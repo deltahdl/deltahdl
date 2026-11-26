@@ -72,7 +72,7 @@ struct Place {
   std::string_view close;
 };
 
-constexpr Place kSpecializationPlaces[] = {
+constexpr Place kDeclarationPlaces[] = {
     {"module top;\n", "endmodule\n"},
     {"interface j;\n", "endinterface\nmodule top; j u(); endmodule\n"},
     {"program q;\n", "endprogram\nmodule top; q u(); endmodule\n"},
@@ -82,7 +82,7 @@ constexpr Place kSpecializationPlaces[] = {
 };
 
 TEST(SpecializationEnumerationSim, ArgumentDeclaresItsConstantsInEachPlace) {
-  for (const Place& place : kSpecializationPlaces) {
+  for (const Place& place : kDeclarationPlaces) {
     std::string design = "class X #(type T = int); T v; endclass\n";
     design.append(place.open)
         .append(
@@ -97,6 +97,23 @@ TEST(SpecializationEnumerationSim, ArgumentDeclaresItsConstantsInEachPlace) {
             "  end\n")
         .append(place.close);
     EXPECT_EQ(Printed(design), "1 5 3 2\n");
+  }
+}
+
+TEST(InitializerOperandEnumerationSim, OperandDeclaresItsConstantsInEachPlace) {
+  for (const Place& place : kDeclarationPlaces) {
+    std::string design(place.open);
+    design
+        .append(
+            "  int w = $bits(enum {A, B}), v = $bits(enum {C, D = 5});\n"
+            "  int y = B;\n"
+            "  int u = $bits(type(enum logic [1:0] {E = 2, F}));\n"
+            "  localparam int P = $bits(enum {G, H = 7});\n"
+            "  wire integer z = $bits(enum {I = 3, J});\n"
+            "  initial #1 $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+            "                      w, y, v, D, u, F, P + H, z, J);\n")
+        .append(place.close);
+    EXPECT_EQ(Printed(design), "32 1 32 5 2 3 39 32 4\n");
   }
 }
 

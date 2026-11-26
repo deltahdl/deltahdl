@@ -437,6 +437,15 @@ void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
   for (const SpecifyItem* specify : item->specify_items) {
     Insert(specify->param_name);
   }
+  AddItemEnumerations(item);
+  if (item->kind == ModuleItemKind::kContAssign) {
+    AddImplicitNets(item->assign_lhs);
+  }
+  for (const auto& [port, conn] : item->inst_ports) AddImplicitNets(conn);
+  for (const Expr* terminal : item->gate_terminals) AddImplicitNets(terminal);
+}
+
+void ScopeNameSet::AddItemEnumerations(const ModuleItem* item) {
   for (const DataType* type : {&item->data_type, &item->typedef_type}) {
     AddEnumerations(*type);
     if (!type->param_assignment_written) continue;
@@ -447,11 +456,11 @@ void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
     if (value != nullptr && value->type_value != nullptr)
       AddEnumerations(*value->type_value);
   }
-  if (item->kind == ModuleItemKind::kContAssign) {
-    AddImplicitNets(item->assign_lhs);
-  }
-  for (const auto& [port, conn] : item->inst_ports) AddImplicitNets(conn);
-  for (const Expr* terminal : item->gate_terminals) AddImplicitNets(terminal);
+  auto add_operand = [this](const Expr* e) {
+    if (e->kind == ExprKind::kTypeRef && e->type_value != nullptr)
+      AddEnumerations(*e->type_value);
+  };
+  ForEachExprUnder(item->init_expr, add_operand);
 }
 
 void ScopeNameSet::AddEnumerations(const DataType& type) {

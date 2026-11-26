@@ -200,10 +200,15 @@ std::string_view EnumTypeKey(std::string_view decl_name,
   return *key;
 }
 
-std::string_view ArgumentEnumKey(std::string_view owner, std::size_t position,
-                                 Arena& arena) {
-  const std::string kKey = std::format("{}#{}", owner, position);
+std::string_view PositionEnumKey(std::string_view owner, char mark,
+                                 std::size_t position, Arena& arena) {
+  const std::string kKey = std::format("{}{}{}", owner, mark, position);
   return {arena.AllocString(kKey.c_str(), kKey.size()), kKey.size()};
+}
+
+bool IsTypeOperand(const Expr* e) {
+  return e != nullptr && e->kind == ExprKind::kTypeRef &&
+         e->type_value != nullptr;
 }
 
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
@@ -410,7 +415,8 @@ void Elaborator::EmitArgumentEnumMembers(const DataType& type,
     const DataType& argument = type.type_params[i];
     if (argument.kind == DataTypeKind::kEnum)
       ValidateEnumDecl(argument, loc, true);
-    EmitInPlaceEnumMembers(argument, ArgumentEnumKey(key, i, arena_), loc, mod);
+    EmitInPlaceEnumMembers(argument, PositionEnumKey(key, '#', i, arena_), loc,
+                           mod);
   }
 }
 
@@ -446,15 +452,32 @@ void Elaborator::DeclareOverrideEnumConstants(const ModuleItem& item,
   if (item.inst_continues_list) return;
   for (std::size_t i = 0; i < item.inst_params.size(); ++i) {
     const Expr* value = item.inst_params[i].second;
-    if (value == nullptr || value->kind != ExprKind::kTypeRef ||
-        value->type_value == nullptr)
-      continue;
-    const DataType& type = *value->type_value;
-    if (type.kind == DataTypeKind::kEnum)
-      ValidateEnumDecl(type, value->range.start, true);
-    EmitInPlaceEnumMembers(type, ArgumentEnumKey(item.inst_name, i, arena_),
-                           value->range.start, mod);
+    if (IsTypeOperand(value))
+      DeclareOperandEnumConstants(
+          *value, PositionEnumKey(item.inst_name, '#', i, arena_), mod);
   }
+}
+
+void Elaborator::DeclareOperandEnumConstants(const Expr& operand,
+                                             std::string_view key,
+                                             RtlirModule* mod) {
+  const DataType& type = *operand.type_value;
+  if (type.kind == DataTypeKind::kEnum)
+    ValidateEnumDecl(type, operand.range.start, true);
+  EmitInPlaceEnumMembers(type, key, operand.range.start, mod);
+}
+
+void Elaborator::EmitDeclarationEnumMembers(const ModuleItem* item,
+                                            bool writes_its_type,
+                                            RtlirModule* mod) {
+  std::size_t position = 0;
+  auto declare = [&](const Expr* e) {
+    if (IsTypeOperand(e))
+      DeclareOperandEnumConstants(
+          *e, PositionEnumKey(item->name, '=', position++, arena_), mod);
+  };
+  ForEachExprUnder(item->init_expr, declare);
+  if (writes_its_type) EmitBareEnumMembers(item, mod);
 }
 
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {

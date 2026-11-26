@@ -279,7 +279,7 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     ResolveBodyTypeParam(item, kDefaultType, pd, mod);
     DeclareTypeParamEnums(item->typedef_type, pd, pd.from_override, mod);
   } else {
-    EmitBareEnumMembers(item, mod);
+    EmitDeclarationEnumMembers(item, true, mod);
   }
   const ScopeMap kScope = BuildParamScope(mod);
   FoldParamUnpackedBounds(pd, kScope);

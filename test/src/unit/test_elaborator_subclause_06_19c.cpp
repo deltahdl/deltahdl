@@ -73,7 +73,7 @@ TEST(OverrideEnumerationElaboration, ConstantIsNoNameOfTheInstantiatedModule) {
                             LineHolding(kSrc, "int y = B"), "23.9"));
 }
 
-constexpr Parent kSpecializationParents[] = {
+constexpr Parent kDeclarationParents[] = {
     {"module top;\n", "endmodule\n"},
     {"interface j;\n", "endinterface\nmodule top; j k(); endmodule\n"},
     {"program q;\n", "endprogram\nmodule top; q k(); endmodule\n"},
@@ -90,7 +90,7 @@ std::string WithClassX(const Parent& parent, std::string_view body) {
 
 TEST(SpecializationEnumerationElaboration,
      DuplicateValueInAnArgumentIsReported) {
-  for (const Parent& parent : kSpecializationParents) {
+  for (const Parent& parent : kDeclarationParents) {
     for (std::string_view body :
          {"  X #(enum {A = 1, B = 1}) k;\n",
           "  typedef X #(.T(enum {A = 1, B = 1})) x_t;\n"}) {
@@ -106,7 +106,7 @@ TEST(SpecializationEnumerationElaboration,
 }
 
 TEST(SpecializationEnumerationElaboration, DistinctValuesInAnArgumentAccepted) {
-  for (const Parent& parent : kSpecializationParents) {
+  for (const Parent& parent : kDeclarationParents) {
     const std::string kSrc =
         WithClassX(parent,
                    "  X #(enum {A = 1, B = 2}) k;\n"
@@ -133,6 +133,40 @@ TEST(SpecializationEnumerationElaboration, ConstantIsNoNameOfTheClass) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to unresolved identifier 'B'",
                             LineHolding(kSrc, "return B"), "23.9"));
+}
+
+TEST(InitializerOperandEnumerationElaboration,
+     DuplicateValueInAnOperandIsReported) {
+  for (const Parent& parent : kDeclarationParents) {
+    for (std::string_view body :
+         {"  int w = $bits(enum {A = 1, B = 1});\n",
+          "  localparam int P = $bits(type(enum {A = 1, B = 1}));\n",
+          "  wire integer z = $bits(enum {A = 1, B = 1});\n"}) {
+      const std::string kSrc = InParent(parent, body);
+      SCOPED_TRACE(kSrc);
+      ElabFixture f;
+      ElaborateSrc(kSrc, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "duplicate enum member value 1",
+                                LineHolding(kSrc, "enum {A = 1"), "6.19"));
+    }
+  }
+}
+
+TEST(InitializerOperandEnumerationElaboration,
+     DistinctValuesInAnOperandAccepted) {
+  for (const Parent& parent : kDeclarationParents) {
+    const std::string kSrc =
+        InParent(parent,
+                 "  int w = $bits(enum {A = 1, B = 2});\n"
+                 "  localparam int P = $bits(type(enum {C = 1, D = 2}));\n"
+                 "  wire integer z = $bits(enum {E = 1, F = 2});\n"
+                 "  int y = B + D + F;\n");
+    SCOPED_TRACE(kSrc);
+    ElabFixture f;
+    ElaborateSrc(kSrc, f);
+    EXPECT_FALSE(f.has_errors);
+  }
 }
 
 }  // namespace
