@@ -37,7 +37,7 @@ working even as a citation, since `31402` no longer reads as `3.14.2`.
   deleting the characters the check objects to.
 - When an existing name of this kind turns up, rename it in the push when it is
   related to the push's issues, and otherwise file an issue for it unless an
-  open one already covers it ([what-does-not-get-filed](what-does-not-get-filed.md)).
+  open one already covers it ([a-finding-joins-the-push-or-is-filed](a-finding-joins-the-push-or-is-filed.md)).
 - The struct a refactor groups parameters into is named after the entity the
   standard defines. That entity's name, never its
   clause number, is what goes into the identifier.

@@ -1,5 +1,5 @@
 ---
-name: what-does-not-get-filed
+name: a-finding-joins-the-push-or-is-filed
 description: "A finding related to the issues the push is solving goes in that push, and every other finding is filed, a case of an open issue's rule or part on that issue; nothing is fixed on the spot outside that work."
 metadata:
   node_type: memory
@@ -8,7 +8,7 @@ metadata:
   modified: 2026-11-21T02:53:56.911Z
 ---
 
-# What does not get filed
+# A finding joins the push or is filed
 
 A finding related to the issues the push is solving goes in that push, and every other finding is filed. The one rule covers every kind of finding, whether it breaks a rule of a standard or has no rule behind it, such as a misleading message or a fault in a script.
 

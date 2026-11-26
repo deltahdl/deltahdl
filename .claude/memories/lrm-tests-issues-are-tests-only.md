@@ -18,7 +18,7 @@ Every other issue is fair game for a fix: its commit delivers the src change and
 
 **How to apply:**
 
-- For an `lrm-tests` issue, trace each new test through the code under its plain name, building nothing locally ([verifying-through-ci](verifying-through-ci.md)), and judge whether deltahdl passes it. A test that passes keeps its plain name. A test that fails because deltahdl does not do what its case states takes the prefix. A test failing for another reason is wrong and is corrected, or has found a defect of another rule, which becomes a case of that rule's issue with a test of its own ([what-does-not-get-filed](what-does-not-get-filed.md)).
+- For an `lrm-tests` issue, trace each new test through the code under its plain name, building nothing locally ([verifying-through-ci](verifying-through-ci.md)), and judge whether deltahdl passes it. A test that passes keeps its plain name. A test that fails because deltahdl does not do what its case states takes the prefix. A test failing for another reason is wrong and is corrected, or has found a defect of another rule, which becomes a case of that rule's issue with a test of its own ([a-finding-joins-the-push-or-is-filed](a-finding-joins-the-push-or-is-filed.md)).
 - The `lrm-tests` push also closes each rule issue all of whose cases now pass under their plain names ([a-push-closes-an-issue](a-push-closes-an-issue.md)): that records conformance found, not a fix.
 - Choose a name no other test has once the prefix is gone.
 - A test carrying the prefix shows nothing about its case. The case stays unticked in its rule's issue, with the test named beside it ([a-rule-conforms-only-when-tests-show-it](a-rule-conforms-only-when-tests-show-it.md)).
