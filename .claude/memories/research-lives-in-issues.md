@@ -17,8 +17,8 @@ The session's scratchpad is not durable.
 **Why:** a session can be lost, and its scratchpad with it;
 research recorded only there is lost too.
 
-**How to apply:** unlike a problem met while working, which may be solved rather
-than filed, a plan of discovery, and each
+**How to apply:** unlike a problem met while working, which joins the push when
+it is related to the push's issues ([what-does-not-get-filed](what-does-not-get-filed.md)), a plan of discovery, and each
 mismatch a discovery records, is filed at once. Include the reproducing
 source inline in a mismatch issue so it reproduces without the scratch
 directory. See [one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md) for the grain.

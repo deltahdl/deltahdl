@@ -95,7 +95,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Issues
 
-- [What does not get filed](what-does-not-get-filed.md) — a case of the part of a rule in hand joins the fix and one of an open issue's part joins that issue; only a defect with no rule behind it is fixed on the spot.
+- [What does not get filed](what-does-not-get-filed.md) — a finding related to the issues the push is solving goes in that push; every other finding is filed.
 - [Searching for an existing report before filing](searching-for-an-existing-report-before-filing.md) — grep all of src/ and test/ for the rule's own words before filing "not reported".
 - [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one rule, or one part of a rule that one push takes, with every case listed, or one defect with one fix; split two, merge cases of one.
 - [Research lives in issues](research-lives-in-issues.md) — file a plan that outlives the session, and each finding, as it arises.
