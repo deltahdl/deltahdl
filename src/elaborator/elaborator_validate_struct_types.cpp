@@ -155,9 +155,22 @@ bool NamesPackageType(const Expr& ref, const CompilationUnit* unit) {
   return pkg != nullptr && DeclaresAType(*ItemNamed(pkg->items, ref.rhs->text));
 }
 
+static bool NamesClassProperty(const Expr& ref, const CompilationUnit* unit) {
+  if (ref.rhs == nullptr || ref.rhs->kind != ExprKind::kIdentifier)
+    return false;
+  const std::vector<const ClassDecl*> kChain =
+      ClassChainOfScopePrefix(ref.lhs, unit);
+  return !kChain.empty() &&
+         std::ranges::any_of(kChain.back()->members, [&](const ClassMember* m) {
+           return m->kind == ClassMemberKind::kProperty &&
+                  m->name == ref.rhs->text;
+         });
+}
+
 static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
                                  const TypeRefScope& scope) {
-  if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
+  if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution ||
+      NamesClassProperty(*ref, scope.unit)) {
     return false;
   }
   if (ref->lhs->kind != ExprKind::kIdentifier || ref->lhs->has_param_spec) {

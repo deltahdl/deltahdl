@@ -143,6 +143,33 @@ void ExpectAsArgumentInEachPlaceAndPosition(
                     printed, places);
 }
 
+constexpr Place kPrefixPlaces[] = {
+    kPlaces[0],
+    {"module top;\n", "", "endmodule\n"},
+    kPlaces[1],
+};
+
+void ExpectAsPrefixArgumentInEachPlace(
+    std::string_view type, std::string_view value, std::string_view printed,
+    std::span<const Place> places = kPrefixPlaces) {
+  for (const Place& place : places) {
+    std::string text(kPackage);
+    text.append(place.open).append(kClasses);
+    text.append(
+        "class X #(type T = int);\n"
+        "  static function int w(); T v; return $bits(v); endfunction\n"
+        "endclass\n"
+        "function automatic void show();\n"
+        "  $display(\"%0d %0d\", X#(type(");
+    text.append(type).append("))::w(), X#(type(").append(value);
+    text.append("))::w());\nendfunction\n").append(place.use);
+    text.append("initial show();\n").append(place.close);
+    SCOPED_TRACE(text);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(text, f), printed);
+  }
+}
+
 TEST(ClassScopedTypeRefInScopeSim, TakesABareClassTypeOrStaticProperty) {
   ExpectInEachPlaceAndPosition("C::u", "C::s", "7 5 7 5");
 }
@@ -183,6 +210,28 @@ TEST(ClassScopedTypeRefArgumentInScopeSim,
 TEST(ClassScopedTypeRefArgumentInScopeSim,
      TakesAPackagesClassTypeOrStaticProperty) {
   ExpectAsArgumentInEachPlaceAndPosition("pk::K::inner", "pk::K::s", "3 6");
+}
+
+TEST(ClassScopedTypeRefPrefixArgumentSim,
+     TakesASpecializationsTypeOrStaticProperty) {
+  ExpectAsPrefixArgumentInEachPlace("W#(logic [6:0])::s", "W#(logic [6:0])::u",
+                                    "7 7\n");
+}
+
+TEST(ClassScopedTypeRefPrefixArgumentSim, TakesABareClassStaticProperty) {
+  ExpectAsPrefixArgumentInEachPlace("C::s", "C::s", "5 5\n");
+}
+
+TEST(ClassScopedTypeRefPrefixArgumentSim,
+     TakesABareClassTypeInAModuleOrTheUnit) {
+  ExpectAsPrefixArgumentInEachPlace("C::u", "C::u", "7 7\n",
+                                    std::span(kPrefixPlaces).subspan(1));
+}
+
+TEST(ClassScopedTypeRefPrefixArgumentSim,
+     DISABLED_TakesABareClassTypeInAPackage) {
+  ExpectAsPrefixArgumentInEachPlace("C::u", "C::u", "7 7\n",
+                                    std::span(kPrefixPlaces).first(1));
 }
 
 }  // namespace
