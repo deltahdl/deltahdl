@@ -68,29 +68,77 @@ std::string Positions(std::string_view type, std::string_view value) {
       .append("endtask\n");
 }
 
-void ExpectInEachPlaceAndPosition(std::string_view type, std::string_view value,
-                                  std::string_view bits) {
-  std::string printed;
-  for (int line = 0; line < 4; ++line) printed.append(bits).append("\n");
+void ExpectInEachPlace(const std::string& items, std::string_view body,
+                       std::string_view printed) {
   for (const Place& place : kPlaces) {
     std::string text(kPackage);
     text.append(place.open);
-    text.append(kClasses).append(Positions(type, value)).append(place.use);
-    text.append(
-        "  P p = new;\n"
-        "  initial begin\n"
-        "    $display(\"%0d %0d %0d %0d\", $bits(p.a), $bits(p.b), "
-        "$bits(p.sa),\n"
-        "             $bits(p.sb));\n"
-        "    p.m(0, 0);\n"
-        "    f(0, 0);\n"
-        "    t(0, 0);\n"
-        "  end\n");
-    text.append(place.close);
+    text.append(kClasses).append(items).append(place.use);
+    text.append("  P p = new;\n  initial begin\n").append(body);
+    text.append("  end\n").append(place.close);
     SCOPED_TRACE(text);
     SimFixture f;
     EXPECT_EQ(RunCapture(text, f), printed);
   }
+}
+
+void ExpectInEachPlaceAndPosition(std::string_view type, std::string_view value,
+                                  std::string_view bits) {
+  std::string printed;
+  for (int line = 0; line < 4; ++line) printed.append(bits).append("\n");
+  ExpectInEachPlace(Positions(type, value),
+                    "    $display(\"%0d %0d %0d %0d\", $bits(p.a), $bits(p.b), "
+                    "$bits(p.sa),\n"
+                    "             $bits(p.sb));\n"
+                    "    p.m(0, 0);\n"
+                    "    f(0, 0);\n"
+                    "    t(0, 0);\n",
+                    printed);
+}
+
+std::string ArgumentLocals(std::string_view type, std::string_view value) {
+  return std::string("()\n    X #(type(")
+      .append(type)
+      .append(")) la = new;\n    X #(type(")
+      .append(value)
+      .append(
+          ")) lb = new;\n"
+          "    $display(\"%0d %0d\", $bits(la.v), $bits(lb.v));\n");
+}
+
+std::string ArgumentPositions(std::string_view type, std::string_view value) {
+  const std::string kLocals = ArgumentLocals(type, value);
+  return std::string(
+             "class X #(type T = int); T v; endclass\n"
+             "class P;\n  X #(type(")
+      .append(type)
+      .append(")) a = new;\n  X #(type(")
+      .append(value)
+      .append(")) b = new;\n  function void m")
+      .append(kLocals)
+      .append(
+          "  endfunction\n"
+          "endclass\n"
+          "function automatic void f")
+      .append(kLocals)
+      .append(
+          "endfunction\n"
+          "task automatic t")
+      .append(kLocals)
+      .append("endtask\n");
+}
+
+void ExpectAsArgumentInEachPlaceAndPosition(std::string_view type,
+                                            std::string_view value,
+                                            std::string_view bits) {
+  std::string printed;
+  for (int line = 0; line < 4; ++line) printed.append(bits).append("\n");
+  ExpectInEachPlace(ArgumentPositions(type, value),
+                    "    $display(\"%0d %0d\", $bits(p.a.v), $bits(p.b.v));\n"
+                    "    p.m();\n"
+                    "    f();\n"
+                    "    t();\n",
+                    printed);
 }
 
 TEST(ClassScopedTypeRefInScopeSim, TakesABareClassTypeOrStaticProperty) {
@@ -108,6 +156,21 @@ TEST(ClassScopedTypeRefInScopeSim, SpecializationArgumentDecidesTheType) {
 
 TEST(ClassScopedTypeRefInScopeSim, TakesAPackagesClassTypeOrStaticProperty) {
   ExpectInEachPlaceAndPosition("pk::K::inner", "pk::K::s", "3 6 3 6");
+}
+
+TEST(ClassScopedTypeRefArgumentInScopeSim,
+     TakesABareClassTypeOrStaticProperty) {
+  ExpectAsArgumentInEachPlaceAndPosition("C::u", "C::s", "7 5");
+}
+
+TEST(ClassScopedTypeRefArgumentInScopeSim,
+     TakesASpecializationsTypeOrStaticProperty) {
+  ExpectAsArgumentInEachPlaceAndPosition("W#(byte)::u", "W#(byte)::s", "8 8");
+}
+
+TEST(ClassScopedTypeRefArgumentInScopeSim,
+     TakesAPackagesClassTypeOrStaticProperty) {
+  ExpectAsArgumentInEachPlaceAndPosition("pk::K::inner", "pk::K::s", "3 6");
 }
 
 }  // namespace
