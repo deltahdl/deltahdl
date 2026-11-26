@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -556,6 +557,12 @@ void Elaborator::ReportSpecializationErrors(const DataType& written,
                                  {kTables, BuildParamScope(mod), unit_}, diag_);
 }
 
+template <typename Finds>
+static bool AnyReadOperand(const Expr* e, const Finds& finds) {
+  if (e->kind != ExprKind::kAssignmentPattern) return AnyExprChild(e, finds);
+  return std::ranges::any_of(e->elements, finds);
+}
+
 template <typename IsVariable>
 static const Expr* FirstVariableRead(const Expr* e,
                                      const IsVariable& is_variable) {
@@ -569,17 +576,10 @@ static const Expr* FirstVariableRead(const Expr* e,
                                   : FirstVariableRead(e->lhs, is_variable);
   }
   const Expr* found = nullptr;
-  auto finds = [&](const Expr* child) {
+  AnyReadOperand(e, [&](const Expr* child) {
     found = FirstVariableRead(child, is_variable);
     return found != nullptr;
-  };
-  if (e->kind == ExprKind::kAssignmentPattern) {
-    for (const Expr* element : e->elements) {
-      if (finds(element)) break;
-    }
-  } else {
-    AnyExprChild(e, finds);
-  }
+  });
   return found;
 }
 

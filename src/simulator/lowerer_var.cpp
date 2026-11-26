@@ -420,16 +420,15 @@ bool Lowerer::InitWaitsForDesign(const RtlirVariable& var) {
   if (!HoldsOneValue(var)) return false;
   bool waits = false;
   ForEachEvaluatedSubExpr(var.init_expr, [&](const Expr* e) {
-    if (e->kind == ExprKind::kCall && e->lhs != nullptr &&
-        e->lhs->kind == ExprKind::kIdentifier) {
-      waits = true;
-    } else if (e->kind == ExprKind::kMemberAccess &&
-               ReachesOutsideItsScope(e, ctx_)) {
-      waits = true;
-    } else if (e->kind == ExprKind::kIdentifier &&
-               deferred_init_vars_.contains(ctx_.FindVariable(e->text))) {
-      waits = true;
-    }
+    const bool kCallsSubroutine = e->kind == ExprKind::kCall &&
+                                  e->lhs != nullptr &&
+                                  e->lhs->kind == ExprKind::kIdentifier;
+    const bool kReachesOut =
+        e->kind == ExprKind::kMemberAccess && ReachesOutsideItsScope(e, ctx_);
+    const bool kReadsDeferred =
+        e->kind == ExprKind::kIdentifier &&
+        deferred_init_vars_.contains(ctx_.FindVariable(e->text));
+    if (kCallsSubroutine || kReachesOut || kReadsDeferred) waits = true;
   });
   return waits;
 }
