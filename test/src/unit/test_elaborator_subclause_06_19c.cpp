@@ -1,0 +1,76 @@
+#include <gtest/gtest.h>
+
+#include <string>
+#include <string_view>
+
+#include "fixture_elaborator.h"
+#include "helpers_reported_error.h"
+
+using namespace delta;
+
+namespace {
+
+constexpr std::string_view kChildren =
+    "module m #(type T = int) (); T x; endmodule\n"
+    "interface i #(type T = int) (); T x; endinterface\n";
+
+struct Parent {
+  std::string_view open;
+  std::string_view close;
+};
+
+constexpr Parent kParents[] = {
+    {"module top;\n", "endmodule\n"},
+    {"interface j;\n", "endinterface\nmodule top; j k(); endmodule\n"},
+    {"module top;\n  if (1) begin : g\n", "  end\nendmodule\n"},
+};
+
+std::string InParent(const Parent& parent, std::string_view body) {
+  std::string text(kChildren);
+  text.append(parent.open).append(body).append(parent.close);
+  return text;
+}
+
+TEST(OverrideEnumerationElaboration, DuplicateValueInAnOverrideIsReported) {
+  for (const Parent& parent : kParents) {
+    for (std::string_view body : {"  i #(enum {A = 1, B = 1}) w();\n",
+                                  "  i #(.T(enum {A = 1, B = 1})) w();\n"}) {
+      const std::string kSrc = InParent(parent, body);
+      SCOPED_TRACE(kSrc);
+      ElabFixture f;
+      ElaborateSrc(kSrc, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "duplicate enum member value 1",
+                                LineHolding(kSrc, "enum {A = 1"), "6.19"));
+    }
+  }
+}
+
+TEST(OverrideEnumerationElaboration, DistinctValuesInAnOverrideAreAccepted) {
+  for (const Parent& parent : kParents) {
+    const std::string kSrc =
+        InParent(parent, "  i #(enum {A = 1, B = 2}) w();\n  int y = B;\n");
+    SCOPED_TRACE(kSrc);
+    ElabFixture f;
+    ElaborateSrc(kSrc, f);
+    EXPECT_FALSE(f.has_errors);
+  }
+}
+
+TEST(OverrideEnumerationElaboration, ConstantIsNoNameOfTheInstantiatedModule) {
+  const std::string kSrc =
+      "module n #(type T = int) ();\n"
+      "  T x;\n"
+      "  int y = B;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  n #(enum {A, B}) u();\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'B'",
+                            LineHolding(kSrc, "int y = B"), "23.9"));
+}
+
+}  // namespace

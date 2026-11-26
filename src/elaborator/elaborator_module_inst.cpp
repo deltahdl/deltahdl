@@ -488,6 +488,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   DeclareInModuleNameSpace(item->inst_name, item->loc);
+  DeclareOverrideEnumConstants(*item, mod);
   ReportInterconnectInInstance(*item, interconnect_names_, diag_);
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;

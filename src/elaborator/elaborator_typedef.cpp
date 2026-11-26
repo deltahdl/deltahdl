@@ -421,6 +421,24 @@ void Elaborator::EmitInPlaceEnumMembers(const DataType& type,
   });
 }
 
+void Elaborator::DeclareOverrideEnumConstants(const ModuleItem& item,
+                                              RtlirModule* mod) {
+  if (item.inst_continues_list) return;
+  for (std::size_t i = 0; i < item.inst_params.size(); ++i) {
+    const Expr* value = item.inst_params[i].second;
+    if (value == nullptr || value->kind != ExprKind::kTypeRef ||
+        value->type_value == nullptr)
+      continue;
+    const DataType& type = *value->type_value;
+    if (type.kind == DataTypeKind::kEnum)
+      ValidateEnumDecl(type, value->range.start, true);
+    const std::string kKey = std::format("{}#{}", item.inst_name, i);
+    const std::string_view kStored{
+        arena_.AllocString(kKey.c_str(), kKey.size()), kKey.size()};
+    EmitInPlaceEnumMembers(type, kStored, value->range.start, mod);
+  }
+}
+
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->typedef_type, item->loc, mod);
   ReportIllegalNettypeDataType(*item, {typedefs_, td_array_dims_, class_names_},
