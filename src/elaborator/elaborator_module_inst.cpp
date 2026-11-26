@@ -490,6 +490,21 @@ void Elaborator::ElaborateInstanceWithOverrideEnums(ModuleItem* item,
   ElaborateModuleInst(item, mod);
 }
 
+void Elaborator::RecordCheckerUwireOutputs(const ModuleItem* item,
+                                           const ModuleDecl* checker,
+                                           RtlirModule* mod) {
+  ScopeMap scope = BuildConstantScope(mod);
+  for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
+  RecordUwireCheckerOutputs(uwire_drivers_, item, checker,
+                            {mod,
+                             var_types_,
+                             unit_,
+                             unit_uwire_drivers_,
+                             {gen_prefix_scopes_, declared_names_},
+                             scope},
+                            diag_);
+}
+
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
@@ -529,18 +544,8 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
   BindCheckerTreeActuals(inst, checker_tree_actuals_);
-  if (child_decl->decl_kind == ModuleDeclKind::kChecker) {
-    ScopeMap scope = BuildConstantScope(mod);
-    for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
-    RecordUwireCheckerOutputs(uwire_drivers_, item, child_decl,
-                              {mod,
-                               var_types_,
-                               unit_,
-                               unit_uwire_drivers_,
-                               {gen_prefix_scopes_, declared_names_},
-                               scope},
-                              diag_);
-  }
+  if (child_decl->decl_kind == ModuleDeclKind::kChecker)
+    RecordCheckerUwireOutputs(item, child_decl, mod);
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =

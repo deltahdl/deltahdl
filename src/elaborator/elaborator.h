@@ -254,6 +254,8 @@ class Elaborator : public ElaboratorClassRules {
   void RunPostItemValidations(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
+  void RecordCheckerUwireOutputs(const ModuleItem* item,
+                                 const ModuleDecl* checker, RtlirModule* mod);
   void ElaborateChildInstance(RtlirModuleInst& inst, const ModuleItem* item,
                               ModuleDecl* child_decl, RtlirModule* mod,
                               const ScopeMap& parent_scope);
