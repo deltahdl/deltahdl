@@ -40,6 +40,8 @@ void ResolveItemPrefixTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
 
 const Expr* TypeRefOperand(const Expr* written);
 
+bool WritesTypeRefAmong(const std::vector<DataType>& args);
+
 bool WritesTypeRefArgument(const DataType& type);
 
 void ResolveTypeRefArguments(std::vector<DataType>& args,

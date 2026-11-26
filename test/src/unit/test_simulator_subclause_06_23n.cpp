@@ -53,8 +53,9 @@ constexpr BasePlace kBasePlaces[] = {
     {"", "module top;\n", "endmodule\n"},
 };
 
-constexpr BasePlace kImplementerPlaces[] = {kBasePlaces[3], kBasePlaces[4],
-                                            kBasePlaces[5]};
+constexpr BasePlace kSignatureCheckedPlaces[] = {kBasePlaces[0], kBasePlaces[1],
+                                                 kBasePlaces[2], kBasePlaces[4],
+                                                 kBasePlaces[5]};
 
 std::string Declared(const BasePlace& place) {
   return std::string(kShared).append(place.open).append(kDeclarations);
@@ -161,8 +162,7 @@ TEST(BaseTypeRefArgumentSim, OperandIsTheClassesOwnParameter) {
 }
 
 TEST(BaseTypeRefArgumentSim, ImplementsTakesEachOperand) {
-  ExpectPrintedIn(
-      kImplementerPlaces,
+  ExpectInEachBasePlace(
       "class A implements I #(type(n));\n"
       "  virtual function int f(logic [6:0] x); return $bits(x); endfunction\n"
       "endclass\n"
@@ -202,8 +202,7 @@ TEST(BaseTypeRefArgumentSim, ImplementsTakesEachOperand) {
 }
 
 TEST(BaseTypeRefArgumentSim, InterfaceClassExtends) {
-  ExpectPrintedIn(
-      kImplementerPlaces,
+  ExpectInEachBasePlace(
       "interface class J extends I #(type(n)); endclass\n"
       "class D implements J;\n"
       "  virtual function int f(logic [6:0] x); return $bits(x); endfunction\n"
@@ -258,6 +257,32 @@ void ExpectBaseOperandsJudged(const BasePlace& place, std::string_view base) {
 TEST(BaseTypeRefArgumentElab, OperandNamesATypeWithoutAHierarchicalName) {
   for (const BasePlace& place : kBasePlaces) {
     for (std::string_view base : kBases) ExpectBaseOperandsJudged(place, base);
+  }
+}
+
+TEST(BaseTypeRefArgumentElab, ImplementationIsCheckedAgainstTheOperandsType) {
+  for (const BasePlace& place : kSignatureCheckedPlaces) {
+    for (std::string_view formal : {"byte", "logic [6:0]"}) {
+      const std::string kBefore =
+          Declared(place).append("class D implements I #(type(n));\n");
+      const std::string kSource =
+          std::string(kBefore)
+              .append("  virtual function int f(")
+              .append(formal)
+              .append(" x); return 0; endfunction\nendclass\n")
+              .append(place.use)
+              .append(place.close);
+      SCOPED_TRACE(kSource);
+      SimFixture f;
+      ElaborateSrc(kSource, f);
+      const bool kMismatched = formal == "byte";
+      EXPECT_EQ(ReportedError(f.diag.Diagnostics(),
+                              "method 'f' does not match signature of pure "
+                              "virtual method 'f' in interface 'I",
+                              LineAfter(kBefore), "8.26.6.1"),
+                kMismatched);
+      EXPECT_EQ(f.diag.Diagnostics().size(), kMismatched ? 1U : 0U);
+    }
   }
 }
 

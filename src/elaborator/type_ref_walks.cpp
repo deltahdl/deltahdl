@@ -578,10 +578,14 @@ static bool IsTypeRefArgument(const DataType& arg) {
          arg.type_ref_expr->kind == ExprKind::kTypeRef;
 }
 
-bool WritesTypeRefArgument(const DataType& type) {
-  return std::ranges::any_of(type.type_params, [](const DataType& arg) {
-    return IsTypeRefArgument(arg) || WritesTypeRefArgument(arg);
+bool WritesTypeRefAmong(const std::vector<DataType>& args) {
+  return std::ranges::any_of(args, [](const DataType& arg) {
+    return IsTypeRefArgument(arg) || WritesTypeRefAmong(arg.type_params);
   });
+}
+
+bool WritesTypeRefArgument(const DataType& type) {
+  return WritesTypeRefAmong(type.type_params);
 }
 
 void ResolveTypeRefArguments(std::vector<DataType>& args,

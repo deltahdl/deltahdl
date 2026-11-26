@@ -99,6 +99,8 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
   void ValidateRestrictedScopePrefixInClasses();
 
   void ValidateInterfaceClassRules();
+  void ValidateResolvedInterfaceSignatures(const ClassDecl* cls,
+                                           const ScopeMap& params);
 
   void ValidateForwardClassTypedefs();
 
@@ -129,6 +131,7 @@ class ElaboratorClassRules : public ElaboratorOperationRules {
  private:
   std::unordered_set<const ClassDecl*> static_method_bodies_checked_;
   std::unordered_set<std::string_view> keyword_typed_params_;
+  std::unordered_set<const ClassDecl*> interface_signatures_awaiting_types_;
 };
 
 }  // namespace delta

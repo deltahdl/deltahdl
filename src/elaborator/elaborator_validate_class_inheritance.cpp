@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_validate_classes_internal.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_parameter_values.h"
+#include "elaborator/type_ref_walks.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -204,7 +205,7 @@ static void DiagnoseInterfaceSignatureConflicts(
       if (!MethodSignaturesCompatible(first_method, entries[0].first.subst,
                                       entries[i].second,
                                       entries[i].first.subst)) {
-        diag.Error(
+        diag.ErrorOnce(
             cls->range.start,
             std::format("method name conflict for '{}' in '{}': incompatible "
                         "signatures in interface '{}' and interface '{}'",
@@ -258,11 +259,11 @@ static void DiagnoseImplSignatureMismatches(const ClassDecl* cls,
     for (const auto& [iface_spec, iface_method] : entries) {
       if (!MethodSignaturesCompatible(impl, kImplSubst, iface_method,
                                       iface_spec.subst)) {
-        diag.Error(impl->loc,
-                   std::format("method '{}' does not match signature of pure "
-                               "virtual method '{}' in interface '{}'",
-                               method_name, method_name, iface_spec.key),
-                   Subclause("8.26.6.1"));
+        diag.ErrorOnce(impl->loc,
+                       std::format("method '{}' does not match signature of "
+                                   "pure virtual method '{}' in interface '{}'",
+                                   method_name, method_name, iface_spec.key),
+                       Subclause("8.26.6.1"));
         break;
       }
     }
@@ -708,6 +709,31 @@ static void ValidateSpecializationArgsInInheritance(const ClassDecl* cls,
                                         names, diag);
 }
 
+static bool ReachesTypeRefArgument(const ClassDecl* cls,
+                                   const CompilationUnit* unit,
+                                   std::unordered_set<const ClassDecl*>& seen) {
+  if (cls == nullptr || !seen.insert(cls).second) return false;
+  for (const auto* refs : {&cls->implements_types, &cls->extends_interfaces}) {
+    for (const InterfaceRef& ref : *refs) {
+      if (WritesTypeRefAmong(ref.type_params) ||
+          ReachesTypeRefArgument(FindReferencedClass(ref, unit), unit, seen))
+        return true;
+    }
+  }
+  return ReachesTypeRefArgument(FindBaseClass(cls, unit), unit, seen);
+}
+
+void ElaboratorClassRules::ValidateResolvedInterfaceSignatures(
+    const ClassDecl* cls, const ScopeMap& params) {
+  std::vector<const ClassDecl*> classes;
+  AppendWithNested(cls, classes);
+  const ClassLookup kLook{unit_, params};
+  for (const ClassDecl* each : classes) {
+    if (interface_signatures_awaiting_types_.contains(each))
+      ValidateMethodNameConflicts(each, kLook, diag_);
+  }
+}
+
 void ElaboratorClassRules::ValidateInterfaceClassRules() {
   for (const auto& scope : DeclaredClassScopes(unit_)) {
     ScopeMap params = ScopeParamValues(scope, cu_param_scope_);
@@ -723,7 +749,12 @@ void ElaboratorClassRules::ValidateInterfaceClassRules() {
         ValidateImplementsTypeAccess(cls, params);
       }
 
-      ValidateMethodNameConflicts(cls, look, diag_);
+      std::unordered_set<const ClassDecl*> seen;
+      if (ReachesTypeRefArgument(cls, unit_, seen)) {
+        interface_signatures_awaiting_types_.insert(cls);
+      } else {
+        ValidateMethodNameConflicts(cls, look, diag_);
+      }
 
       ValidateParamTypeConflicts(cls, look, diag_);
 

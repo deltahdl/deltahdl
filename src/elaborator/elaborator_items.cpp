@@ -402,6 +402,7 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
                          CarryLocalOperandDims(s, mod);
                        });
   CarryClassOperandDims(*item->class_decl, mod);
+  ValidateResolvedInterfaceSignatures(item->class_decl, kModuleScope);
   ReportClassTypeParamErrors(*item->class_decl,
                              {typedefs_, unit_, class_names_}, diag_);
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
