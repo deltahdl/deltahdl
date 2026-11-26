@@ -456,7 +456,7 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateContAssign(item, mod);
       return true;
     case ModuleItemKind::kModuleInst:
-      ElaborateModuleInst(item, mod);
+      ElaborateInstanceWithOverrideEnums(item, mod);
       return true;
     case ModuleItemKind::kParamDecl:
       ElaborateParamDecl(item, mod);

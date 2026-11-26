@@ -439,6 +439,10 @@ void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
   }
   AddEnumerations(item->data_type);
   AddEnumerations(item->typedef_type);
+  for (const auto& [param, value] : item->inst_params) {
+    if (value != nullptr && value->type_value != nullptr)
+      AddEnumerations(*value->type_value);
+  }
   if (item->kind == ModuleItemKind::kContAssign) {
     AddImplicitNets(item->assign_lhs);
   }
