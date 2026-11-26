@@ -12,6 +12,14 @@ namespace delta {
 bool IsInterconnectNetLvalue(const Expr* e,
                              const std::unordered_set<std::string_view>& names);
 
+void ReportInterconnectInItem(const ModuleItem& item,
+                              const std::unordered_set<std::string_view>& names,
+                              DiagEngine& diag);
+
+void ReportInterconnectInCheckerArguments(
+    const ModuleItem& item, const std::unordered_set<std::string_view>& names,
+    DiagEngine& diag);
+
 void ReportInterconnectInInstance(
     const ModuleItem& item, const std::unordered_set<std::string_view>& names,
     DiagEngine& diag);

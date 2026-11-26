@@ -663,23 +663,31 @@ constexpr const char* kInProceduralExpression =
 }
 
 TEST(InterconnectElaboration,
-     DISABLED_NetDeclarationAssignmentReadingAnInterconnectIsError) {
+     NetDeclarationAssignmentReadingAnInterconnectIsError) {
   EXPECT_TRUE(LastLineReportedInEachPlace(
       kEveryPlace, "", "  interconnect ic;\n  wire w = ic;\n", kInExpression));
   EXPECT_TRUE(
       AcceptedInEachPlace(kEveryPlace, "", "  wire x;\n  wire w = x;\n"));
 }
 
-TEST(InterconnectElaboration,
-     DISABLED_VariableInitializerReadingAnInterconnectIsError) {
+TEST(InterconnectElaboration, VariableInitializerReadingAnInterconnectIsError) {
   EXPECT_TRUE(LastLineReportedInEachPlace(
       kEveryPlace, "", "  interconnect ic;\n  logic v = ic;\n", kInExpression));
   EXPECT_TRUE(
       AcceptedInEachPlace(kEveryPlace, "", "  wire x;\n  logic v = x;\n"));
 }
 
+TEST(InterconnectElaboration, LetBodyReadingAnInterconnectIsError) {
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "", "  interconnect ic;\n  let l = ic;\n", kInExpression));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "", "  wire x;\n  let l = x;\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlace, "",
+                                  "  interconnect ic;\n  let l(ic) = ic;\n"));
+}
+
 TEST(InterconnectElaboration,
-     DISABLED_SubroutineBodyReadingForcingOrReleasingAnInterconnectIsError) {
+     SubroutineBodyReadingForcingOrReleasingAnInterconnectIsError) {
   EXPECT_TRUE(LastLineReportedInEachPlace(
       kEveryPlace, "",
       "  interconnect ic;\n"
@@ -700,6 +708,10 @@ TEST(InterconnectElaboration,
                           "  function logic f(); return x; endfunction\n"
                           "  task k(); force x = 1'b1; endtask\n"
                           "  task r(); release x; endtask\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  function logic f(logic ic); return ic; endfunction\n"));
 }
 
 TEST(InterconnectElaboration, SubroutineBodyAssigningAnInterconnectIsError) {
@@ -714,8 +726,7 @@ TEST(InterconnectElaboration, SubroutineBodyAssigningAnInterconnectIsError) {
                           "  function void f(); v = 1'b1; endfunction\n"));
 }
 
-TEST(InterconnectElaboration,
-     DISABLED_EventControlNamingAnInterconnectIsError) {
+TEST(InterconnectElaboration, EventControlNamingAnInterconnectIsError) {
   for (const char* item : {"  initial @(ic);\n", "  initial @(posedge ic);\n",
                            "  initial @(negedge ic);\n"}) {
     EXPECT_TRUE(LastLineReportedInEachPlace(
@@ -750,14 +761,14 @@ TEST(InterconnectElaboration, WaitConditionReadingAnInterconnectIsError) {
 }
 
 TEST(InterconnectElaboration,
-     DISABLED_AssertionOrItsDeclarationReadingAnInterconnectIsError) {
+     AssertionOrItsDeclarationReadingAnInterconnectIsError) {
   for (const char* item :
        {"  assert property (@(posedge clk) ic);\n",
         "  assume property (@(posedge clk) ic);\n",
         "  cover property (@(posedge clk) ic);\n",
         "  restrict property (@(posedge clk) ic);\n",
-        "  sequence s; ic; endsequence\n", "  property p; ic; endproperty\n",
-        "  let l = ic;\n"}) {
+        "  cover sequence (@(posedge clk) ic);\n",
+        "  sequence s; ic; endsequence\n", "  property p; ic; endproperty\n"}) {
     EXPECT_TRUE(LastLineReportedInEachPlace(
         kEveryPlace, "",
         std::string("  interconnect ic;\n  logic clk;\n") + item,
@@ -767,11 +778,20 @@ TEST(InterconnectElaboration,
                                   "  wire x;\n"
                                   "  logic clk;\n"
                                   "  assert property (@(posedge clk) x);\n"
-                                  "  sequence s; x; endsequence\n"
-                                  "  let l = x;\n"));
+                                  "  sequence s; x; endsequence\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(kEveryPlace, "",
+                                  "  interconnect ic;\n"
+                                  "  sequence s(ic); ic; endsequence\n"
+                                  "  property p(ic); ic; endproperty\n"));
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kEveryPlace, "",
+                          "  interconnect ic;\n"
+                          "  logic a;\n"
+                          "  sequence s; int ic; (a, ic = 0) ##1 ic == 0; "
+                          "endsequence\n"));
 }
 
-TEST(InterconnectElaboration, DISABLED_CovergroupNamingAnInterconnectIsError) {
+TEST(InterconnectElaboration, CovergroupNamingAnInterconnectIsError) {
   EXPECT_TRUE(LastLineReportedInEachPlace(
       kEveryPlace, "",
       "  interconnect ic;\n"
@@ -788,10 +808,19 @@ TEST(InterconnectElaboration, DISABLED_CovergroupNamingAnInterconnectIsError) {
                                   "  wire x;\n"
                                   "  covergroup cg @(posedge x); coverpoint x; "
                                   "endgroup\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  logic clk;\n"
+      "  covergroup cg(int ic) @(posedge clk); coverpoint ic; endgroup\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  covergroup cg with function sample(int ic); coverpoint ic; "
+      "endgroup\n"));
 }
 
-TEST(InterconnectElaboration,
-     DISABLED_ClockingBlockNamingAnInterconnectIsError) {
+TEST(InterconnectElaboration, ClockingBlockNamingAnInterconnectIsError) {
   EXPECT_TRUE(LastLineReportedInEachPlace(
       kEveryPlace, "",
       "  interconnect ic;\n"
@@ -804,14 +833,19 @@ TEST(InterconnectElaboration,
       "  logic clk;\n"
       "  clocking cb @(posedge clk); input ic; endclocking\n",
       kInExpression));
+  EXPECT_TRUE(LastLineReportedInEachPlace(
+      kEveryPlace, "",
+      "  interconnect ic;\n"
+      "  logic clk;\n"
+      "  clocking cb @(posedge clk); input v = ic; endclocking\n",
+      kInExpression));
   EXPECT_TRUE(AcceptedInEachPlace(
       kEveryPlace, "",
       "  wire x, y;\n"
-      "  clocking cb @(posedge x); input y; endclocking\n"));
+      "  clocking cb @(posedge x); input y; input v = y; endclocking\n"));
 }
 
-TEST(InterconnectElaboration,
-     DISABLED_CheckerArgumentThatIsAnInterconnectIsError) {
+TEST(InterconnectElaboration, CheckerArgumentThatIsAnInterconnectIsError) {
   const std::string kCheckers =
       "checker ci(input logic a);\n"
       "endchecker\n"
@@ -827,8 +861,7 @@ TEST(InterconnectElaboration,
                                   "  wire w;\n  ci x(w);\n  co y(w);\n"));
 }
 
-TEST(InterconnectElaboration,
-     DISABLED_SpecifyBlockNamingAnInterconnectPortIsError) {
+TEST(InterconnectElaboration, SpecifyBlockNamingAnInterconnectPortIsError) {
   EXPECT_TRUE(
       InterconnectUseReported("module t(input interconnect a, output wire b);\n"
                               "  specify (a => b) = 1; endspecify\n"
@@ -839,9 +872,35 @@ TEST(InterconnectElaboration,
                               "  specify $setup(a, posedge b, 1); endspecify\n"
                               "endmodule\n",
                               kInExpression, 2));
+  EXPECT_TRUE(InterconnectUseReported(
+      "module t(input interconnect a, input wire c, output wire b);\n"
+      "  specify if (a) (c => b) = 1; endspecify\n"
+      "endmodule\n",
+      kInExpression, 2));
+  EXPECT_TRUE(InterconnectUseReported(
+      "module t(input interconnect a, input wire c, output wire b);\n"
+      "  specify (posedge c => (b +: a)) = 1; endspecify\n"
+      "endmodule\n",
+      kInExpression, 2));
+  EXPECT_TRUE(InterconnectUseReported(
+      "module t(input interconnect a, input wire c, input wire d);\n"
+      "  specify $setup(c &&& a, posedge d, 1); endspecify\n"
+      "endmodule\n",
+      kInExpression, 2));
+  EXPECT_TRUE(InterconnectUseReported(
+      "module t(input interconnect a, input wire c, input wire d);\n"
+      "  specify $setup(c, posedge d &&& a, 1); endspecify\n"
+      "endmodule\n",
+      kInExpression, 2));
   EXPECT_TRUE(
-      ElabOk("module t(input wire a, output wire b, input wire c);\n"
-             "  specify (a => b) = 1; $setup(a, posedge c, 1); endspecify\n"
+      ElabOk("module t(input wire a, output wire b, input wire c,\n"
+             "         input wire e, output wire f, output wire g);\n"
+             "  specify\n"
+             "    (a => b) = 1;\n"
+             "    if (e) (c => f) = 1;\n"
+             "    (posedge c => (g +: e)) = 1;\n"
+             "    $setup(a &&& e, posedge c &&& e, 1);\n"
+             "  endspecify\n"
              "endmodule\n"));
 }
 

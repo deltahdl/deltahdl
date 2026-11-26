@@ -7,6 +7,9 @@ namespace delta {
 
 class DiagEngine;
 struct ModuleDecl;
+struct ModuleItem;
+
+bool AssertionItemDeclares(const ModuleItem* item, std::string_view name);
 
 void ReportAssertionUnresolved(
     const ModuleDecl* decl,

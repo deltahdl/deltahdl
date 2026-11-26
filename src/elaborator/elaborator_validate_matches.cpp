@@ -12,6 +12,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/force_lhs.h"
+#include "elaborator/interconnect_uses.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/queue_dim.h"
 #include "parser/ast_expr.h"
@@ -107,6 +108,7 @@ void Elaborator::ValidateItemRules(const ModuleItem* item,
 
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
+  ReportInterconnectInItem(*item, interconnect_names_, diag_);
   ValidateSubroutineBodyTargets(item, mod, scope);
   if (item->kind == ModuleItemKind::kContAssign)
     CheckLhsPatternNamedKeys(item->assign_lhs, diag_);

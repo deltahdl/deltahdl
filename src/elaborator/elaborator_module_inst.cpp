@@ -490,10 +490,11 @@ void Elaborator::ElaborateInstanceWithOverrideEnums(ModuleItem* item,
   ElaborateModuleInst(item, mod);
 }
 
-void Elaborator::RecordCheckerUwireOutputs(const ModuleItem* item,
-                                           const ModuleDecl* checker,
-                                           RtlirModule* mod) {
+void Elaborator::CheckCheckerArguments(const ModuleItem* item,
+                                       const ModuleDecl* checker,
+                                       RtlirModule* mod) {
   if (checker->decl_kind != ModuleDeclKind::kChecker) return;
+  ReportInterconnectInCheckerArguments(*item, interconnect_names_, diag_);
   ScopeMap scope = BuildConstantScope(mod);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   RecordUwireCheckerOutputs(uwire_drivers_, item, checker,
@@ -558,7 +559,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
   BindCheckerTreeActuals(inst, checker_tree_actuals_);
-  RecordCheckerUwireOutputs(item, child_decl, mod);
+  CheckCheckerArguments(item, child_decl, mod);
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =

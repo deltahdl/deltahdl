@@ -35,7 +35,9 @@ bool Holds(const std::vector<std::string_view>& names, std::string_view name) {
   return std::find(names.begin(), names.end(), name) != names.end();
 }
 
-bool DeclaresLocally(const ModuleItem* item, std::string_view name) {
+}  // namespace
+
+bool AssertionItemDeclares(const ModuleItem* item, std::string_view name) {
   if (Holds(item->prop_formals, name) ||
       Holds(item->prop_seq_assert_vars, name) ||
       Holds(item->assertion_local_names, name)) {
@@ -46,6 +48,8 @@ bool DeclaresLocally(const ModuleItem* item, std::string_view name) {
   }
   return false;
 }
+
+namespace {
 
 bool Instantiates(const ModuleItem* item, std::string_view callee) {
   if (Holds(item->prop_instance_refs, callee)) return true;
@@ -75,7 +79,7 @@ const ModuleItem* OwnerOfInvisibleLocal(const ModuleItem* item,
                                         std::string_view name,
                                         const DeclsByName& decls) {
   for (const auto& [callee, owner] : decls) {
-    if (owner == item || !DeclaresLocally(owner, name) ||
+    if (owner == item || !AssertionItemDeclares(owner, name) ||
         Holds(owner->prop_formals, name) || !Instantiates(item, callee)) {
       continue;
     }
@@ -133,8 +137,9 @@ void ReportAssertionUnresolved(
   for (const ModuleItem* item : decl->items) {
     if (!IsAssertionTextItem(item->kind)) continue;
     for (const AssertionRead& read : item->assertion_reads) {
-      if (DeclaresLocally(item, read.name) || decls.count(read.name) != 0 ||
-          scope_names.count(read.name) != 0 || declared(read.name)) {
+      if (AssertionItemDeclares(item, read.name) ||
+          decls.count(read.name) != 0 || scope_names.count(read.name) != 0 ||
+          declared(read.name)) {
         continue;
       }
       ReportRead(item, read, decls, diag);

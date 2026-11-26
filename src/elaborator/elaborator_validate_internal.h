@@ -354,6 +354,8 @@ bool IsRealValued(
 bool ExprContainsIdent(const Expr* e, std::string_view name);
 bool ExprUsesInterconnect(const Expr* e,
                           const std::unordered_set<std::string_view>& names);
+bool EventsUseInterconnect(const std::vector<EventExpr>& events,
+                           const std::unordered_set<std::string_view>& names);
 void CheckPcontDynamicArrayTarget(
     const Stmt* s, const std::unordered_set<std::string_view>& dyn_names,
     DiagEngine& diag);

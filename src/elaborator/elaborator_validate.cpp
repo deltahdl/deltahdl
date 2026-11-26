@@ -366,13 +366,16 @@ void CheckInterconnectProceduralRead(
   const Expr* reads[] = {s->rhs,      s->condition,          s->for_cond,
                          s->delay,    s->cycle_delay,        s->expr,
                          s->var_init, s->repeat_event_count, s->assert_expr};
-  for (const Expr* e : reads) {
-    if (ExprUsesInterconnect(e, interconnect_names)) {
-      diag.Error(s->range.start,
-                 "interconnect net cannot be used in a procedural expression",
-                 Subclause("6.6.8"));
-      break;
-    }
+  const bool kReadsInterconnect =
+      std::ranges::any_of(reads,
+                          [&](const Expr* e) {
+                            return ExprUsesInterconnect(e, interconnect_names);
+                          }) ||
+      EventsUseInterconnect(s->events, interconnect_names);
+  if (kReadsInterconnect) {
+    diag.Error(s->range.start,
+               "interconnect net cannot be used in a procedural expression",
+               Subclause("6.6.8"));
   }
   for (auto& ci : s->case_items)
     for (const auto* p : ci.patterns)
@@ -510,6 +513,14 @@ bool ExprUsesInterconnect(const Expr* e,
   }
   return AnyExprUsesInterconnect(e->args, names) ||
          AnyExprUsesInterconnect(e->elements, names);
+}
+
+bool EventsUseInterconnect(const std::vector<EventExpr>& events,
+                           const std::unordered_set<std::string_view>& names) {
+  return std::ranges::any_of(events, [&](const EventExpr& event) {
+    return ExprUsesInterconnect(event.signal, names) ||
+           ExprUsesInterconnect(event.iff_condition, names);
+  });
 }
 
 bool IsRealType(DataTypeKind k) {
