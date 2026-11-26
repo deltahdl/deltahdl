@@ -825,4 +825,30 @@ TEST(ParameterizedScopeResolutionSim,
   }
 }
 
+TEST(ParameterizedScopeResolutionSim,
+     InheritedStaticFunctionRunsAsTheBaseSpecializations) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("class B; static function int f(); return 3; endfunction "
+                 "endclass\n"
+                 "class D extends B; endclass\n"
+                 "class X #(type T = int);\n"
+                 "  static int s;\n"
+                 "  static function int w(); T v; s = 4; return $bits(v); "
+                 "endfunction\n"
+                 "endclass\n"
+                 "class Y #(type U = int) extends X #(U); endclass\n"
+                 "module top;\n"
+                 "  int a, b;\n"
+                 "  initial begin\n"
+                 "    a = D::f();\n"
+                 "    b = Y#(shortint)::w();\n"
+                 "    $display(\"%0d %0d %0d %0d\", a, b, X#(shortint)::s,\n"
+                 "             X#(int)::s);\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "3 16 4 0\n");
+}
+
 }  // namespace

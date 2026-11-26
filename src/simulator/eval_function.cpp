@@ -350,6 +350,14 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   return true;
 }
 
+static const ClassTypeInfo* ClassDeclaringMethod(const ClassTypeInfo* cls,
+                                                 std::string_view name) {
+  const std::string kName(name);
+  while (cls->parent != nullptr && !cls->methods.contains(kName))
+    cls = cls->parent;
+  return cls;
+}
+
 static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
   ClassScopeInfo info;
@@ -359,17 +367,19 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
           ScopeNamedSpecialization(info.access->lhs, ctx, arena)) {
     info.cls = spec;
   }
+  const ClassTypeInfo* owner =
+      ClassDeclaringMethod(info.cls, info.access->rhs->text);
   ctx.PushScope();
-  BindClassParams(info.cls, info.access->lhs, ctx, arena);
-  BindClassScopeTypeActuals(info.cls, info.access->lhs, ctx, arena);
+  BindClassParams(owner, info.access->lhs, ctx, arena);
+  BindClassScopeTypeActuals(owner, info.access->lhs, ctx, arena);
 
   if (info.access->rhs->text == "new") {
     out = EvalClassNew(info.class_name, expr, ctx, arena, expr->range.start);
     ctx.PopScope();
     return true;
   }
-  if (info.method->is_static_method) ctx.PushMethodClass(info.cls);
-  ExecClassMethod({info.method, info.cls}, expr, ctx, arena, out);
+  if (info.method->is_static_method) ctx.PushMethodClass(owner);
+  ExecClassMethod({info.method, owner}, expr, ctx, arena, out);
   if (info.method->is_static_method) ctx.PopMethodClass();
   WritebackOutputArgs(info.method, expr, ctx, arena);
   ctx.PopScope();
