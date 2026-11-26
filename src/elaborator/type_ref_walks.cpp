@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <functional>
+#include <optional>
 #include <span>
 #include <string_view>
 #include <utility>
@@ -452,43 +453,108 @@ const Expr* ObjectMemberName(const Expr& operand, const Expr& call) {
   return name;
 }
 
-Expr* ObjectMemberProbe(const Expr& object, const Expr& name, Arena& arena) {
+Expr* ObjectMemberAccess(const Expr& object, const Expr& name, Arena& arena) {
   auto* access = arena.Create<Expr>();
   access->kind = ExprKind::kMemberAccess;
   access->lhs = const_cast<Expr*>(&object);
   access->rhs = const_cast<Expr*>(&name);
   access->range = name.range;
+  return access;
+}
+
+Expr* ObjectMemberProbe(const Expr& object, const Expr& name, Arena& arena) {
+  Expr* access = ObjectMemberAccess(object, name, arena);
   access->asks_for_object_member = true;
   return access;
+}
+
+struct ObjectOperandRewrite {
+  const Expr& call;
+  const Expr& object;
+  SourceLoc loc;
+  std::span<const ProceduralLocal> names;
+  const TypeRefResolver& resolve_outer;
+  Arena& arena;
+  bool changed = false;
+
+  bool NamesObjectMember(const Expr& name) const {
+    DataType probe;
+    probe.type_ref_expr = ObjectMemberProbe(object, name, arena);
+    resolve_outer(probe, loc, names);
+    return probe.type_ref_expr == nullptr;
+  }
+
+  Expr* Leaf(Expr* name) {
+    const bool kSelf = name->text == "this";
+    if (!kSelf &&
+        (!name->scope_prefix.empty() ||
+         ObjectMemberName(*name, call) == nullptr || !NamesObjectMember(*name)))
+      return name;
+    changed = true;
+    return kSelf ? const_cast<Expr*>(&object)
+                 : ObjectMemberAccess(object, *name, arena);
+  }
+
+  Expr* Rewrite(Expr* e) {
+    if (e == nullptr) return nullptr;
+    if (e->kind == ExprKind::kIdentifier) return Leaf(e);
+    if (e->kind == ExprKind::kMemberAccess && e->is_scope_resolution) return e;
+    auto* copy = arena.Create<Expr>(*e);
+    copy->lhs = Rewrite(e->lhs);
+    if (e->kind == ExprKind::kMemberAccess) return copy;
+    for (Expr** slot :
+         {&copy->rhs, &copy->condition, &copy->true_expr, &copy->false_expr,
+          &copy->base, &copy->index, &copy->index_end})
+      *slot = Rewrite(*slot);
+    for (auto& sub : copy->elements) sub = Rewrite(sub);
+    for (auto& sub : copy->args) sub = Rewrite(sub);
+    return copy;
+  }
+};
+
+std::optional<std::vector<Expr*>> ResolveObjectOperand(
+    DataType& dt, const Expr& operand, ObjectOperandRewrite rewrite) {
+  Expr* rewritten = rewrite.Rewrite(const_cast<Expr*>(&operand));
+  if (!rewrite.changed) return std::nullopt;
+  DataType whole = dt;
+  whole.type_ref_expr = rewritten;
+  std::vector<Expr*> dims =
+      rewrite.resolve_outer(whole, rewrite.loc, rewrite.names);
+  dt = whole;
+  return dims;
 }
 
 TypeRefResolver ResolverInRandomizedObject(
     const Expr& call, const std::vector<ProceduralLocal>& locals,
     const TypeRefResolver& resolve_outer, Arena& arena) {
   const Expr* object = RandomizedObject(call, arena);
-  return
-      [&call, &locals, &resolve_outer, &arena, object](
-          DataType& dt, SourceLoc loc, std::span<const ProceduralLocal> inner) {
-        const std::vector<ProceduralLocal> kNames = NamesInScope(locals, inner);
-        const Expr* operand = TypeRefOperand(dt.type_ref_expr);
-        std::vector<Expr*> dims;
-        const Expr* member =
-            object == nullptr ? nullptr : ObjectMemberName(*operand, call);
-        if (Expr* local = LocalQualifiedName(*operand)) {
-          dt.type_ref_expr = local;
-        } else if (member != nullptr) {
-          DataType probe = dt;
-          probe.type_ref_expr = ObjectMemberProbe(*object, *member, arena);
-          dims = resolve_outer(probe, loc, kNames);
-          if (probe.type_ref_expr == nullptr) {
-            dt = probe;
-            return dims;
-          }
-          if (probe.type_ref_expr->asks_for_object_member) return dims;
-        }
-        ResolveLocalTypeRef(dt, dims, loc, kNames, resolve_outer);
+  return [&call, &locals, &resolve_outer, &arena, object](
+             DataType& dt, SourceLoc loc,
+             std::span<const ProceduralLocal> inner) {
+    const std::vector<ProceduralLocal> kNames = NamesInScope(locals, inner);
+    const Expr* operand = TypeRefOperand(dt.type_ref_expr);
+    std::vector<Expr*> dims;
+    const Expr* member =
+        object == nullptr ? nullptr : ObjectMemberName(*operand, call);
+    if (Expr* local = LocalQualifiedName(*operand)) {
+      dt.type_ref_expr = local;
+    } else if (member != nullptr) {
+      DataType probe = dt;
+      probe.type_ref_expr = ObjectMemberProbe(*object, *member, arena);
+      dims = resolve_outer(probe, loc, kNames);
+      if (probe.type_ref_expr == nullptr) {
+        dt = probe;
         return dims;
-      };
+      }
+      if (probe.type_ref_expr->asks_for_object_member) return dims;
+    } else if (object != nullptr) {
+      if (std::optional<std::vector<Expr*>> taken = ResolveObjectOperand(
+              dt, *operand, {call, *object, loc, kNames, resolve_outer, arena}))
+        return *taken;
+    }
+    ResolveLocalTypeRef(dt, dims, loc, kNames, resolve_outer);
+    return dims;
+  };
 }
 
 void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,

@@ -22,6 +22,9 @@ constexpr std::string_view kClasses =
     "class O; rand int a, f, g; logic [6:0] n; endclass\n"
     "class E extends B; rand int a; endclass\n"
     "class Q #(type T = int); rand int a; T n; endclass\n"
+    "class H; logic [4:0] m; endclass\n"
+    "class H2; logic [1:0] m; endclass\n"
+    "class D; rand int a, f, g, k; logic [6:0] n; H h = new; endclass\n"
     "logic [4:0] n, s;\n";
 
 struct Place {
@@ -107,6 +110,45 @@ TEST(InlinePrefixTypeRefObjectSim, TakesTheMemberOfEachKindOfClass) {
       "  $display(\"%0d %0d %0d %0d\", e.a, p.a, q7.a, q6.a);\n"
       "endtask\n",
       "initial t();\n", "7 7 7 6\n");
+}
+
+TEST(InlinePrefixTypeRefObjectSim, ExpressionOrDottedOperandStartsAtTheObject) {
+  ExpectEachPlacePrints(
+      "task automatic t();\n"
+      "  D d = new;\n"
+      "  logic [2:0] n = 0;\n"
+      "  logic [5:0] q = 0;\n"
+      "  H2 h = new;\n"
+      "  void'(d.randomize() with {\n"
+      "    a == X#(type(n + 1'b0))::w();\n"
+      "    f == X#(type(h.m))::w();\n"
+      "    g == X#(type(this.h.m))::w();\n"
+      "    k == X#(type(n + q))::w();\n"
+      "  });\n"
+      "  $display(\"%0d %0d %0d %0d\", d.a, d.f, d.g, d.k);\n"
+      "endtask\n",
+      "initial t();\n", "7 5 5 7\n");
+}
+
+TEST(InlinePrefixTypeRefObjectSim,
+     MethodsExpressionOrDottedOperandIsItsObjects) {
+  ExpectEachPlacePrints(
+      "class C;\n"
+      "  rand int a;\n"
+      "  logic [6:0] n;\n"
+      "  H h = new;\n"
+      "  function int own();\n"
+      "    logic [2:0] n;\n"
+      "    H2 h;\n"
+      "    void'(randomize() with {\n"
+      "      a == X#(type(h.m))::w() * 10 + X#(type(n + 1'b0))::w();\n"
+      "    });\n"
+      "    return a;\n"
+      "  endfunction\n"
+      "endclass\n",
+      "C c = new;\n"
+      "initial $display(\"%0d\", c.own());\n",
+      "57\n");
 }
 
 }  // namespace
