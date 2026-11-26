@@ -74,7 +74,7 @@ And these:
 | --- | --- |
 | `6,21,36,51 * * * *` | `REMINDER: Before solving an issue the loop's command lists, read the title of every issue in the list and the body of each that shares a subclause or names the same code as another, and sort them into groups of issues whose fixes go through the same code.` |
 | `7,22,37,52 * * * *` | `REMINDER: Take the first group whole as one piece of work, adding to it any other listed issues you choose.` |
-| `8,23,38,53 * * * *` | `REMINDER: Commit and push each commit once it closes at least one issue, as many as you choose to finish in it, with every case each one lists passing.` |
+| `8,23,38,53 * * * *` | `REMINDER: Push your commits together once they close at least one issue, as many as you choose to finish in the push, with every case each one lists passing at its head.` |
 | `9,24,39,54 * * * *` | `REMINDER: Before writing any of its code, split by rule, and then by part of a rule, an issue whose open cases need more than one push, so that the issues it becomes together list every case it listed.` |
 | `10,25,40,55 * * * *` | `REMINDER: Continue autonomously, unless you need human feedback about ANYTHING, not just about what to take next.` |
 | `11,26,41,56 * * * *` | `REMINDER: When an issue needs human feedback, rewrite its title if necessary and its body, label it 'needs decision', and move on to the next issue.` |
