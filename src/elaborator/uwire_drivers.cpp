@@ -13,6 +13,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/checker_actual_rules.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -23,6 +24,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_gate_type.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -163,6 +165,17 @@ void RecordUwirePrimitiveOutputs(UwireDrivers& drivers, const ModuleItem* item,
         GateTerminalWidth(terminal, in.mod, in.constants) != kInstances;
     RecordUwireTarget(drivers, terminal, item->loc, in, diag);
     if (kShared) RecordUwireTarget(drivers, terminal, item->loc, in, diag);
+  }
+}
+
+void RecordUwireCheckerOutputs(UwireDrivers& drivers, const ModuleItem* item,
+                               const ModuleDecl* checker,
+                               const UwireTargetScope& in, DiagEngine& diag) {
+  for (size_t i = 0; i < checker->ports.size(); ++i) {
+    if (checker->ports[i].direction != Direction::kOutput) continue;
+    const Expr* actual = CheckerActualFor(item, checker, i);
+    if (actual != nullptr)
+      RecordUwireTarget(drivers, actual, item->loc, in, diag);
   }
 }
 

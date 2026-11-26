@@ -8,9 +8,13 @@
 namespace delta {
 
 class DiagEngine;
+struct Expr;
 struct TypeShapeTables;
 struct ModuleDecl;
 struct ModuleItem;
+
+const Expr* CheckerActualFor(const ModuleItem* item, const ModuleDecl* decl,
+                             size_t i);
 
 bool CheckerFormalAdmitsDollar(const ModuleDecl* checker, size_t i);
 

@@ -29,16 +29,6 @@ bool Mentions(const Expr* e, std::string_view name) {
   return AnySubExpr(e, [&](const Expr* sub) { return IsNameRef(sub, name); });
 }
 
-const Expr* ActualFor(const ModuleItem* item, const ModuleDecl* decl,
-                      size_t i) {
-  const PortDecl& port = decl->ports[i];
-  for (size_t k = 0; k < item->inst_ports.size(); ++k) {
-    const auto& [name, actual] = item->inst_ports[k];
-    if (name == port.name || (name.empty() && k == i)) return actual;
-  }
-  return port.default_value;
-}
-
 bool IsLvalue(const Expr* e) {
   if (e->kind == ExprKind::kConcatenation) {
     return std::ranges::all_of(e->elements, IsLvalue);
@@ -224,6 +214,16 @@ void CheckOutsideFunctionCalls(const ModuleDecl* checker, NamedDecls funcs,
 
 }  // namespace
 
+const Expr* CheckerActualFor(const ModuleItem* item, const ModuleDecl* decl,
+                             size_t i) {
+  const PortDecl& port = decl->ports[i];
+  for (size_t k = 0; k < item->inst_ports.size(); ++k) {
+    const auto& [name, actual] = item->inst_ports[k];
+    if (name == port.name || (name.empty() && k == i)) return actual;
+  }
+  return port.default_value;
+}
+
 bool CheckerFormalAdmitsDollar(const ModuleDecl* checker, size_t i) {
   const PortDecl& port = checker->ports[i];
   FormalReferences refs = CheckerReferences(checker, port.name);
@@ -235,7 +235,7 @@ void ValidateCheckerActuals(const ModuleItem* item, const ModuleDecl* checker,
                             DiagEngine& diag) {
   for (size_t i = 0; i < checker->ports.size(); ++i) {
     const PortDecl& port = checker->ports[i];
-    const Expr* actual = ActualFor(item, checker, i);
+    const Expr* actual = CheckerActualFor(item, checker, i);
     if (actual == nullptr) continue;
     if (port.direction == Direction::kOutput && !IsLvalue(actual)) {
       diag.Error(actual->range.start,
@@ -261,7 +261,7 @@ void ValidateProceduralCheckerActuals(
     const ModuleItem* item, const ModuleDecl* checker,
     const std::unordered_set<std::string_view>& automatics, DiagEngine& diag) {
   for (size_t i = 0; i < checker->ports.size(); ++i) {
-    const Expr* actual = ActualFor(item, checker, i);
+    const Expr* actual = CheckerActualFor(item, checker, i);
     bool automatic = AnySubExpr(
         actual, [&](const Expr* sub) { return IsLocalRef(sub, automatics); });
     if (automatic) {

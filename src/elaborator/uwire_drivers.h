@@ -74,4 +74,8 @@ void RecordUwireTarget(UwireDrivers& drivers, const Expr* target, SourceLoc loc,
 void RecordUwirePrimitiveOutputs(UwireDrivers& drivers, const ModuleItem* item,
                                  const UwireTargetScope& in, DiagEngine& diag);
 
+void RecordUwireCheckerOutputs(UwireDrivers& drivers, const ModuleItem* item,
+                               const ModuleDecl* checker,
+                               const UwireTargetScope& in, DiagEngine& diag);
+
 }  // namespace delta

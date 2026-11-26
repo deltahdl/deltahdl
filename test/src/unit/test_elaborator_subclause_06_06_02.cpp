@@ -648,7 +648,7 @@ TEST(UwireElaboration, NonConstantSelectDrivesNoCountedBit) {
                              "6.6.2"));
 }
 
-TEST(UwireElaboration, DISABLED_CheckerOutputArgumentIsADriver) {
+TEST(UwireElaboration, CheckerOutputArgumentIsADriver) {
   const std::string kChecker =
       "checker c(output logic o);\n"
       "  assign o = 1'b1;\n"

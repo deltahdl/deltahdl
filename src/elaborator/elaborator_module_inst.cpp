@@ -529,6 +529,18 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
   BindCheckerTreeActuals(inst, checker_tree_actuals_);
+  if (child_decl->decl_kind == ModuleDeclKind::kChecker) {
+    ScopeMap scope = BuildConstantScope(mod);
+    for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
+    RecordUwireCheckerOutputs(uwire_drivers_, item, child_decl,
+                              {mod,
+                               var_types_,
+                               unit_,
+                               unit_uwire_drivers_,
+                               {gen_prefix_scopes_, declared_names_},
+                               scope},
+                              diag_);
+  }
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =
