@@ -210,6 +210,52 @@ TEST(SpecializationTypedefTypeRefArgumentSim, TakesAnArrayOperandsDimensions) {
       "24 44\n");
 }
 
+TEST(SpecializationTypeRefArgumentSim, TakesAVariableSizedOperandsDimension) {
+  ExpectInEachPlace(
+      "  int q [$];\n"
+      "  int y [];\n"
+      "  int s [string];\n"
+      "  X #(type(q)) a = new;\n"
+      "  X #(type(y)) b = new;\n"
+      "  X #(type(s)) c = new;\n"
+      "  initial begin\n"
+      "    a.v.push_back(7);\n"
+      "    a.v.push_back(8);\n"
+      "    b.v = new[3];\n"
+      "    b.v[2] = 9;\n"
+      "    c.v[\"k\"] = 4;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", a.v.size(), a.v[1],\n"
+      "             b.v.size(), b.v[2], c.v.num(), c.v[\"k\"]);\n"
+      "  end\n",
+      "2 8 3 9 1 4\n");
+}
+
+TEST(SpecializationTypedefTypeRefArgumentSim,
+     TakesAVariableSizedOperandsDimension) {
+  EXPECT_EQ(Printed("module top;\n"
+                    "  int q [$];\n"
+                    "  int y [];\n"
+                    "  int s [string];\n"
+                    "  typedef X #(type(q)) qt;\n"
+                    "  typedef X #(type(y)) yt;\n"
+                    "  typedef X #(type(s)) st;\n"
+                    "  qt a = new;\n"
+                    "  yt b = new;\n"
+                    "  st c = new;\n"
+                    "  initial begin\n"
+                    "    a.v.push_back(7);\n"
+                    "    a.v.push_back(8);\n"
+                    "    b.v = new[3];\n"
+                    "    b.v[2] = 9;\n"
+                    "    c.v[\"k\"] = 4;\n"
+                    "    $display(\"%0d %0d %0d %0d %0d %0d\", a.v.size(), "
+                    "a.v[1],\n"
+                    "             b.v.size(), b.v[2], c.v.num(), c.v[\"k\"]);\n"
+                    "  end\n"
+                    "endmodule\n"),
+            "2 8 3 9 1 4\n");
+}
+
 TEST(SpecializationTypedefTypeRefArgumentSim, NamesAVariableOrderedOrNamed) {
   ExpectInEachPlace(
       "  logic [6:0] n;\n"
