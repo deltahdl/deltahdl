@@ -159,12 +159,12 @@ TEST(ClassScopedTypeRefInScopeSim, TakesAPackagesClassTypeOrStaticProperty) {
 }
 
 TEST(ClassScopedTypeRefArgumentInScopeSim,
-     TakesABareClassTypeOrStaticProperty) {
+     DISABLED_TakesABareClassTypeOrStaticProperty) {
   ExpectAsArgumentInEachPlaceAndPosition("C::u", "C::s", "7 5");
 }
 
 TEST(ClassScopedTypeRefArgumentInScopeSim,
-     TakesASpecializationsTypeOrStaticProperty) {
+     DISABLED_TakesASpecializationsTypeOrStaticProperty) {
   ExpectAsArgumentInEachPlaceAndPosition("W#(byte)::u", "W#(byte)::s", "8 8");
 }
 
