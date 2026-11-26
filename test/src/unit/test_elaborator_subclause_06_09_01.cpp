@@ -356,6 +356,32 @@ TEST(VectorSpecification, NonConstantBoundIsErrorInANestedOrLaterMemberDim) {
   }
 }
 
+TEST(VectorSpecification, RealParameterBoundIsErrorInAPackageAndTheUnit) {
+  ElabFixture f;
+  Elaborate(
+      "parameter real CR = 2.0;\n"
+      "logic [CR:0] cu;\n"
+      "parameter CI = 2;\n"
+      "logic [CI:0] ci;\n"
+      "package p;\n"
+      "  parameter real PR = 2.0;\n"
+      "  parameter PU = 1.5;\n"
+      "  parameter PK = 3;\n"
+      "  logic [PR:0] a;\n"
+      "  logic [PU:0] b;\n"
+      "  logic [PK:0] c;\n"
+      "endpackage\n",
+      f);
+  for (uint32_t line : {2U, 9U, 10U}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
+  }
+  for (uint32_t line : {4U, 11U}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
+  }
+}
+
 TEST(VectorSpecification, ClassScopedParameterBoundIsAccepted) {
   ElabFixture f;
   Elaborate(
