@@ -191,6 +191,7 @@ class Elaborator : public ElaboratorClassRules {
   AssignedType BodyTypeParamDefault(ModuleItem* item, RtlirModule* mod);
   bool NamesNoType(const DataType& type, const RtlirModule* mod) const;
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
+  void RecordNetDeclNames(const ModuleItem* item);
   bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);

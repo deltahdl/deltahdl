@@ -504,6 +504,21 @@ static void RecordWrittenNetType(const ModuleItem& item, RtlirNet& net) {
                                 item.data_type.kind != DataTypeKind::kEnum;
 }
 
+void Elaborator::RecordNetDeclNames(const ModuleItem* item) {
+  net_names_.insert(item->name);
+  var_types_[item->name] = item->data_type.kind;
+  if (item->unpacked_dims.empty()) {
+    if (item->data_type.packed_dim_left)
+      packed_array_vars_.insert(item->name);
+    else if (DeclaresScalar(item->data_type, typedefs_))
+      scalar_var_names_.insert(item->name);
+  }
+  if (item->data_type.is_interconnect) {
+    interconnect_names_.insert(item->name);
+    declared_interconnects_.insert(item->name);
+  }
+}
+
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   ResolveTypeRef(item->data_type, item->loc, mod);
 
@@ -516,22 +531,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
        declared_names_, ScopedName(item->name),
        DeclaresNetOrVariable(item->name)},
       "net", diag_);
-  net_names_.insert(item->name);
-  var_types_[item->name] = item->data_type.kind;
-  if (item->unpacked_dims.empty()) {
-    if (item->data_type.packed_dim_left)
-      packed_array_vars_.insert(item->name);
-    else if (DeclaresScalar(item->data_type, typedefs_))
-      scalar_var_names_.insert(item->name);
-  }
+  RecordNetDeclNames(item);
   RtlirNet net;
   net.name = ScopedName(item->name);
   net.loc = item->loc;
-
-  if (item->data_type.is_interconnect) {
-    interconnect_names_.insert(item->name);
-    declared_interconnects_.insert(item->name);
-  }
   net.net_type = WrittenNetType(item->data_type);
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.dtype = NetDeclaredType(item, typedefs_, BuildParamScope(mod), arena_);

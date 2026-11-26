@@ -625,6 +625,8 @@ constexpr std::initializer_list<ItemPlace> kEveryPlace = {
     kModulePlace, kInterfacePlace, kProgramPlace, kGeneratePlace};
 constexpr std::initializer_list<ItemPlace> kEveryPlaceButAProgram = {
     kModulePlace, kInterfacePlace, kGeneratePlace};
+constexpr std::initializer_list<ItemPlace> kPlacesHoldingAGate = {
+    kModulePlace, kGeneratePlace};
 
 constexpr const char* kInProceduralExpression =
     "interconnect net cannot be used in a procedural expression";
@@ -754,8 +756,6 @@ TEST(InterconnectElaboration, EventControlNamingAnInterconnectIsError) {
 }
 
 TEST(InterconnectElaboration, UseAfterAGateTerminalConnectionIsError) {
-  constexpr std::initializer_list<ItemPlace> kGatePlaces = {kModulePlace,
-                                                            kGeneratePlace};
   const std::string kWired =
       "  interconnect ic;\n"
       "  logic x, y;\n"
@@ -768,12 +768,12 @@ TEST(InterconnectElaboration, UseAfterAGateTerminalConnectionIsError) {
       {"  wire w = ic;\n", kInExpression},
       {"  buf c(z, ic & x);\n", kInExpression}};
   for (const auto& [use, message] : kUses) {
-    EXPECT_TRUE(
-        LastLineReportedInEachPlace(kGatePlaces, "", kWired + use, message));
+    EXPECT_TRUE(LastLineReportedInEachPlace(kPlacesHoldingAGate, "",
+                                            kWired + use, message));
   }
-  EXPECT_TRUE(
-      AcceptedInEachPlace(kGatePlaces, "", kWired + "  buf c(z, ic);\n"));
-  EXPECT_TRUE(AcceptedInEachPlace(kGatePlaces, "",
+  EXPECT_TRUE(AcceptedInEachPlace(kPlacesHoldingAGate, "",
+                                  kWired + "  buf c(z, ic);\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(kPlacesHoldingAGate, "",
                                   "  wire ic;\n"
                                   "  logic x, y;\n"
                                   "  wire z, v;\n"
