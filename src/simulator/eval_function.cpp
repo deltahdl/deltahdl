@@ -225,14 +225,14 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
                      SimContext& ctx, Arena& arena) {
   if (!cls->decl) return;
   const auto& params = cls->decl->params;
-  const auto& values = base_id->elements;
   ClassParamSizer sizer(cls->decl);
   sizer.UseTypeActuals(cls->param_actuals);
   for (size_t i = 0; i < params.size(); ++i) {
     if (cls->decl->param_port_unpacked_dims.count(params[i].first)) continue;
     Logic4Vec val;
-    if (i < values.size()) {
-      val = sizer.Value(i, values[i], ctx, arena);
+    if (const Expr* written =
+            SpecializationElement(*base_id, i, params[i].first)) {
+      val = sizer.Value(i, written, ctx, arena);
     } else if (params[i].second) {
       val = sizer.Value(i, params[i].second, ctx, arena);
     } else {

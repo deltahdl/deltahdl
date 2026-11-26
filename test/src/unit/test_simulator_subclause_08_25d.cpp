@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -609,6 +612,47 @@ TEST(ClassSim, NewIntoAPropertyOfAPackagesHandleBuildsTheSpecialization) {
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"r1", 2u}});
+}
+
+constexpr std::string_view kNamedArgumentClass =
+    "class Z #(int W = 1, int V = 2, type T = int);\n"
+    "  static int s;\n"
+    "  typedef logic [W * 10 + V - 1:0] tw;\n"
+    "  static function int w(); T v; return $bits(v) * 100 + W * 10 + V;\n"
+    "  endfunction\n"
+    "  static task tk(output int o); T v; o = $bits(v) * 100 + W * 10 + V;\n"
+    "    s = W * 10 + V;\n"
+    "  endtask\n"
+    "endclass\n";
+
+TEST(ClassParamsSim,
+     NamedArgumentsOfAClassScopePrefixSetTheParametersTheyName) {
+  SimFixture f;
+  std::string text("package pk;\n");
+  text.append(kNamedArgumentClass)
+      .append("endpackage\n")
+      .append(kNamedArgumentClass)
+      .append(
+          "module top;\n"
+          "  logic [6:0] n;\n"
+          "  int a;\n"
+          "  Z#(.V(4), .W(3))::tw x;\n"
+          "  initial begin\n"
+          "    $display(\"%0d %0d %0d\", Z#(.V(4), .W(3), .T(bit "
+          "[4:0]))::w(),\n"
+          "             Z#(.T(bit [4:0]), .W(3), .V(4))::w(),\n"
+          "             Z#(.T(bit [4:0]))::w());\n"
+          "    $display(\"%0d %0d\", Z#(.W(), .T(bit [4:0]))::w(), "
+          "Z#(.T())::w());\n"
+          "    Z#(.V(4), .W(3))::tk(a);\n"
+          "    $display(\"%0d %0d %0d\", Z#(3, 4)::s, a, $bits(x));\n"
+          "    $display(\"%0d %0d\", pk::Z#(.V(4), .W(3), .T(bit "
+          "[4:0]))::w(),\n"
+          "             Z#(.T(type(n)), .W(3))::w());\n"
+          "  end\n"
+          "endmodule\n");
+  EXPECT_EQ(RunCapture(text, f),
+            "534 534 512\n512 3212\n34 3234 34\n534 732\n");
 }
 
 }  // namespace

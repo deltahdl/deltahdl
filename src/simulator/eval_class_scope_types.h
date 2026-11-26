@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <string_view>
 
@@ -10,6 +11,9 @@ struct ClassTypeInfo;
 struct DataType;
 struct Expr;
 class SimContext;
+
+const Expr* SpecializationElement(const Expr& base, size_t pos,
+                                  std::string_view pname);
 
 void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
                                SimContext& ctx, Arena& arena);

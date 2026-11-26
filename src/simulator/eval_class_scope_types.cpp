@@ -19,8 +19,8 @@
 
 namespace delta {
 
-static const Expr* SpecializationElement(const Expr& base, size_t pos,
-                                         std::string_view pname) {
+const Expr* SpecializationElement(const Expr& base, size_t pos,
+                                  std::string_view pname) {
   for (size_t j = 0; j < base.elements.size(); ++j) {
     if (j < base.arg_names.size() && base.arg_names[j] == pname)
       return base.elements[j];
