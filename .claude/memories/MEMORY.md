@@ -6,7 +6,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Commits and pushes
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main` and push a finished change without asking.
-- [One commit per push](one-commit-per-push.md) — every push carries exactly one commit; push what sits unpushed before new work, and push or amend it before committing again.
+- [Several commits per push](several-commits-per-push.md) — break work into small whole commits and push them together; each run page lists them through `summarize-commits`.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name to `git add` a path neither on disk nor in the index; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
@@ -86,6 +86,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [CI shows all output](ci-shows-all-output.md) — every step prints all its tools say: no quiet flags, no /dev/null.
 - [CI toolchain versions](ci-toolchain-versions.md) — LLVM's major is install-llvm's default, moved in its own commit; platform-named jobs pin their image; the rest floats; Actions tags stay at their major.
 - [What an allowlist entry rests on](allowlist-entries-rest-on-a-reading.md) — a name joins a list under `etc/` only for the reason it admits, given in the commit that adds the line.
+- [Job names start with a verb](job-names-start-with-a-verb.md) — a new job's or composite action's name opens with what it does, as in `summarize-commits`.
 - [Never weakening a gate](never-weakening-a-gate.md) — fix a red gate in the code: no lowered threshold, disabled check, exempted name or `continue-on-error`.
 - [The test clang-tidy config mirrors the source one](clang-tidy-test-config-mirrors-src.md) — change `etc/clang_tidy/src.yml` and `test_src_unit.yml` together.
 - [Scans stand on their own](scans-stand-on-their-own.md) — no scanning job needs another or a path detector; each step reporting findings carries `if: ${{ !cancelled() }}`.

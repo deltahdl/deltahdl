@@ -1851,6 +1851,17 @@ jobs:
         run: |
           git tag -f latest
           git push origin latest --force
+  summarize-commits:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/summarize-commits
+      - name: Summarize pushed commits
+        uses: ./.github/actions/summarize-commits
   supplemental-integration-test-coverage:
     env:
       LLVM_PROFILE_FILE: ${{ github.workspace }}/profraw/%m.profraw

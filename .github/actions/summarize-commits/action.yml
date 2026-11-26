@@ -1,0 +1,25 @@
+---
+description: >-
+  Write a table of every commit the triggering push carried, giving each
+  one's short SHA linked to the commit, its author and its title, to the
+  run's summary page and to the job log. A run page otherwise names only the
+  push's head commit, so without this the other commits of a push that
+  carried several are not listed anywhere on it.
+name: Summarize commits
+runs:
+  steps:
+    - name: Summarize pushed commits
+      run: |
+        {
+          echo "## Pushed commits"
+          echo ""
+          echo "| Commit | Author | Message |"
+          echo "| --- | --- | --- |"
+          jq -r '
+            def cell: gsub("[\r\n]+"; " ") | gsub("\\|"; "&#124;");
+            .commits[] |
+            "| [\(.id[0:7])](\(.url)) | \(.author.name | cell) | \(.message | split("\n")[0] | cell) |"
+          ' "$GITHUB_EVENT_PATH"
+        } | tee -a "$GITHUB_STEP_SUMMARY"
+      shell: bash
+  using: composite

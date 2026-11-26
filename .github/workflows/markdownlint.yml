@@ -22,6 +22,7 @@ jobs:
         run: >-
           assert-no-comments
           --verbose
+          ${{ github.workspace }}/.github/actions/summarize-commits/
           ${{ github.workspace }}/.github/workflows/markdownlint.yml
   markdownlint:
     runs-on: ubuntu-latest
@@ -59,6 +60,17 @@ jobs:
       - if: ${{ !cancelled() }}
         name: Lint Markdown
         run: markdownlint . --dot --disable MD013
+  summarize-commits:
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          sparse-checkout: .github/actions/summarize-commits
+      - name: Summarize pushed commits
+        uses: ./.github/actions/summarize-commits
   yamllint:
     runs-on: ubuntu-latest
     steps:
@@ -104,5 +116,6 @@ on:
     branches: [main]
     paths:
       - '**/*.md'
+      - .github/actions/summarize-commits/**
       - .github/workflows/markdownlint.yml
   workflow_dispatch: {}
