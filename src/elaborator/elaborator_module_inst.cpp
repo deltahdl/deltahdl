@@ -493,6 +493,7 @@ void Elaborator::ElaborateInstanceWithOverrideEnums(ModuleItem* item,
 void Elaborator::RecordCheckerUwireOutputs(const ModuleItem* item,
                                            const ModuleDecl* checker,
                                            RtlirModule* mod) {
+  if (checker->decl_kind != ModuleDeclKind::kChecker) return;
   ScopeMap scope = BuildConstantScope(mod);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   RecordUwireCheckerOutputs(uwire_drivers_, item, checker,
@@ -503,6 +504,19 @@ void Elaborator::RecordCheckerUwireOutputs(const ModuleItem* item,
                              {gen_prefix_scopes_, declared_names_},
                              scope},
                             diag_);
+}
+
+void Elaborator::CheckInstanceConnections(
+    RtlirModuleInst& inst, const ModuleItem* item, RtlirModule* mod,
+    const std::vector<uint32_t>& inst_dim_sizes, uint32_t total_instances) {
+  if (!item->inst_dims.empty()) {
+    ValidateInstanceArrayPorts(inst, item, mod, inst_dim_sizes,
+                               total_instances);
+  } else {
+    ValidateUnpackedArrayPorts(inst, item, mod);
+  }
+  CheckInstancePorts(inst, item, mod);
+  CoerceDrivenInputPorts(inst, mod);
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
@@ -544,8 +558,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   ElaborateChildInstance(inst, item, child_decl, mod, parent_scope);
   BindPorts(inst, item, mod, child_decl);
   BindCheckerTreeActuals(inst, checker_tree_actuals_);
-  if (child_decl->decl_kind == ModuleDeclKind::kChecker)
-    RecordCheckerUwireOutputs(item, child_decl, mod);
+  RecordCheckerUwireOutputs(item, child_decl, mod);
 
   std::vector<uint32_t> inst_dim_sizes;
   uint32_t total_instances =
@@ -553,15 +566,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   RepeatUnitUwireDrivers(unit_uwire_drivers_, kUwireCounts, total_instances,
                          item->loc, diag_);
 
-  if (!item->inst_dims.empty()) {
-    ValidateInstanceArrayPorts(inst, item, mod, inst_dim_sizes,
-                               total_instances);
-  } else {
-    ValidateUnpackedArrayPorts(inst, item, mod);
-  }
-
-  CheckInstancePorts(inst, item, mod);
-  CoerceDrivenInputPorts(inst, mod);
+  CheckInstanceConnections(inst, item, mod, inst_dim_sizes, total_instances);
   inst.attrs = ResolveAttributes(item->attrs, diag_, BuildConstantScope(mod));
   if (item->inst_range_left && item->inst_range_right &&
       (!ConstEvalInt(item->inst_range_left, parent_scope) ||

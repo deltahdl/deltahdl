@@ -261,6 +261,10 @@ class Elaborator : public ElaboratorClassRules {
                               const ScopeMap& parent_scope);
   void CheckInstancePorts(RtlirModuleInst& inst, const ModuleItem* item,
                           RtlirModule* mod);
+  void CheckInstanceConnections(RtlirModuleInst& inst, const ModuleItem* item,
+                                RtlirModule* mod,
+                                const std::vector<uint32_t>& inst_dim_sizes,
+                                uint32_t total_instances);
 
   void CheckPrimitiveTerminals(const ModuleItem* item, RtlirModule* mod);
 
