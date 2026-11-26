@@ -10,7 +10,7 @@ metadata:
 
 # lrm-tests issues are tests only
 
-An issue labelled `lrm-tests` asks for a test of every case of every rule in one section of a standard, and for nothing else. Its commit changes nothing under `src/`, however small the fix a failing test points to. Every test it asks for lands in the one commit that closes it, never spread over several pushes. A test deltahdl passes carries its plain name. A test deltahdl fails carries `DISABLED_` in front of its name, as in `TEST(Suite, DISABLED_Name)`: GoogleTest builds such a test but leaves it out of a run unless asked, so it neither passes nor fails. The commit that later makes it pass removes the prefix.
+An issue labelled `lrm-tests` asks for a test of every case of every rule in one section of a standard, and for nothing else. Its commit changes nothing under `src/`, however small the fix a failing test points to. Every test it asks for lands in the one push that closes it, never spread over several pushes. A test deltahdl passes carries its plain name. A test deltahdl fails carries `DISABLED_` in front of its name, as in `TEST(Suite, DISABLED_Name)`: GoogleTest builds such a test but leaves it out of a run unless asked, so it neither passes nor fails. The commit that later makes it pass removes the prefix.
 
 Every other issue is fair game for a fix: its commit delivers the src change and every case's test together, each passing under its plain name, and no src line lands uncovered ([test-driven-development](test-driven-development.md), [fixing-a-rule-in-full](fixing-a-rule-in-full.md)). Its tests are never pushed ahead of the fix, disabled or not.
 
@@ -19,7 +19,7 @@ Every other issue is fair game for a fix: its commit delivers the src change and
 **How to apply:**
 
 - For an `lrm-tests` issue, trace each new test through the code under its plain name, building nothing locally ([verifying-through-ci](verifying-through-ci.md)), and judge whether deltahdl passes it. A test that passes keeps its plain name. A test that fails because deltahdl does not do what its case states takes the prefix. A test failing for another reason is wrong and is corrected, or has found a defect of another rule, which becomes a case of that rule's issue with a test of its own ([what-does-not-get-filed](what-does-not-get-filed.md)).
-- The `lrm-tests` commit also closes each rule issue all of whose cases now pass under their plain names ([a-commit-closes-an-issue](a-commit-closes-an-issue.md)): that records conformance found, not a fix.
+- The `lrm-tests` push also closes each rule issue all of whose cases now pass under their plain names ([a-push-closes-an-issue](a-push-closes-an-issue.md)): that records conformance found, not a fix.
 - Choose a name no other test has once the prefix is gone.
 - A test carrying the prefix shows nothing about its case. The case stays unticked in its rule's issue, with the test named beside it ([a-rule-conforms-only-when-tests-show-it](a-rule-conforms-only-when-tests-show-it.md)).
 - A test CI shows failing under its plain name takes the prefix in a push of its own, per [fixing-a-red-run](fixing-a-red-run.md).

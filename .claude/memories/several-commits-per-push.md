@@ -16,7 +16,7 @@ A push may carry several commits. Work is broken into small commits, each a whol
 
 **How to apply:**
 
-- Each commit carries its own tests with its code ([test-driven-development](test-driven-development.md)) and closes its issues ([a-commit-closes-an-issue](a-commit-closes-an-issue.md)).
+- Each commit carries its own tests with its code ([test-driven-development](test-driven-development.md)). A commit may close an issue or only move one forward; the push as a whole closes at least one ([a-push-closes-an-issue](a-push-closes-an-issue.md)).
 - A push still waits for no run to be in progress ([reading-a-ci-run](reading-a-ci-run.md)), and a red-run fix still goes in a push of its own ([fixing-a-red-run](fixing-a-red-run.md)).
 - A red run is read against the push as a whole; the log names the failing check, and the commit that touched it is found from the push's list.
 - A new workflow gets the `summarize-commits` job, the action in its `paths` filter and in its `assert-no-comments` trees ([workflow-paths-name-the-programs-its-jobs-run](workflow-paths-name-the-programs-its-jobs-run.md)).

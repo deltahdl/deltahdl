@@ -18,7 +18,7 @@ This repository writes `Closes #N` for an issue the commit finishes, and `Refs #
 
 **How to apply:**
 
-- Write a closing keyword beside each issue the commit finishes and beside no other; every commit finishes at least one, per [a-commit-closes-an-issue](a-commit-closes-an-issue.md).
+- Write a closing keyword beside each issue the commit finishes and beside no other; every push finishes at least one, per [a-push-closes-an-issue](a-push-closes-an-issue.md), and an earlier commit of the push that only works on an issue writes `Refs #N` for it.
 - Where the message mentions an issue it does not finish, use `Refs` or `See`, or rephrase a title that would read as a keyword.
 - Give each finished issue a line of its own:
 

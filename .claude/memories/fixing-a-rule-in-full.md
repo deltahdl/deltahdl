@@ -1,6 +1,6 @@
 ---
 name: fixing-a-rule-in-full
-description: "Every case of an issue's rule (each allowed and forbidden form, in every place it can be written, with every operand or type it names) is listed before the fix, held by the issue in hand or by the issue of another part of the rule; the fix reaches every case its issue lists, a test per case, in one commit, never only the example the issue gives."
+description: "Every case of an issue's rule (each allowed and forbidden form, in every place it can be written, with every operand or type it names) is listed before the fix, held by the issue in hand or by the issue of another part of the rule; the fix reaches every case its issue lists, a test per case, in one push, never only the example the issue gives."
 metadata:
   node_type: memory
   type: feedback
@@ -16,7 +16,7 @@ A fix reaches every case its issue lists, not only the example the issue gives, 
 - each written in every place the standard lets that form appear: a module, interface, program, checker, package, class, generate block, task or function, or the compilation unit, as applies;
 - each with every kind of operand or type the rule names.
 
-See that each case is on the open issue of its part or is already shown by a passing test. Then write a test for each case the issue in hand lists and make deltahdl pass all of them in the same commit.
+See that each case is on the open issue of its part or is already shown by a passing test. Then write a test for each case the issue in hand lists and make deltahdl pass all of them in the same push.
 
 **Why:** A fix shaped to one example leaves the rule's other forms as broken as they were. Each is met later by whichever session trips over it and filed as an issue of its own, so one fault in deltahdl surfaces as a chain of issues, each paying for a CI run of its own. Listing the cases first, and filing each part before any is fixed, leaves no case off the record while keeping each fix small. A forbidden form needs its nearest allowed form tested beside it because a check written for the forbidden form tends to catch the legal form next to it too, and then reports an error on valid code.
 
