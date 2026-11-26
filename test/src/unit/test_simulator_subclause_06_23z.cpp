@@ -44,15 +44,14 @@ TEST(ScopePrefixUntypedFormalTypeRefSim, TakesEachInstancesActualType) {
               "endproperty\n"
               "property two(x, int b); @(posedge c) X#(type(x))::w() == b;\n"
               "endproperty\n"
-              "property d(x = m); @(posedge c) X#(type(x))::w() == 5;\n"
-              "endproperty\n"
+              "property d(int b, x = m); X#(type(x))::w() == b; endproperty\n"
               "assert property (p(m)) held[0] = 1;\n"
               "assert property (t(m)) held[1] = 1;\n"
               "assert property (@(posedge c) q(m)) held[2] = 1;\n"
               "assert property (e(m)) held[3] = 1;\n"
               "assert property (two(m, 5)) held[4] = 1;\n"
               "assert property (two(k2, 2)) held[5] = 1;\n"
-              "assert property (d) held[6] = 1;\n"
+              "assert property (@(posedge c) d(5)) held[6] = 1;\n"
               "assert property (two(r, 64)) held[7] = 1;\n"),
       Held("11111111"));
 }
