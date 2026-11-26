@@ -643,6 +643,7 @@ class Elaborator : public ElaboratorClassRules {
                                    RtlirModule* mod);
   void EmitDeclarationEnumMembers(const ModuleItem* item, bool writes_its_type,
                                   RtlirModule* mod);
+  void EmitStatementEnumMembers(const ModuleItem* item, RtlirModule* mod);
   void EmitArgumentEnumMembers(const DataType& type, std::string_view key,
                                SourceLoc loc, RtlirModule* mod);
   void ElaborateInstanceWithOverrideEnums(ModuleItem* item, RtlirModule* mod);

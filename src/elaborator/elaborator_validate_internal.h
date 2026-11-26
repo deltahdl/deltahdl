@@ -266,6 +266,24 @@ void ForEachExprUnder(const Expr* e, Fn& fn) {
                    [&fn](const Expr* child) { ForEachExprUnder(child, fn); });
 }
 
+template <typename Fn>
+void ForEachExprOutsideBlocks(const Stmt* s, Fn& fn) {
+  if (s == nullptr || s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork)
+    return;
+  ForEachChildExpr(s, [&fn](const Expr* e) { ForEachExprUnder(e, fn); });
+  ForEachChildStmt(
+      s, [&fn](const Stmt* sub) { ForEachExprOutsideBlocks(sub, fn); });
+}
+
+template <typename Fn>
+void ForEachItemScopeExpr(const ModuleItem* item, Fn& fn) {
+  ForEachExprUnder(item->init_expr, fn);
+  ForEachExprUnder(item->assign_lhs, fn);
+  ForEachExprUnder(item->assign_rhs, fn);
+  if (IsProceduralItemKind(item->kind))
+    ForEachExprOutsideBlocks(item->body, fn);
+}
+
 struct ProceduralRoot {
   const ModuleItem* item = nullptr;
   const Stmt* body = nullptr;

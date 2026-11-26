@@ -211,6 +211,13 @@ bool IsTypeOperand(const Expr* e) {
          e->type_value != nullptr;
 }
 
+std::string_view OperandEnumKey(const Expr& operand, Arena& arena) {
+  const SourceLoc kAt = operand.range.start;
+  const std::string kKey =
+      std::format("@{}.{}.{}", kAt.file_id, kAt.line, kAt.column);
+  return {arena.AllocString(kKey.c_str(), kKey.size()), kKey.size()};
+}
+
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
                      ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
   auto members = BuildEnumMembers(type, width, ctx);
@@ -478,6 +485,18 @@ void Elaborator::EmitDeclarationEnumMembers(const ModuleItem* item,
   };
   ForEachExprUnder(item->init_expr, declare);
   if (writes_its_type) EmitBareEnumMembers(item, mod);
+}
+
+void Elaborator::EmitStatementEnumMembers(const ModuleItem* item,
+                                          RtlirModule* mod) {
+  if (item->kind != ModuleItemKind::kContAssign &&
+      !IsProceduralItemKind(item->kind))
+    return;
+  auto declare = [&](const Expr* e) {
+    if (IsTypeOperand(e))
+      DeclareOperandEnumConstants(*e, OperandEnumKey(*e, arena_), mod);
+  };
+  ForEachItemScopeExpr(item, declare);
 }
 
 void Elaborator::ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod) {

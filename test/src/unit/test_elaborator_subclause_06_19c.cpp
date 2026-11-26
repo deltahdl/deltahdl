@@ -142,7 +142,9 @@ TEST(InPlaceOperandEnumerationElaboration,
          {"  int w = $bits(enum {A = 1, B = 1});\n",
           "  localparam int P = $bits(type(enum {A = 1, B = 1}));\n",
           "  wire integer z = $bits(enum {A = 1, B = 1});\n",
-          "  var type(enum {A = 1, B = 1}) e;\n"}) {
+          "  var type(enum {A = 1, B = 1}) e;\n",
+          "  int c;\n  assign c = $bits(enum {A = 1, B = 1});\n",
+          "  int c;\n  initial c = $bits(enum {A = 1, B = 1});\n"}) {
       const std::string kSrc = InParent(parent, body);
       SCOPED_TRACE(kSrc);
       ElabFixture f;
@@ -162,7 +164,10 @@ TEST(InPlaceOperandEnumerationElaboration, DistinctValuesInAnOperandAccepted) {
                  "  localparam int P = $bits(type(enum {C = 1, D = 2}));\n"
                  "  wire integer z = $bits(enum {E = 1, F = 2});\n"
                  "  var type(enum {G = 1, H = 2}) e = H, g;\n"
-                 "  int y = B + D + F;\n");
+                 "  int c, d;\n"
+                 "  assign c = $bits(enum {I = 1, J = 2});\n"
+                 "  initial d = $bits(enum {K = 1, L = 2});\n"
+                 "  int y = B + D + F + J + L;\n");
     SCOPED_TRACE(kSrc);
     ElabFixture f;
     ElaborateSrc(kSrc, f);

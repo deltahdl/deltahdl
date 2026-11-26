@@ -460,7 +460,7 @@ void ScopeNameSet::AddItemEnumerations(const ModuleItem* item) {
     if (e->kind == ExprKind::kTypeRef && e->type_value != nullptr)
       AddEnumerations(*e->type_value);
   };
-  ForEachExprUnder(item->init_expr, add_operand);
+  ForEachItemScopeExpr(item, add_operand);
 }
 
 void ScopeNameSet::AddEnumerations(const DataType& type) {

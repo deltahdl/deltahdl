@@ -340,6 +340,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
         ResolveTypeRef(dt, loc, mod);
       });
   ResolveItemPrefixTypeRefs(*item, kAmongLocals, arena_);
+  EmitStatementEnumMembers(item, mod);
   if (ElaborateDeclItem(item, mod)) return;
   ResolveProceduralTypeRefs(
       item, kAmongLocals, arena_,

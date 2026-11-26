@@ -131,4 +131,35 @@ TEST(TypeReferenceEnumerationSim, DeclarationDeclaresItsConstantsInEachPlace) {
   }
 }
 
+TEST(StatementOperandEnumerationSim, OperandDeclaresItsConstantsInEachPlace) {
+  for (const Place& place : kDeclarationPlaces) {
+    std::string design(place.open);
+    design
+        .append(
+            "  int w, k, v, u;\n"
+            "  assign w = $bits(enum {A, B}), k = $bits(enum {G, H = 7});\n"
+            "  int y = B;\n"
+            "  initial v = $bits(enum {C, D = 5});\n"
+            "  initial if (1) u = $bits(type(enum logic [1:0] {E = 2, F}));\n"
+            "  initial #1 $display(\"%0d %0d %0d %0d %0d %0d %0d\",\n"
+            "                      w, y, v, D, u, F, k + H);\n")
+        .append(place.close);
+    EXPECT_EQ(Printed(design), "32 1 32 5 2 3 39\n");
+  }
+}
+
+TEST(StatementOperandEnumerationSim, AlwaysStatementDeclaresInItsScope) {
+  for (const Place& place : kDeclarationPlaces) {
+    if (place.open.starts_with("program")) continue;
+    std::string design(place.open);
+    design
+        .append(
+            "  int x;\n"
+            "  always_comb x = $bits(enum logic [3:0] {I = 9, J});\n"
+            "  initial #1 $display(\"%0d %0d\", x, J);\n")
+        .append(place.close);
+    EXPECT_EQ(Printed(design), "4 10\n");
+  }
+}
+
 }  // namespace
