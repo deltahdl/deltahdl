@@ -236,7 +236,7 @@ TEST(VectorSpecification, DISABLED_XOrZFromAParameterInRangeIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, 5, "7.4.1"));
 }
 
-TEST(VectorSpecification, DISABLED_NonConstantOrRealBoundIsError) {
+TEST(VectorSpecification, NonConstantOrRealBoundIsError) {
   ElabFixture f;
   Elaborate(
       "module m;\n"

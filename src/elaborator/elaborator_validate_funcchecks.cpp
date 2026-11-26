@@ -494,6 +494,34 @@ static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
   }
 }
 
+bool Elaborator::IsConstantFunction(const ModuleItem* func,
+                                    const ScopeMap& constants) {
+  std::unordered_set<std::string_view> param_names;
+  for (const auto& [name, _] : constants) param_names.insert(name);
+  param_names.insert(specparam_names_.begin(), specparam_names_.end());
+  std::unordered_set<std::string_view> function_names;
+  for (const auto& [fname, _] : func_decls_) function_names.insert(fname);
+  std::unordered_set<std::string_view> visited;
+  DiagEngine trial(diag_.Sources());
+  trial.SetQuiet(true);
+  const ConstFuncScope kScope{param_names, function_names, &func_decls_,
+                              &visited, trial};
+  return ValidateConstantFunction(func, func->loc, kScope);
+}
+
+bool Elaborator::CallsNonConstantFunction(const Expr* e,
+                                          const ScopeMap& constants) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kCall && !e->callee.empty()) {
+    auto it = func_decls_.find(e->callee);
+    if (it != func_decls_.end() && !IsConstantFunction(it->second, constants))
+      return true;
+  }
+  return AnyExprChild(e, [&](const Expr* child) {
+    return CallsNonConstantFunction(child, constants);
+  });
+}
+
 void Elaborator::ValidateConstantFunctionCalls(const ModuleDecl* decl) {
   std::unordered_set<std::string_view> param_names;
   for (const auto& [pname, _] : decl->params) param_names.insert(pname);

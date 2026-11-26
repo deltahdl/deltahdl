@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -363,7 +364,22 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
   }
 }
 
-void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
+void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc,
+                                        const RtlirModule* mod) {
+  std::vector<const Expr*> bounds = {dtype.packed_dim_left,
+                                     dtype.packed_dim_right};
+  for (const auto& [left, right] : dtype.extra_packed_dims) {
+    bounds.push_back(left);
+    bounds.push_back(right);
+  }
+  if (std::ranges::any_of(bounds, [&](const Expr* bound) {
+        return bound != nullptr && BoundIsNoConstantInteger(bound, mod);
+      })) {
+    diag_.Error(loc,
+                "packed dimension range shall be a constant integer "
+                "expression",
+                Subclause("7.4.1"));
+  }
   if (dtype.packed_dim_left && ExprContainsXZ(dtype.packed_dim_left)) {
     diag_.Error(loc, "packed dimension range shall not contain x or z",
                 Subclause("7.4.1"));

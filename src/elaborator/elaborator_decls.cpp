@@ -543,7 +543,7 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.is_signed = IsSignedType(item->data_type, typedefs_);
   net.is_signed =
       ReconcilePartialPort(item->name, net.is_signed, net.net_type, mod);
-  ValidatePackedDimRange(item->data_type, item->loc);
+  ValidatePackedDimRange(item->data_type, item->loc, mod);
 
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   ValidateNetDeclDataType(item, nettype_names_, kShapeTables, diag_);

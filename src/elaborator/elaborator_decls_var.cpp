@@ -583,15 +583,20 @@ static const Expr* FirstVariableRead(const Expr* e,
   return found;
 }
 
+bool Elaborator::NamesVariableNetOrPort(std::string_view name,
+                                        const ScopeMap& constants) const {
+  if (const_names_.contains(name) || constants.contains(name)) return false;
+  return var_types_.contains(name) || net_names_.contains(name) ||
+         ansi_port_names_.contains(name) ||
+         non_ansi_complete_ports_.contains(name);
+}
+
 void Elaborator::ReportStaticConstReadingVariable(const ModuleItem* item,
                                                   const RtlirModule* mod) {
   if (!item->data_type.is_const || item->is_automatic) return;
   const ScopeMap kConstants = BuildParamScope(mod);
   auto is_variable = [&](std::string_view name) {
-    if (const_names_.contains(name) || kConstants.contains(name)) return false;
-    return var_types_.contains(name) || net_names_.contains(name) ||
-           ansi_port_names_.contains(name) ||
-           non_ansi_complete_ports_.contains(name);
+    return NamesVariableNetOrPort(name, kConstants);
   };
   const Expr* read = FirstVariableRead(item->init_expr, is_variable);
   if (read == nullptr) return;
@@ -601,6 +606,46 @@ void Elaborator::ReportStaticConstReadingVariable(const ModuleItem* item,
                           "constant",
                           item->name, read->text),
               Subclause("6.20.6"));
+}
+
+template <typename IsVariable>
+static bool BoundReadsVariable(const Expr* e, const IsVariable& is_variable) {
+  if (e == nullptr || e->kind == ExprKind::kMemberAccess) return false;
+  if (e->kind == ExprKind::kIdentifier) return is_variable(e->text);
+  if (e->kind == ExprKind::kSystemCall && IsConstantWhateverItsArguments(e))
+    return false;
+  return AnyReadOperand(e, [&](const Expr* child) {
+    return BoundReadsVariable(child, is_variable);
+  });
+}
+
+static bool CallsNonConstantSystemFunction(const Expr* e) {
+  if (e == nullptr) return false;
+  if (e->kind == ExprKind::kSystemCall && !IsConstantSysFunc(e->callee))
+    return true;
+  return AnyExprChild(e, [](const Expr* child) {
+    return CallsNonConstantSystemFunction(child);
+  });
+}
+
+bool Elaborator::BoundIsNoConstantInteger(const Expr* bound,
+                                          const RtlirModule* mod) {
+  if (bound->kind == ExprKind::kIntegerLiteral) return false;
+  const ScopeMap kConstants = BuildParamScope(mod);
+  auto is_variable = [&](std::string_view name) {
+    return NamesVariableNetOrPort(name, kConstants);
+  };
+  std::unordered_map<std::string_view, DataTypeKind> real_params;
+  for (const RtlirParamDecl& param : mod->params) {
+    if (param.is_real_value || param.decl_is_real)
+      real_params[param.name] = DataTypeKind::kReal;
+  }
+  for (std::string_view name : real_param_names_)
+    real_params[name] = DataTypeKind::kReal;
+  return BoundReadsVariable(bound, is_variable) ||
+         CallsNonConstantSystemFunction(bound) ||
+         CallsNonConstantFunction(bound, kConstants) ||
+         IsRealValued(bound, real_params);
 }
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
@@ -655,7 +700,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.gen_block_prefix = InternedGenPrefix();
   SizeClassHandleMembers(item->data_type, typedefs_, class_names_);
   var.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
-  ValidatePackedDimRange(item->data_type, item->loc);
+  ValidatePackedDimRange(item->data_type, item->loc, mod);
   SetVariableKindFlags(item, var, typedefs_);
   var.is_signed =
       ReconcilePartialPort(item->name, IsSignedType(item->data_type, typedefs_),

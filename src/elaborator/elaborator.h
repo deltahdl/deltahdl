@@ -164,6 +164,11 @@ class Elaborator : public ElaboratorClassRules {
                                   const RtlirModule* mod);
   void ReportStaticConstReadingVariable(const ModuleItem* item,
                                         const RtlirModule* mod);
+  bool NamesVariableNetOrPort(std::string_view name,
+                              const ScopeMap& constants) const;
+  bool BoundIsNoConstantInteger(const Expr* bound, const RtlirModule* mod);
+  bool CallsNonConstantFunction(const Expr* e, const ScopeMap& constants);
+  bool IsConstantFunction(const ModuleItem* func, const ScopeMap& constants);
   void AddInferenceCallees(const Stmt* body);
   void ResolveStaticAssertionClock(ModuleItem* item,
                                    const std::vector<EventExpr>& default_clock);
@@ -487,7 +492,8 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateGenericPortModportAccess(const ModuleDecl* child,
                                         const RtlirModuleInst& inst);
 
-  void ValidatePackedDimRange(const DataType& dtype, SourceLoc loc);
+  void ValidatePackedDimRange(const DataType& dtype, SourceLoc loc,
+                              const RtlirModule* mod);
 
   void ValidateUnpackedDimRange(const std::vector<Expr*>& dims, SourceLoc loc);
 
