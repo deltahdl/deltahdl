@@ -137,7 +137,10 @@ void CheckMailboxCallStmt(
 
 const DataType& ElaboratedType(const ModuleItem& item, const RtlirModule& mod) {
   auto var = std::ranges::find(mod.variables, item.name, &RtlirVariable::name);
-  return var == mod.variables.end() ? item.data_type : *var->written_type;
+  if (var == mod.variables.end() || var->written_type == nullptr) {
+    return item.data_type;
+  }
+  return *var->written_type;
 }
 
 }  // namespace
