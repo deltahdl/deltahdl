@@ -232,11 +232,28 @@ std::optional<DeclaredValue> ValueBehindScope(std::string_view prefix,
   return scope.scoped_value(prefix, name);
 }
 
+std::optional<DeclaredValue> ClassScopedValue(const Expr* access,
+                                              const ExprTypeScope& scope) {
+  if (access->lhs->kind != ExprKind::kIdentifier ||
+      access->lhs->has_param_spec) {
+    return std::nullopt;
+  }
+  DataType named_class;
+  named_class.kind = DataTypeKind::kNamed;
+  named_class.type_name = access->lhs->text;
+  return ClassMemberValue(named_class, access->rhs->text, scope);
+}
+
 std::optional<DeclaredValue> MemberValue(const Expr* access,
                                          const ExprTypeScope& scope) {
   if (access->rhs == nullptr) return std::nullopt;
-  if (access->is_scope_resolution)
-    return ValueBehindScope(access->lhs->text, access->rhs->text, scope);
+  if (access->is_scope_resolution) {
+    if (std::optional<DeclaredValue> behind =
+            ValueBehindScope(access->lhs->text, access->rhs->text, scope)) {
+      return behind;
+    }
+    return ClassScopedValue(access, scope);
+  }
   std::optional<DeclaredValue> base = ValueOf(access->lhs, scope);
   if (!base || base->unpacked_dims != 0) return std::nullopt;
   const DataType* aggregate = ResolvedAggregateType(

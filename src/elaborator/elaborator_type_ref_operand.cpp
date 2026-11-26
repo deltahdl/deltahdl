@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <format>
 #include <functional>
 #include <optional>
 #include <span>
@@ -9,6 +10,7 @@
 #include <vector>
 
 #include "common/arena.h"
+#include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
@@ -540,11 +542,52 @@ void ElaboratorOperationRules::InUnitExprTypeScope(
   use(scope);
 }
 
+static bool DeclaresEnumConstant(const DataType& type, std::string_view name) {
+  return std::ranges::any_of(type.enum_members, [&](const EnumMember& member) {
+    return member.name == name;
+  });
+}
+
+static bool ClassDeclaresName(const ClassDecl& cls, std::string_view name,
+                              const CompilationUnit* unit) {
+  if (FindMemberAndOwner(&cls, name, unit).member != nullptr) return true;
+  return std::ranges::any_of(cls.members, [&](const ClassMember* member) {
+    return DeclaresEnumConstant(member->data_type, name) ||
+           (member->typedef_item != nullptr &&
+            DeclaresEnumConstant(member->typedef_item->typedef_type, name));
+  });
+}
+
+static void ReportUndeclaredClassMember(const Expr* written, SourceLoc loc,
+                                        const CompilationUnit* unit,
+                                        DiagEngine& diag) {
+  const Expr* operand = TypeRefOperand(written);
+  if (operand == nullptr || operand->kind != ExprKind::kMemberAccess ||
+      !operand->is_scope_resolution || operand->lhs == nullptr ||
+      operand->lhs->kind != ExprKind::kIdentifier ||
+      operand->lhs->has_param_spec || operand->rhs == nullptr ||
+      operand->rhs->kind != ExprKind::kIdentifier ||
+      PackageNamed(*unit, operand->lhs->text) != nullptr) {
+    return;
+  }
+  const ClassDecl* cls = FindClassDecl(operand->lhs->text, unit);
+  if (cls == nullptr || !cls->params.empty() || !cls->base_class.empty() ||
+      !cls->extends_interfaces.empty() ||
+      ClassDeclaresName(*cls, operand->rhs->text, unit)) {
+    return;
+  }
+  diag.Error(loc,
+             std::format("class '{}' declares no member '{}'", cls->name,
+                         operand->rhs->text),
+             Subclause("8.23"));
+}
+
 void ElaboratorOperationRules::ValidateUnitScopeTypeRefArgs() {
   for (const UnitScopeTypeRef& ref : unit_scope_type_refs_) {
     type_ref_package_ = ref.package;
     InLocals(ref.locals,
              [&] { CheckTypeRefArgInner(ref.operand, ref.loc, nullptr); });
+    ReportUndeclaredClassMember(ref.operand, ref.loc, unit_, diag_);
   }
   type_ref_package_ = nullptr;
 }
@@ -658,6 +701,10 @@ std::vector<Expr*> ElaboratorOperationRules::ResolveUnitScopeTypeRef(
   const Expr* ref = dt.type_ref_expr;
   if (NamesPackageType(*ref, unit_)) {
     AdoptReferencedType(dt, TypeSpelledBy(ref));
+    return taken;
+  }
+  if (const DataType* class_typedef = ClassTypedefNamedBy(*ref, unit_)) {
+    AdoptReferencedType(dt, *class_typedef);
     return taken;
   }
   InLocals(locals, [&] {

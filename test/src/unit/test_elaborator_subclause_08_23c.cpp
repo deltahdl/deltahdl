@@ -382,4 +382,36 @@ TEST(ClassScopeResolutionAccess,
       ReportedError(diags, "class 'C' declares no type 'nope'", 6, "8.23"));
 }
 
+TEST(ClassScopeResolutionAccess,
+     TypeReferenceToNoMemberOfABareClassInScopeIsReported) {
+  for (const char* open : {"package q;\n", ""}) {
+    std::string text(open);
+    text.append(
+        "class C;\n"
+        "  typedef logic [6:0] u;\n"
+        "  static logic [4:0] s;\n"
+        "  localparam int W = 3;\n"
+        "  typedef enum {E0, E1} e_t;\n"
+        "endclass\n"
+        "class P;\n"
+        "  var type(C::u) a;\n"
+        "  var type(C::s) b;\n"
+        "  var type(C::W) c;\n"
+        "  var type(C::E1) d;\n"
+        "  var type(C::nosuch) e;\n"
+        "endclass\n");
+    if (*open != '\0') text.append("endpackage\n");
+    text.append("module top;\nendmodule\n");
+    SCOPED_TRACE(text);
+    const int kFirst = *open != '\0' ? 9 : 8;
+    ElabFixture f;
+    ElaborateSrc(text, f);
+    const auto& diags = f.diag.Diagnostics();
+    for (int line = kFirst; line < kFirst + 4; ++line)
+      EXPECT_FALSE(ErrorOnLine(diags, line));
+    EXPECT_TRUE(ReportedError(diags, "class 'C' declares no member 'nosuch'",
+                              kFirst + 4, "8.23"));
+  }
+}
+
 }  // namespace

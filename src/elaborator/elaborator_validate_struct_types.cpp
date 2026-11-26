@@ -477,6 +477,15 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   return &td->typedef_type;
 }
 
+const DataType* ClassTypedefNamedBy(const Expr& ref,
+                                    const CompilationUnit* unit) {
+  if (!IsPlainScopedName(ref) || ref.lhs->kind != ExprKind::kIdentifier ||
+      ref.rhs == nullptr || ref.rhs->kind != ExprKind::kIdentifier) {
+    return nullptr;
+  }
+  return FindClassScopedTypedefType(ref.lhs->text, ref.rhs->text, unit);
+}
+
 const ModuleItem* ResolveClassScopedDeclType(DataType& dtype,
                                              const TypedefMap& typedefs,
                                              const CompilationUnit* unit) {
