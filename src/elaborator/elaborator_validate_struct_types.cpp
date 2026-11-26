@@ -156,11 +156,9 @@ bool NamesPackageType(const Expr& ref, const CompilationUnit* unit) {
 }
 
 static bool NamesClassProperty(const Expr& ref, const CompilationUnit* unit) {
-  if (ref.rhs == nullptr || ref.rhs->kind != ExprKind::kIdentifier)
-    return false;
   const std::vector<const ClassDecl*> kChain =
       ClassChainOfScopePrefix(ref.lhs, unit);
-  return !kChain.empty() &&
+  return !kChain.empty() && ref.rhs != nullptr &&
          std::ranges::any_of(kChain.back()->members, [&](const ClassMember* m) {
            return m->kind == ClassMemberKind::kProperty &&
                   m->name == ref.rhs->text;
