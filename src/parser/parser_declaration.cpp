@@ -498,7 +498,7 @@ DataType Parser::ParseFunctionReturnType() {
   if (Check(TokenKind::kKwType)) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("6.23"));
-    dt.type_ref_expr = ParseExpr();
+    dt.written_type_ref = dt.type_ref_expr = ParseExpr();
     Expect(TokenKind::kRParen, Subclause("6.23"));
     return dt;
   }

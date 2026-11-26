@@ -547,4 +547,227 @@ TEST(DeclaredBeforeUse, SubroutineAssignmentInsideGenerateBlocksJoinsMixture) {
       {"", "logic v; initial v = 1;", "task t; v = 0; endtask"}));
 }
 
+TEST(DeclaredBeforeUse, TypeOperatorAboveItsOperandInAModule) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  var type(w) v;\n"
+      "  typedef type(w) tw;\n"
+      "  localparam type(w) P = 0;\n"
+      "  int k = $bits(type(w));\n"
+      "  localparam type T = type(w);\n"
+      "  int w;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 2));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 3));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 4));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 5));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 6));
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int w;\n"
+             "  var type(w) v;\n"
+             "  typedef type(w) tw;\n"
+             "  localparam type(w) P = 0;\n"
+             "  int k = $bits(type(w));\n"
+             "  localparam type T = type(w);\n"
+             "endmodule\n"));
+}
+
+TEST(DeclaredBeforeUse, TypeOperatorAboveItsOperandInEachDesignScope) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n"
+      "  var type(a) v;\n"
+      "  int a;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  var type(b) v;\n"
+      "  int b;\n"
+      "endprogram\n"
+      "package k;\n"
+      "  var type(c) v;\n"
+      "  int c;\n"
+      "endpackage\n"
+      "var type(d) uv;\n"
+      "int d;\n"
+      "module t;\n"
+      "  i u();\n"
+      "  p q();\n"
+      "  if (1) begin : g\n"
+      "    var type(e) v;\n"
+      "    int e;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(UsedBeforeDeclared(f, "a", 2));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "b", 6));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "c", 10));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "d", 13));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "e", 19));
+  EXPECT_TRUE(
+      ElabOk("interface i;\n"
+             "  int a;\n"
+             "  var type(a) v;\n"
+             "endinterface\n"
+             "program p;\n"
+             "  int b;\n"
+             "  var type(b) v;\n"
+             "endprogram\n"
+             "package k;\n"
+             "  int c;\n"
+             "  var type(c) v;\n"
+             "endpackage\n"
+             "int d;\n"
+             "var type(d) uv;\n"
+             "module t;\n"
+             "  i u();\n"
+             "  p q();\n"
+             "  if (1) begin : g\n"
+             "    int e;\n"
+             "    var type(e) v;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(DeclaredBeforeUse, TypeOperatorAboveItsOperandInAClassSubroutineOrBlock) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  var type(w) v;\n"
+      "  int w;\n"
+      "  function void f();\n"
+      "    var type(u) a;\n"
+      "    int u;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module t;\n"
+      "  task tk;\n"
+      "    var type(x) b;\n"
+      "    int x;\n"
+      "  endtask\n"
+      "  function void g();\n"
+      "    var type(y) c;\n"
+      "    int y;\n"
+      "  endfunction\n"
+      "  initial begin : nb\n"
+      "    var type(z) d;\n"
+      "    int z;\n"
+      "  end\n"
+      "  initial begin\n"
+      "    var type(q) e;\n"
+      "    int q;\n"
+      "  end\n"
+      "  initial fork\n"
+      "    var type(r) g;\n"
+      "    int r;\n"
+      "  join\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 2));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "u", 5));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "x", 11));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "y", 15));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "z", 19));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "q", 23));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "r", 27));
+  EXPECT_TRUE(
+      ElabOk("class C;\n"
+             "  int w;\n"
+             "  var type(w) v;\n"
+             "  function void f();\n"
+             "    int u;\n"
+             "    var type(u) a;\n"
+             "  endfunction\n"
+             "endclass\n"
+             "module t;\n"
+             "  task tk;\n"
+             "    int x;\n"
+             "    var type(x) b;\n"
+             "  endtask\n"
+             "  function void g();\n"
+             "    int y;\n"
+             "    var type(y) c;\n"
+             "  endfunction\n"
+             "  initial begin : nb\n"
+             "    int z;\n"
+             "    var type(z) d;\n"
+             "  end\n"
+             "  initial begin\n"
+             "    int q;\n"
+             "    var type(q) e;\n"
+             "  end\n"
+             "  initial fork\n"
+             "    int r;\n"
+             "    var type(r) g;\n"
+             "  join\n"
+             "endmodule\n"));
+}
+
+TEST(DeclaredBeforeUse, TypeOperatorsNamingEachOtherReportTheFirst) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  var type(w) v;\n"
+      "  var type(v) w;\n"
+      "  initial begin\n"
+      "    var type(b) a;\n"
+      "    var type(a) b;\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 2));
+  EXPECT_FALSE(UsedBeforeDeclared(f, "v", 3));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "b", 5));
+  EXPECT_FALSE(UsedBeforeDeclared(f, "a", 6));
+}
+
+TEST(DeclaredBeforeUse, BlockLocalDeclarationReadsDataDeclaredBelow) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  initial begin\n"
+      "    int a = x;\n"
+      "    logic [N-1:0] b;\n"
+      "    localparam M = L;\n"
+      "    localparam L = 1;\n"
+      "  end\n"
+      "  int x;\n"
+      "  localparam N = 2;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(UsedBeforeDeclared(f, "x", 3));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "N", 4));
+  EXPECT_TRUE(UsedBeforeDeclared(f, "L", 5));
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int x;\n"
+             "  localparam N = 2;\n"
+             "  initial begin\n"
+             "    int a = x;\n"
+             "    logic [N-1:0] b;\n"
+             "    localparam L = 1;\n"
+             "    localparam M = L;\n"
+             "  end\n"
+             "endmodule\n"));
+}
+
+TEST(DeclaredBeforeUse, LocalDeclarationReadsWhatItsStatementBinds) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n"
+             "  int arr[2];\n"
+             "  initial for (int i = 0; i < 2; i++) begin\n"
+             "    int a = i;\n"
+             "  end\n"
+             "  initial foreach (arr[k]) begin\n"
+             "    int c = k;\n"
+             "  end\n"
+             "  task tk(int j);\n"
+             "    var type(j) b = j;\n"
+             "  endtask\n"
+             "  int i, j, k;\n"
+             "endmodule\n"));
+}
+
 }  // namespace

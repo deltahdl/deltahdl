@@ -373,7 +373,7 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
   if (Check(TokenKind::kKwType)) {
     Consume();
     Expect(TokenKind::kLParen, Subclause("6.23"));
-    dtype.type_ref_expr = ParseExpr();
+    dtype.written_type_ref = dtype.type_ref_expr = ParseExpr();
     Expect(TokenKind::kRParen, Subclause("6.23"));
     return true;
   }
@@ -770,7 +770,7 @@ bool ParserDataDeclHelpers::ReadTypeReference(Parser& p, DataType& dtype) {
   p.Consume();
   p.Expect(TokenKind::kLParen, Subclause("6.23"));
   if (!p.TryParseInlineAggregateType(dtype))
-    dtype.type_ref_expr = p.ParseExpr();
+    dtype.written_type_ref = dtype.type_ref_expr = p.ParseExpr();
   p.Expect(TokenKind::kRParen, Subclause("6.23"));
   return true;
 }

@@ -87,18 +87,24 @@ void CollectTargets(const Stmt* s,
                    [&](Stmt* const& sub) { CollectTargets(sub, locals, out); });
 }
 
+void CollectTypeReads(const DataType& type, std::vector<const Expr*>& out) {
+  for (const Expr* e :
+       {type.written_type_ref, type.packed_dim_left, type.packed_dim_right})
+    CollectBareIdents(e, out);
+  for (const auto& [left, right] : type.extra_packed_dims) {
+    CollectBareIdents(left, out);
+    CollectBareIdents(right, out);
+  }
+}
+
 void CollectItemReads(const ModuleItem& item, std::vector<const Expr*>& out) {
   if (item.kind == ModuleItemKind::kContAssign)
     CollectBareIdents(item.assign_rhs, out);
   else if (DeclaresData(item))
     CollectBareIdents(item.init_expr, out);
-  for (const Expr* e : {item.gen_cond, item.data_type.packed_dim_left,
-                        item.data_type.packed_dim_right})
-    CollectBareIdents(e, out);
-  for (const auto& [left, right] : item.data_type.extra_packed_dims) {
-    CollectBareIdents(left, out);
-    CollectBareIdents(right, out);
-  }
+  CollectBareIdents(item.gen_cond, out);
+  CollectTypeReads(item.data_type, out);
+  CollectBareIdents(item.typedef_type.written_type_ref, out);
   for (const Expr* dim : item.unpacked_dims) CollectBareIdents(dim, out);
   for (const EventExpr& ev : item.sensitivity) {
     CollectBareIdents(ev.signal, out);
@@ -107,6 +113,40 @@ void CollectItemReads(const ModuleItem& item, std::vector<const Expr*>& out) {
   for (const auto& case_item : item.gen_case_items)
     for (const Expr* pattern : case_item.patterns)
       CollectBareIdents(pattern, out);
+}
+
+void CollectLocalDeclarationReads(const Stmt& s,
+                                  std::vector<const Expr*>& out) {
+  if (s.kind == StmtKind::kBlockItemDecl && s.decl_item != nullptr)
+    CollectItemReads(*s.decl_item, out);
+  if (s.kind != StmtKind::kVarDecl) return;
+  CollectTypeReads(s.var_decl_type, out);
+  CollectBareIdents(s.var_init, out);
+  for (const Expr* dim : s.var_unpacked_dims) CollectBareIdents(dim, out);
+}
+
+Declarations LocalDeclarationsOf(const std::vector<Stmt*>& stmts,
+                                 Declarations around) {
+  for (const Stmt* s : stmts) {
+    if (s == nullptr) continue;
+    if (s->kind == StmtKind::kVarDecl && !s->var_name.empty())
+      around.emplace(s->var_name, s->range.start);
+    if (s->kind == StmtKind::kBlockItemDecl && s->decl_item != nullptr &&
+        DeclaresData(*s->decl_item))
+      around.emplace(s->decl_item->name, s->decl_item->loc);
+  }
+  return around;
+}
+
+Declarations NamesAStatementBinds(
+    const Stmt& s, const std::unordered_set<std::string_view>& bound) {
+  Declarations names;
+  for (std::string_view name : bound) names.emplace(name, s.range.start);
+  for (std::string_view name : ForHeaderDeclaredNames(&s))
+    names.emplace(name, s.range.start);
+  for (std::string_view name : s.foreach_vars)
+    names.emplace(name, s.range.start);
+  return names;
 }
 
 void CollectBodyUses(const std::vector<Stmt*>& body,
@@ -141,35 +181,81 @@ class UseBeforeDeclaration {
   void ClassBody(const ClassDecl& cls) {
     Declarations properties;
     std::vector<const Expr*> uses;
+    std::vector<const ModuleItem*> methods;
     for (const ClassMember* member : cls.members) {
       if (member->kind == ClassMemberKind::kProperty) {
         properties.emplace(member->name, member->loc);
         CollectBareIdents(member->init_expr, uses);
+        CollectBareIdents(member->data_type.written_type_ref, uses);
       }
-      if (member->kind == ClassMemberKind::kMethod)
+      if (member->kind == ClassMemberKind::kMethod) {
         CollectSubroutineUses(*member->method, uses);
+        methods.push_back(member->method);
+      }
       if (member->kind == ClassMemberKind::kClassDecl)
         ClassBody(*member->nested_class);
     }
+    const ClassDecl* outer = std::exchange(class_, &cls);
     scopes_.push_back(std::move(properties));
-    for (const Expr* use : uses)
-      if (!MayInherit(cls, use->text)) Use(*use);
+    for (const Expr* use : uses) Use(*use);
+    for (const ModuleItem* method : methods) Subroutine(*method);
     scopes_.pop_back();
+    class_ = outer;
   }
 
  private:
   void Item(const ModuleItem& item) {
     std::vector<const Expr*> uses;
     CollectItemReads(item, uses);
+    const bool kIsSubroutine = item.kind == ModuleItemKind::kTaskDecl ||
+                               item.kind == ModuleItemKind::kFunctionDecl;
     if (IsProceduralItemKind(item.kind)) CollectBodyUses({item.body}, {}, uses);
-    if (item.kind == ModuleItemKind::kTaskDecl ||
-        item.kind == ModuleItemKind::kFunctionDecl)
-      CollectSubroutineUses(item, uses);
+    if (kIsSubroutine) CollectSubroutineUses(item, uses);
     for (const Expr* use : uses) Use(*use);
+    if (IsProceduralItemKind(item.kind)) Procedure(item.body, {});
+    if (kIsSubroutine) Subroutine(item);
     if (item.kind == ModuleItemKind::kClassDecl) ClassBody(*item.class_decl);
     Scope(item.gen_body);
     if (item.gen_else != nullptr) Item(*item.gen_else);
     for (const auto& case_item : item.gen_case_items) Scope(case_item.body);
+  }
+
+  void Subroutine(const ModuleItem& subroutine) {
+    Declarations formals;
+    formals.emplace(subroutine.name, subroutine.loc);
+    for (const FunctionArg& formal : subroutine.func_args)
+      formals.emplace(formal.name, subroutine.loc);
+    Locals(subroutine.func_body_stmts, std::move(formals));
+  }
+
+  void Procedure(const Stmt* s,
+                 const std::unordered_set<std::string_view>& bound) {
+    if (s == nullptr) return;
+    Declarations names = NamesAStatementBinds(*s, bound);
+    if (s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork) {
+      Locals(s->kind == StmtKind::kFork ? s->fork_stmts : s->stmts,
+             std::move(names));
+      return;
+    }
+    scopes_.push_back(std::move(names));
+    ForEachChildStmtWithBindings(
+        s, [&](const Stmt* sub,
+               const std::unordered_set<std::string_view>& sub_bound) {
+          Procedure(sub, sub_bound);
+        });
+    scopes_.pop_back();
+  }
+
+  void Locals(const std::vector<Stmt*>& stmts, Declarations around) {
+    scopes_.push_back(LocalDeclarationsOf(stmts, std::move(around)));
+    for (const Stmt* s : stmts) {
+      if (s == nullptr) continue;
+      std::vector<const Expr*> reads;
+      CollectLocalDeclarationReads(*s, reads);
+      for (const Expr* read : reads) Use(*read);
+      Procedure(s, {});
+    }
+    scopes_.pop_back();
   }
 
   bool MayInherit(const ClassDecl& cls, std::string_view name) const {
@@ -187,6 +273,7 @@ class UseBeforeDeclaration {
   }
 
   void Use(const Expr& use) {
+    if (class_ != nullptr && MayInherit(*class_, use.text)) return;
     bool declared = false;
     for (const Declarations& scope : scopes_) {
       auto it = scope.find(use.text);
@@ -205,6 +292,7 @@ class UseBeforeDeclaration {
   const OuterScopes& outer_;
   DiagEngine& diag_;
   std::vector<Declarations> scopes_;
+  const ClassDecl* class_ = nullptr;
 };
 
 }  // namespace

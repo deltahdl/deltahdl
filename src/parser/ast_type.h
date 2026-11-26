@@ -129,6 +129,7 @@ struct DataType {
   bool param_assignment_written = false;
   std::vector<DataType> specialized_scopes;
   std::vector<Expr*> operand_unpacked_dims;
+  const Expr* written_type_ref = nullptr;
 };
 
 struct FunctionArg {

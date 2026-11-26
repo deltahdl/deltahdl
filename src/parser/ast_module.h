@@ -453,7 +453,8 @@ inline bool SetByTypeReference(const ModuleItem& item) {
 
 inline bool DeclareAsTypedef(ModuleItem& item) {
   if (SetByTypeReference(item)) {
-    item.typedef_type.type_ref_expr = std::exchange(item.init_expr, nullptr);
+    item.typedef_type.written_type_ref = item.typedef_type.type_ref_expr =
+        std::exchange(item.init_expr, nullptr);
   } else if (!DeclaresTypeParam(item)) {
     return false;
   }
