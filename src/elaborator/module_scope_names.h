@@ -27,6 +27,7 @@ struct ModuleScopeNames {
   std::unordered_set<std::string_view> real_params;
   std::unordered_map<std::string_view, VarSelectShape> select_shapes;
   std::unordered_set<std::string_view> class_vars;
+  std::unordered_set<std::string_view> declared_interconnects;
 };
 
 }  // namespace delta

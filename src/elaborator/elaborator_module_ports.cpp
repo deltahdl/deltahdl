@@ -481,12 +481,16 @@ struct PortNetNameSets {
   std::unordered_set<std::string_view>& interconnects;
   std::unordered_set<std::string_view>& nets;
   UwireDrivers& uwire_drivers;
+  std::unordered_set<std::string_view>& declared_interconnects;
 };
 
 static void RegisterPortNetNames(const ModuleDecl* decl, const PortDecl& port,
                                  const RtlirPort& rp, PortNetNameSets sets) {
   if (port.name.empty()) return;
-  if (port.data_type.is_interconnect) sets.interconnects.insert(port.name);
+  if (port.data_type.is_interconnect) {
+    sets.interconnects.insert(port.name);
+    sets.declared_interconnects.insert(port.name);
+  }
   if (decl->decl_kind == ModuleDeclKind::kChecker || rp.is_var) return;
   if (decl->is_non_ansi_ports && BodyDeclaresObject(decl, port.name)) return;
   sets.nets.insert(port.name);
@@ -616,7 +620,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
       rp.direction = PortExprDirection(decl, port.port_expr);
     }
     RegisterPortNetNames(decl, port, rp,
-                         {interconnect_names_, net_names_, uwire_drivers_});
+                         {interconnect_names_, net_names_, uwire_drivers_,
+                          declared_interconnects_});
     rp.loc = port.loc;
     {
       ParamRangeRegistryGuard registry(mod);

@@ -93,8 +93,8 @@ void Elaborator::ValidateItemRules(const ModuleItem* item,
                                    const ScopeMap& scope) {
   bool is_proc = IsProceduralItemKind(item->kind);
   if (is_proc && item->body) {
-    CheckInterconnectProcContAssign(item->body, interconnect_names_, diag_);
-    CheckInterconnectProceduralRead(item->body, interconnect_names_, diag_);
+    CheckInterconnectProcContAssign(item->body, declared_interconnects_, diag_);
+    CheckInterconnectProceduralRead(item->body, declared_interconnects_, diag_);
     CheckProceduralAssignLhs(item->body, diag_);
     const std::unordered_set<std::string_view> kNetNames =
         NetNamesAt(item->loc);
@@ -108,7 +108,7 @@ void Elaborator::ValidateItemRules(const ModuleItem* item,
 
     WalkStmtsForLhsPatternKeys(item->body, diag_);
   }
-  ReportInterconnectInItem(*item, interconnect_names_, diag_);
+  ReportInterconnectInItem(*item, declared_interconnects_, diag_);
   ValidateSubroutineBodyTargets(item, mod, scope);
   if (item->kind == ModuleItemKind::kContAssign)
     CheckLhsPatternNamedKeys(item->assign_lhs, diag_);

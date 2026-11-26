@@ -5,6 +5,7 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "common/types.h"
 #include "fixture_elaborator.h"
@@ -750,6 +751,38 @@ TEST(InterconnectElaboration, EventControlNamingAnInterconnectIsError) {
                                   "  logic y, z;\n"
                                   "  always @(x) y = 1'b1;\n"
                                   "  always_ff @(posedge x) z <= 1'b1;\n"));
+}
+
+TEST(InterconnectElaboration, UseAfterAGateTerminalConnectionIsError) {
+  constexpr std::initializer_list<ItemPlace> kGatePlaces = {kModulePlace,
+                                                            kGeneratePlace};
+  const std::string kWired =
+      "  interconnect ic;\n"
+      "  logic x, y;\n"
+      "  wire z;\n"
+      "  buf b(ic, x);\n";
+  const std::pair<const char*, const char*> kUses[] = {
+      {"  initial y = ic;\n", kInProceduralExpression},
+      {"  initial force ic = 1'b1;\n", kInProcContAssign},
+      {"  assign z = ic;\n", kInExpression},
+      {"  wire w = ic;\n", kInExpression},
+      {"  buf c(z, ic & x);\n", kInExpression}};
+  for (const auto& [use, message] : kUses) {
+    EXPECT_TRUE(
+        LastLineReportedInEachPlace(kGatePlaces, "", kWired + use, message));
+  }
+  EXPECT_TRUE(
+      AcceptedInEachPlace(kGatePlaces, "", kWired + "  buf c(z, ic);\n"));
+  EXPECT_TRUE(AcceptedInEachPlace(kGatePlaces, "",
+                                  "  wire ic;\n"
+                                  "  logic x, y;\n"
+                                  "  wire z, v;\n"
+                                  "  buf b(ic, x);\n"
+                                  "  initial y = ic;\n"
+                                  "  initial force ic = 1'b1;\n"
+                                  "  assign z = ic;\n"
+                                  "  wire w = ic;\n"
+                                  "  buf c(v, ic & x);\n"));
 }
 
 TEST(InterconnectElaboration, WaitConditionReadingAnInterconnectIsError) {

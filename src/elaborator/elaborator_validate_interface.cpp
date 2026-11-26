@@ -647,13 +647,13 @@ void Elaborator::ValidateGenericPortModportAccess(const ModuleDecl* child,
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
 
-  if (ExprUsesInterconnect(item->assign_lhs, interconnect_names_)) {
+  if (ExprUsesInterconnect(item->assign_lhs, declared_interconnects_)) {
     diag_.Error(item->loc,
                 "interconnect net cannot be used in continuous assignment",
                 Subclause("6.6.8"));
   }
 
-  if (ExprUsesInterconnect(item->assign_rhs, interconnect_names_)) {
+  if (ExprUsesInterconnect(item->assign_rhs, declared_interconnects_)) {
     diag_.Error(item->loc, "interconnect net cannot be used in expression",
                 Subclause("6.6.8"));
   }

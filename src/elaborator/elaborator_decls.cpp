@@ -528,7 +528,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   net.name = ScopedName(item->name);
   net.loc = item->loc;
 
-  if (item->data_type.is_interconnect) interconnect_names_.insert(item->name);
+  if (item->data_type.is_interconnect) {
+    interconnect_names_.insert(item->name);
+    declared_interconnects_.insert(item->name);
+  }
   net.net_type = WrittenNetType(item->data_type);
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.dtype = NetDeclaredType(item, typedefs_, BuildParamScope(mod), arena_);

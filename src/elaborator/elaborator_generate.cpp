@@ -36,6 +36,7 @@ void ElaboratorData::SwapModuleScopeNames(ModuleScopeNames& names) {
   std::swap(var_init_names_, names.initialized);
   std::swap(uwire_drivers_, names.uwire_drivers);
   std::swap(interconnect_names_, names.interconnects);
+  std::swap(declared_interconnects_, names.declared_interconnects);
   std::swap(force_release_targets_, names.force_targets);
   std::swap(var_types_, names.var_types);
   std::swap(class_var_types_, names.class_var_types);

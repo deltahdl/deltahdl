@@ -494,7 +494,7 @@ void Elaborator::CheckCheckerArguments(const ModuleItem* item,
                                        const ModuleDecl* checker,
                                        RtlirModule* mod) {
   if (checker->decl_kind != ModuleDeclKind::kChecker) return;
-  ReportInterconnectInCheckerArguments(*item, interconnect_names_, diag_);
+  ReportInterconnectInCheckerArguments(*item, declared_interconnects_, diag_);
   ScopeMap scope = BuildConstantScope(mod);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   RecordUwireCheckerOutputs(uwire_drivers_, item, checker,
@@ -524,7 +524,7 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   DeclareInModuleNameSpace(item->inst_name, item->loc);
-  ReportInterconnectInInstance(*item, interconnect_names_, diag_);
+  ReportInterconnectInInstance(*item, declared_interconnects_, diag_);
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = scoped_inst_name;

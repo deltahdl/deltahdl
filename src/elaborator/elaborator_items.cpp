@@ -287,7 +287,7 @@ void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
       diag_);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   ValidatePrimitiveDrivenTerminals(item, mod, scope, gen_prefix_scopes_, diag_);
-  ReportInterconnectInInstance(*item, interconnect_names_, diag_);
+  ReportInterconnectInInstance(*item, declared_interconnects_, diag_);
   RecordUwirePrimitiveOutputs(uwire_drivers_, item,
                               {mod,
                                var_types_,

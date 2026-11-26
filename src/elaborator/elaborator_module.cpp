@@ -188,6 +188,7 @@ void Elaborator::ResetItemElaborationState() {
   force_release_targets_.clear();
   nettype_net_names_.clear();
   interconnect_names_.clear();
+  declared_interconnects_.clear();
   scalar_var_names_.clear();
   real_var_names_.clear();
   real_param_names_.clear();
@@ -239,6 +240,7 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::force_release_targets_) force_release_targets;
   decltype(Elaborator::nettype_net_names_) nettype_net_names;
   decltype(Elaborator::interconnect_names_) interconnect_names;
+  decltype(Elaborator::declared_interconnects_) declared_interconnects;
   decltype(Elaborator::scalar_var_names_) scalar_var_names;
   decltype(Elaborator::real_var_names_) real_var_names;
   decltype(Elaborator::real_param_names_) real_param_names;
@@ -303,6 +305,7 @@ struct ItemElaborationStateSaver {
     force_release_targets = std::move(e.force_release_targets_);
     nettype_net_names = std::move(e.nettype_net_names_);
     interconnect_names = std::move(e.interconnect_names_);
+    declared_interconnects = std::move(e.declared_interconnects_);
     scalar_var_names = std::move(e.scalar_var_names_);
     real_var_names = std::move(e.real_var_names_);
     real_param_names = std::move(e.real_param_names_);
@@ -376,6 +379,7 @@ struct ItemElaborationStateSaver {
     e.force_release_targets_ = std::move(force_release_targets);
     e.nettype_net_names_ = std::move(nettype_net_names);
     e.interconnect_names_ = std::move(interconnect_names);
+    e.declared_interconnects_ = std::move(declared_interconnects);
     e.scalar_var_names_ = std::move(scalar_var_names);
     e.real_var_names_ = std::move(real_var_names);
     e.real_param_names_ = std::move(real_param_names);
@@ -519,7 +523,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                               std::move(real_var_names_),
                               std::move(real_param_names_),
                               std::move(var_select_shapes_),
-                              std::move(class_var_names_)};
+                              std::move(class_var_names_),
+                              declared_interconnects_};
   saved_item_state.Restore(*this);
   return mod;
 }

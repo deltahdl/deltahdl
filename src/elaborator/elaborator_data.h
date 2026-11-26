@@ -188,6 +188,7 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::string_view> nettype_resolve_funcs_;
   std::unordered_map<std::string_view, std::string_view> nettype_canonical_;
   std::unordered_set<std::string_view> interconnect_names_;
+  std::unordered_set<std::string_view> declared_interconnects_;
   InterconnectMerges interconnect_merges_;
   std::unordered_set<std::string_view> scalar_var_names_;
   std::unordered_set<std::string_view> real_var_names_;
