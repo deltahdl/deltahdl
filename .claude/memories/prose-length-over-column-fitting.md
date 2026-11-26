@@ -14,4 +14,4 @@ The shorter word chosen to fit a column is paid for out of the accuracy the pros
 
 **Why:** A width limit is arbitrary against the thing being described, so every time the two conflict the description loses. The cost is invisible afterwards, because what the prose would have said is not in the file to compare against.
 
-**How to apply:** Where a limit really is enforced, move rather than compress: split the file, or take the text somewhere that has room. The file-line cap that `pre-push-checks` and CI enforce is one such limit, and the commit subject's is another, so a commit's detail goes in its body, left unwrapped ([commit-body-left-unwrapped](commit-body-left-unwrapped.md)).
+**How to apply:** Where a limit really is enforced, move rather than compress: split the file, or take the text somewhere that has room. The file-line cap that CI enforces is one such limit, and the commit subject's is another, so a commit's detail goes in its body, left unwrapped ([commit-body-left-unwrapped](commit-body-left-unwrapped.md)).

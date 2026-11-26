@@ -11,7 +11,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name to `git add` a path neither on disk nor in the index; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
 - [A commit closes at least one issue](a-commit-closes-an-issue.md) — and as many more as it finishes, every case each one lists passing; only a red-run fix, writing `Refs #N` for each issue whose tests it changes, or a change the user asks for may close none.
-- [A commit body is left unwrapped](commit-body-left-unwrapped.md) — each body paragraph on one line, never broken at a column; pre-push-checks refuses a paragraph running onto a second line.
+- [A commit body is left unwrapped](commit-body-left-unwrapped.md) — each body paragraph on one line, never broken at a column; read it back with `git log -1` before pushing.
 - [Closing keywords](closing-keywords.md) — nine words close an issue from anywhere in a message; `Closes #N` on its own line per finished issue, `Refs #N` or `See #N` to mention.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
 - [A revert does not reopen](a-revert-does-not-reopen.md) — reopen by hand with `gh issue reopen` after reverting the commit that closed it.
@@ -49,7 +49,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Every LRM rule has been swept for tests](every-lrm-rule-has-been-swept.md) — each case of IEEE 1800-2023 already has a test, plain if it passes and `DISABLED_` if not; start from those.
 - [Searching for a test before adding one](searching-for-a-test-before-adding-one.md) — search all of `test/`, open what is found and trace its code; add only what it would not catch.
 - [A deleted test leaves its cases shown](a-deleted-test-leaves-its-cases-shown.md) — establish what it asserts, what the standard requires and what still shows each correct case; the commit says so.
-- [Test-driven development](test-driven-development.md) — tests first, each seen to fail for its issue's reason before the fix; a test lands in the same commit as its code, and no src line lands uncovered.
+- [Test-driven development](test-driven-development.md) — tests first, each traced to fail for its issue's reason before the fix, CI showing it pass; a test lands in the same commit as its code, and no src line lands uncovered.
 - [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
 - [Fixing a rule in full](fixing-a-rule-in-full.md) — list every case of the rule, each on the issue of its part, then test and fix every case the issue in hand lists in one commit.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
@@ -66,7 +66,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Verification
 
-- [Checking locally, then verifying through CI](verifying-through-ci.md) — run locally only what shows a change works: new tests, the rule's test files, `pre-push-checks` over touched files; suite-wide runs are CI's.
+- [Verifying through CI](verifying-through-ci.md) — nothing is built or run locally, no build, unit test, probe or `pre-push-checks`; push and read CI's run.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — only a test asserting the standard's outcome shows a case conforms; an untested case is filed.
 - [Reading a CI run](reading-a-ci-run.md) — no push while a run is in progress or queued; `gh run view --log-failed` after.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run.

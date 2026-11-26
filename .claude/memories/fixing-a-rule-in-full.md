@@ -27,6 +27,6 @@ See that each case is on the open issue of its part or is already shown by a pas
 - A case's test may already be in the tree with `DISABLED_` in front of its name, per [lrm-tests-issues-are-tests-only](lrm-tests-issues-are-tests-only.md). Run it and read why it fails, then remove the prefix in the commit that makes it pass.
 - A case found while fixing joins the fix when it falls in the part in hand, and otherwise goes on the issue of its part ([what-does-not-get-filed](what-does-not-get-filed.md)).
 - Choose inputs that tell correct code from incorrect ([discriminating-test-inputs](discriminating-test-inputs.md)).
-- Run each test before writing the fix and see it fail because of the rule in hand ([test-driven-development](test-driven-development.md)). A test that fails for another reason has found a defect of another rule, which is dealt with as [what-does-not-get-filed](what-does-not-get-filed.md) says before the fix is designed. Never bend the tests around it unrecorded.
-- Run the `pre-push-checks` skill before pushing the tests with the fix, then let the run give the verdict over all of deltahdl.
+- Write each test before the fix and trace through the code why it fails because of the rule in hand, building nothing locally ([test-driven-development](test-driven-development.md)). A test that fails for another reason has found a defect of another rule, which is dealt with as [what-does-not-get-filed](what-does-not-get-filed.md) says before the fix is designed. Never bend the tests around it unrecorded.
+- Push the tests with the fix and let the CI run give the verdict over all of deltahdl ([verifying-through-ci](verifying-through-ci.md)).
 - An issue about deltahdl itself, such as a coverage gap, has no rule behind it; fix the problem it names.

@@ -10,7 +10,7 @@ metadata:
 
 # Long-running commands in the background
 
-Run every command that can take more than about a minute as a background Bash call (`run_in_background: true`), then end the turn and let its completion notification resume the work. This covers a sweep of `gh` calls over many issues, a long `grep` or `find` over the tree, a local build, a test run and the `pre-push-checks` skill, whose first build of the library takes several minutes ([verifying-through-ci](verifying-through-ci.md)), as well as the wait for a CI run ([watching-a-ci-run](watching-a-ci-run.md)).
+Run every command that can take more than about a minute as a background Bash call (`run_in_background: true`), then end the turn and let its completion notification resume the work. This covers a sweep of `gh` calls over many issues, a long `grep` or `find` over the tree and the wait for a CI run ([watching-a-ci-run](watching-a-ci-run.md)).
 
 **Why:** The autopilot's reminders are cron jobs, and a cron job fires only while the session is idle between turns. A foreground command holds the turn for as long as it runs, so every reminder due in that time waits behind it, and the user cannot type either. A background command frees the turn as soon as it starts.
 

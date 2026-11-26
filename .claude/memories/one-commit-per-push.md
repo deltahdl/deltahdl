@@ -10,7 +10,7 @@ metadata:
 
 # One commit per push
 
-Every push carries exactly one commit. Local `main` is never more than one commit ahead of `origin/main`: once a commit is made, it is checked with the `pre-push-checks` skill and pushed before the next commit is made. Work that would go into a second commit before the first is pushed either joins the first, by amending it while it is still unpushed, or waits until the first is pushed.
+Every push carries exactly one commit. Local `main` is never more than one commit ahead of `origin/main`: once a commit is made, it is pushed before the next commit is made. Work that would go into a second commit before the first is pushed either joins the first, by amending it while it is still unpushed, or waits until the first is pushed.
 
 **Why:** CI checks a push as one run against its head. With several commits in a push, a red run cannot be pinned on one of them, and a red-run fix pushed alongside other work stops being a push of its own ([fixing-a-red-run](fixing-a-red-run.md)). An unpushed commit is also work CI has not checked, and building more on top of it lets it go stale against the tree.
 

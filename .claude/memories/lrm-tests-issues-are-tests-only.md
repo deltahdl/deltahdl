@@ -18,10 +18,11 @@ Every other issue is fair game for a fix: its commit delivers the src change and
 
 **How to apply:**
 
-- For an `lrm-tests` issue, build and run each new test under its plain name first, and read why it fails. A test that passes keeps its plain name. A test that fails because deltahdl does not do what its case states takes the prefix. A test failing for another reason is wrong and is corrected, or has found a defect of another rule, which becomes a case of that rule's issue with a test of its own ([what-does-not-get-filed](what-does-not-get-filed.md)).
+- For an `lrm-tests` issue, trace each new test through the code under its plain name, building nothing locally ([verifying-through-ci](verifying-through-ci.md)), and judge whether deltahdl passes it. A test that passes keeps its plain name. A test that fails because deltahdl does not do what its case states takes the prefix. A test failing for another reason is wrong and is corrected, or has found a defect of another rule, which becomes a case of that rule's issue with a test of its own ([what-does-not-get-filed](what-does-not-get-filed.md)).
 - The `lrm-tests` commit also closes each rule issue all of whose cases now pass under their plain names ([a-commit-closes-an-issue](a-commit-closes-an-issue.md)): that records conformance found, not a fix.
 - Choose a name no other test has once the prefix is gone.
 - A test carrying the prefix shows nothing about its case. The case stays unticked in its rule's issue, with the test named beside it ([a-rule-conforms-only-when-tests-show-it](a-rule-conforms-only-when-tests-show-it.md)).
-- To run a test carrying the prefix, pass `--gtest_also_run_disabled_tests --gtest_filter=Suite.DISABLED_Name` to its binary.
+- A test CI shows failing under its plain name takes the prefix in a push of its own, per [fixing-a-red-run](fixing-a-red-run.md).
+- On CI, a test carrying the prefix runs when its binary is passed `--gtest_also_run_disabled_tests --gtest_filter=Suite.DISABLED_Name` to its binary.
 - The fix of a rule removes the prefix from every test of the rule, and closes its issue only when none of its cases' tests still carries one.
 - A test that cannot compile because it needs a declaration deltahdl lacks waits for its fix, its case naming the declaration.

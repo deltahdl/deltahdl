@@ -1,15 +1,15 @@
 ---
 name: waiting-while-anything-runs-in-the-background
-description: "While any command runs in the background, a CI watch, a build, a test run, the pre-push check or a sweep, do nothing but wait: start it as a turn's last call and act again only on its notification; what the user instructs is the exception, done in full at once."
+description: "While any command runs in the background, a CI watch or a sweep, do nothing but wait: start it as a turn's last call and act again only on its notification; what the user instructs is the exception, done in full at once."
 metadata:
   type: feedback
 ---
 
 # Waiting while anything runs in the background
 
-While any command runs in the background, whether a CI watch, a build, a test run, the `pre-push-checks` skill, a probe or a sweep of `gh` calls, do nothing but wait. A background command is the last call of its turn, and the next work starts when its completion notification arrives. Until then there is no reading, searching, diagnosis, planning, editing, staging, committing or issue writing, for the issue in hand or any other.
+While any command runs in the background, whether a CI watch or a sweep of `gh` calls, do nothing but wait. A background command is the last call of its turn, and the next work starts when its completion notification arrives. Until then there is no reading, searching, diagnosis, planning, editing, staging, committing or issue writing, for the issue in hand or any other.
 
-**Why:** The user wants one thing done at a time, with no switching between pieces of work while something runs. A session that fills a wait drifts: it reads ahead into the next issue, or ticks a case before the test showing it has passed, and the result then lands while its attention is elsewhere. Locally there is a second reason: `check.sh` and a build read the working tree until they finish, so an edit made while they run is checked in place of the commit. The local waits are short besides, under about a minute for `check.sh` once `build-check/` is built, so filling them gains nothing.
+**Why:** The user wants one thing done at a time, with no switching between pieces of work while something runs. A session that fills a wait drifts: it reads ahead into the next issue, or ticks a case before the test showing it has passed, and the result then lands while its attention is elsewhere.
 
 **How to apply:**
 
