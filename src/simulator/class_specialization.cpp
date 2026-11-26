@@ -292,12 +292,16 @@ const DataType* TypeParamActualIn(const ClassDecl* decl,
   return nullptr;
 }
 
-bool ActualSizesIntegralProperty(const DataType& actual, SimContext& ctx) {
-  if (DeclaredTypeIsString(actual, ctx) || DeclaredTypeIsReal(actual, ctx))
-    return false;
-  if (actual.kind != DataTypeKind::kNamed) return true;
-  const ModuleItem* item = ctx.FindTypedefItem(actual.type_name);
-  return item == nullptr || item->unpacked_dims.empty();
+const DataType* IntegralElementOf(const DataType& actual, SimContext& ctx) {
+  const DataType* element = &actual;
+  if (actual.kind == DataTypeKind::kNamed) {
+    const ModuleItem* item = ctx.FindTypedefItem(actual.type_name);
+    if (item != nullptr && !item->unpacked_dims.empty())
+      element = &item->typedef_type;
+  }
+  if (DeclaredTypeIsString(*element, ctx) || DeclaredTypeIsReal(*element, ctx))
+    return nullptr;
+  return element;
 }
 
 std::string_view ActualLayoutKey(const ClassTypeInfo& spec,
@@ -322,9 +326,10 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
                                  ? std::string_view{}
                                  : TypeParamNamedBy(decl, prop.type_name);
     if (prop.width_is_declared || pname.empty()) continue;
-    const DataType* actual = TypeParamActualIn(decl, actuals, pname);
-    if (actual == nullptr || !ActualSizesIntegralProperty(*actual, ctx))
-      continue;
+    const DataType* written = TypeParamActualIn(decl, actuals, pname);
+    const DataType* actual =
+        written != nullptr ? IntegralElementOf(*written, ctx) : nullptr;
+    if (actual == nullptr) continue;
     uint32_t width = DeclaredTypeWidth(*actual, ctx);
     if (width == 0) continue;
     prop.width = width;
@@ -332,7 +337,7 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
     prop.is_signed = DeclaredTypeIsSigned(*actual, ctx);
     if (actual->kind != DataTypeKind::kNamed)
       prop.is_4state = DeclaredTypeIs4State(*actual, ctx);
-    std::string_view layout = ActualLayoutKey(*spec, pname, *actual, ctx);
+    std::string_view layout = ActualLayoutKey(*spec, pname, *written, ctx);
     if (!layout.empty()) prop.type_name = layout;
   }
 }

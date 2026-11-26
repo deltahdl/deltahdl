@@ -82,6 +82,13 @@ static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   return name.empty() ? 0 : ctx.FindTypeWidth(name);
 }
 
+static uint64_t ClassArrayBits(const ClassArrayRef& ref) {
+  uint64_t count = ref.size;
+  const std::vector<uint32_t>& sizes = ref.prop->dim_sizes;
+  for (size_t d = ref.dim + 1; d < sizes.size(); ++d) count *= sizes[d];
+  return count * ref.prop->width;
+}
+
 static uint64_t UserSystemFunctionBits(const Expr* arg) {
   if (arg->kind != ExprKind::kSystemCall) return 0;
   VpiContext& vpi = GetGlobalVpiContext();
@@ -126,8 +133,7 @@ Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   ClassArrayRef ref;
   if (ResolveClassArray(arg, ctx, arena, ref)) {
-    return MakeLogic4VecVal(arena, 32,
-                            static_cast<uint64_t>(ref.size) * ref.prop->width);
+    return MakeLogic4VecVal(arena, 32, ClassArrayBits(ref));
   }
   auto val = EvalExpr(arg, ctx, arena);
   return MakeLogic4VecVal(arena, 32, val.width);

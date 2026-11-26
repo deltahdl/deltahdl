@@ -199,6 +199,20 @@ TEST(PrimarySim, BitsOfClassArrayPropertiesCountEveryElement) {
             "24 24 64\n");
 }
 
+TEST(PrimarySim, BitsOfAClassPropertyOfSeveralDimensionsCountsEveryElement) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  class C;\n"
+                       "    int g [2][3];\n"
+                       "  endclass\n"
+                       "  C m = new;\n"
+                       "  initial $display(\"%0d %0d\", $bits(m.g), "
+                       "$bits(m.g[1]));\n"
+                       "endmodule\n",
+                       f),
+            "192 96\n");
+}
+
 TEST(PrimarySim, BitsOfClassAndPackageScopedTypedefs) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
