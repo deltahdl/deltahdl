@@ -1,6 +1,6 @@
 ---
 name: several-commits-per-push
-description: "A push may carry several commits, each one a whole step of the work; every workflow's run page lists them all through its summarize-commits job."
+description: "A push may carry several commits, each one a whole step of the work, pushed whenever the session chooses; every workflow's run page lists them all through its summarize-commits job."
 metadata:
   node_type: memory
   type: feedback
@@ -10,7 +10,7 @@ metadata:
 
 # Several commits per push
 
-A push may carry several commits. Work is broken into small commits, each a whole step that stands on its own, and they are pushed together once the work is done.
+A push may carry several commits. Work is broken into small commits, each a whole step that stands on its own. When to push them, and how many go in one push, is the session's own choice.
 
 **Why:** Small commits keep each change readable and revertable on its own. A run page names only the push's head commit, so every workflow carries a `summarize-commits` job, from the composite action `.github/actions/summarize-commits`, which lists every commit of the push on that run's summary page; the user reads the commits there.
 

@@ -6,7 +6,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 ## Commits and pushes
 
 - [Pushing to main](pushing-to-main.md) — commit straight to `main` and push a finished change without asking.
-- [Several commits per push](several-commits-per-push.md) — break work into small whole commits and push them together; each run page lists them through `summarize-commits`.
+- [Several commits per push](several-commits-per-push.md) — break work into small whole commits and push them when you choose; each run page lists them through `summarize-commits`.
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name to `git add` a path neither on disk nor in the index; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
