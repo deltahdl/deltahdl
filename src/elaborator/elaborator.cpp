@@ -507,6 +507,7 @@ RtlirDesign* Elaborator::ElaborateTops(
 
   design->unit_constants = cu_param_scope_;
   design->unit_type_ref_compares = std::move(unit_type_ref_compares_);
+  design->argument_typedefs = std::move(argument_typedefs_);
   FinalizeDesignTail(
       design, unit_,
       TypeNameSources{typedefs_, aggregate_typedef_names_, arena_},

@@ -428,6 +428,8 @@ class ElaboratorData {
 
   std::unordered_map<const ModuleItem*, const ModuleItem*>
       written_declarations_;
+
+  std::vector<ModuleItem*> argument_typedefs_;
 };
 
 }  // namespace delta

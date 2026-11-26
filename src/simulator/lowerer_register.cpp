@@ -453,6 +453,7 @@ static void RegisterScopeTypedefs(const std::vector<ModuleDecl*>& decls,
 
 static void RegisterTypeDeclarations(const RtlirDesign* design,
                                      SimContext& ctx) {
+  RegisterTypedefItems(design->argument_typedefs, {}, ctx);
   const CompilationUnit* unit = design->compilation_unit;
   if (unit == nullptr) return;
   RegisterTypedefItems(unit->cu_items, {}, ctx);

@@ -484,12 +484,34 @@ std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
   return adopted_enumeration;
 }
 
+DataType Elaborator::ArgumentTypedef(const DataType& element,
+                                     std::vector<Expr*> dims, SourceLoc loc,
+                                     RtlirModule* mod) {
+  auto* declared = arena_.Create<ModuleItem>();
+  declared->kind = ModuleItemKind::kTypedef;
+  declared->loc = loc;
+  declared->name = *arena_.Create<std::string>(
+      std::format("type#{}", argument_typedefs_.size()));
+  declared->typedef_type = element;
+  declared->unpacked_dims = std::move(dims);
+  ElaborateTypedef(declared, mod);
+  argument_typedefs_.push_back(declared);
+  DataType named;
+  named.kind = DataTypeKind::kNamed;
+  named.type_name = declared->name;
+  return named;
+}
+
 ModuleItem* Elaborator::ResolveArgumentTypeRefs(ModuleItem* item,
-                                                const RtlirModule* mod) {
+                                                RtlirModule* mod) {
   for (DataType* written : {&item->data_type, &item->typedef_type}) {
     ResolveTypeRefArguments(written->type_params, [&](DataType& type) {
+      std::vector<Expr*> dims = TypeRefUnpackedDims(type.type_ref_expr, mod);
       ResolveTypeRef(type, item->loc, mod);
       FoldPackedDims(type, BuildParamScope(mod), arena_);
+      if (!dims.empty()) {
+        type = ArgumentTypedef(type, std::move(dims), item->loc, mod);
+      }
     });
   }
   return item;

@@ -405,6 +405,7 @@ struct RtlirDesign : RtlirTypedefFacts {
   std::string last_elab_severity_scope;
   SourceLoc last_elab_severity_loc;
   std::vector<TypeRefCompareResult> unit_type_ref_compares;
+  std::vector<ModuleItem*> argument_typedefs;
 };
 
 }  // namespace delta

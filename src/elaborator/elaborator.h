@@ -194,7 +194,9 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   std::string_view ResolveVarDeclTypeRefs(ModuleItem* item, RtlirModule* mod);
   ModuleItem* DeclarationOfInstance(ModuleItem* item, const RtlirModule& mod);
-  ModuleItem* ResolveArgumentTypeRefs(ModuleItem* item, const RtlirModule* mod);
+  ModuleItem* ResolveArgumentTypeRefs(ModuleItem* item, RtlirModule* mod);
+  DataType ArgumentTypedef(const DataType& element, std::vector<Expr*> dims,
+                           SourceLoc loc, RtlirModule* mod);
   bool ReconcilePartialPort(std::string_view name, bool decl_signed,
                             NetType net_type, RtlirModule* mod);
   void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,

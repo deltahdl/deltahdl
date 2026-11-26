@@ -179,6 +179,37 @@ TEST(SpecializationTypeRefArgumentSim, TypesAPackagesClassAndANestedArgument) {
       "7 44\n");
 }
 
+TEST(SpecializationTypeRefArgumentSim, TakesAnArrayOperandsDimensions) {
+  ExpectInEachPlace(
+      "  typedef byte arr_t [4];\n"
+      "  byte n [3];\n"
+      "  int m [2][3];\n"
+      "  arr_t u;\n"
+      "  X #(type(n)) a = new;\n"
+      "  X #(type(m)) b = new;\n"
+      "  X #(type(u)) c = new;\n"
+      "  X #(type(arr_t)) d = new;\n"
+      "  initial begin\n"
+      "    a.v[2] = 300;\n"
+      "    b.v[1][2] = 5;\n"
+      "    $display(\"%0d %0d %0d %0d %0d %0d\", $bits(a.v), a.v[2],\n"
+      "             $bits(b.v), b.v[1][2], $bits(c.v), $bits(d.v));\n"
+      "  end\n",
+      "24 44 192 5 32 32\n");
+}
+
+TEST(SpecializationTypedefTypeRefArgumentSim, TakesAnArrayOperandsDimensions) {
+  ExpectInEachPlace(
+      "  byte n [3];\n"
+      "  typedef X #(type(n)) xt;\n"
+      "  xt a = new;\n"
+      "  initial begin\n"
+      "    a.v[2] = 300;\n"
+      "    $display(\"%0d %0d\", $bits(a.v), a.v[2]);\n"
+      "  end\n",
+      "24 44\n");
+}
+
 TEST(SpecializationTypedefTypeRefArgumentSim, NamesAVariableOrderedOrNamed) {
   ExpectInEachPlace(
       "  logic [6:0] n;\n"
