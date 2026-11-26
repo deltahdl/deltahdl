@@ -197,7 +197,7 @@ TEST(VectorSpecification, XOrZInRangeIsErrorOnANetAnUnpackedDimAndAnInterface) {
                             6, "7.4.2"));
 }
 
-TEST(VectorSpecification, DISABLED_XOrZInRangeIsErrorInEveryPlace) {
+TEST(VectorSpecification, XOrZInRangeIsErrorInEveryPlace) {
   ElabFixture f;
   Elaborate(
       "package p;\n"
@@ -266,7 +266,7 @@ TEST(VectorSpecification, NonConstantOrRealBoundIsError) {
   }
 }
 
-TEST(VectorSpecification, DISABLED_NonConstantBoundIsErrorInEveryPlace) {
+TEST(VectorSpecification, NonConstantBoundIsErrorInEveryPlace) {
   ElabFixture f;
   Elaborate(
       "package p;\n"
@@ -304,6 +304,82 @@ TEST(VectorSpecification, DISABLED_NonConstantBoundIsErrorInEveryPlace) {
     EXPECT_TRUE(
         ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
   }
+}
+
+TEST(VectorSpecification,
+     NonConstantBoundIsErrorInTheUnitAProcedureAndAClassMethod) {
+  ElabFixture f;
+  Elaborate(
+      "int cn;\n"
+      "logic [cn:0] cu;\n"
+      "class D;\n"
+      "  int n;\n"
+      "  function logic [n:0] get();\n"
+      "    logic [n:0] r;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m;\n"
+      "  int n;\n"
+      "  initial begin\n"
+      "    logic [n:0] q;\n"
+      "  end\n"
+      "  task t;\n"
+      "    logic [n:0] k;\n"
+      "  endtask\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2U, 5U, 6U, 12U, 15U}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
+  }
+}
+
+TEST(VectorSpecification, ConstantBoundIsAcceptedInEveryPlace) {
+  ElabFixture f;
+  Elaborate(
+      "parameter int CK = 2;\n"
+      "logic [CK:0] cu;\n"
+      "package p;\n"
+      "  parameter int PK = 3;\n"
+      "  logic [PK:0] a;\n"
+      "  typedef logic [PK:0] PT;\n"
+      "endpackage\n"
+      "interface i;\n"
+      "  localparam int K = 3;\n"
+      "  logic [K:0] a;\n"
+      "endinterface\n"
+      "program q;\n"
+      "  localparam int K = 3;\n"
+      "  logic [K:0] a;\n"
+      "endprogram\n"
+      "class C;\n"
+      "  localparam int K = 3;\n"
+      "  logic [K:0] a;\n"
+      "  function logic [K:0] get();\n"
+      "    logic [K:0] r;\n"
+      "    return r;\n"
+      "  endfunction\n"
+      "endclass\n"
+      "module m(input logic [p::PK:0] pa);\n"
+      "  localparam int K = 3;\n"
+      "  wire [K:0] w;\n"
+      "  typedef logic [K:0] T;\n"
+      "  struct packed { logic [K:0] f; } s;\n"
+      "  function logic [K:0] fn();\n"
+      "    return '0;\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    logic [$clog2(K):0] v;\n"
+      "  end\n"
+      "  if (1) begin : g\n"
+      "    logic [K:0] b;\n"
+      "  end\n"
+      "  i ii();\n"
+      "  q qq();\n"
+      "  C c;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(VectorSpecification, ConstantSystemFunctionBoundIsAccepted) {

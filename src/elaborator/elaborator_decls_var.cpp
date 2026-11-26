@@ -4,6 +4,8 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -32,6 +34,7 @@
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
+#include "elaborator/packed_bound_rules.h"
 #include "elaborator/param_value_assignability.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -608,44 +611,55 @@ void Elaborator::ReportStaticConstReadingVariable(const ModuleItem* item,
               Subclause("6.20.6"));
 }
 
-template <typename IsVariable>
-static bool BoundReadsVariable(const Expr* e, const IsVariable& is_variable) {
-  if (e == nullptr || e->kind == ExprKind::kMemberAccess) return false;
-  if (e->kind == ExprKind::kIdentifier) return is_variable(e->text);
-  if (e->kind == ExprKind::kSystemCall && IsConstantWhateverItsArguments(e))
-    return false;
-  return AnyReadOperand(e, [&](const Expr* child) {
-    return BoundReadsVariable(child, is_variable);
-  });
-}
-
-static bool CallsNonConstantSystemFunction(const Expr* e) {
-  if (e == nullptr) return false;
-  if (e->kind == ExprKind::kSystemCall && !IsConstantSysFunc(e->callee))
-    return true;
-  return AnyExprChild(e, [](const Expr* child) {
-    return CallsNonConstantSystemFunction(child);
-  });
-}
-
-bool Elaborator::BoundIsNoConstantInteger(const Expr* bound,
-                                          const RtlirModule* mod) {
-  if (bound->kind == ExprKind::kIntegerLiteral) return false;
-  const ScopeMap kConstants = BuildParamScope(mod);
-  auto is_variable = [&](std::string_view name) {
-    return NamesVariableNetOrPort(name, kConstants);
+void Elaborator::WithModuleBoundNames(
+    const RtlirModule* mod,
+    const std::function<void(const PackedBoundNames&)>& fn) {
+  std::optional<ScopeMap> constants;
+  auto constants_of = [&]() -> const ScopeMap& {
+    if (!constants) constants = BuildParamScope(mod);
+    return *constants;
   };
-  std::unordered_map<std::string_view, DataTypeKind> real_params;
+  RealParamKinds real_params;
   for (const RtlirParamDecl& param : mod->params) {
     if (param.is_real_value || param.decl_is_real)
       real_params[param.name] = DataTypeKind::kReal;
   }
   for (std::string_view name : real_param_names_)
     real_params[name] = DataTypeKind::kReal;
-  return BoundReadsVariable(bound, is_variable) ||
-         CallsNonConstantSystemFunction(bound) ||
-         CallsNonConstantFunction(bound, kConstants) ||
-         IsRealValued(bound, real_params);
+  const PackedBoundNames kNames{
+      [&](const Expr* e) {
+        if (e->kind == ExprKind::kIdentifier) {
+          return NamesVariableNetOrPort(e->text, constants_of());
+        }
+        return NamesPackageVariable(e, unit_);
+      },
+      [&](const Expr* e) {
+        return CallsNonConstantFunction(e, constants_of());
+      },
+      real_params};
+  fn(kNames);
+}
+
+void Elaborator::ReportItemPackedBounds(const ModuleItem* item,
+                                        const RtlirModule* mod) {
+  if (item->kind != ModuleItemKind::kTypedef &&
+      item->kind != ModuleItemKind::kFunctionDecl &&
+      item->func_body_stmts.empty() && !IsProceduralItemKind(item->kind)) {
+    return;
+  }
+  WithModuleBoundNames(mod, [&](const PackedBoundNames& names) {
+    ReportPackedBoundsOfItem(*item, false, names, diag_);
+  });
+}
+
+void Elaborator::ReportAnsiPortPackedBounds(const ModuleDecl* decl,
+                                            const RtlirModule* mod) {
+  if (decl->is_non_ansi_ports) return;
+  WithModuleBoundNames(mod, [&](const PackedBoundNames& names) {
+    for (const auto& port : decl->ports) {
+      ReportPackedBounds(port.data_type, port.loc, names, diag_);
+    }
+  });
 }
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {

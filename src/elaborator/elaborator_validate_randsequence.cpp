@@ -13,6 +13,7 @@
 #include "elaborator/implication_operator_rules.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
+#include "elaborator/packed_bound_rules.h"
 #include "elaborator/return_value_fit.h"
 #include "elaborator/virtual_interface_target.h"
 #include "parser/ast_design.h"
@@ -245,6 +246,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckForeachLoopsInClass(cls);
     CheckPatternsInClass(cls);
     ReportClassImplicationOperators(cls, diag_);
+    ReportPackedBoundsInClass(*cls, unit_, diag_);
   }
 }
 

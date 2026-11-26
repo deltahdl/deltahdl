@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -38,6 +39,7 @@ class DiagEngine;
 struct AppliedTypeParams;
 struct ContTargetLeaf;
 struct Expr;
+struct PackedBoundNames;
 struct TypeParamAssignments;
 
 class Elaborator : public ElaboratorClassRules {
@@ -166,7 +168,12 @@ class Elaborator : public ElaboratorClassRules {
                                         const RtlirModule* mod);
   bool NamesVariableNetOrPort(std::string_view name,
                               const ScopeMap& constants) const;
-  bool BoundIsNoConstantInteger(const Expr* bound, const RtlirModule* mod);
+  void WithModuleBoundNames(
+      const RtlirModule* mod,
+      const std::function<void(const PackedBoundNames&)>& fn);
+  void ReportItemPackedBounds(const ModuleItem* item, const RtlirModule* mod);
+  void ReportAnsiPortPackedBounds(const ModuleDecl* decl,
+                                  const RtlirModule* mod);
   bool CallsNonConstantFunction(const Expr* e, const ScopeMap& constants);
   bool IsConstantFunction(const ModuleItem* func, const ScopeMap& constants);
   void AddInferenceCallees(const Stmt* body);

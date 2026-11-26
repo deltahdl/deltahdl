@@ -18,6 +18,7 @@
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/library_cell_writes.h"
+#include "elaborator/packed_bound_rules.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_design.h"
@@ -805,7 +806,9 @@ void Elaborator::ValidatePackageItems() {
       }
     }
     ReportPackageSubroutineStaticInits(pkg, diag_);
+    ReportPackedBoundsInScope(pkg->items, unit_, diag_);
   }
+  ReportPackedBoundsInScope(unit_->cu_items, unit_, diag_);
   ReportScopeNets(unit_->cu_items,
                   "a net declaration with an implicit continuous assignment "
                   "cannot stand in the compilation-unit scope",

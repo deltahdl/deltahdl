@@ -602,6 +602,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/sdf_annotate_calls.cpp
     elaborator/interconnect_merges.cpp
     elaborator/interconnect_uses.cpp
+    elaborator/packed_bound_rules.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp
     elaborator/elaborator_resolve.cpp

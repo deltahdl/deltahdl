@@ -612,6 +612,7 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   ResolvePortTypeRefs(
       decl, [&](DataType& dt, SourceLoc loc) { ResolveTypeRef(dt, loc, mod); },
       arena_);
+  ReportAnsiPortPackedBounds(decl, mod);
   for (const auto& port : decl->ports) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
