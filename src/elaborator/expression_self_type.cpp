@@ -235,7 +235,6 @@ std::optional<DeclaredValue> ValueBehindScope(std::string_view prefix,
 
 std::optional<DeclaredValue> ClassScopedValue(const Expr* access,
                                               const ExprTypeScope& scope) {
-  if (access->lhs->kind != ExprKind::kIdentifier) return std::nullopt;
   return ClassMemberValue(TypeSpelledBy(access->lhs), access->rhs->text, scope);
 }
 

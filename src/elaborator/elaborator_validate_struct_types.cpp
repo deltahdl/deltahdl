@@ -479,11 +479,15 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
 
 const DataType* ClassTypedefNamedBy(const Expr& ref,
                                     const CompilationUnit* unit) {
-  if (!IsPlainScopedName(ref) || ref.lhs->kind != ExprKind::kIdentifier ||
-      ref.rhs == nullptr || ref.rhs->kind != ExprKind::kIdentifier) {
+  if (!IsPlainScopedName(ref) || ref.rhs == nullptr ||
+      ref.rhs->kind != ExprKind::kIdentifier) {
     return nullptr;
   }
-  return FindClassScopedTypedefType(ref.lhs->text, ref.rhs->text, unit);
+  const std::vector<const ClassDecl*> kChain =
+      ClassChainOfScopePrefix(ref.lhs, unit);
+  if (kChain.empty()) return nullptr;
+  const ModuleItem* td = FindClassTypedef(kChain.back(), ref.rhs->text);
+  return td == nullptr ? nullptr : &td->typedef_type;
 }
 
 const ModuleItem* ResolveClassScopedDeclType(DataType& dtype,

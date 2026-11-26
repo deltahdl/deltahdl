@@ -20,6 +20,11 @@ constexpr Place kPlaces[] = {
     {"", "module top;\n", "endmodule\n"},
 };
 
+constexpr std::string_view kPackage =
+    "package pk;\n"
+    "  class K; typedef logic [2:0] inner; static logic [5:0] s; endclass\n"
+    "endpackage\n";
+
 constexpr std::string_view kClasses =
     "class C; typedef logic [6:0] u; static logic [4:0] s; endclass\n"
     "class W #(type T = int); typedef T u; static T s; endclass\n";
@@ -68,7 +73,8 @@ void ExpectInEachPlaceAndPosition(std::string_view type, std::string_view value,
   std::string printed;
   for (int line = 0; line < 4; ++line) printed.append(bits).append("\n");
   for (const Place& place : kPlaces) {
-    std::string text(place.open);
+    std::string text(kPackage);
+    text.append(place.open);
     text.append(kClasses).append(Positions(type, value)).append(place.use);
     text.append(
         "  P p = new;\n"
@@ -98,6 +104,10 @@ TEST(ClassScopedTypeRefInScopeSim, TakesASpecializationsTypeOrStaticProperty) {
 TEST(ClassScopedTypeRefInScopeSim, SpecializationArgumentDecidesTheType) {
   ExpectInEachPlaceAndPosition("W#(logic [6:0])::u", "W#(logic [6:0])::s",
                                "7 7 7 7");
+}
+
+TEST(ClassScopedTypeRefInScopeSim, TakesAPackagesClassTypeOrStaticProperty) {
+  ExpectInEachPlaceAndPosition("pk::K::inner", "pk::K::s", "3 6 3 6");
 }
 
 }  // namespace
