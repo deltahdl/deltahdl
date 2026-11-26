@@ -97,7 +97,7 @@ void ExpectInEachPlaceAndPosition(std::string_view type, std::string_view value,
 }
 
 std::string ArgumentLocals(std::string_view type, std::string_view value) {
-  return std::string("()\n    X #(type(")
+  return std::string("();\n    X #(type(")
       .append(type)
       .append(")) la = new;\n    X #(type(")
       .append(value)

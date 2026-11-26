@@ -707,10 +707,22 @@ static std::optional<DataType> SpecializationTypedefNamedBy(
   return spelled;
 }
 
+static const Expr* UnwrappedClassScopedOperand(const Expr* written,
+                                               const CompilationUnit* unit) {
+  if (written->kind != ExprKind::kTypeRef) return written;
+  const Expr* operand = written->lhs;
+  if (operand == nullptr || operand->kind != ExprKind::kMemberAccess ||
+      !operand->is_scope_resolution ||
+      ClassChainOfScopePrefix(operand->lhs, unit).empty()) {
+    return written;
+  }
+  return operand;
+}
+
 std::vector<Expr*> ElaboratorOperationRules::ResolveUnitScopeTypeRef(
     DataType& dt, std::span<const ProceduralLocal> locals) {
   std::vector<Expr*> taken;
-  const Expr* ref = dt.type_ref_expr;
+  const Expr* ref = UnwrappedClassScopedOperand(dt.type_ref_expr, unit_);
   if (NamesPackageType(*ref, unit_)) {
     AdoptReferencedType(dt, TypeSpelledBy(ref));
     return taken;
