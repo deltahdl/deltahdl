@@ -260,6 +260,8 @@ void ResolveFormalTypeRefs(ModuleItem* item,
                            std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena) {
   for (auto& arg : item->func_args) {
+    ResolvePrefixTypeRefs(arg.data_type.type_ref_expr, item->loc, locals,
+                          resolve_outer, arena);
     ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
                         resolve_outer);
     ResolveLocalIndexTypeRefs(arg.unpacked_dims, item->loc, locals,
@@ -307,6 +309,8 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
     locals.resize(kOuter);
     return;
   }
+  ResolvePrefixTypeRefs(s->var_decl_type.type_ref_expr, s->range.start, locals,
+                        resolve_outer, arena);
   ResolveLocalTypeRef(s->var_decl_type, s->var_unpacked_dims, s->range.start,
                       locals, resolve_outer);
   ResolveLocalIndexTypeRefs(s->var_unpacked_dims, s->range.start, locals,
@@ -612,10 +616,11 @@ void ResolveItemPrefixTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
     ResolvePrefixTypeRefs(e, item.loc, {}, resolve, arena);
   };
   for (const Expr* e :
-       {item.init_expr, item.assign_lhs, item.assign_rhs, item.assign_delay,
-        item.assign_delay_fall, item.assign_delay_decay, item.net_delay,
-        item.net_delay_fall, item.net_delay_decay, item.gate_delay,
-        item.gate_delay_fall, item.gate_delay_decay}) {
+       {item.data_type.type_ref_expr, item.init_expr, item.assign_lhs,
+        item.assign_rhs, item.assign_delay, item.assign_delay_fall,
+        item.assign_delay_decay, item.net_delay, item.net_delay_fall,
+        item.net_delay_decay, item.gate_delay, item.gate_delay_fall,
+        item.gate_delay_decay}) {
     in_expr(e);
   }
   in_expr(item.assert_expr);
