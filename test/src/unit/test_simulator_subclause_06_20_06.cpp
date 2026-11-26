@@ -368,8 +368,7 @@ TEST(ConstConstantSim, MemberWrittenThroughAConstHandleReadsBack) {
   EXPECT_EQ(out, "7\n");
 }
 
-TEST(ConstConstantSim,
-     DISABLED_StaticConstReadsAParameterThroughAHierarchicalName) {
+TEST(ConstConstantSim, StaticConstReadsAParameterThroughAHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(
       RunCapture("module sub; parameter P = 9; endmodule\n"
@@ -384,6 +383,38 @@ TEST(ConstConstantSim,
                  "endmodule\n",
                  f),
       "9 6\n");
+}
+
+TEST(ConstConstantSim, StaticConstReadsAVariableThroughAHierarchicalName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  int v = 9;\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub u();\n"
+                       "  const int c = u.v;\n"
+                       "  initial #1 $display(\"%0d\", c);\n"
+                       "endmodule\n",
+                       f),
+            "9\n");
+}
+
+TEST(ConstConstantSim, StaticConstInAPackageProgramOrUnitHoldsItsValue) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("const int uc = 5;\n"
+                       "package k;\n"
+                       "  const int pc = 3;\n"
+                       "endpackage\n"
+                       "program p;\n"
+                       "  const int qc = 4;\n"
+                       "  initial $display(\"p %0d\", qc);\n"
+                       "endprogram\n"
+                       "module t;\n"
+                       "  p pp();\n"
+                       "  initial $display(\"m %0d %0d\", k::pc, uc);\n"
+                       "endmodule\n",
+                       f),
+            "m 3 5\np 4\n");
 }
 
 }  // namespace

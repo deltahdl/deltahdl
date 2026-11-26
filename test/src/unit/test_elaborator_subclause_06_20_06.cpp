@@ -289,4 +289,93 @@ TEST(ConstConstantElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+std::string StaticConstReadReport(const std::string& constant,
+                                  const std::string& name) {
+  return "static constant '" + constant + "' cannot be set from '" + name +
+         "', which is a variable, net or port rather than a constant";
+}
+
+TEST(ConstConstantElaboration, StaticConstSetFromAVariableNetOrPortIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module m(input int a);\n"
+      "  int v;\n"
+      "  wire [3:0] w;\n"
+      "  typedef struct { int f; } s_t;\n"
+      "  s_t s;\n"
+      "  const int c1 = v;\n"
+      "  const int c2 = w + 1;\n"
+      "  const int c3 = a;\n"
+      "  const int c4 = s.f;\n"
+      "  const bit c5 = v[0];\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("c1", "v"), 6, "6.20.6"));
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("c2", "w"), 7, "6.20.6"));
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("c3", "a"), 8, "6.20.6"));
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("c4", "s"), 9, "6.20.6"));
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("c5", "v"), 10, "6.20.6"));
+}
+
+TEST(ConstConstantElaboration,
+     StaticConstSetFromAVariableInAnInterfaceProgramOrGenerateBlockIsError) {
+  ElabFixture f;
+  ElaborateSrc(
+      "interface i;\n"
+      "  int iv;\n"
+      "  const int ic = iv;\n"
+      "endinterface\n"
+      "program p;\n"
+      "  int pv;\n"
+      "  const int pc = pv;\n"
+      "endprogram\n"
+      "module m;\n"
+      "  int mv;\n"
+      "  if (1) begin : g\n"
+      "    const int gc = mv;\n"
+      "  end\n"
+      "  i ii();\n"
+      "  p pp();\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("ic", "iv"), 3, "6.20.6"));
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("pc", "pv"), 7, "6.20.6"));
+  EXPECT_TRUE(
+      ReportedError(diags, StaticConstReadReport("gc", "mv"), 12, "6.20.6"));
+}
+
+TEST(ConstConstantElaboration, StaticConstSetFromConstantsBesideAVariable) {
+  ElabFixture f;
+  auto* design = ElaborateSrc(
+      "module sub;\n"
+      "  int v = 9;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  int v;\n"
+      "  parameter P = 2;\n"
+      "  localparam LP = 3;\n"
+      "  typedef enum {A, B} e_t;\n"
+      "  const int k = 1;\n"
+      "  const int c = P + LP + B + k + $bits(v);\n"
+      "  sub u();\n"
+      "  const int d = u.v;\n"
+      "  function automatic int fa(int a);\n"
+      "    const int e = a + v;\n"
+      "    return e;\n"
+      "  endfunction\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
 }  // namespace

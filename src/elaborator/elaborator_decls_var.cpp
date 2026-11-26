@@ -28,6 +28,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_validate_classes_internal.h"
+#include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
 #include "elaborator/nettype_uses.h"
 #include "elaborator/param_value_assignability.h"
@@ -555,6 +556,53 @@ void Elaborator::ReportSpecializationErrors(const DataType& written,
                                  {kTables, BuildParamScope(mod), unit_}, diag_);
 }
 
+template <typename IsVariable>
+static const Expr* FirstVariableRead(const Expr* e,
+                                     const IsVariable& is_variable) {
+  if (e == nullptr) return nullptr;
+  if (e->kind == ExprKind::kIdentifier)
+    return is_variable(e->text) ? e : nullptr;
+  if (e->kind == ExprKind::kSystemCall && IsConstantWhateverItsArguments(e))
+    return nullptr;
+  if (e->kind == ExprKind::kMemberAccess) {
+    return e->is_scope_resolution ? nullptr
+                                  : FirstVariableRead(e->lhs, is_variable);
+  }
+  const Expr* found = nullptr;
+  auto finds = [&](const Expr* child) {
+    found = FirstVariableRead(child, is_variable);
+    return found != nullptr;
+  };
+  if (e->kind == ExprKind::kAssignmentPattern) {
+    for (const Expr* element : e->elements) {
+      if (finds(element)) break;
+    }
+  } else {
+    AnyExprChild(e, finds);
+  }
+  return found;
+}
+
+void Elaborator::ReportStaticConstReadingVariable(const ModuleItem* item,
+                                                  const RtlirModule* mod) {
+  if (!item->data_type.is_const || item->is_automatic) return;
+  const ScopeMap kConstants = BuildParamScope(mod);
+  auto is_variable = [&](std::string_view name) {
+    if (const_names_.contains(name) || kConstants.contains(name)) return false;
+    return var_types_.contains(name) || net_names_.contains(name) ||
+           ansi_port_names_.contains(name) ||
+           non_ansi_complete_ports_.contains(name);
+  };
+  const Expr* read = FirstVariableRead(item->init_expr, is_variable);
+  if (read == nullptr) return;
+  diag_.Error(read->range.start,
+              std::format("static constant '{}' cannot be set from '{}', "
+                          "which is a variable, net or port rather than a "
+                          "constant",
+                          item->name, read->text),
+              Subclause("6.20.6"));
+}
+
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   if (item->is_genvar) return;
 
@@ -592,6 +640,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                         scalar_var_names_, real_var_names_, packed_array_vars_,
                         var_named_types_, var_select_shapes_},
                        typedefs_, diag_);
+  ReportStaticConstReadingVariable(item, mod);
   RegisterVirtualInterfaceVarDecl(
       item,
       item->data_type.kind == DataTypeKind::kVirtualInterface

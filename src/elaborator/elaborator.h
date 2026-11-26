@@ -162,6 +162,8 @@ class Elaborator : public ElaboratorClassRules {
                                  const ScopeMap& scope);
   void ReportSpecializationErrors(const DataType& written, SourceLoc loc,
                                   const RtlirModule* mod);
+  void ReportStaticConstReadingVariable(const ModuleItem* item,
+                                        const RtlirModule* mod);
   void AddInferenceCallees(const Stmt* body);
   void ResolveStaticAssertionClock(ModuleItem* item,
                                    const std::vector<EventExpr>& default_clock);

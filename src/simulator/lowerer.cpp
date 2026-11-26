@@ -568,6 +568,8 @@ void Lowerer::LowerTopModules(const std::vector<RtlirModule*>& tops) {
     }
   }
   for (const auto& fill : deferred_param_fills_) fill();
+  for (const auto& init : deferred_var_inits_) init();
+  var_inits_ran_ = true;
 }
 
 void Lowerer::Lower(const RtlirDesign* design) {

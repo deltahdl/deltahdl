@@ -94,6 +94,9 @@ class Lowerer {
                                Variable* v, uint32_t width);
   void LowerVarInit(std::string_view name, const RtlirVariable& var,
                     Variable* v, uint32_t width);
+  bool InitWaitsForDesign(const RtlirVariable& var);
+  void DeferVarInit(std::string_view name, const RtlirVariable& var,
+                    Variable* v, uint32_t width);
   Logic4Vec CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
                                uint32_t width);
   void LowerVarAggregate(std::string_view name, const RtlirVariable& var);
@@ -250,6 +253,9 @@ class Lowerer {
   std::unordered_set<std::string> path_delayed_ports_;
   std::unordered_map<const RtlirModule*, std::string> instance_prefixes_;
   std::vector<std::function<void()>> deferred_param_fills_;
+  std::vector<std::function<void()>> deferred_var_inits_;
+  std::unordered_set<const Variable*> deferred_init_vars_;
+  bool var_inits_ran_ = false;
 };
 
 }  // namespace delta

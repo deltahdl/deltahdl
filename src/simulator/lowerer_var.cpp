@@ -13,13 +13,16 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
+#include "simulator/deferred_caller.h"
 #include "simulator/eval_array_element_queue.h"
 #include "simulator/eval_string.h"
 #include "simulator/evaluation.h"
+#include "simulator/expr_walk.h"
 #include "simulator/gen_block_const_frame.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/pattern_type_key.h"
+#include "simulator/process.h"
 #include "simulator/queue_bound.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -383,8 +386,75 @@ void Lowerer::LowerBlockScopedVarInit(std::string_view name,
   const std::vector<std::string> kBlockPrefixes(var.gen_block_prefixes.begin(),
                                                 var.gen_block_prefixes.end());
   ctx_.SetLoweringGenPrefixes(&kBlockPrefixes);
-  LowerVarInit(name, var, v, width);
+  if (!var_inits_ran_ && InitWaitsForDesign(var)) {
+    DeferVarInit(name, var, v, width);
+  } else {
+    LowerVarInit(name, var, v, width);
+  }
   ctx_.SetLoweringGenPrefixes(nullptr);
+}
+
+static bool HoldsOneValue(const RtlirVariable& var) {
+  return var.unpacked_dims.empty() && !var.is_dynamic && !var.is_queue &&
+         !var.is_assoc && !var.is_event && !var.is_chandle &&
+         var.class_type_name.empty();
+}
+
+static const Expr* PathRoot(const Expr* e) {
+  while (e != nullptr &&
+         (e->kind == ExprKind::kMemberAccess || e->kind == ExprKind::kSelect)) {
+    e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
+  }
+  return e;
+}
+
+static bool ReachesOutsideItsScope(const Expr* e, SimContext& ctx) {
+  const Expr* root = PathRoot(e);
+  return !e->is_scope_resolution && root != nullptr &&
+         root->kind == ExprKind::kIdentifier &&
+         ctx.FindVariable(root->text) == nullptr &&
+         ctx.FindNet(root->text) == nullptr;
+}
+
+bool Lowerer::InitWaitsForDesign(const RtlirVariable& var) {
+  if (!HoldsOneValue(var)) return false;
+  bool waits = false;
+  ForEachEvaluatedSubExpr(var.init_expr, [&](const Expr* e) {
+    if (e->kind == ExprKind::kCall && e->lhs != nullptr &&
+        e->lhs->kind == ExprKind::kIdentifier) {
+      waits = true;
+    } else if (e->kind == ExprKind::kMemberAccess &&
+               ReachesOutsideItsScope(e, ctx_)) {
+      waits = true;
+    } else if (e->kind == ExprKind::kIdentifier &&
+               deferred_init_vars_.contains(ctx_.FindVariable(e->text))) {
+      waits = true;
+    }
+  });
+  return waits;
+}
+
+void Lowerer::DeferVarInit(std::string_view name, const RtlirVariable& var,
+                           Variable* v, uint32_t width) {
+  deferred_init_vars_.insert(v);
+  deferred_var_inits_.emplace_back(
+      [this, name, &var, v, width, prefix = ctx_.ActiveInstancePrefix()] {
+        Process stand_in;
+        stand_in.stand_in = true;
+        stand_in.is_static_init = true;
+        stand_in.inst_prefix = prefix;
+        stand_in.gen_prefixes.assign(var.gen_block_prefixes.begin(),
+                                     var.gen_block_prefixes.end());
+        CallerStandIn in_owner(&stand_in, ctx_);
+        GenBlockConstFrame loop_consts(var.gen_block_consts, ctx_, arena_);
+        const std::vector<std::string> kBlockPrefixes(
+            var.gen_block_prefixes.begin(), var.gen_block_prefixes.end());
+        ctx_.SetLoweringGenBlockPrefix(var.gen_block_prefix);
+        ctx_.SetLoweringGenPrefixes(&kBlockPrefixes);
+        LowerVarInit(name, var, v, width);
+        ctx_.SetLoweringGenPrefixes(nullptr);
+        ctx_.SetLoweringGenBlockPrefix({});
+      });
 }
 
 static void RecordDeclaredForm(const RtlirVariable& var, Variable* v,

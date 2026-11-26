@@ -468,7 +468,7 @@ TEST(VariableDeclaration, MailboxInitializedByNewIsUsableAtTimeZero) {
 }
 
 TEST(VariableDeclaration,
-     DISABLED_FunctionCallInitializerIsSetBeforeAnyProcedureStarts) {
+     FunctionCallInitializerIsSetBeforeAnyProcedureStarts) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
                        "  function int f();\n"
@@ -488,8 +488,7 @@ TEST(VariableDeclaration,
             "9 5\nalways 9\n");
 }
 
-TEST(VariableDeclaration,
-     DISABLED_FunctionCallInitializerInAnInterfaceOrProgramIsSet) {
+TEST(VariableDeclaration, FunctionCallInitializerInAnInterfaceOrProgramIsSet) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface i;\n"
                        "  function int h();\n"
@@ -618,6 +617,75 @@ TEST(VariableDeclaration, OnlySignedTypesKeepTheSignOfANegativeValue) {
           "endmodule\n",
           f),
       "-1 -1 -1 -1 -1\n255 255 255 0\n-1 -1 -1\n");
+}
+
+TEST(VariableDeclaration, StaticInitializerReadsAParameterThroughAHierarchy) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  parameter P = 9;\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub u();\n"
+                       "  if (1) begin : a\n"
+                       "    if (1) begin : b\n"
+                       "      localparam logic [3:0] LP = 4'd6;\n"
+                       "    end\n"
+                       "  end\n"
+                       "  int v = u.P;\n"
+                       "  logic [3:0] x = a.b.LP;\n"
+                       "  initial $display(\"%0d %0d\", v, x);\n"
+                       "endmodule\n",
+                       f),
+            "9 6\n");
+}
+
+TEST(VariableDeclaration,
+     HierarchicalInitializerInAnInterfaceProgramBlockOrStaticSubroutine) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module sub;\n"
+                 "  parameter P = 9;\n"
+                 "endmodule\n"
+                 "interface j;\n"
+                 "  parameter Q = 7;\n"
+                 "endinterface\n"
+                 "interface i;\n"
+                 "  j jj();\n"
+                 "  int iv = jj.Q;\n"
+                 "endinterface\n"
+                 "program p;\n"
+                 "  int qv = t.u.P;\n"
+                 "  initial $display(\"p %0d\", qv);\n"
+                 "endprogram\n"
+                 "module t;\n"
+                 "  sub u();\n"
+                 "  i ii();\n"
+                 "  p pp();\n"
+                 "  if (1) begin : g\n"
+                 "    int gv = u.P + 1;\n"
+                 "  end\n"
+                 "  function int f();\n"
+                 "    static int s = u.P + 2;\n"
+                 "    return s;\n"
+                 "  endfunction\n"
+                 "  initial $display(\"m %0d %0d %0d\", ii.iv, g.gv, f());\n"
+                 "endmodule\n",
+                 f),
+      "m 7 10 11\np 9\n");
+}
+
+TEST(VariableDeclaration, InitializerReadingAnUnsetVariableThroughAHierarchy) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module sub;\n"
+                       "  logic [3:0] y;\n"
+                       "endmodule\n"
+                       "module t;\n"
+                       "  sub u();\n"
+                       "  logic [3:0] x = u.y;\n"
+                       "  initial $display(\"%b\", x);\n"
+                       "endmodule\n",
+                       f),
+            "xxxx\n");
 }
 
 }  // namespace
