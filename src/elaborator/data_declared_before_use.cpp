@@ -24,6 +24,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -88,9 +89,9 @@ void CollectTargets(const Stmt* s,
 }
 
 void CollectTypeReads(const DataType& type, std::vector<const Expr*>& out) {
-  for (const Expr* e :
-       {type.written_type_ref, type.packed_dim_left, type.packed_dim_right})
-    CollectBareIdents(e, out);
+  CollectBareIdents(type.written_type_ref, out);
+  CollectBareIdents(type.packed_dim_left, out);
+  CollectBareIdents(type.packed_dim_right, out);
   for (const auto& [left, right] : type.extra_packed_dims) {
     CollectBareIdents(left, out);
     CollectBareIdents(right, out);
