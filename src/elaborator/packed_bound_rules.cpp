@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/assertion_walk.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator_enum_constants.h"
@@ -17,6 +18,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 

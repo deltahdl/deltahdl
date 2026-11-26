@@ -21,6 +21,7 @@
 #include "elaborator/packed_bound_rules.h"
 #include "elaborator/rtlir_attribute.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -809,6 +810,9 @@ void Elaborator::ValidatePackageItems() {
     ReportPackedBoundsInScope(pkg->items, unit_, diag_);
   }
   ReportPackedBoundsInScope(unit_->cu_items, unit_, diag_);
+  for (const auto* cls : unit_->classes) {
+    ReportPackedBoundsInClass(*cls, unit_, diag_);
+  }
   ReportScopeNets(unit_->cu_items,
                   "a net declaration with an implicit continuous assignment "
                   "cannot stand in the compilation-unit scope",
