@@ -117,4 +117,18 @@ TEST(InitializerOperandEnumerationSim, OperandDeclaresItsConstantsInEachPlace) {
   }
 }
 
+TEST(TypeReferenceEnumerationSim, DeclarationDeclaresItsConstantsInEachPlace) {
+  for (const Place& place : kDeclarationPlaces) {
+    std::string design(place.open);
+    design
+        .append(
+            "  var type(enum {A, B}) e = B, g;\n"
+            "  var type(enum logic [1:0] {C = 2, D}) f;\n"
+            "  initial #1 $display(\"%0d %0d %0d %0d %0d\",\n"
+            "                      e, $bits(e), $bits(f), D, g);\n")
+        .append(place.close);
+    EXPECT_EQ(Printed(design), "1 32 2 3 0\n");
+  }
+}
+
 }  // namespace

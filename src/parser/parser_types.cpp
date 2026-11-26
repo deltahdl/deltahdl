@@ -769,7 +769,8 @@ bool ParserDataDeclHelpers::ReadTypeReference(Parser& p, DataType& dtype) {
   if (!p.Check(TokenKind::kKwType)) return false;
   p.Consume();
   p.Expect(TokenKind::kLParen, Subclause("6.23"));
-  dtype.type_ref_expr = p.ParseExpr();
+  if (!p.TryParseInlineAggregateType(dtype))
+    dtype.type_ref_expr = p.ParseExpr();
   p.Expect(TokenKind::kRParen, Subclause("6.23"));
   return true;
 }

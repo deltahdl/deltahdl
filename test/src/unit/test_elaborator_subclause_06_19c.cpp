@@ -135,13 +135,14 @@ TEST(SpecializationEnumerationElaboration, ConstantIsNoNameOfTheClass) {
                             LineHolding(kSrc, "return B"), "23.9"));
 }
 
-TEST(InitializerOperandEnumerationElaboration,
+TEST(InPlaceOperandEnumerationElaboration,
      DuplicateValueInAnOperandIsReported) {
   for (const Parent& parent : kDeclarationParents) {
     for (std::string_view body :
          {"  int w = $bits(enum {A = 1, B = 1});\n",
           "  localparam int P = $bits(type(enum {A = 1, B = 1}));\n",
-          "  wire integer z = $bits(enum {A = 1, B = 1});\n"}) {
+          "  wire integer z = $bits(enum {A = 1, B = 1});\n",
+          "  var type(enum {A = 1, B = 1}) e;\n"}) {
       const std::string kSrc = InParent(parent, body);
       SCOPED_TRACE(kSrc);
       ElabFixture f;
@@ -153,14 +154,14 @@ TEST(InitializerOperandEnumerationElaboration,
   }
 }
 
-TEST(InitializerOperandEnumerationElaboration,
-     DistinctValuesInAnOperandAccepted) {
+TEST(InPlaceOperandEnumerationElaboration, DistinctValuesInAnOperandAccepted) {
   for (const Parent& parent : kDeclarationParents) {
     const std::string kSrc =
         InParent(parent,
                  "  int w = $bits(enum {A = 1, B = 2});\n"
                  "  localparam int P = $bits(type(enum {C = 1, D = 2}));\n"
                  "  wire integer z = $bits(enum {E = 1, F = 2});\n"
+                 "  var type(enum {G = 1, H = 2}) e = H, g;\n"
                  "  int y = B + D + F;\n");
     SCOPED_TRACE(kSrc);
     ElabFixture f;
