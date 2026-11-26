@@ -561,7 +561,7 @@ static bool ClassDeclaresName(const ClassDecl& cls, std::string_view name,
 static void ReportUndeclaredClassMember(const Expr* written, SourceLoc loc,
                                         const CompilationUnit* unit,
                                         DiagEngine& diag) {
-  const Expr* operand = TypeRefOperand(written);
+  const Expr* operand = written != nullptr ? TypeRefOperand(written) : nullptr;
   if (operand == nullptr || operand->kind != ExprKind::kMemberAccess ||
       !operand->is_scope_resolution || operand->lhs == nullptr ||
       operand->lhs->kind != ExprKind::kIdentifier ||
