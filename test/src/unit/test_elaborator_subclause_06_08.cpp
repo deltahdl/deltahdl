@@ -391,28 +391,70 @@ TEST(VarDecl, AutomaticInEveryProceduralPlaceOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(VarDecl, DISABLED_AutomaticInCompilationUnitIsError) {
+TEST(VarDecl, AutomaticInCompilationUnitIsError) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(
       "automatic int x;\n"
+      "var automatic logic v;\n"
+      "const automatic int c = 1;\n"
       "module t;\n"
       "endmodule\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "'automatic' is not allowed in a data_declaration outside", 1, "6.8"));
+  for (uint32_t line : {1U, 2U, 3U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'automatic' is not allowed in a data_declaration outside", line,
+        "6.8"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3U);
 }
 
-TEST(VarDecl, DISABLED_AutomaticClassPropertyIsError) {
+TEST(VarDecl, AutomaticInACompilationUnitSubroutineOk) {
+  ElabFixture f;
+  ElaborateSrc(
+      "function void fn();\n"
+      "  automatic int y;\n"
+      "  var automatic logic v;\n"
+      "  const automatic int c = 1;\n"
+      "endfunction\n"
+      "module t;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(VarDecl, AutomaticClassPropertyIsError) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(
       "class C;\n"
       "  automatic int x;\n"
+      "  var automatic logic v;\n"
+      "  const automatic int c = 1;\n"
       "endclass\n",
       f);
-  EXPECT_TRUE(ReportedError(
-      f.diag.Diagnostics(),
-      "'automatic' is not allowed in a data_declaration outside", 2, "6.8"));
+  for (uint32_t line : {2U, 3U, 4U}) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "'automatic' is not allowed in a data_declaration outside", line,
+        "6.8"));
+  }
+  EXPECT_EQ(f.diag.ErrorCount(), 3U);
+}
+
+TEST(VarDecl, AutomaticInAClassMethodOk) {
+  ElabFixture f;
+  ElaborateSrc(
+      "class C;\n"
+      "  int p;\n"
+      "  var logic q;\n"
+      "  function void m();\n"
+      "    automatic int y;\n"
+      "    var automatic logic v;\n"
+      "    const automatic int c = 1;\n"
+      "  endfunction\n"
+      "endclass\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
 }
 
 TEST(VarDecl, StructWithoutPackedKeywordIsErrorInEveryPlace) {

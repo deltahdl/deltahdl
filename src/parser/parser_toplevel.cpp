@@ -615,6 +615,7 @@ static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwUwire:
     case TokenKind::kKwConst:
     case TokenKind::kKwStatic:
+    case TokenKind::kKwAutomatic:
     case TokenKind::kKwVirtual:
     case TokenKind::kKwEnum:
     case TokenKind::kKwStruct:

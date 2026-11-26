@@ -12,6 +12,13 @@
 
 namespace delta {
 
+static void ReportAutomaticOutsideProcedure(SourceLoc loc, DiagEngine& diag) {
+  diag.Error(loc,
+             "'automatic' is not allowed in a data_declaration outside "
+             "a procedural context",
+             Subclause("6.8"));
+}
+
 void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
                                const std::vector<Attribute>& attrs) {
   const SourceLoc kRandLoc = CurrentLoc();
@@ -23,10 +30,7 @@ void Parser::ParseDataDeclItem(std::vector<ModuleItem*>& items, size_t before,
   const DataDeclQualifiers kQuals =
       ParserDataDeclHelpers::ReadQualifiers(*this);
   if (kQuals.is_automatic) {
-    diag_.Error(kQuals.lifetime_loc,
-                "'automatic' is not allowed in a data_declaration outside "
-                "a procedural context",
-                Subclause("6.8"));
+    ReportAutomaticOutsideProcedure(kQuals.lifetime_loc, diag_);
   }
 
   ParseTypedItemOrInst(items, kQuals);
@@ -80,6 +84,10 @@ static void ReportQualifiersBeforeItem(const DataDeclQualifiers& quals,
 
 DataType ParserDataDeclHelpers::ReadClassPropertyType(Parser& p) {
   bool has_var = p.Match(TokenKind::kKwVar);
+  if (p.Check(TokenKind::kKwAutomatic)) {
+    ReportAutomaticOutsideProcedure(p.CurrentLoc(), p.diag_);
+    p.Consume();
+  }
   SourceLoc type_loc = p.CurrentLoc();
   DataType dtype;
   if (p.Check(TokenKind::kKwType)) {
