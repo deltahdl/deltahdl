@@ -720,7 +720,8 @@ static bool ReachesTypeRefArgument(const ClassDecl* cls,
         return true;
     }
   }
-  return ReachesTypeRefArgument(FindBaseClass(cls, unit), unit, seen);
+  return WritesTypeRefAmong(cls->base_class_type_params) ||
+         ReachesTypeRefArgument(FindBaseClass(cls, unit), unit, seen);
 }
 
 void ElaboratorClassRules::ValidateResolvedInterfaceSignatures(
