@@ -348,6 +348,7 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
           CheckDynamicElementArgsOfStmt(s, mod);
           FoldTypeRefComparesOfStmt(s, kFold);
         });
+        CarryLocalOperandDims(s, mod);
       });
   report_type_params();
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
@@ -398,7 +399,9 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
                            CheckDynamicElementArgsOfStmt(s, mod);
                            FoldTypeRefComparesOfStmt(s, kFold);
                          });
+                         CarryLocalOperandDims(s, mod);
                        });
+  CarryClassOperandDims(*item->class_decl, mod);
   ReportClassTypeParamErrors(*item->class_decl,
                              {typedefs_, unit_, class_names_}, diag_);
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };

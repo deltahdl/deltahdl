@@ -256,6 +256,57 @@ TEST(SpecializationTypedefTypeRefArgumentSim,
             "2 8 3 9 1 4\n");
 }
 
+constexpr std::string_view kArrayOperandLocals =
+    "    X #(type(n)) a;\n"
+    "    X #(type(m)) b;\n"
+    "    a = new;\n"
+    "    b = new;\n"
+    "    a.v[2] = 300;\n"
+    "    b.v[1][2] = 5;\n"
+    "    $display(\"%0d %0d %0d %0d\", $bits(a.v), a.v[2], $bits(b.v),\n"
+    "             b.v[1][2]);\n";
+
+TEST(SpecializationTypeRefArgumentSim, TakesAnArrayOperandsDimensionsInALocal) {
+  EXPECT_EQ(Printed(std::string("module top;\n"
+                                "  byte n [3];\n"
+                                "  int m [2][3];\n"
+                                "  task automatic tk();\n")
+                        .append(kArrayOperandLocals)
+                        .append("  endtask\n"
+                                "  function automatic void fn();\n")
+                        .append(kArrayOperandLocals)
+                        .append("  endfunction\n"
+                                "  initial begin\n")
+                        .append(kArrayOperandLocals)
+                        .append("    tk();\n"
+                                "    fn();\n"
+                                "  end\n"
+                                "endmodule\n")),
+            "24 44 192 5\n24 44 192 5\n24 44 192 5\n");
+}
+
+TEST(SpecializationTypeRefArgumentSim,
+     TakesAnArrayOperandsDimensionsInAClassPropertyOrExtends) {
+  EXPECT_EQ(Printed("module top;\n"
+                    "  byte n [3];\n"
+                    "  int m [2][3];\n"
+                    "  class H;\n"
+                    "    X #(type(n)) p = new;\n"
+                    "    X #(type(m)) q = new;\n"
+                    "  endclass\n"
+                    "  class D extends X #(type(n)); endclass\n"
+                    "  class E extends X #(type(m)); endclass\n"
+                    "  H h = new;\n"
+                    "  D d = new;\n"
+                    "  E e = new;\n"
+                    "  initial\n"
+                    "    $display(\"%0d %0d %0d %0d\", $bits(h.p.v), "
+                    "$bits(h.q.v),\n"
+                    "             $bits(d.v), $bits(e.v));\n"
+                    "endmodule\n"),
+            "24 192 24 192\n");
+}
+
 TEST(SpecializationTypedefTypeRefArgumentSim, NamesAVariableOrderedOrNamed) {
   ExpectInEachPlace(
       "  logic [6:0] n;\n"

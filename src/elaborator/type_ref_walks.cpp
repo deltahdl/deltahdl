@@ -5,6 +5,7 @@
 #include <functional>
 #include <span>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "common/arena.h"
@@ -34,10 +35,22 @@ namespace {
 void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
+                         const TypeRefResolver& resolve_outer);
+
+void ResolveArgumentTypeRef(DataType& arg, SourceLoc loc,
+                            const std::vector<ProceduralLocal>& locals,
+                            const TypeRefResolver& resolve_outer) {
+  std::vector<Expr*> taken_dims;
+  ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
+  if (!taken_dims.empty()) arg.operand_unpacked_dims = std::move(taken_dims);
+}
+
+void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
+                         SourceLoc loc,
+                         const std::vector<ProceduralLocal>& locals,
                          const TypeRefResolver& resolve_outer) {
   ResolveTypeRefArguments(dt.type_params, [&](DataType& arg) {
-    std::vector<Expr*> taken_dims;
-    ResolveLocalTypeRef(arg, taken_dims, loc, locals, resolve_outer);
+    ResolveArgumentTypeRef(arg, loc, locals, resolve_outer);
   });
   if (dt.type_ref_expr == nullptr) return;
   const Expr* operand = TypeRefOperand(dt.type_ref_expr);
@@ -676,9 +689,7 @@ static std::vector<ProceduralLocal> ResolveClassHeaderTypeRefs(
   std::vector<ProceduralLocal> values =
       ResolveHeaderTypeRefs(cls, resolve_outer, arena);
   const auto kResolve = [&](DataType& arg) {
-    std::vector<Expr*> taken_dims;
-    ResolveLocalTypeRef(arg, taken_dims, cls.range.start, values,
-                        resolve_outer);
+    ResolveArgumentTypeRef(arg, cls.range.start, values, resolve_outer);
   };
   ResolveTypeRefArguments(cls.base_class_type_params, kResolve);
   for (auto* refs : {&cls.extends_interfaces, &cls.implements_types}) {

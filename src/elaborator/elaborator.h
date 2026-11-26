@@ -197,6 +197,10 @@ class Elaborator : public ElaboratorClassRules {
   ModuleItem* ResolveArgumentTypeRefs(ModuleItem* item, RtlirModule* mod);
   DataType ArgumentTypedef(const DataType& element, std::vector<Expr*> dims,
                            SourceLoc loc, RtlirModule* mod);
+  void CarryOperandDims(std::vector<DataType>& args, SourceLoc loc,
+                        RtlirModule* mod);
+  void CarryLocalOperandDims(Stmt* s, RtlirModule* mod);
+  void CarryClassOperandDims(ClassDecl& cls, RtlirModule* mod);
   bool ReconcilePartialPort(std::string_view name, bool decl_signed,
                             NetType net_type, RtlirModule* mod);
   void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,

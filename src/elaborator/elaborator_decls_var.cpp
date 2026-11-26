@@ -39,9 +39,11 @@
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/virtual_interface_target.h"
 #include "lexer/token.h"
+#include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -515,6 +517,31 @@ ModuleItem* Elaborator::ResolveArgumentTypeRefs(ModuleItem* item,
     });
   }
   return item;
+}
+
+void Elaborator::CarryOperandDims(std::vector<DataType>& args, SourceLoc loc,
+                                  RtlirModule* mod) {
+  for (DataType& arg : args) {
+    CarryOperandDims(arg.type_params, loc, mod);
+    if (arg.operand_unpacked_dims.empty()) continue;
+    std::vector<Expr*> dims = std::move(arg.operand_unpacked_dims);
+    arg.operand_unpacked_dims.clear();
+    FoldPackedDims(arg, BuildParamScope(mod), arena_);
+    arg = ArgumentTypedef(arg, std::move(dims), loc, mod);
+  }
+}
+
+void Elaborator::CarryLocalOperandDims(Stmt* s, RtlirModule* mod) {
+  if (s->kind != StmtKind::kVarDecl) return;
+  CarryOperandDims(s->var_decl_type.type_params, s->range.start, mod);
+}
+
+void Elaborator::CarryClassOperandDims(ClassDecl& cls, RtlirModule* mod) {
+  CarryOperandDims(cls.base_class_type_params, cls.range.start, mod);
+  for (ClassMember* m : cls.members) {
+    if (m->kind == ClassMemberKind::kProperty)
+      CarryOperandDims(m->data_type.type_params, m->loc, mod);
+  }
 }
 
 void Elaborator::ReportSpecializationErrors(const DataType& written,
