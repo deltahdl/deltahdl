@@ -23,6 +23,7 @@ Nothing is compiled or run locally. That means no build in `build-check/` or any
   - register new test files in `test/CMakeLists.txt`;
   - keep the commit subject to 72 characters or fewer and each body paragraph on one line;
   - stay within the clang-tidy limits the touched code must meet.
+- **A src change of any size** is pushed once traced through the code, even though CI is the first place it compiles; a red run it causes, a compile error included, is fixed in a push of its own. The user chose this over a local compile-only check.
 - **After the push,** watch every run, per [watching-a-ci-run](watching-a-ci-run.md), read it, per [reading-a-ci-run](reading-a-ci-run.md), and fix a red run, per [fixing-a-red-run](fixing-a-red-run.md).
 - **Coverage** of changed src lines is read from CI's coverage report, not from a local profile.
 - Running Python tests with `pytest` compiles nothing and stays allowed.
