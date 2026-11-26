@@ -51,13 +51,8 @@ bool BoundReadsVariable(const Expr* e, const PackedBoundNames& names) {
   if (e->kind == ExprKind::kSystemCall && IsConstantWhateverItsArguments(e)) {
     return false;
   }
-  auto reads = [&](const Expr* child) {
-    return BoundReadsVariable(child, names);
-  };
-  if (e->kind == ExprKind::kAssignmentPattern) {
-    return std::ranges::any_of(e->elements, reads);
-  }
-  return AnyExprChild(e, reads);
+  return AnyExprChild(
+      e, [&](const Expr* child) { return BoundReadsVariable(child, names); });
 }
 
 bool CallsNonConstantSystemFunction(const Expr* e) {
@@ -95,17 +90,13 @@ bool DeclaresRealParam(const ModuleItem& item) {
 }  // namespace
 
 bool NamesPackageVariable(const Expr* e, const CompilationUnit* unit) {
-  if (unit == nullptr || e->lhs == nullptr || e->rhs == nullptr ||
-      e->lhs->kind != ExprKind::kIdentifier) {
-    return false;
-  }
-  for (const PackageDecl* pkg : unit->packages) {
-    if (pkg->name != e->lhs->text) continue;
-    return std::ranges::any_of(pkg->items, [&](const ModuleItem* item) {
-      return item->name == e->rhs->text && DeclaresVariable(*item);
-    });
-  }
-  return false;
+  const auto kPackage = std::ranges::find_if(
+      unit->packages,
+      [&](const PackageDecl* pkg) { return pkg->name == e->lhs->text; });
+  return kPackage != unit->packages.end() &&
+         std::ranges::any_of((*kPackage)->items, [&](const ModuleItem* item) {
+           return item->name == e->rhs->text && DeclaresVariable(*item);
+         });
 }
 
 void ReportPackedBounds(const DataType& dtype, SourceLoc loc,

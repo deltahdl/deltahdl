@@ -334,6 +334,41 @@ TEST(VectorSpecification,
   }
 }
 
+TEST(VectorSpecification, NonConstantBoundIsErrorInANestedOrLaterMemberDim) {
+  ElabFixture f;
+  Elaborate(
+      "module m;\n"
+      "  int n;\n"
+      "  localparam int K = 3;\n"
+      "  struct packed { struct packed { logic [n:0] g; } h; } s;\n"
+      "  struct packed { logic [K:0][n:0] f; } t;\n"
+      "  struct packed { struct packed { logic [K:0] g; } h; } u;\n"
+      "  struct packed { logic [K:0][1:0] f; } v;\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNonConstantRange, 4, "7.4.1"));
+  EXPECT_TRUE(
+      ReportedError(f.diag.Diagnostics(), kNonConstantRange, 5, "7.4.1"));
+  for (uint32_t line : {6U, 7U}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
+  }
+}
+
+TEST(VectorSpecification, ClassScopedParameterBoundIsAccepted) {
+  ElabFixture f;
+  Elaborate(
+      "class C;\n"
+      "  localparam int K = 3;\n"
+      "endclass\n"
+      "module m;\n"
+      "  logic [C::K:0] a;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
 TEST(VectorSpecification, ConstantBoundIsAcceptedInEveryPlace) {
   ElabFixture f;
   Elaborate(
