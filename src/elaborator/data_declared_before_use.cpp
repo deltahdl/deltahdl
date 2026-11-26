@@ -132,9 +132,6 @@ Declarations LocalDeclarationsOf(const std::vector<Stmt*>& stmts,
     if (s == nullptr) continue;
     if (s->kind == StmtKind::kVarDecl && !s->var_name.empty())
       around.emplace(s->var_name, s->range.start);
-    if (s->kind == StmtKind::kBlockItemDecl && s->decl_item != nullptr &&
-        DeclaresData(*s->decl_item))
-      around.emplace(s->decl_item->name, s->decl_item->loc);
   }
   return around;
 }

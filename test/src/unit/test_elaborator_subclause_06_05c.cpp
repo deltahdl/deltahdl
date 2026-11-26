@@ -631,6 +631,28 @@ TEST(DeclaredBeforeUse, TypeOperatorAboveItsOperandInEachDesignScope) {
              "endmodule\n"));
 }
 
+TEST(DeclaredBeforeUse, TypeOperatorAboveItsOperandInAChecker) {
+  ElabFixture f;
+  ElaborateSrc(
+      "checker c;\n"
+      "  var type(w) v;\n"
+      "  int w;\n"
+      "endchecker\n"
+      "module t;\n"
+      "  c u();\n"
+      "endmodule\n",
+      f);
+  EXPECT_TRUE(UsedBeforeDeclared(f, "w", 2));
+  EXPECT_TRUE(
+      ElabOk("checker c;\n"
+             "  int w;\n"
+             "  var type(w) v;\n"
+             "endchecker\n"
+             "module t;\n"
+             "  c u();\n"
+             "endmodule\n"));
+}
+
 TEST(DeclaredBeforeUse, TypeOperatorAboveItsOperandInAClassSubroutineOrBlock) {
   ElabFixture f;
   ElaborateSrc(
