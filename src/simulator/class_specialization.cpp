@@ -292,10 +292,11 @@ const DataType* TypeParamActualIn(const ClassDecl* decl,
   return nullptr;
 }
 
-const DataType* IntegralElementOf(const DataType& actual, SimContext& ctx) {
-  const DataType* element = &actual;
-  if (actual.kind == DataTypeKind::kNamed) {
-    const ModuleItem* item = ctx.FindTypedefItem(actual.type_name);
+const DataType* IntegralElementOf(const DataType* actual, SimContext& ctx) {
+  if (actual == nullptr) return nullptr;
+  const DataType* element = actual;
+  if (actual->kind == DataTypeKind::kNamed) {
+    const ModuleItem* item = ctx.FindTypedefItem(actual->type_name);
     if (item != nullptr && !item->unpacked_dims.empty())
       element = &item->typedef_type;
   }
@@ -327,8 +328,7 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
                                  : TypeParamNamedBy(decl, prop.type_name);
     if (prop.width_is_declared || pname.empty()) continue;
     const DataType* written = TypeParamActualIn(decl, actuals, pname);
-    const DataType* actual =
-        written != nullptr ? IntegralElementOf(*written, ctx) : nullptr;
+    const DataType* actual = IntegralElementOf(written, ctx);
     if (actual == nullptr) continue;
     uint32_t width = DeclaredTypeWidth(*actual, ctx);
     if (width == 0) continue;
