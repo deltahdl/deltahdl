@@ -51,7 +51,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [A deleted test leaves its cases shown](a-deleted-test-leaves-its-cases-shown.md) — establish what it asserts, what the standard requires and what still shows each correct case; the commit says so.
 - [Test-driven development](test-driven-development.md) — tests first, each traced to fail for its issue's reason before the fix, CI showing it pass; a test lands in the same commit as its code, and no src line lands uncovered.
 - [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
-- [Fixing a rule in full](fixing-a-rule-in-full.md) — list every case of the rule, each on the issue of its problem, then test and fix every case the issue in hand lists in one push.
+- [Fixing a problem in full](fixing-a-problem-in-full.md) — list every case of the rule, each on the issue of its problem, then test and fix every case the issue in hand lists in one push.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
 - [Rename rather than delete a duplicate](renaming-rather-than-deleting-a-duplicate-test.md) — keep both files covering one rule and qualify the names.

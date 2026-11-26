@@ -12,7 +12,7 @@ metadata:
 
 An issue labelled `lrm-tests` asks for a test of every case of every rule in one section of a standard, and for nothing else. Its commit changes nothing under `src/`, however small the fix a failing test points to. Every test it asks for lands in the one push that closes it, never spread over several pushes. A test deltahdl passes carries its plain name. A test deltahdl fails carries `DISABLED_` in front of its name, as in `TEST(Suite, DISABLED_Name)`: GoogleTest builds such a test but leaves it out of a run unless asked, so it neither passes nor fails. The commit that later makes it pass removes the prefix.
 
-Every other issue is fair game for a fix: its commit delivers the src change and every case's test together, each passing under its plain name, and no src line lands uncovered ([test-driven-development](test-driven-development.md), [fixing-a-rule-in-full](fixing-a-rule-in-full.md)). Its tests are never pushed ahead of the fix, disabled or not.
+Every other issue is fair game for a fix: its commit delivers the src change and every case's test together, each passing under its plain name, and no src line lands uncovered ([test-driven-development](test-driven-development.md), [fixing-a-problem-in-full](fixing-a-problem-in-full.md)). Its tests are never pushed ahead of the fix, disabled or not.
 
 **Why:** an `lrm-tests` issue exists so that every case has a test in `test/`, not only a sentence in an issue, with the prefixed tests marking exactly what is left. Keeping it to tests keeps that inventory separate from the fixes, which belong to the rule issues. A rule issue, by contrast, is finished only when the rule works, so its tests and its fix travel together.
 

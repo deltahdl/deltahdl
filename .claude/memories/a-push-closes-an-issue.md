@@ -14,7 +14,7 @@ Every push closes at least one issue. It may close as many as its work finishes,
 
 A push carries one commit or several, as the session chooses ([commits-in-a-push-are-the-sessions-choice](commits-in-a-push-are-the-sessions-choice.md)). A commit may finish an issue or only move one forward; it is the push, taken as a whole, that has to finish at least one. This says what a push holds, not when it goes: the session chooses when to push.
 
-**Why:** CI checks a push at its head, so the push is what lands on `main` checked. A string of pushes that each reference an issue and none closes it leaves an issue half fixed on `main`, its cases never tested together as [fixing-a-rule-in-full](fixing-a-rule-in-full.md) asks, and the open issue list stops saying what is still wrong. Inside one push that risk does not arise, since all its commits land and are checked together.
+**Why:** CI checks a push at its head, so the push is what lands on `main` checked. A string of pushes that each reference an issue and none closes it leaves an issue half fixed on `main`, its cases never tested together as [fixing-a-problem-in-full](fixing-a-problem-in-full.md) asks, and the open issue list stops saying what is still wrong. Inside one push that risk does not arise, since all its commits land and are checked together.
 
 Two kinds of push may close nothing:
 

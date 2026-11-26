@@ -1,5 +1,5 @@
 ---
-name: fixing-a-rule-in-full
+name: fixing-a-problem-in-full
 description: "Every case of an issue's rule (each allowed and forbidden form, in every place it can be written, with every operand or type it names) is listed before the fix, held by the issue in hand or by the issue of another problem under the rule; the fix reaches every case its issue lists, a test per case, in one push, never only the example the issue gives."
 metadata:
   node_type: memory
@@ -8,7 +8,7 @@ metadata:
   modified: 2026-11-21T02:54:00.439Z
 ---
 
-# Fixing a rule in full
+# Fixing a problem in full
 
 A fix reaches every case its issue lists, not only the example the issue gives, and an issue holds one problem under a rule ([one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md)). Before writing the fix, list every case of the rule:
 

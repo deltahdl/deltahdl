@@ -12,7 +12,7 @@ metadata:
 
 An issue holds one problem: one thing deltahdl gets wrong, or leaves untested, that one fix corrects. A problem is not a rule. A rule is what a standard requires, and one rule can hold several problems, such as a forbidden form that the parser lets through inside a class and the elaborator lets through inside a package.
 
-- **An issue of a standard** holds one problem under a rule the standard states. It lists every case of the rule that its fix corrects, each form in each place it can be written ([fixing-a-rule-in-full](fixing-a-rule-in-full.md)), with each forbidden form beside its nearest allowed form, and names the issues of the rule's other problems.
+- **An issue of a standard** holds one problem under a rule the standard states. It lists every case of the rule that its fix corrects, each form in each place it can be written ([fixing-a-problem-in-full](fixing-a-problem-in-full.md)), with each forbidden form beside its nearest allowed form, and names the issues of the rule's other problems.
 - **An issue about deltahdl itself**, such as a coverage gap or a harness defect, holds one defect with one fix.
 
 Two problems are two issues, even under one rule, and even when they share a clause, a failing file list or a first report. Two cases that one fix corrects are one issue, even when they were found apart. One problem takes one fix, so its issue closes in one push.
