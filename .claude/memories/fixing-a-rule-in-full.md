@@ -24,7 +24,7 @@ See that each case is on the open issue of its part or is already shown by a pas
 
 - Draw the list from the clause itself, per [lrm-source-of-truth](lrm-source-of-truth.md); the cases the issue names are a start, not the whole.
 - For each forbidden form, write one test that it is reported, per [naming-the-report-in-a-rejection-test](naming-the-report-in-a-rejection-test.md), and one that the nearest allowed form is accepted without a report.
-- A case's test may already be in the tree with `DISABLED_` in front of its name, per [lrm-tests-issues-are-tests-only](lrm-tests-issues-are-tests-only.md). Run it and read why it fails, then remove the prefix in the commit that makes it pass.
+- A case's test may already be in the tree with `DISABLED_` in front of its name, per [lrm-tests-issues-are-tests-only](lrm-tests-issues-are-tests-only.md). Trace through the code why it fails, then remove the prefix in the commit that makes it pass.
 - A case found while fixing joins the fix when it falls in the part in hand, and otherwise goes on the issue of its part ([what-does-not-get-filed](what-does-not-get-filed.md)).
 - Choose inputs that tell correct code from incorrect ([discriminating-test-inputs](discriminating-test-inputs.md)).
 - Write each test before the fix and trace through the code why it fails because of the rule in hand, building nothing locally ([test-driven-development](test-driven-development.md)). A test that fails for another reason has found a defect of another rule, which is dealt with as [what-does-not-get-filed](what-does-not-get-filed.md) says before the fix is designed. Never bend the tests around it unrecorded.

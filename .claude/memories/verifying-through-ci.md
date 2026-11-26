@@ -1,6 +1,6 @@
 ---
 name: verifying-through-ci
-description: "Nothing is built or run locally: no build, no unit test, no probe through the deltahdl binary and no pre-push-checks; a change is pushed and CI's run gives the verdict."
+description: "Nothing is built or run locally: no build, no unit test, and no probe through the deltahdl binary; a change is pushed and CI's run gives the verdict."
 metadata:
   node_type: memory
   type: feedback
@@ -10,7 +10,7 @@ metadata:
 
 # Verifying through CI
 
-Nothing is compiled or run locally. That means no build in `build-check/` or anywhere else, no unit test binary, no probe of a design through the `deltahdl` binary, and no `.claude/skills/pre-push-checks/check.sh`, which builds. A change is committed and pushed, and the CI run is the verdict on all of it: the unit tests, coverage of changed lines, clang-tidy, the sanitizer and gcc builds, the copy-paste detectors, and the e2e, integration and sv-tests runs.
+Nothing is compiled or run locally. That means no build in `build-check/` or anywhere else, no unit test binary, and no probe of a design through the `deltahdl` binary. A change is committed and pushed, and the CI run is the verdict on all of it: the unit tests, coverage of changed lines, clang-tidy, the sanitizer and gcc builds, the copy-paste detectors, and the e2e, integration and sv-tests runs.
 
 **Why:** The user does not want anything built on the local machine. A local build holds the session for minutes to hours, and a local tree can drift from CI's setup unnoticed. When `build-check/` was reconfigured with the system compiler and no coverage flags, every local check after that reported nothing true.
 

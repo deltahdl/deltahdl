@@ -19,6 +19,6 @@ research recorded only there is lost too.
 
 **How to apply:** unlike a problem met while working, which may be solved rather
 than filed, a plan of discovery, and each
-mismatch a discovery records, is filed at once. Include the probe
+mismatch a discovery records, is filed at once. Include the reproducing
 source inline in a mismatch issue so it reproduces without the scratch
 directory. See [one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md) for the grain.

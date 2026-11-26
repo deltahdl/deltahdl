@@ -66,7 +66,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 ## Verification
 
-- [Verifying through CI](verifying-through-ci.md) — nothing is built or run locally, no build, unit test, probe or `pre-push-checks`; push and read CI's run.
+- [Verifying through CI](verifying-through-ci.md) — nothing is built or run locally, no build, unit test or probe; push and read CI's run.
 - [A rule conforms only when tests show it](a-rule-conforms-only-when-tests-show-it.md) — only a test asserting the standard's outcome shows a case conforms; an untested case is filed.
 - [Reading a CI run](reading-a-ci-run.md) — no push while a run is in progress or queued; `gh run view --log-failed` after.
 - [gh run list --commit takes a full SHA](gh-run-list-commit-takes-a-full-sha.md) — pass `$(git rev-parse HEAD)`; a short SHA lists no run.
