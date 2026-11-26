@@ -1,6 +1,6 @@
 ---
 name: a-push-closes-an-issue
-description: "Every push closes at least one issue, and as many more as its work finishes, every case each one lists passing at its head; the commits inside it may be steps that close nothing; an issue too large for one push is split first, by rule and then by part of a rule; only a red-run fix or a change the user asks for may close none."
+description: "Every push closes at least one issue, and as many more as its work finishes; the commits inside it may be steps that close nothing; an issue too large for one push is split first, by rule and then by part of a rule; only a red-run fix or a change the user asks for may close none."
 metadata:
   node_type: memory
   type: feedback
@@ -10,7 +10,7 @@ metadata:
 
 # A push closes at least one issue
 
-Every push closes at least one issue. It may close as many as its work finishes, with no upper limit: issues whose fixes go through the same code, or unrelated ones, in source, tests, scripts, workflows, documentation or the notes. Issues that are close to done join the push rather than waiting for a later one. Every case each issue it closes lists passes at the push's head; for an `lrm-tests` issue, which asks for tests alone, every test it asks for is in the push ([lrm-tests-issues-are-tests-only](lrm-tests-issues-are-tests-only.md)). An issue whose open cases need more than one push is split by rule, and then by part of a rule, before its work starts, or partway when that is found then ([one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md)).
+Every push closes at least one issue. It may close as many as its work finishes, with no upper limit: issues whose fixes go through the same code, or unrelated ones, in source, tests, scripts, workflows, documentation or the notes. Issues that are close to done join the push rather than waiting for a later one. An issue whose open cases need more than one push is split by rule, and then by part of a rule, before its work starts, or partway when that is found then ([one-indivisible-problem-per-issue](one-indivisible-problem-per-issue.md)).
 
 A push carries one commit or several, as the session chooses ([commits-in-a-push-are-the-sessions-choice](commits-in-a-push-are-the-sessions-choice.md)). A commit may finish an issue or only move one forward; it is the push, taken as a whole, that has to finish at least one. This says what a push holds, not when it goes: the session chooses when to push.
 

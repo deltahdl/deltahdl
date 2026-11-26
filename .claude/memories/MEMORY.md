@@ -10,7 +10,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [Staging explicit paths](git-add-explicit-paths.md) — never `git add -A` or `git add .`; name every path.
 - [git add stages nothing when one pathspec misses](git-add-all-or-nothing-pathspecs.md) — never name to `git add` a path neither on disk nor in the index; it then stages none.
 - [Reading the index back](reading-the-index-before-committing.md) — `git status --porcelain` between staging and committing, every time.
-- [A push closes at least one issue](a-push-closes-an-issue.md) — and as many more as it finishes, every case each one lists passing at its head; its commits may be steps that close nothing; only a red-run fix, writing `Refs #N` for each issue whose tests it changes, or a change the user asks for may close none.
+- [A push closes at least one issue](a-push-closes-an-issue.md) — and as many more as it finishes; its commits may be steps that close nothing; only a red-run fix, writing `Refs #N` for each issue whose tests it changes, or a change the user asks for may close none.
 - [A commit body is left unwrapped](commit-body-left-unwrapped.md) — each body paragraph on one line, never broken at a column; read it back with `git log -1` before pushing.
 - [Closing keywords](closing-keywords.md) — nine words close an issue from anywhere in a message; `Closes #N` on its own line per finished issue, `Refs #N` or `See #N` to mention.
 - [Confirming a push closed its issues](confirming-a-push-closed-its-issues.md) — once the runs are clean, check each issue closed; close by hand where it did not.
