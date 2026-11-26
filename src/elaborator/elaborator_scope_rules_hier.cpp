@@ -437,8 +437,12 @@ void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
   for (const SpecifyItem* specify : item->specify_items) {
     Insert(specify->param_name);
   }
-  AddEnumerations(item->data_type);
-  AddEnumerations(item->typedef_type);
+  for (const DataType* type : {&item->data_type, &item->typedef_type}) {
+    AddEnumerations(*type);
+    if (!type->param_assignment_written) continue;
+    for (const DataType& argument : type->type_params)
+      AddEnumerations(argument);
+  }
   for (const auto& [param, value] : item->inst_params) {
     if (value != nullptr && value->type_value != nullptr)
       AddEnumerations(*value->type_value);

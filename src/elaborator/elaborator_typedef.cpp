@@ -200,6 +200,12 @@ std::string_view EnumTypeKey(std::string_view decl_name,
   return *key;
 }
 
+std::string_view ArgumentEnumKey(std::string_view owner, std::size_t position,
+                                 Arena& arena) {
+  const std::string kKey = std::format("{}#{}", owner, position);
+  return {arena.AllocString(kKey.c_str(), kKey.size()), kKey.size()};
+}
+
 void DeclareEnumType(const DataType& type, std::string_view key, uint32_t width,
                      ScopeMap& scope, const EnumMemberDeclCtx& ctx) {
   auto members = BuildEnumMembers(type, width, ctx);
@@ -387,11 +393,25 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                         {scope, arena_, mod, enum_member_names_, nullptr,
                          IsSignedType(type, typedefs_), InternedGenPrefix()});
       });
+  EmitArgumentEnumMembers(item->typedef_type, item->name, item->loc, mod);
 }
 
 void Elaborator::EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod) {
   if (!item->first_in_decl_list) return;
   EmitInPlaceEnumMembers(item->data_type, item->name, item->loc, mod);
+  EmitArgumentEnumMembers(item->data_type, item->name, item->loc, mod);
+}
+
+void Elaborator::EmitArgumentEnumMembers(const DataType& type,
+                                         std::string_view key, SourceLoc loc,
+                                         RtlirModule* mod) {
+  if (!type.param_assignment_written) return;
+  for (std::size_t i = 0; i < type.type_params.size(); ++i) {
+    const DataType& argument = type.type_params[i];
+    if (argument.kind == DataTypeKind::kEnum)
+      ValidateEnumDecl(argument, loc, true);
+    EmitInPlaceEnumMembers(argument, ArgumentEnumKey(key, i, arena_), loc, mod);
+  }
 }
 
 void Elaborator::DeclareTypeParamEnums(const DataType& written,
@@ -432,10 +452,8 @@ void Elaborator::DeclareOverrideEnumConstants(const ModuleItem& item,
     const DataType& type = *value->type_value;
     if (type.kind == DataTypeKind::kEnum)
       ValidateEnumDecl(type, value->range.start, true);
-    const std::string kKey = std::format("{}#{}", item.inst_name, i);
-    const std::string_view kStored{
-        arena_.AllocString(kKey.c_str(), kKey.size()), kKey.size()};
-    EmitInPlaceEnumMembers(type, kStored, value->range.start, mod);
+    EmitInPlaceEnumMembers(type, ArgumentEnumKey(item.inst_name, i, arena_),
+                           value->range.start, mod);
   }
 }
 

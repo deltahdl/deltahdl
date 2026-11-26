@@ -67,4 +67,37 @@ TEST(OverrideEnumerationSim, InstanceInAGenerateBlockDeclaresInTheBlock) {
             "6\n9\n10\n");
 }
 
+struct Place {
+  std::string_view open;
+  std::string_view close;
+};
+
+constexpr Place kSpecializationPlaces[] = {
+    {"module top;\n", "endmodule\n"},
+    {"interface j;\n", "endinterface\nmodule top; j u(); endmodule\n"},
+    {"program q;\n", "endprogram\nmodule top; q u(); endmodule\n"},
+    {"module top;\nif (1) begin : g\n", "end\nendmodule\n"},
+    {"module top;\nfor (genvar n = 0; n < 1; n++) begin : l\n",
+     "end\nendmodule\n"},
+};
+
+TEST(SpecializationEnumerationSim, ArgumentDeclaresItsConstantsInEachPlace) {
+  for (const Place& place : kSpecializationPlaces) {
+    std::string design = "class X #(type T = int); T v; endclass\n";
+    design.append(place.open)
+        .append(
+            "  X #(enum {A, B}) k = new;\n"
+            "  X #(.T(enum {C, D = 5})) h = new, g = new;\n"
+            "  typedef X #(enum logic [1:0] {E = 2, F}) x_t;\n"
+            "  x_t s = new;\n"
+            "  x_t r = new;\n"
+            "  initial begin\n"
+            "    k.v = B;\n"
+            "    $display(\"%0d %0d %0d %0d\", k.v, D, F, $bits(s.v));\n"
+            "  end\n")
+        .append(place.close);
+    EXPECT_EQ(Printed(design), "1 5 3 2\n");
+  }
+}
+
 }  // namespace

@@ -639,6 +639,8 @@ class Elaborator : public ElaboratorClassRules {
   void EmitInPlaceEnumMembers(const DataType& type, std::string_view key,
                               SourceLoc loc, RtlirModule* mod);
   void DeclareOverrideEnumConstants(const ModuleItem& item, RtlirModule* mod);
+  void EmitArgumentEnumMembers(const DataType& type, std::string_view key,
+                               SourceLoc loc, RtlirModule* mod);
   void ElaborateInstanceWithOverrideEnums(ModuleItem* item, RtlirModule* mod);
 
   void ValidateEnumAssignments(const ModuleDecl* decl);

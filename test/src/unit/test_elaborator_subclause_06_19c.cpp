@@ -73,4 +73,66 @@ TEST(OverrideEnumerationElaboration, ConstantIsNoNameOfTheInstantiatedModule) {
                             LineHolding(kSrc, "int y = B"), "23.9"));
 }
 
+constexpr Parent kSpecializationParents[] = {
+    {"module top;\n", "endmodule\n"},
+    {"interface j;\n", "endinterface\nmodule top; j k(); endmodule\n"},
+    {"program q;\n", "endprogram\nmodule top; q k(); endmodule\n"},
+    {"module top;\n  if (1) begin : g\n", "  end\nendmodule\n"},
+    {"module top;\n  for (genvar n = 0; n < 1; n++) begin : l\n",
+     "  end\nendmodule\n"},
+};
+
+std::string WithClassX(const Parent& parent, std::string_view body) {
+  std::string text = "class X #(type T = int); T v; endclass\n";
+  text.append(parent.open).append(body).append(parent.close);
+  return text;
+}
+
+TEST(SpecializationEnumerationElaboration,
+     DuplicateValueInAnArgumentIsReported) {
+  for (const Parent& parent : kSpecializationParents) {
+    for (std::string_view body :
+         {"  X #(enum {A = 1, B = 1}) k;\n",
+          "  typedef X #(.T(enum {A = 1, B = 1})) x_t;\n"}) {
+      const std::string kSrc = WithClassX(parent, body);
+      SCOPED_TRACE(kSrc);
+      ElabFixture f;
+      ElaborateSrc(kSrc, f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "duplicate enum member value 1",
+                                LineHolding(kSrc, "enum {A = 1"), "6.19"));
+    }
+  }
+}
+
+TEST(SpecializationEnumerationElaboration, DistinctValuesInAnArgumentAccepted) {
+  for (const Parent& parent : kSpecializationParents) {
+    const std::string kSrc =
+        WithClassX(parent,
+                   "  X #(enum {A = 1, B = 2}) k;\n"
+                   "  typedef X #(.T(enum {C = 1, D = 2})) x_t;\n"
+                   "  int y = B + D;\n");
+    SCOPED_TRACE(kSrc);
+    ElabFixture f;
+    ElaborateSrc(kSrc, f);
+    EXPECT_FALSE(f.has_errors);
+  }
+}
+
+TEST(SpecializationEnumerationElaboration, ConstantIsNoNameOfTheClass) {
+  const std::string kSrc =
+      "class Z #(type T = int);\n"
+      "  T v;\n"
+      "  function int f(); return B; endfunction\n"
+      "endclass\n"
+      "module top;\n"
+      "  Z #(enum {A, B}) k = new;\n"
+      "endmodule\n";
+  ElabFixture f;
+  ElaborateSrc(kSrc, f);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "reference to unresolved identifier 'B'",
+                            LineHolding(kSrc, "return B"), "23.9"));
+}
+
 }  // namespace
