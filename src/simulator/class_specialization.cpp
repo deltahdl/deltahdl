@@ -11,6 +11,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/scope_value_type.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_spelled_by.h"
 #include "lexer/token.h"
@@ -27,6 +28,7 @@
 #include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
+#include "simulator/evaluation_internal.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
@@ -182,9 +184,34 @@ const DataType* RunningTypeActual(std::string_view name, SimContext& ctx) {
 
 namespace {
 
-std::vector<DataType> ActualsUnderRunningClass(
-    const ClassDecl* decl, const std::vector<DataType>& written,
-    SimContext& ctx) {
+DataType RunningOperandType(const Expr& operand, SimContext& ctx) {
+  DataType type;
+  AdoptLogicVector(type,
+                   {SimSelfWidth(&operand, ctx), SimSelfSigned(&operand, ctx)},
+                   ctx.GetArena());
+  if (!SimSelf4State(&operand, ctx)) type.kind = DataTypeKind::kBit;
+  if (SimSelfReal(&operand, ctx)) type = TypeNameToDataType("real");
+  return type;
+}
+
+void TypeRunningOperands(std::vector<DataType>& actuals, SimContext& ctx) {
+  for (DataType& actual : actuals) {
+    const Expr* ref = actual.type_ref_expr;
+    if (ref == nullptr || ref->kind != ExprKind::kTypeRef ||
+        ref->type_value != nullptr || ref->lhs == nullptr ||
+        SimSelfWidth(ref->lhs, ctx) == 0) {
+      continue;
+    }
+    std::string_view arg = actual.param_arg_name;
+    actual = RunningOperandType(*ref->lhs, ctx);
+    actual.param_arg_name = arg;
+  }
+}
+
+std::vector<DataType> ActualsUnderRunningClass(const ClassDecl* decl,
+                                               std::vector<DataType> written,
+                                               SimContext& ctx) {
+  TypeRunningOperands(written, ctx);
   std::vector<DataType> bound = SpelledActuals(decl, written);
   for (DataType& actual : bound) {
     if (actual.kind != DataTypeKind::kNamed) continue;

@@ -16,6 +16,7 @@
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/let_construct.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/type_ref_dynamic_element.h"
 #include "lexer/token.h"
@@ -269,10 +270,23 @@ void ResolveAssertionDeclPrefixTypeRefs(ModuleItem& decl,
     ForEachTreeSlot(decl.prop_body_tree, in_expr);
 }
 
+static std::vector<bool> UntypedLetFormals(const ModuleItem& item) {
+  std::vector<bool> untyped(item.func_args.size(), false);
+  if (item.kind != ModuleItemKind::kLetDecl) return untyped;
+  const std::vector<const DataType*> kTypes = LetFormalTypes(item.func_args);
+  for (size_t i = 0; i < untyped.size(); ++i) {
+    untyped[i] = kTypes[i] == nullptr &&
+                 item.func_args[i].data_type.type_ref_expr == nullptr;
+  }
+  return untyped;
+}
+
 void ResolveFormalTypeRefs(ModuleItem* item,
                            std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena) {
-  for (auto& arg : item->func_args) {
+  const std::vector<bool> kUntyped = UntypedLetFormals(*item);
+  for (size_t i = 0; i < item->func_args.size(); ++i) {
+    FunctionArg& arg = item->func_args[i];
     ResolvePrefixTypeRefs(arg.data_type.type_ref_expr, item->loc, locals,
                           resolve_outer, arena);
     ResolveLocalTypeRef(arg.data_type, arg.unpacked_dims, item->loc, locals,
@@ -281,7 +295,10 @@ void ResolveFormalTypeRefs(ModuleItem* item,
                               resolve_outer, arena);
     ResolvePrefixTypeRefs(arg.default_value, item->loc, locals, resolve_outer,
                           arena);
-    locals.push_back({arg.name, &arg.data_type, &arg.unpacked_dims});
+    locals.push_back(
+        {arg.name,
+         kUntyped[i] ? UntypedFormal(arg.name, arena) : &arg.data_type,
+         &arg.unpacked_dims});
   }
 }
 
