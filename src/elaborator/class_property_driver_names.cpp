@@ -13,7 +13,6 @@
 #include "elaborator/type_spelled_by.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
-#include "parser/ast_type.h"
 
 namespace delta {
 
