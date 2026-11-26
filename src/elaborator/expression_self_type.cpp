@@ -19,6 +19,7 @@
 #include "elaborator/operator_classes.h"
 #include "elaborator/system_function_types.h"
 #include "elaborator/type_eval.h"
+#include "elaborator/type_spelled_by.h"
 #include "elaborator/typename_writer.h"
 #include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
@@ -234,14 +235,8 @@ std::optional<DeclaredValue> ValueBehindScope(std::string_view prefix,
 
 std::optional<DeclaredValue> ClassScopedValue(const Expr* access,
                                               const ExprTypeScope& scope) {
-  if (access->lhs->kind != ExprKind::kIdentifier ||
-      access->lhs->has_param_spec) {
-    return std::nullopt;
-  }
-  DataType named_class;
-  named_class.kind = DataTypeKind::kNamed;
-  named_class.type_name = access->lhs->text;
-  return ClassMemberValue(named_class, access->rhs->text, scope);
+  if (access->lhs->kind != ExprKind::kIdentifier) return std::nullopt;
+  return ClassMemberValue(TypeSpelledBy(access->lhs), access->rhs->text, scope);
 }
 
 std::optional<DeclaredValue> MemberValue(const Expr* access,

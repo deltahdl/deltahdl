@@ -20,24 +20,36 @@ constexpr Place kPlaces[] = {
     {"", "module top;\n", "endmodule\n"},
 };
 
-constexpr std::string_view kClass =
-    "class C; typedef logic [6:0] u; static logic [4:0] s; endclass\n";
+constexpr std::string_view kClasses =
+    "class C; typedef logic [6:0] u; static logic [4:0] s; endclass\n"
+    "class W #(type T = int); typedef T u; static T s; endclass\n";
 
-constexpr std::string_view kFormals =
-    "(input var type(C::u) x, input var type(C::s) y);\n"
-    "  var type(C::u) la;\n"
-    "  var type(C::s) lb;\n"
-    "  $display(\"%0d %0d %0d %0d\", $bits(x), $bits(y), $bits(la), "
-    "$bits(lb));\n";
+std::string Formals(std::string_view type, std::string_view value) {
+  return std::string("(input var type(")
+      .append(type)
+      .append(") x, input var type(")
+      .append(value)
+      .append(") y);\n  var type(")
+      .append(type)
+      .append(") la;\n  var type(")
+      .append(value)
+      .append(
+          ") lb;\n"
+          "  $display(\"%0d %0d %0d %0d\", $bits(x), $bits(y), $bits(la), "
+          "$bits(lb));\n");
+}
 
-std::string Positions() {
-  return std::string(
-             "class P;\n"
-             "  var type(C::u) a;\n"
-             "  var type(C::s) b;\n"
-             "  static var type(C::u) sa;\n"
-             "  static var type(C::s) sb;\n"
-             "  function void m")
+std::string Positions(std::string_view type, std::string_view value) {
+  const std::string kFormals = Formals(type, value);
+  return std::string("class P;\n  var type(")
+      .append(type)
+      .append(") a;\n  var type(")
+      .append(value)
+      .append(") b;\n  static var type(")
+      .append(type)
+      .append(") sa;\n  static var type(")
+      .append(value)
+      .append(") sb;\n  function void m")
       .append(kFormals)
       .append(
           "  endfunction\n"
@@ -51,10 +63,13 @@ std::string Positions() {
       .append("endtask\n");
 }
 
-TEST(ClassScopedTypeRefInScopeSim, TakesABareClassTypeOrStaticProperty) {
+void ExpectInEachPlaceAndPosition(std::string_view type, std::string_view value,
+                                  std::string_view bits) {
+  std::string printed;
+  for (int line = 0; line < 4; ++line) printed.append(bits).append("\n");
   for (const Place& place : kPlaces) {
     std::string text(place.open);
-    text.append(kClass).append(Positions()).append(place.use);
+    text.append(kClasses).append(Positions(type, value)).append(place.use);
     text.append(
         "  P p = new;\n"
         "  initial begin\n"
@@ -68,8 +83,21 @@ TEST(ClassScopedTypeRefInScopeSim, TakesABareClassTypeOrStaticProperty) {
     text.append(place.close);
     SCOPED_TRACE(text);
     SimFixture f;
-    EXPECT_EQ(RunCapture(text, f), "7 5 7 5\n7 5 7 5\n7 5 7 5\n7 5 7 5\n");
+    EXPECT_EQ(RunCapture(text, f), printed);
   }
+}
+
+TEST(ClassScopedTypeRefInScopeSim, TakesABareClassTypeOrStaticProperty) {
+  ExpectInEachPlaceAndPosition("C::u", "C::s", "7 5 7 5");
+}
+
+TEST(ClassScopedTypeRefInScopeSim, TakesASpecializationsTypeOrStaticProperty) {
+  ExpectInEachPlaceAndPosition("W#(byte)::u", "W#(byte)::s", "8 8 8 8");
+}
+
+TEST(ClassScopedTypeRefInScopeSim, SpecializationArgumentDecidesTheType) {
+  ExpectInEachPlaceAndPosition("W#(logic [6:0])::u", "W#(logic [6:0])::s",
+                               "7 7 7 7");
 }
 
 }  // namespace

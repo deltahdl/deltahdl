@@ -695,6 +695,18 @@ std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
   return (*matched != is_negated) ? 1 : 0;
 }
 
+static std::optional<DataType> SpecializationTypedefNamedBy(
+    const Expr& ref, const CompilationUnit* unit) {
+  if (ref.kind != ExprKind::kMemberAccess || !ref.is_scope_resolution ||
+      ref.lhs->kind != ExprKind::kIdentifier || !ref.lhs->has_param_spec ||
+      ref.rhs == nullptr || ref.rhs->kind != ExprKind::kIdentifier) {
+    return std::nullopt;
+  }
+  DataType spelled = TypeSpelledBy(&ref);
+  if (!ResolveParameterizedType(spelled, unit)) return std::nullopt;
+  return spelled;
+}
+
 std::vector<Expr*> ElaboratorOperationRules::ResolveUnitScopeTypeRef(
     DataType& dt, std::span<const ProceduralLocal> locals) {
   std::vector<Expr*> taken;
@@ -705,6 +717,11 @@ std::vector<Expr*> ElaboratorOperationRules::ResolveUnitScopeTypeRef(
   }
   if (const DataType* class_typedef = ClassTypedefNamedBy(*ref, unit_)) {
     AdoptReferencedType(dt, *class_typedef);
+    return taken;
+  }
+  if (std::optional<DataType> specialized =
+          SpecializationTypedefNamedBy(*ref, unit_)) {
+    AdoptReferencedType(dt, *specialized);
     return taken;
   }
   InLocals(locals, [&] {
