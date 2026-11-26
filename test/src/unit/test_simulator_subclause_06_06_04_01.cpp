@@ -292,7 +292,7 @@ TEST(CapacitiveNetwork, SmallerTriregJoinedThroughASwitchTakesTheLargersValue) {
 }
 
 TEST(CapacitiveNetwork,
-     DISABLED_EqualTriregsJoinedThroughASwitchHoldingDifferentValuesGoToX) {
+     EqualTriregsJoinedThroughASwitchHoldingDifferentValuesGoToX) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -421,8 +421,7 @@ TEST(CapacitiveNetwork, VectorTriregJoinedOnOneBitTakesTheLargersValueThere) {
   EXPECT_EQ(out, "01 x1 La1 SmX\n");
 }
 
-TEST(CapacitiveNetwork,
-     DISABLED_EqualVectorTriregsGoToXOnlyOnTheBitsWhereTheyDiffer) {
+TEST(CapacitiveNetwork, EqualVectorTriregsGoToXOnlyOnTheBitsWhereTheyDiffer) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -444,6 +443,28 @@ TEST(CapacitiveNetwork,
       "endmodule\n",
       f);
   EXPECT_EQ(out, "x1 x1\n");
+}
+
+TEST(CapacitiveNetwork, DriveArrivingAtTheTriregsOwnChargeStrengthDrivesIt) {
+  SimFixture f;
+  auto out = RunCapture(
+      "module t;\n"
+      "  reg a, d, e;\n"
+      "  wire w;\n"
+      "  trireg (medium) m;\n"
+      "  nmos n (m, d, a);\n"
+      "  assign (weak0, weak1) w = e ? 1'b1 : 1'bz;\n"
+      "  rtran r (w, m);\n"
+      "  initial begin\n"
+      "    a = 1; d = 0; e = 0;\n"
+      "    #10 a = 0;\n"
+      "    #1 $display(\"%b %v\", m, m);\n"
+      "    #9 e = 1;\n"
+      "    #1 $display(\"%b %v\", m, m);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "0 Me0\n1 Me1\n");
 }
 
 }  // namespace

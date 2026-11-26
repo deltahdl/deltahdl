@@ -81,6 +81,8 @@ struct Net {
   std::optional<Logic4Vec> pending_path_value;
 
   bool strength_watched = false;
+
+  std::vector<bool> switch_charges;
 };
 
 void PropagateCharge(Net& a, Net& b);

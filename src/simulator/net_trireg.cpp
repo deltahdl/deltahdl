@@ -35,10 +35,12 @@ void CopyBit(Logic4Vec& dst, const Logic4Vec& src, uint32_t bit) {
   to.bval = (to.bval & ~mask) | (from.bval & mask);
 }
 
+template <typename Counts>
 Strength StrongestAt(const std::vector<Logic4Vec>& values,
                      const std::vector<DriverStrength>& strengths, uint32_t bit,
-                     Strength strongest) {
+                     Strength strongest, const Counts& counts) {
   for (size_t i = 0; i < values.size(); ++i) {
+    if (!counts(i)) continue;
     uint8_t v = BitOf(values[i], bit);
     if (v == 3) continue;
     const DriverStrength& ds = strengths[i];
@@ -50,11 +52,22 @@ Strength StrongestAt(const std::vector<Logic4Vec>& values,
   return strongest;
 }
 
-Strength StrongestSourceAt(const Net& net,
-                           const std::vector<DriverStrength>& own,
-                           uint32_t bit) {
-  return StrongestAt(net.switch_drivers, net.switch_strengths, bit,
-                     StrongestAt(net.drivers, own, bit, Strength::kHighz));
+struct StrongestSources {
+  Strength drive;
+  Strength charge;
+};
+
+StrongestSources StrongestSourcesAt(const Net& net,
+                                    const std::vector<DriverStrength>& own,
+                                    uint32_t bit) {
+  auto charge = [&net](size_t i) { return net.switch_charges[i]; };
+  auto drive = [&net](size_t i) { return !net.switch_charges[i]; };
+  Strength direct = StrongestAt(net.drivers, own, bit, Strength::kHighz,
+                                [](size_t) { return true; });
+  return {
+      StrongestAt(net.switch_drivers, net.switch_strengths, bit, direct, drive),
+      StrongestAt(net.switch_drivers, net.switch_strengths, bit,
+                  Strength::kHighz, charge)};
 }
 
 void ScheduleChargeDecay(Net& net, uint64_t since, Arena& arena,
@@ -92,11 +105,13 @@ std::optional<Logic4Vec> SettleTriregCharge(Net& net, Arena& arena,
   bool holds = false;
   bool entered = false;
   for (uint32_t b = 0; b < width; ++b) {
-    Strength strongest = StrongestSourceAt(net, own, b);
+    StrongestSources sources = StrongestSourcesAt(net, own, b);
     uint64_t& since = net.charge_since[b];
     bool charge_stands = since != kBitDriven && since != kBitInitial &&
-                         strongest < net.charge_strength;
-    if (strongest != Strength::kHighz && !charge_stands) {
+                         sources.drive < net.charge_strength &&
+                         sources.charge <= net.charge_strength;
+    if (std::max(sources.drive, sources.charge) != Strength::kHighz &&
+        !charge_stands) {
       since = kBitDriven;
       continue;
     }

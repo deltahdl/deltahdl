@@ -335,7 +335,7 @@ DriverStrength ReduceAcross(DriverStrength ds, const SwitchLink& link) {
 }
 
 void AppendThroughUnknown(Net& member, const Logic4Vec& v, DriverStrength ds,
-                          Arena& arena) {
+                          bool charge, Arena& arena) {
   Logic4Vec parts[3] = {MakeLogic4Vec(arena, v.width),
                         MakeLogic4Vec(arena, v.width),
                         MakeLogic4Vec(arena, v.width)};
@@ -356,6 +356,7 @@ void AppendThroughUnknown(Net& member, const Logic4Vec& v, DriverStrength ds,
     if (!any[k]) continue;
     member.switch_drivers.push_back(parts[k]);
     member.switch_strengths.push_back(sides[k]);
+    member.switch_charges.push_back(charge);
   }
 }
 
@@ -375,8 +376,11 @@ void AppendReachedSources(Net& member, const std::vector<Reached>& reached,
   std::vector<DriverStrength> strengths;
   OwnSources(*reached[j].net, arena, values, strengths);
   uint32_t width = member.resolved->value.width;
+  const size_t kDrives =
+      values.size() - (reached[j].net->type == NetType::kTrireg ? 1 : 0);
   for (size_t d = 0; d < values.size(); ++d) {
     DriverStrength ds = strengths[d];
+    const bool kCharge = d >= kDrives;
     bool unknown = false;
     for (size_t k = j; reached[k].link != nullptr; k = reached[k].from) {
       ds = ReduceAcross(ds, *reached[k].link);
@@ -385,10 +389,11 @@ void AppendReachedSources(Net& member, const std::vector<Reached>& reached,
     }
     Logic4Vec v = ArrivingValue(values[d], reached[j].bits, width, arena);
     if (unknown) {
-      AppendThroughUnknown(member, v, ds, arena);
+      AppendThroughUnknown(member, v, ds, kCharge, arena);
     } else {
       member.switch_drivers.push_back(v);
       member.switch_strengths.push_back(ds);
+      member.switch_charges.push_back(kCharge);
     }
   }
 }
@@ -396,6 +401,7 @@ void AppendReachedSources(Net& member, const std::vector<Reached>& reached,
 void GatherSwitchDrivers(Net& member, Arena& arena) {
   member.switch_drivers.clear();
   member.switch_strengths.clear();
+  member.switch_charges.clear();
   if (member.resolved == nullptr) return;
   std::vector<Reached> reached = ReachAcrossConducting(member);
   for (size_t j = 1; j < reached.size(); ++j) {
