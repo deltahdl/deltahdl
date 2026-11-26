@@ -1,4 +1,6 @@
 #include <cstddef>
+#include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -8,8 +10,23 @@
 #include "parser/ast_type.h"
 #include "parser/expr_parser_internal.h"
 #include "parser/parser.h"
+#include "parser/scope_type_names.h"
 
 namespace delta {
+
+namespace {
+
+bool SpellsAClassMemberValue(
+    const DataType& dtype,
+    const std::unordered_map<std::string_view, ScopeTypeNames>& class_types) {
+  if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty())
+    return false;
+  const auto kClass = class_types.find(dtype.scope_name);
+  return kClass != class_types.end() &&
+         !kClass->second.types.contains(dtype.type_name);
+}
+
+}  // namespace
 
 Expr* Parser::ParseTypeRefExpr() {
   auto loc = CurrentLoc();
@@ -25,7 +42,7 @@ Expr* Parser::ParseTypeRefExpr() {
                              !dtype.scope_name.empty() &&
                              Check(TokenKind::kLParen);
   if (Check(TokenKind::kApostrophe) || Check(TokenKind::kApostropheLBrace) ||
-      calls_scoped_method) {
+      calls_scoped_method || SpellsAClassMemberValue(dtype, class_types_)) {
     lexer_.RestorePos(saved);
     dtype = DataType{};
   }

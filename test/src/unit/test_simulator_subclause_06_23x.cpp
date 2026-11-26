@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -69,8 +70,9 @@ std::string Positions(std::string_view type, std::string_view value) {
 }
 
 void ExpectInEachPlace(const std::string& items, std::string_view body,
-                       std::string_view printed) {
-  for (const Place& place : kPlaces) {
+                       std::string_view printed,
+                       std::span<const Place> places = kPlaces) {
+  for (const Place& place : places) {
     std::string text(kPackage);
     text.append(place.open);
     text.append(kClasses).append(items).append(place.use);
@@ -128,9 +130,9 @@ std::string ArgumentPositions(std::string_view type, std::string_view value) {
       .append("endtask\n");
 }
 
-void ExpectAsArgumentInEachPlaceAndPosition(std::string_view type,
-                                            std::string_view value,
-                                            std::string_view bits) {
+void ExpectAsArgumentInEachPlaceAndPosition(
+    std::string_view type, std::string_view value, std::string_view bits,
+    std::span<const Place> places = kPlaces) {
   std::string printed;
   for (int line = 0; line < 4; ++line) printed.append(bits).append("\n");
   ExpectInEachPlace(ArgumentPositions(type, value),
@@ -138,7 +140,7 @@ void ExpectAsArgumentInEachPlaceAndPosition(std::string_view type,
                     "    p.m();\n"
                     "    f();\n"
                     "    t();\n",
-                    printed);
+                    printed, places);
 }
 
 TEST(ClassScopedTypeRefInScopeSim, TakesABareClassTypeOrStaticProperty) {
@@ -158,13 +160,23 @@ TEST(ClassScopedTypeRefInScopeSim, TakesAPackagesClassTypeOrStaticProperty) {
   ExpectInEachPlaceAndPosition("pk::K::inner", "pk::K::s", "3 6 3 6");
 }
 
-TEST(ClassScopedTypeRefArgumentInScopeSim,
-     DISABLED_TakesABareClassTypeOrStaticProperty) {
-  ExpectAsArgumentInEachPlaceAndPosition("C::u", "C::s", "7 5");
+TEST(ClassScopedTypeRefArgumentInScopeSim, TakesABareClassStaticProperty) {
+  ExpectAsArgumentInEachPlaceAndPosition("C::s", "C::s", "5 5");
+}
+
+TEST(ClassScopedTypeRefArgumentInScopeSim, TakesABareClassTypeInTheUnit) {
+  ExpectAsArgumentInEachPlaceAndPosition("C::u", "C::u", "7 7",
+                                         std::span(kPlaces).subspan(1));
 }
 
 TEST(ClassScopedTypeRefArgumentInScopeSim,
-     DISABLED_TakesASpecializationsTypeOrStaticProperty) {
+     DISABLED_TakesABareClassTypeInAPackage) {
+  ExpectAsArgumentInEachPlaceAndPosition("C::u", "C::u", "7 7",
+                                         std::span(kPlaces).first(1));
+}
+
+TEST(ClassScopedTypeRefArgumentInScopeSim,
+     TakesASpecializationsTypeOrStaticProperty) {
   ExpectAsArgumentInEachPlaceAndPosition("W#(byte)::u", "W#(byte)::s", "8 8");
 }
 
