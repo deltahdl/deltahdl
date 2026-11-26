@@ -51,7 +51,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [A deleted test leaves its cases shown](a-deleted-test-leaves-its-cases-shown.md) — establish what it asserts, what the standard requires and what still shows each correct case; the commit says so.
 - [Test-driven development](test-driven-development.md) — tests first, each traced to fail for its issue's reason before the fix, CI showing it pass; a test lands in the same commit as its code, and no src line lands uncovered.
 - [lrm-tests issues are tests only](lrm-tests-issues-are-tests-only.md) — an `lrm-tests` issue lands its tests alone, nothing under src/, failing ones under `DISABLED_`; every other issue lands fix and tests together.
-- [Fixing a rule in full](fixing-a-rule-in-full.md) — list every case of the rule, each on the issue of its part, then test and fix every case the issue in hand lists in one push.
+- [Fixing a rule in full](fixing-a-rule-in-full.md) — list every case of the rule, each on the issue of its problem, then test and fix every case the issue in hand lists in one push.
 - [Inputs that discriminate](discriminating-test-inputs.md) — choose values where incorrect code gives a different answer from correct code.
 - [Naming the report in a rejection test](naming-the-report-in-a-rejection-test.md) — use `ReportedError` with message, line and exact `Subclause("…")`.
 - [Rename rather than delete a duplicate](renaming-rather-than-deleting-a-duplicate-test.md) — keep both files covering one rule and qualify the names.
@@ -97,7 +97,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 
 - [A finding joins the push or is filed](a-finding-joins-the-push-or-is-filed.md) — a finding related to the issues the push is solving goes in that push; every other finding is filed.
 - [Searching for an existing report before filing](searching-for-an-existing-report-before-filing.md) — grep all of src/ and test/ for the rule's own words before filing "not reported".
-- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one rule, or one part of a rule that one push takes, with every case listed, or one defect with one fix; split two, merge cases of one.
+- [One indivisible problem per issue](one-indivisible-problem-per-issue.md) — one thing deltahdl gets wrong or leaves untested that one fix corrects, every case listed; a rule can hold several; split two, merge repeats.
 - [Research lives in issues](research-lives-in-issues.md) — file a plan that outlives the session, and each finding, as it arises.
 - [Issues carry a standard label and a clause label](issues-carry-a-standard-and-a-clause-label.md) — a standard's issue carries its standard's label and its `§N` or `Annex X`, as does a defect whose fix rewrites a rule's tests; a coverage or harness issue neither.
 - [Issue sections take headings](issue-sections-take-headings.md) — open each section of an issue body with `## Heading`, never a bolded first sentence.
