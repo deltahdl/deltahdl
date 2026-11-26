@@ -79,6 +79,8 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
 void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena);
 const Stmt* DeclParameterTypedByValue(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena);
+const Stmt* DeclOfRunningTypeParam(const Stmt* stmt, SimContext& ctx,
+                                   Arena& arena);
 void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                               SimContext& ctx, Arena& arena);
 

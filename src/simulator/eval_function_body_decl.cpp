@@ -216,7 +216,7 @@ static const Stmt* DeclOfThisTypeRef(const Stmt* stmt, SimContext& ctx,
   return copy;
 }
 
-static const Stmt* DeclOfTypeParam(const Stmt* stmt, SimContext& ctx,
+const Stmt* DeclOfRunningTypeParam(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   const DataType& type = stmt->var_decl_type;
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||
@@ -271,7 +271,7 @@ void ExecFuncVarDecl(const Stmt* stmt, StaticFrame frame, SimContext& ctx,
                      Arena& arena) {
   stmt = DeclareInlineEnumOf(stmt, ctx, arena);
   stmt = DeclOfThisTypeRef(stmt, ctx, arena);
-  stmt = DeclOfTypeParam(stmt, ctx, arena);
+  stmt = DeclOfRunningTypeParam(stmt, ctx, arena);
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   stmt = DeclParameterTypedByValue(stmt, ctx, arena);
   if (stmt->var_is_automatic) {

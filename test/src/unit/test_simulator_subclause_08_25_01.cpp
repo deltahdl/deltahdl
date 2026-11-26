@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <string_view>
+
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
@@ -754,6 +757,72 @@ TEST(ParameterizedScopeResolutionSim,
       f);
   LowerRunAndCheck(
       f, design, {{"r1", 4u}, {"r2", 4u}, {"r3", 6u}, {"r4", 9u}, {"r5", 0u}});
+}
+
+struct TaskEnablePlace {
+  std::string_view open;
+  std::string_view run_open;
+  std::string_view run_close;
+  std::string_view close;
+};
+
+constexpr std::string_view kTask = "task automatic run();\n";
+constexpr std::string_view kEndTask = "endtask\n";
+
+constexpr TaskEnablePlace kTaskEnablePlaces[] = {
+    {"module top;\n", kTask, kEndTask, "initial run();\nendmodule\n"},
+    {"interface itf;\n", kTask, kEndTask,
+     "initial run();\nendinterface\nmodule top; itf i(); endmodule\n"},
+    {"program p;\n", kTask, kEndTask,
+     "initial run();\nendprogram\nmodule top; p i(); endmodule\n"},
+    {"module top;\nif (1) begin : b\n", kTask, kEndTask,
+     "initial run();\nend\nendmodule\n"},
+    {"", "class R;\nstatic task run();\n", "endtask\nendclass\n",
+     "module top; initial R::run(); endmodule\n"},
+    {"package q;\n", kTask, kEndTask,
+     "endpackage\nmodule top; import q::*; initial run(); endmodule\n"},
+    {"", kTask, kEndTask, "module top; initial run(); endmodule\n"},
+};
+
+TEST(ParameterizedScopeResolutionSim,
+     StaticTaskEnabledThroughASpecializationRunsThatSpecializations) {
+  for (const TaskEnablePlace& place : kTaskEnablePlaces) {
+    std::string text(
+        "package pk;\n"
+        "  class X #(type T = int);\n"
+        "    static task tk(output int o); T v; o = $bits(v); endtask\n"
+        "  endclass\n"
+        "endpackage\n");
+    text.append(place.open);
+    text.append(
+        "class X #(type T = int);\n"
+        "  static int s;\n"
+        "  static task tk(output int o); T v; o = $bits(v); s = 4; endtask\n"
+        "  static task tw(output int o); T v; #1 o = $bits(v); endtask\n"
+        "endclass\n"
+        "class Y #(type U = int) extends X #(U); endclass\n"
+        "class Z #(int W = 1);\n"
+        "  static task tk(output int o); o = W; endtask\n"
+        "endclass\n"
+        "logic [6:0] n;\n");
+    text.append(place.run_open);
+    text.append(
+        "  int a, b, c, d, e, g, h;\n"
+        "  X#(byte)::tk(a);\n"
+        "  Z#(3)::tk(b);\n"
+        "  Z#(.W(3))::tk(c);\n"
+        "  pk::X#(byte)::tk(d);\n"
+        "  Y#(shortint)::tk(e);\n"
+        "  X#(byte)::tw(g);\n"
+        "  X#(type(n))::tk(h);\n"
+        "  $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d %0d\", a, b, c, d, "
+        "e,\n"
+        "           g, h, X#(byte)::s, X#(shortint)::s, X#(int)::s);\n");
+    text.append(place.run_close).append(place.close);
+    SCOPED_TRACE(text);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(text, f), "8 3 3 8 16 8 7 4 4 0\n");
+  }
 }
 
 }  // namespace

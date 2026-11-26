@@ -38,13 +38,15 @@ static bool ResolveStaticTaskByScope(const Expr* expr, SimContext& ctx,
       access->lhs->elements.empty()
           ? ctx.FindClassType(ScopedClassKey(access->lhs, arena))
           : ScopeNamedSpecialization(access->lhs, ctx, arena);
-  if (cls == nullptr) return false;
-  auto it = cls->methods.find(std::string(access->rhs->text));
-  if (it == cls->methods.end()) return false;
-  call.obj = nullptr;
-  call.method = it->second;
-  call.owner = cls;
-  return true;
+  for (; cls != nullptr; cls = cls->parent) {
+    auto it = cls->methods.find(std::string(access->rhs->text));
+    if (it == cls->methods.end()) continue;
+    call.obj = nullptr;
+    call.method = it->second;
+    call.owner = cls;
+    return true;
+  }
+  return false;
 }
 
 static bool IsPackageQualifiedName(const Expr* expr) {
