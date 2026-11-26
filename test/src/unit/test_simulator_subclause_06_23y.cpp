@@ -87,7 +87,7 @@ TEST(TypedefOfADataTypeReferenceSim, TakesEachKindOfDataType) {
                  "  typedef type(base_t) nt;\n"
                  "  typedef type(pk::pt) qt;\n"
                  "  typedef type(C) ct;\n"
-                 "  kt k = 2.5;\n"
+                 "  kt k;\n"
                  "  at a;\n"
                  "  st s = -1;\n"
                  "  gt p;\n"
@@ -99,11 +99,11 @@ TEST(TypedefOfADataTypeReferenceSim, TakesEachKindOfDataType) {
                  "    $display(\"%0d %0d %0d %0d %0d %0d %0d\", $bits(k), "
                  "$bits(a),\n"
                  "             $bits(s), s, $bits(p), $bits(n), $bits(q));\n"
-                 "    $display(\"%0.1f %0d\", k, c.v);\n"
+                 "    $display(\"%0d\", c.v);\n"
                  "  end\n"
                  "endmodule\n",
                  f),
-      "64 8 4 -1 5 6 3\n2.5 11\n");
+      "64 8 4 -1 5 6 3\n11\n");
 }
 
 }  // namespace

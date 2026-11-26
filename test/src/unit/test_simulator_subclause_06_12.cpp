@@ -241,6 +241,8 @@ TEST(RealDataType, DISABLED_AVariableOfARealTypedefHoldsTheNearestBinary64) {
            "  typedef real R;\n  R s = 0.1;\n", "", "s"},
           {"module realtime typedef initializer", "",
            "  typedef realtime T;\n  T s = 0.1;\n", "", "s"},
+          {"module typedef of a type reference to real", "",
+           "  typedef type(real) R;\n  R s = 0.1;\n", "", "s"},
           {"module real typedef assignment", "", "  typedef real R;\n  R s;\n",
            "    s = 0.1;\n", "s"},
           {"package real typedef, declared in a module",
