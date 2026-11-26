@@ -11,6 +11,7 @@
 #include "parser/ast_type.h"
 #include "parser/parser.h"
 #include "parser/parser_data_decl_internal.h"
+#include "parser/parser_token_skips.h"
 #include "parser/parser_type_name_scope.h"
 
 namespace delta {
@@ -208,13 +209,41 @@ bool Parser::TryInterfacePortTypedef(ModuleItem* item) {
   return true;
 }
 
+static bool StartsADataTypeOnly(TokenKind kind) {
+  return IsDataTypeKeyword(kind) || kind == TokenKind::kKwStruct ||
+         kind == TokenKind::kKwUnion || kind == TokenKind::kKwEnum;
+}
+
+bool ParserDataDeclHelpers::ReadTypeReferenceToADataType(Parser& p,
+                                                         DataType& dtype) {
+  if (!AtTypeReference(p)) return false;
+  auto saved = p.lexer_.SavePos();
+  p.Consume();
+  p.Consume();
+  const Token kOperand = p.CurrentToken();
+  const bool kNamesAType = kOperand.kind == TokenKind::kIdentifier &&
+                           p.known_types_.count(kOperand.text) != 0;
+  if (kNamesAType || StartsADataTypeOnly(kOperand.kind)) {
+    DataType referenced;
+    if (!p.TryParseInlineAggregateType(referenced))
+      referenced = p.ParseDataType();
+    if (referenced.scope_name.empty() && p.Match(TokenKind::kRParen)) {
+      dtype = referenced;
+      return true;
+    }
+  }
+  p.lexer_.RestorePos(saved);
+  return false;
+}
+
 DataType ParserDataDeclHelpers::ReadDeclaredTypeOfAName(Parser& p) {
   if (p.Check(TokenKind::kKwEnum)) return p.ParseEnumType();
   DataType dtype;
   if (p.Check(TokenKind::kKwStruct) || p.Check(TokenKind::kKwUnion)) {
     dtype = p.ParseStructOrUnionType();
     p.ParsePackedDims(dtype);
-  } else if (!ReadTypeReference(p, dtype)) {
+  } else if (!ReadTypeReferenceToADataType(p, dtype) &&
+             !ReadTypeReference(p, dtype)) {
     dtype = p.ParseDeclaredDataType();
   }
   return dtype;

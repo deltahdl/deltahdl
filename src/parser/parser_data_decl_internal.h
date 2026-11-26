@@ -38,6 +38,8 @@ struct ParserDataDeclHelpers {
 
   static bool ReadTypeReference(Parser& p, DataType& dtype);
 
+  static bool ReadTypeReferenceToADataType(Parser& p, DataType& dtype);
+
   static bool AtTypeReference(Parser& p);
 
   static bool ReadKeyedTypeReference(Parser& p, DataType& dtype, bool has_var,
