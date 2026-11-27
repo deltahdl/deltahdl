@@ -189,4 +189,89 @@ TEST(ClassMethodTypeRefSim, ClassOfAnInstanceJudgesItsOwnTypeParameter) {
   }
 }
 
+enum class Holds { kAlways, kNever, kWhenUIsInt, kWhenNIs8 };
+
+struct SpecializedCompare {
+  const char* left;
+  const char* right;
+  Holds holds;
+};
+
+struct Actuals {
+  const char* handle;
+  bool u_is_int;
+  bool n_is_8;
+};
+
+constexpr std::array kActuals = {
+    Actuals{"K #()", true, true},
+    Actuals{"K #(byte, 4)", false, false},
+    Actuals{"K #(int, 4)", true, false},
+    Actuals{"K #(byte, 8)", false, true},
+};
+
+bool HoldsFor(Holds holds, const Actuals& actuals) {
+  return holds == Holds::kAlways ||
+         (holds == Holds::kWhenUIsInt && actuals.u_is_int) ||
+         (holds == Holds::kWhenNIs8 && actuals.n_is_8);
+}
+
+template <size_t kCount>
+void ExpectEachSpecializationJudges(
+    std::string_view members, std::string_view locals,
+    const std::array<SpecializedCompare, kCount>& compares) {
+  std::string checks;
+  for (size_t k = 0; k < kCount; ++k) {
+    const SpecializedCompare& c = compares[k];
+    checks += std::format(
+        "      if (type({0}) == type({1})) r[{2}] = 1'b1;\n"
+        "      if (type({0}) != type({1})) r[{3}] = 1'b1;\n",
+        c.left, c.right, 2 * (kCount - k) - 1, 2 * (kCount - k) - 2);
+  }
+  const std::string kClass = std::format(
+      "  class K #(type U = int, int N = 8);\n{}"
+      "    function int check();\n      int r = 0;\n{}{}"
+      "      return r;\n    endfunction\n  endclass\n",
+      members, locals, checks);
+  for (const Actuals& actuals : kActuals) {
+    SCOPED_TRACE(actuals.handle);
+    uint64_t expected = 0;
+    for (const SpecializedCompare& c : compares) {
+      const bool kHolds = HoldsFor(c.holds, actuals);
+      expected = (expected << 2) | (kHolds ? 0b10u : 0b01u);
+    }
+    ExpectEveryPlaceGives(kClass, actuals.handle, expected);
+  }
+}
+
+TEST(ClassMethodTypeRefSim, ParameterizedClassJudgesAMethodsLocals) {
+  constexpr std::array kCompares = {
+      SpecializedCompare{"v", "logic [7:0]", Holds::kAlways},
+      SpecializedCompare{"u", "int", Holds::kWhenUIsInt},
+      SpecializedCompare{"u", "U", Holds::kAlways},
+      SpecializedCompare{"w", "logic [7:0]", Holds::kWhenNIs8},
+      SpecializedCompare{"U", "i", Holds::kWhenUIsInt},
+      SpecializedCompare{"v", "U", Holds::kNever},
+  };
+  ExpectEachSpecializationJudges("",
+                                 "      logic [7:0] v;\n      U u;\n"
+                                 "      logic [N-1:0] w;\n      int i;\n",
+                                 kCompares);
+}
+
+TEST(ClassMethodTypeRefSim, ParameterizedClassJudgesItsTypedefs) {
+  constexpr std::array kCompares = {
+      SpecializedCompare{"ut", "int", Holds::kWhenUIsInt},
+      SpecializedCompare{"ut", "U", Holds::kAlways},
+      SpecializedCompare{"ut2", "int", Holds::kWhenUIsInt},
+      SpecializedCompare{"vt", "logic [7:0]", Holds::kWhenNIs8},
+      SpecializedCompare{"p", "int", Holds::kWhenUIsInt},
+      SpecializedCompare{"ut", "logic [7:0]", Holds::kNever},
+  };
+  ExpectEachSpecializationJudges(
+      "    typedef U ut;\n    typedef ut ut2;\n"
+      "    typedef logic [N-1:0] vt;\n    ut p;\n",
+      "", kCompares);
+}
+
 }  // namespace

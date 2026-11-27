@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,6 +12,7 @@
 #include "elaborator/type_spelled_by.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
@@ -19,6 +21,7 @@
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
+#include "simulator/variable.h"
 
 namespace delta {
 
@@ -150,25 +153,78 @@ static uint32_t HeldWidth(std::string_view name, SimContext& ctx) {
   return held != self->properties.end() ? held->second.width : 0;
 }
 
+static const ClassTypeInfo* RunningParameterizedClass(SimContext& ctx) {
+  const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+  return cls != nullptr && cls->decl != nullptr && !cls->decl->params.empty()
+             ? cls
+             : nullptr;
+}
+
+static const Variable* RunningMethodLocal(std::string_view name,
+                                          SimContext& ctx) {
+  if (RunningParameterizedClass(ctx) == nullptr) return nullptr;
+  const Variable* local = ctx.FindLocalVariable(name);
+  const bool kScalar = ctx.FindArrayInfo(name) == nullptr &&
+                       ctx.FindQueue(name) == nullptr &&
+                       ctx.FindAssocArray(name) == nullptr;
+  return local != nullptr && local->declared_type != nullptr && kScalar
+             ? local
+             : nullptr;
+}
+
+static uint32_t EvaluatedWidth(const DataType& type, SimContext& ctx) {
+  if (type.packed_dim_left == nullptr || type.packed_dim_right == nullptr ||
+      !type.extra_packed_dims.empty())
+    return 0;
+  Arena& arena = ctx.GetArena();
+  const auto kLeft = static_cast<int64_t>(
+      EvalExpr(type.packed_dim_left, ctx, arena).ToUint64());
+  const auto kRight = static_cast<int64_t>(
+      EvalExpr(type.packed_dim_right, ctx, arena).ToUint64());
+  return static_cast<uint32_t>(std::abs(kLeft - kRight) + 1);
+}
+
+static const ModuleItem* RunningClassTypedef(std::string_view name,
+                                             SimContext& ctx) {
+  const ClassTypeInfo* cls = RunningParameterizedClass(ctx);
+  const ModuleItem* item =
+      cls != nullptr ? ClassScopeTypedefItem(cls, name) : nullptr;
+  return item != nullptr && item->unpacked_dims.empty() ? item : nullptr;
+}
+
+static std::optional<RunningOperandType> DeclaredOperandType(
+    const DataType& declared, uint32_t held_width, SimContext& ctx) {
+  if (IsBareTypeName(declared)) {
+    if (const DataType* actual = RunningClassTypeParam(declared.type_name, ctx))
+      return RunningOperandType{*actual, true};
+    if (const ModuleItem* item = RunningClassTypedef(declared.type_name, ctx))
+      return DeclaredOperandType(item->typedef_type,
+                                 EvaluatedWidth(item->typedef_type, ctx), ctx);
+  }
+  return RunningOperandType{declared, true, held_width};
+}
+
 static std::optional<RunningOperandType> PropertyType(const ClassMember& prop,
                                                       SimContext& ctx) {
   if (!prop.unpacked_dims.empty()) return std::nullopt;
-  const DataType* actual =
-      IsBareTypeName(prop.data_type)
-          ? RunningClassTypeParam(prop.data_type.type_name, ctx)
-          : nullptr;
-  if (actual != nullptr) return RunningOperandType{*actual, true};
-  return RunningOperandType{prop.data_type, true, HeldWidth(prop.name, ctx)};
+  return DeclaredOperandType(prop.data_type, HeldWidth(prop.name, ctx), ctx);
 }
 
 static std::optional<RunningOperandType> TypeOfRunningOperand(const Expr* op,
                                                               SimContext& ctx) {
   const std::string_view kName = WrittenName(op);
   if (!kName.empty()) {
+    if (const Variable* local = RunningMethodLocal(kName, ctx))
+      return DeclaredOperandType(*local->declared_type,
+                                 EvaluatedWidth(*local->declared_type, ctx),
+                                 ctx);
     if (const DataType* actual = RunningClassTypeParam(kName, ctx))
       return RunningOperandType{*actual, true};
     if (const ClassMember* prop = RunningClassProperty(kName, ctx))
       return PropertyType(*prop, ctx);
+    if (const ModuleItem* item = RunningClassTypedef(kName, ctx))
+      return DeclaredOperandType(item->typedef_type,
+                                 EvaluatedWidth(item->typedef_type, ctx), ctx);
   }
   if (op->type_value == nullptr) return std::nullopt;
   return RunningOperandType{*op->type_value};
