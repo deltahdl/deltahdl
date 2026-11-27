@@ -146,7 +146,7 @@ TEST(EnumerationTypedefBaseSimulation,
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_LocalTypeNamesOfATypedefBaseEnumerationGiveItsWidth) {
+     LocalTypeNamesOfATypedefBaseEnumerationGiveItsWidth) {
   ExpectOkIn({"function", "task", "block"}, kTypedefBaseDecls,
              kTypedefBaseTypeNamesCheck);
 }

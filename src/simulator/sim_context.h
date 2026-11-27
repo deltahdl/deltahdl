@@ -447,6 +447,9 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<const Stmt*, const Stmt*>& ClassTypedefShapedDecls() {
     return class_typedef_shaped_decls_;
   }
+  std::unordered_map<const Expr*, const ModuleItem*>& BlockTypeNameOperands() {
+    return block_type_name_operands_;
+  }
 
   void SetActiveMonitor(const Expr* call);
   const Expr* ActiveMonitor() const { return active_monitor_; }
@@ -506,6 +509,7 @@ class SimContext : public DeclaredNameTables,
   AssertionSampleStore assertion_samples_;
   std::unordered_map<const Expr*, Expr*> paren_free_calls_;
   std::unordered_map<const Stmt*, const Stmt*> class_typedef_shaped_decls_;
+  std::unordered_map<const Expr*, const ModuleItem*> block_type_name_operands_;
 
   const Expr* active_monitor_ = nullptr;
   std::shared_ptr<Process> monitor_caller_;

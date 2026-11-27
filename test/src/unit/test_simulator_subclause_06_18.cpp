@@ -428,7 +428,7 @@ constexpr std::string_view kLocalPackedArray = "typedef m_t [2:0] t_t;";
 constexpr std::string_view kLocalUnpackedArray = "typedef int t_t [3];";
 constexpr std::string_view kLocalEnum = "typedef enum shortint {A, B} t_t;";
 
-TEST(TypedefSim, DISABLED_LocalStructTypedefNameBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalStructTypedefNameBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalStruct, "t_t"), f),
             SevenLinesOf("12"));
@@ -440,7 +440,7 @@ TEST(TypedefSim, LocalStructTypedefVariableBitsInEveryLocalScope) {
             SevenLinesOf("12"));
 }
 
-TEST(TypedefSim, DISABLED_LocalSoftUnionTypedefNameBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalSoftUnionTypedefNameBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalSoftUnion, "t_t"), f),
             SevenLinesOf("8"));
@@ -452,7 +452,7 @@ TEST(TypedefSim, LocalSoftUnionTypedefVariableBitsInEveryLocalScope) {
             SevenLinesOf("8"));
 }
 
-TEST(TypedefSim, DISABLED_LocalVectorTypedefNameBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalVectorTypedefNameBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalVector, "t_t"), f),
             SevenLinesOf("6"));
@@ -464,7 +464,7 @@ TEST(TypedefSim, LocalVectorTypedefVariableBitsInEveryLocalScope) {
             SevenLinesOf("6"));
 }
 
-TEST(TypedefSim, DISABLED_LocalPackedArrayTypedefNameBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalPackedArrayTypedefNameBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalPackedArray, "t_t"), f),
             SevenLinesOf("12"));
@@ -476,20 +476,19 @@ TEST(TypedefSim, LocalPackedArrayTypedefVariableBitsInEveryLocalScope) {
             SevenLinesOf("12"));
 }
 
-TEST(TypedefSim, DISABLED_LocalUnpackedArrayTypedefNameBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalUnpackedArrayTypedefNameBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalUnpackedArray, "t_t"), f),
             SevenLinesOf("96"));
 }
 
-TEST(TypedefSim,
-     DISABLED_LocalUnpackedArrayTypedefVariableBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalUnpackedArrayTypedefVariableBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalUnpackedArray, "v"), f),
             SevenLinesOf("96"));
 }
 
-TEST(TypedefSim, DISABLED_LocalEnumTypedefNameBitsInEveryLocalScope) {
+TEST(TypedefSim, LocalEnumTypedefNameBitsInEveryLocalScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BitsInEveryLocalScope(kLocalEnum, "t_t"), f),
             SevenLinesOf("16"));
@@ -501,7 +500,7 @@ TEST(TypedefSim, LocalEnumTypedefVariableBitsInEveryLocalScope) {
             SevenLinesOf("16"));
 }
 
-TEST(TypedefSim, DISABLED_LocalTypedefHidesTheModuleTypedefOfItsName) {
+TEST(TypedefSim, LocalTypedefHidesTheModuleTypedefOfItsName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
                        "  typedef logic [9:0] s_t;\n"

@@ -303,10 +303,11 @@ static void CollectBlockEnumMemberNames(
   ForEachEnumTypeOfItem(s->decl_item, collect);
 }
 
-static void CollectBlockLetName(const Stmt* s,
-                                std::unordered_set<std::string_view>& names) {
+static void CollectBlockLetOrTypedefName(
+    const Stmt* s, std::unordered_set<std::string_view>& names) {
   if (s->kind == StmtKind::kBlockItemDecl &&
-      s->decl_item->kind == ModuleItemKind::kLetDecl)
+      (s->decl_item->kind == ModuleItemKind::kLetDecl ||
+       s->decl_item->kind == ModuleItemKind::kTypedef))
     names.insert(s->decl_item->name);
 }
 
@@ -325,7 +326,7 @@ static void CollectLocalNames(const Stmt* s,
     names.insert(s->var_name);
   }
   if (with_lets_and_enum_members) {
-    CollectBlockLetName(s, names);
+    CollectBlockLetOrTypedefName(s, names);
     CollectBlockEnumMemberNames(s, names);
   }
   for (auto v : s->foreach_vars) names.insert(v);

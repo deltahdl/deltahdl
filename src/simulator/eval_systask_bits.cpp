@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/eval_array_class_assoc.h"
@@ -108,6 +109,11 @@ Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (arg->type_value != nullptr) {
     return MakeLogic4VecVal(arena, 32,
                             DeclaredTypeWidth(*arg->type_value, ctx));
+  }
+  const auto& local_types = ctx.BlockTypeNameOperands();
+  if (auto local = local_types.find(arg); local != local_types.end()) {
+    return MakeLogic4VecVal(arena, 32,
+                            TypedefItemBits(*local->second, ctx, arena));
   }
   if (uint64_t bits = FixedArrayBits(arg, ctx, arena); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);

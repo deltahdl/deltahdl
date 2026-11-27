@@ -55,6 +55,7 @@ const ModuleItem* BlockTypeParamOf(const Stmt* s) {
 struct BlockTypeName {
   std::string_view key;
   const DataType* type = nullptr;
+  const std::vector<Expr*>* unpacked_dims = nullptr;
 };
 
 using BlockTypeNames = std::unordered_map<std::string_view, BlockTypeName>;
@@ -171,7 +172,40 @@ struct BlockEnumWalk {
     if (it == aliases.end()) return;
     auto* shaped = arena.Create<Stmt>(*s);
     shaped->var_decl_type = TypeThroughName(type, it->second);
+    if (it->second.unpacked_dims != nullptr) {
+      shaped->var_unpacked_dims.insert(shaped->var_unpacked_dims.end(),
+                                       it->second.unpacked_dims->begin(),
+                                       it->second.unpacked_dims->end());
+    }
     ctx.ClassTypedefShapedDecls()[s] = shaped;
+  }
+
+  void RecordTypeNameOperand(const Expr* e, const BlockTypeNames& aliases) {
+    const Expr* operand = e->kind == ExprKind::kSystemCall &&
+                                  e->callee == "$bits" && !e->args.empty()
+                              ? e->args[0]
+                              : nullptr;
+    if (operand == nullptr || operand->kind != ExprKind::kIdentifier ||
+        !operand->scope_prefix.empty()) {
+      return;
+    }
+    auto it = aliases.find(operand->text);
+    if (it == aliases.end()) return;
+    DataType use;
+    use.kind = DataTypeKind::kNamed;
+    use.type_name = operand->text;
+    auto* item = arena.Create<ModuleItem>();
+    item->kind = ModuleItemKind::kTypedef;
+    item->name = operand->text;
+    item->typedef_type = TypeThroughName(use, it->second);
+    if (it->second.unpacked_dims != nullptr)
+      item->unpacked_dims = *it->second.unpacked_dims;
+    ctx.BlockTypeNameOperands()[operand] = item;
+  }
+
+  void RecordTypeNameOperands(const Stmt* s, const BlockTypeNames& aliases) {
+    auto record = [&](const Expr* e) { RecordTypeNameOperand(e, aliases); };
+    ForEachChildExpr(s, [&](const Expr* e) { ForEachExprUnder(e, record); });
   }
 
   template <typename List>
@@ -181,8 +215,9 @@ struct BlockEnumWalk {
         aliases.erase(td->name);
         RegisterTypedef(td, aliases);
         RegisterAggregateTypedef(td, aliases);
-        if (!aliases.contains(td->name) && td->unpacked_dims.empty())
-          RegisterPlainType(td, aliases);
+        if (!aliases.contains(td->name)) RegisterPlainType(td, aliases);
+        if (!td->unpacked_dims.empty())
+          aliases[td->name].unpacked_dims = &td->unpacked_dims;
         continue;
       }
       if (const ModuleItem* param = BlockTypeParamOf(s)) {
@@ -190,11 +225,13 @@ struct BlockEnumWalk {
         continue;
       }
       Walk(s, aliases);
+      if (s->kind == StmtKind::kVarDecl) aliases.erase(s->var_name);
     }
   }
 
   void Walk(const Stmt* s, const BlockTypeNames& aliases) {
     if (s == nullptr) return;
+    RecordTypeNameOperands(s, aliases);
     if (s->kind == StmtKind::kVarDecl &&
         s->var_decl_type.kind == DataTypeKind::kEnum) {
       RegisterInlineEnum(s);

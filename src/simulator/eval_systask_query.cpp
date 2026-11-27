@@ -474,6 +474,16 @@ static int64_t FixedDimCount(const Expr* dim, SimContext& ctx, Arena& arena) {
   return (left > right ? left - right : right - left) + 1;
 }
 
+static uint64_t UnpackedDimsTimes(uint64_t bits, const std::vector<Expr*>& dims,
+                                  SimContext& ctx, Arena& arena) {
+  for (const Expr* dim : dims) {
+    int64_t count = FixedDimCount(dim, ctx, arena);
+    if (count <= 0) return 0;
+    bits *= static_cast<uint64_t>(count);
+  }
+  return bits;
+}
+
 uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
                      int depth) {
   if (uint32_t bits = IntegralKeywordBits(name); bits > 0) return bits;
@@ -487,12 +497,13 @@ uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
   uint64_t bits = elem.kind == DataTypeKind::kNamed && elem.scope_name.empty()
                       ? TypedefBits(elem.type_name, ctx, arena, depth + 1)
                       : DeclaredTypeWidth(elem, ctx);
-  for (const Expr* dim : item->unpacked_dims) {
-    int64_t count = FixedDimCount(dim, ctx, arena);
-    if (count <= 0) return 0;
-    bits *= static_cast<uint64_t>(count);
-  }
-  return bits;
+  return UnpackedDimsTimes(bits, item->unpacked_dims, ctx, arena);
+}
+
+uint64_t TypedefItemBits(const ModuleItem& item, SimContext& ctx,
+                         Arena& arena) {
+  return UnpackedDimsTimes(DeclaredTypeWidth(item.typedef_type, ctx),
+                           item.unpacked_dims, ctx, arena);
 }
 
 }  // namespace delta
