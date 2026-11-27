@@ -491,13 +491,16 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
       expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
   if (!is_eq && !is_neq) return false;
   if (!IsTypeRef(expr->lhs) || !IsTypeRef(expr->rhs)) return false;
+  if (std::optional<bool> same =
+          RunningClassTypeRefsMatch(expr->lhs, expr->rhs, ctx)) {
+    out = MakeLogic4VecVal(arena, 1, *same == is_eq ? 1 : 0);
+    return true;
+  }
   if (std::optional<bool> holds = ctx.TypeRefCompareHere(expr)) {
     out = MakeLogic4VecVal(arena, 1, *holds ? 1 : 0);
     return true;
   }
-  std::optional<bool> same =
-      RunningClassTypeRefsMatch(expr->lhs, expr->rhs, ctx);
-  if (!same) same = SpelledTypeRefsMatch(expr->lhs, expr->rhs, ctx);
+  std::optional<bool> same = SpelledTypeRefsMatch(expr->lhs, expr->rhs, ctx);
   if (!same) return false;
   out = MakeLogic4VecVal(arena, 1, *same == is_eq ? 1 : 0);
   return true;
