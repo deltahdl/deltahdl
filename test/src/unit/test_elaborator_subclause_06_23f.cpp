@@ -5,7 +5,9 @@
 #include <string>
 #include <string_view>
 
+#include "fixture_elaborator.h"
 #include "helpers_declaration_places.h"
+#include "helpers_reported_error.h"
 
 using namespace delta;
 
