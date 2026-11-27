@@ -124,7 +124,7 @@ std::optional<std::string> PackedBoundsKey(const PackedDims& dims,
     bits *= static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
     key += "[" + std::to_string(l) + ":" + std::to_string(r) + "]";
   }
-  if (bits != width) return std::nullopt;
+  if (width != 0 && bits != width) return std::nullopt;
   return key;
 }
 
@@ -135,12 +135,12 @@ std::string IntegralTypeKey(const DataType& builtin,
   const auto [four_state, predefined] = form;
   std::string key = four_state ? "logic" : "bit";
   if (builtin.is_signed) key += " signed";
+  if (predefined != 0)
+    return key + "[" + std::to_string(predefined - 1) + ":0]";
+  std::optional<std::string> bounds = PackedBoundsKey(dims, width, ctx);
+  if (bounds.has_value() && !bounds->empty()) return key + *bounds;
   if (width == 0) return key;
-  std::optional<std::string> bounds;
-  if (predefined == 0) bounds = PackedBoundsKey(dims, width, ctx);
-  if (!bounds.has_value() || bounds->empty())
-    bounds = "[" + std::to_string(width - 1) + ":0]";
-  return key + *bounds;
+  return key + "[" + std::to_string(width - 1) + ":0]";
 }
 
 std::string ClassKey(ClassTypeInfo* cls, const DataType& type,
