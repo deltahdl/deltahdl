@@ -126,7 +126,7 @@ class Elaborator : public ElaboratorClassRules {
   void ApplyHeaderImports(const ModuleDecl* decl, RtlirModule* mod);
   void ApplyBodyImport(const ImportItem& import_item);
 
-  void ValidateModports();
+  void ValidatePortAndModportDeclarations();
 
   void ValidateSpecifyBlocks();
 

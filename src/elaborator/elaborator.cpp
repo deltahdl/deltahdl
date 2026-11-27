@@ -355,8 +355,6 @@ void Elaborator::RunPreElaborationValidations() {
 
   ValidatePackageExports();
 
-  ValidateModports();
-
   ValidateSpecifyBlocks();
 
   ReportViewportsContainingNothing(*unit_, diag_);
@@ -364,6 +362,8 @@ void Elaborator::RunPreElaborationValidations() {
   ReportTypeParametersSetToNoTypes(*unit_, diag_);
 
   RegisterCuScopeItems();
+
+  ValidatePortAndModportDeclarations();
 
   ValidateProgramWideSpaceAccessInPackageAndCuScopes();
 

@@ -143,8 +143,8 @@ static void ComputePortUnpackedDims(const PortDecl& port, RtlirPort& rp,
 
 static bool RejectIllegalPortType(const PortDecl& port, DiagEngine& diag) {
   if (port.data_type.kind == DataTypeKind::kChandle) {
-    diag.Error(port.loc, "chandle cannot be used as a port type",
-               Subclause("6.14"));
+    diag.ErrorOnce(port.loc, "chandle cannot be used as a port type",
+                   Subclause("6.14"));
     return true;
   }
   if (port.data_type.kind == DataTypeKind::kVirtualInterface) {

@@ -15,6 +15,7 @@
 #include "common/source_loc.h"
 #include "elaborator/assertion_body_slots.h"
 #include "elaborator/assertion_walk.h"
+#include "elaborator/chandle_ports.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_modport_imports.h"
@@ -748,10 +749,14 @@ void ValidateModportsOf(const ModuleDecl* decl, DiagEngine& diag) {
 
 }  // namespace
 
-void Elaborator::ValidateModports() {
+void Elaborator::ValidatePortAndModportDeclarations() {
   for (const auto* decls :
        {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
     for (const auto* decl : *decls) ValidateModportsOf(decl, diag_);
+  }
+  for (const auto* decls : {&unit_->modules, &unit_->interfaces,
+                            &unit_->programs, &unit_->checkers}) {
+    for (const auto* decl : *decls) ReportChandlePorts(*decl, typedefs_, diag_);
   }
 }
 

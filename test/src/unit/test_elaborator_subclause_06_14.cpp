@@ -666,9 +666,8 @@ TEST(ChandleDataType, RefNonAnsiProgramAndArrayPortsOfChandleAreReported) {
                          "input", kPort));
 }
 
-TEST(
-    ChandleDataType,
-    DISABLED_TypedefInterfaceCheckerStructAndModportPortsOfChandleAreReported) {
+TEST(ChandleDataType,
+     TypedefInterfaceCheckerStructAndModportPortsOfChandleAreReported) {
   EXPECT_TRUE(ReportedOn(
       "typedef chandle h_t;\nmodule m(input var h_t ch);\nendmodule\n",
       "h_t ch", kPort));
@@ -684,6 +683,24 @@ TEST(
       ReportedOn("interface i;\n  chandle ch;\n  modport mp(input ch);\n"
                  "endinterface\nmodule t;\nendmodule\n",
                  "modport", kPort));
+  EXPECT_TRUE(
+      ReportedOn("typedef chandle h_t;\ntypedef struct { int i; h_t h; } S;\n"
+                 "module m(input var S s);\nendmodule\n",
+                 "S s", kPort));
+}
+
+TEST(ChandleDataType, PortsOfTypesHoldingNoChandleAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("typedef int i_t;\nmodule m(input var i_t p);\nendmodule\n"));
+  EXPECT_TRUE(ElabOk(
+      "interface i(input int x);\nendinterface\nmodule t;\nendmodule\n"));
+  EXPECT_TRUE(ElabOk("checker c(int x);\nendchecker\nmodule t;\nendmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("typedef int i_t;\ntypedef struct { int a; i_t b; } S;\n"
+             "module m(input var S s);\nendmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("interface i;\n  int x;\n  modport mp(input x);\n"
+             "endinterface\nmodule t;\nendmodule\n"));
 }
 
 TEST(ChandleDataType, ChandleArgumentsOfTasksFunctionsAndMethodsAreAccepted) {
