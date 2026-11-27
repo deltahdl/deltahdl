@@ -2,10 +2,12 @@
 #include <cstdint>
 #include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <unordered_set>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "elaborator/aggregate_shape.h"
@@ -255,8 +257,9 @@ static void CheckEnumDuplicateValues(int64_t start, int64_t count,
 
 static void CheckEnumMemberValueInRange(const EnumMember& member,
                                         const EnumBaseRange& range,
+                                        const ScopeMap& earlier_members,
                                         int64_t& next_val, DiagEngine& diag) {
-  auto v = ConstEvalInt(member.value);
+  auto v = ConstEvalInt(member.value, earlier_members);
   if (!v) return;
   if (EnumValueOutOfRange(*v, range)) {
     diag.Error(member.value->range.start,
@@ -266,6 +269,21 @@ static void CheckEnumMemberValueInRange(const EnumMember& member,
                Subclause("6.19"));
   }
   next_val = *v;
+}
+
+static void BindCheckedMember(const EnumMember& member, int64_t first_value,
+                              ScopeMap& earlier_members, Arena& arena) {
+  if (!member.range_start) {
+    BindDeclaredConstant(earlier_members, member.name, first_value);
+    return;
+  }
+  int64_t value = first_value;
+  for (const std::string& name :
+       EnumMemberDeclaredNames(member, earlier_members)) {
+    BindDeclaredConstant(
+        earlier_members,
+        {arena.AllocString(name.c_str(), name.size()), name.size()}, value++);
+  }
 }
 
 static const std::unordered_set<std::string_view>* NamesToClashAgainst(
@@ -302,6 +320,7 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
       ComputeEnumBaseRange(IsSignedType(dtype, typedefs_), base_width);
   std::unordered_set<std::string_view> seen_names;
   std::unordered_set<int64_t> seen_values;
+  ScopeMap earlier_members;
   int64_t next_val = 0;
   const auto* declared =
       NamesToClashAgainst(enum_member_names_, declares_its_constants);
@@ -320,12 +339,14 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
     } else {
       prev_had_xz = ValidateEnumLiteral(member, base_width, is_2state);
       if (!prev_had_xz) {
-        CheckEnumMemberValueInRange(member, range, next_val, diag_);
+        CheckEnumMemberValueInRange(member, range, earlier_members, next_val,
+                                    diag_);
       }
     }
     int64_t count = ComputeEnumRangeCount(member, loc, diag_);
     if (!prev_had_xz) {
       CheckEnumDuplicateValues(next_val, count, seen_values, loc, diag_);
+      BindCheckedMember(member, next_val, earlier_members, arena_);
     }
     next_val += count;
     if (!prev_had_xz) {

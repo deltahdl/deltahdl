@@ -700,7 +700,7 @@ TEST(EnumerationSimulation, DISABLED_GenvarOperandGivesEachIterationItsValue) {
   EXPECT_EQ(out, "1 2\n2 3\n");
 }
 
-TEST(EnumerationSimulation, DISABLED_EarlierConstantInAProductGivesItsValue) {
+TEST(EnumerationSimulation, EarlierConstantInAProductGivesItsValue) {
   SimFixture f;
   auto out = RunCapture(
       "module m;\n"

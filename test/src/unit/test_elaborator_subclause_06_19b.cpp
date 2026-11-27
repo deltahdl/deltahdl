@@ -133,6 +133,10 @@ constexpr Forbidden kDuplicateValue[] = {
      "enum {A = 1"},
     {"  typedef enum {A = 0, B = 7, C, D = 8} e_t;\n",
      "duplicate enum member value 8", "typedef enum"},
+    {"  enum {A = 1, B = A} v;\n", "duplicate enum member value 1",
+     "enum {A = 1, B = A}"},
+    {"  typedef enum {R[2] = 3, S = R1 - 1} e_t;\n",
+     "duplicate enum member value 3", "typedef enum"},
 };
 
 TEST(EnumerationElaboration, DuplicateValueIsReportedInADesignElement) {
@@ -160,8 +164,11 @@ TEST(EnumerationElaboration,
 }
 
 TEST(EnumerationElaboration, DistinctNamesAndValuesAreCleanEverywhere) {
-  ExpectEachCleanIn(kEveryPlace, {"  enum {A = 0, B = 7, C, D = 9} v;\n",
-                                  "  typedef enum {E, F = 7, G} e_t;\n"});
+  ExpectEachCleanIn(kEveryPlace,
+                    {"  enum {A = 0, B = 7, C, D = 9} v;\n",
+                     "  typedef enum {E, F = 7, G} e_t;\n",
+                     "  enum {A = 1, B = A + 1, C = B * 2} v;\n",
+                     "  typedef enum {R[2] = 3, S = R1 + 1} e_t;\n"});
 }
 
 constexpr Forbidden kNameOfAnotherEnumeration[] = {
@@ -204,6 +211,10 @@ constexpr Forbidden kValueOutsideTheBase[] = {
      "enum literal width 3 does not match base type width 4", "enum bit [3:0]"},
     {"  enum bit [3:0] {A = 5'h13} v;\n",
      "enum literal width 5 does not match base type width 4", "enum bit [3:0]"},
+    {"  enum bit [1:0] {A = 3, B = A + 1} v;\n",
+     "enum member 'B' value 4 is outside the representable range of the base "
+     "type",
+     "enum bit [1:0]"},
 };
 
 TEST(EnumerationElaboration, ValueOutsideTheBaseIsReportedInADesignElement) {
@@ -219,7 +230,8 @@ TEST(EnumerationElaboration, ValueTheBaseHoldsIsCleanEverywhere) {
   ExpectEachCleanIn(kEveryPlace,
                     {"  enum bit signed [3:0] {A = -8, B = 7} v;\n",
                      "  enum bit [3:0] {A = 'hF, B = 0} v;\n",
-                     "  enum bit [3:0] {A = 4'h3, B, C = 4'h5} v;\n"});
+                     "  enum bit [3:0] {A = 4'h3, B, C = 4'h5} v;\n",
+                     "  enum bit [1:0] {A = 1, B = A + 2} v;\n"});
 }
 
 TEST(EnumerationElaboration,

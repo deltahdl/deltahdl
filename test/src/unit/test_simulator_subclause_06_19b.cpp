@@ -369,4 +369,13 @@ TEST(EnumerationParameterSimulation,
       RunAndGet(std::string(kFourStateConstantParameters), "two_state_ok"), 1u);
 }
 
+TEST(EnumerationEarlierConstantSimulation,
+     EarlierConstantsGiveTheirValuesInEveryPlace) {
+  ExpectOkIn(kEveryPlace,
+             "  enum {A = 2, B = A * 3, C, D = C - B} e;\n"
+             "  typedef enum {R[2] = 5, S = R1 * 2, T = S + R0} r_t;\n",
+             "A == 2 && B == 6 && C == 7 && D == 1 && R0 == 5 && R1 == 6 && "
+             "S == 12 && T == 17");
+}
+
 }  // namespace

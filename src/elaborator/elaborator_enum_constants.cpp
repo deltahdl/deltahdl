@@ -177,15 +177,23 @@ const DataType* EnumDeclaringConstantOfClass(const ClassDecl& cls,
 std::vector<RtlirEnumMember> FoldEnumMembers(
     const std::vector<EnumMember>& decl_members, const ScopeMap& scope,
     Arena& arena) {
-  EnumMemberFolder folder{scope, arena};
+  ScopeMap with_earlier_members = scope;
+  EnumMemberFolder folder{with_earlier_members, arena};
   for (const auto& member : decl_members) {
     if (member.value) {
-      folder.next_val =
-          ConstEvalInt(member.value, scope).value_or(folder.next_val);
+      folder.next_val = ConstEvalInt(member.value, with_earlier_members)
+                            .value_or(folder.next_val);
     }
+    const size_t kFirstEmitted = folder.members.size();
     folder.EmitDeclared(member);
-    if (ExprContainsXZ(member.value) && !member.range_start)
+    if (ExprContainsXZ(member.value) && !member.range_start) {
       folder.members.back().xz_value = member.value;
+      continue;
+    }
+    for (size_t i = kFirstEmitted; i < folder.members.size(); ++i) {
+      BindDeclaredConstant(with_earlier_members, folder.members[i].name,
+                           folder.members[i].value);
+    }
   }
   return std::move(folder.members);
 }
