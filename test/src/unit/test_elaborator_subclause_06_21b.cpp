@@ -468,8 +468,7 @@ void ExpectReportedOnEachLine(const std::string& src, std::string_view message,
   EXPECT_EQ(f.diag.ErrorCount(), needles.size());
 }
 
-TEST(DynamicElementLifetime,
-     DISABLED_ContinuousWriteOfADynamicArrayElementReported) {
+TEST(DynamicElementLifetime, ContinuousWriteOfADynamicArrayElementReported) {
   ExpectReportedOnEachLine(
       "module top;\n"
       "  int d[];\n"
@@ -486,7 +485,7 @@ TEST(DynamicElementLifetime,
 }
 
 TEST(DynamicElementLifetime,
-     DISABLED_ContinuousWriteOfAPartOrMemberOfADynamicElementReported) {
+     ContinuousWriteOfAPartOrMemberOfADynamicElementReported) {
   ExpectReportedOnEachLine(
       "module top;\n"
       "  typedef struct {int f;} s_t;\n"
@@ -500,23 +499,30 @@ TEST(DynamicElementLifetime,
       kContinuousDynamicWrite, {"d[0][3:0]", "s[0].f", "{d[1], y}"});
 }
 
-TEST(DynamicElementLifetime,
-     DISABLED_GateAndPortOutputOnADynamicElementReported) {
+TEST(DynamicElementLifetime, GateAndPortOutputOnADynamicElementReported) {
   ExpectReportedOnEachLine(
+      "primitive u(output o, input i);\n"
+      "  table\n"
+      "    0 : 0;\n"
+      "    1 : 1;\n"
+      "  endtable\n"
+      "endprimitive\n"
       "module child(input var int i, output int o);\n"
       "endmodule\n"
       "module top;\n"
       "  int d[];\n"
+      "  logic ld[];\n"
       "  int x;\n"
       "  logic l;\n"
       "  buf (d[0], l);\n"
       "  child c(.i(x), .o(d[1]));\n"
+      "  u ui(ld[0], l);\n"
       "endmodule\n",
-      kContinuousDynamicWrite, {"buf (d[0]", ".o(d[1])"});
+      kContinuousDynamicWrite, {"buf (d[0]", ".o(d[1])", "ui(ld[0]"});
 }
 
 TEST(DynamicElementLifetime,
-     DISABLED_ContinuousWriteOfADynamicElementReportedInEveryScope) {
+     ContinuousWriteOfADynamicElementReportedInEveryScope) {
   ExpectReportedOnEachLine(
       "interface ifc;\n"
       "  int d[];\n"
@@ -560,8 +566,7 @@ TEST(DynamicElementLifetime, FixedArrayElementContinuousWritesAccepted) {
              "endmodule\n"));
 }
 
-TEST(DynamicElementLifetime,
-     DISABLED_DynamicElementReadOutsideAProcedureReported) {
+TEST(DynamicElementLifetime, DynamicElementReadOutsideAProcedureReported) {
   ExpectReportedOnEachLine(
       "module top;\n"
       "  int d[];\n"
@@ -571,12 +576,13 @@ TEST(DynamicElementLifetime,
       "  assign w1 = d[0];\n"
       "  assign w2 = q[$];\n"
       "  assign w3 = a[\"k\"];\n"
+      "  wire [31:0] w4 = d[1] + 1;\n"
       "endmodule\n",
-      kDynamicReadOutsideAProcedure, {"= d[0]", "= q[$]", "= a[\"k\"]"});
+      kDynamicReadOutsideAProcedure,
+      {"= d[0]", "= q[$]", "= a[\"k\"]", "= d[1]"});
 }
 
-TEST(DynamicElementLifetime,
-     DISABLED_DynamicElementAsAGateInputPortOrDelayReported) {
+TEST(DynamicElementLifetime, DynamicElementAsAGateInputPortOrDelayReported) {
   ExpectReportedOnEachLine(
       "module child(input var int i, output int o);\n"
       "endmodule\n"
@@ -592,8 +598,7 @@ TEST(DynamicElementLifetime,
       kDynamicReadOutsideAProcedure, {"buf (o", ".i(e[0])", "#(e[1])"});
 }
 
-TEST(DynamicElementLifetime,
-     DISABLED_ClassMemberReadOutsideAProcedureReported) {
+TEST(DynamicElementLifetime, ClassMemberReadOutsideAProcedureReported) {
   ElabFixture f;
   std::string src =
       "class K;\n"
@@ -609,6 +614,31 @@ TEST(DynamicElementLifetime,
       f.diag.Diagnostics(),
       "member of a class object referenced outside a procedural block",
       LineHolding(src, "h.v"), "6.21"));
+}
+
+TEST(DynamicElementLifetime,
+     FixedElementAndStaticMemberReadsOutsideAProcedureAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class K;\n"
+             "  static int s;\n"
+             "endclass\n"
+             "module child(input var int i, output int o);\n"
+             "endmodule\n"
+             "module top;\n"
+             "  typedef struct {int f;} s_t;\n"
+             "  int f[2];\n"
+             "  logic g[2];\n"
+             "  s_t st;\n"
+             "  int w1, w2, w3, w5, x, o1;\n"
+             "  logic o;\n"
+             "  assign w1 = f[0];\n"
+             "  assign w2 = st.f;\n"
+             "  assign w3 = K::s;\n"
+             "  wire [31:0] w4 = f[1] + 1;\n"
+             "  buf (o, g[0]);\n"
+             "  child c(.i(f[1]), .o(o1));\n"
+             "  assign #(f[0]) w5 = x;\n"
+             "endmodule\n"));
 }
 
 TEST(DynamicElementLifetime, DynamicReadsInProceduresAccepted) {

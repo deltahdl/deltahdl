@@ -564,6 +564,7 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
+  void ValidateDynamicElementsOutsideProcedures(const ModuleDecl* decl);
   void AdoptProceduralTypedefDims(const ModuleDecl* decl);
   void AdoptTypedefDimsInStmt(Stmt* s);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);

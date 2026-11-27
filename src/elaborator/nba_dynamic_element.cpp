@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <optional>
 #include <string_view>
@@ -5,6 +6,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "elaborator/design_name_lookup.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/net_data_type.h"
@@ -23,6 +25,7 @@ struct PathShape {
   const std::vector<Expr*>* dims = nullptr;
   size_t next_dim = 0;
   bool dynamic_element = false;
+  bool class_member = false;
 };
 
 using ShapeMap = std::unordered_map<std::string_view, PathShape>;
@@ -34,12 +37,36 @@ const ClassMember* FindClassProperty(const ClassDecl* cls,
   return nullptr;
 }
 
+const PortDecl* PortConnectedAt(const ModuleDecl& child, std::string_view name,
+                                size_t position) {
+  if (name.empty()) {
+    return position < child.ports.size() ? &child.ports[position] : nullptr;
+  }
+  auto it = std::ranges::find(child.ports, name, &PortDecl::name);
+  return it == child.ports.end() ? nullptr : &*it;
+}
+
 class NbaDynamicElementWalk {
  public:
   NbaDynamicElementWalk(const NbaDynamicTables& tables,
                         const ShapeMap& module_vars, const ClassDecl* cls,
                         DiagEngine& diag)
       : tables_(tables), module_vars_(module_vars), cls_(cls), diag_(diag) {}
+
+  void CheckItemOutsideProcedures(const ModuleItem* item) const {
+    if (item->kind == ModuleItemKind::kContAssign) {
+      ReportWrite(item->assign_lhs);
+      ReportReads(item->assign_rhs);
+      ReportReads(item->assign_delay);
+    } else if (item->kind == ModuleItemKind::kNetDecl) {
+      ReportReads(item->init_expr);
+    } else if (item->kind == ModuleItemKind::kGateInst ||
+               item->kind == ModuleItemKind::kUdpInst) {
+      CheckTerminals(item);
+    } else if (item->kind == ModuleItemKind::kModuleInst) {
+      CheckPortConnections(*item);
+    }
+  }
 
   void CheckBody(const std::vector<FunctionArg>& formals,
                  const std::vector<Stmt*>& body) {
@@ -88,7 +115,9 @@ class NbaDynamicElementWalk {
     if (const ClassDecl* cls = FindClassDecl(type->type_name, tables_.unit)) {
       const ClassMember* prop = FindClassProperty(cls, member);
       if (prop == nullptr) return std::nullopt;
-      return ShapeOf(&prop->data_type, &prop->unpacked_dims);
+      PathShape shape = ShapeOf(&prop->data_type, &prop->unpacked_dims);
+      shape.class_member = !prop->is_static;
+      return shape;
     }
     std::vector<std::string_view> names;
     const DataType* agg = FollowTypedefs(*type, tables_.shape.typedefs, names);
@@ -133,10 +162,63 @@ class NbaDynamicElementWalk {
     return shape && shape->dynamic_element;
   }
 
+  void CheckTerminals(const ModuleItem* item) const {
+    const std::vector<size_t> kDriven = PrimitiveDrivenTerminalIndices(item);
+    for (size_t i = 0; i < item->gate_terminals.size(); ++i) {
+      if (std::ranges::find(kDriven, i) != kDriven.end()) {
+        ReportWrite(item->gate_terminals[i]);
+      } else {
+        ReportReads(item->gate_terminals[i]);
+      }
+    }
+  }
+
+  void CheckPortConnections(const ModuleItem& item) const {
+    const ModuleDecl* child = FindDefinition(tables_.unit, item.inst_module);
+    if (child == nullptr) return;
+    for (size_t i = 0; i < item.inst_ports.size(); ++i) {
+      const auto& [name, actual] = item.inst_ports[i];
+      const PortDecl* port = PortConnectedAt(*child, name, i);
+      if (port == nullptr) continue;
+      if (port->direction == Direction::kInput) {
+        ReportReads(actual);
+      } else if (port->direction == Direction::kOutput ||
+                 port->direction == Direction::kInout) {
+        ReportWrite(actual);
+      }
+    }
+  }
+
+  void ReportWrite(const Expr* target) const {
+    if (target == nullptr || !WritesDynamicElement(target, no_locals_)) return;
+    diag_.Error(target->range.start,
+                "continuous assignment to element of dynamically sized array",
+                Subclause("6.21"));
+  }
+
+  void ReportReads(const Expr* e) const {
+    if (e == nullptr) return;
+    if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
+      std::optional<PathShape> shape = Resolve(e, no_locals_);
+      if (shape && (shape->dynamic_element || shape->class_member)) {
+        diag_.ErrorOnce(e->range.start,
+                        shape->dynamic_element
+                            ? "element of dynamically sized array referenced "
+                              "outside a procedural block"
+                            : "member of a class object referenced outside a "
+                              "procedural block",
+                        Subclause("6.21"));
+        return;
+      }
+    }
+    ForEachExprChild(e, [this](const Expr* child) { ReportReads(child); });
+  }
+
   const NbaDynamicTables& tables_;
   const ShapeMap& module_vars_;
   const ClassDecl* cls_;
   DiagEngine& diag_;
+  const BodyDeclScopes no_locals_{false};
 };
 
 void CheckItemBodies(const ModuleItem* item, NbaDynamicElementWalk& walk) {
@@ -144,10 +226,7 @@ void CheckItemBodies(const ModuleItem* item, NbaDynamicElementWalk& walk) {
   walk.CheckBody(item->func_args, item->func_body_stmts);
 }
 
-}  // namespace
-
-void CheckNbaDynamicElements(const ModuleDecl* decl,
-                             const NbaDynamicTables& tables, DiagEngine& diag) {
+ShapeMap ModuleVariableShapes(const ModuleDecl* decl) {
   ShapeMap module_vars;
   for (const ModuleItem* top : decl->items) {
     ForEachItemAndGenerateDescendant(top, [&](const ModuleItem* item) {
@@ -156,12 +235,32 @@ void CheckNbaDynamicElements(const ModuleDecl* decl,
                                                 .dims = &item->unpacked_dims});
     });
   }
-  NbaDynamicElementWalk module_walk(tables, module_vars, nullptr, diag);
+  return module_vars;
+}
+
+}  // namespace
+
+void CheckDynamicElementsOutsideProcedures(const ModuleDecl* decl,
+                                           const NbaDynamicTables& tables,
+                                           DiagEngine& diag) {
+  const ShapeMap kModuleVars = ModuleVariableShapes(decl);
+  const NbaDynamicElementWalk kWalk(tables, kModuleVars, nullptr, diag);
+  for (const ModuleItem* top : decl->items) {
+    ForEachItemAndGenerateDescendant(top, [&](const ModuleItem* item) {
+      kWalk.CheckItemOutsideProcedures(item);
+    });
+  }
+}
+
+void CheckNbaDynamicElements(const ModuleDecl* decl,
+                             const NbaDynamicTables& tables, DiagEngine& diag) {
+  const ShapeMap kModuleVars = ModuleVariableShapes(decl);
+  NbaDynamicElementWalk module_walk(tables, kModuleVars, nullptr, diag);
   for (const ModuleItem* top : decl->items) {
     ForEachItemAndGenerateDescendant(top, [&](const ModuleItem* item) {
       CheckItemBodies(item, module_walk);
       if (item->kind != ModuleItemKind::kClassDecl) return;
-      NbaDynamicElementWalk class_walk(tables, module_vars, item->class_decl,
+      NbaDynamicElementWalk class_walk(tables, kModuleVars, item->class_decl,
                                        diag);
       for (const ClassMember* m : item->class_decl->members)
         if (m->method != nullptr) CheckItemBodies(m->method, class_walk);

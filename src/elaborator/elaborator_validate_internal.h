@@ -421,6 +421,9 @@ struct NbaDynamicTables {
 };
 void CheckNbaDynamicElements(const ModuleDecl* decl,
                              const NbaDynamicTables& tables, DiagEngine& diag);
+void CheckDynamicElementsOutsideProcedures(const ModuleDecl* decl,
+                                           const NbaDynamicTables& tables,
+                                           DiagEngine& diag);
 
 void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
                                         DiagEngine& diag);

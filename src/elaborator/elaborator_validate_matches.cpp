@@ -380,6 +380,13 @@ static void CollectItemDynamicNames(
   }
 }
 
+void Elaborator::ValidateDynamicElementsOutsideProcedures(
+    const ModuleDecl* decl) {
+  const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
+  CheckDynamicElementsOutsideProcedures(
+      decl, NbaDynamicTables{kShapeTables, unit_}, diag_);
+}
+
 void Elaborator::ValidateDynamicArrayNba(const ModuleDecl* decl) {
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
   CheckNbaDynamicElements(decl, NbaDynamicTables{kShapeTables, unit_}, diag_);
