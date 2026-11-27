@@ -465,11 +465,19 @@ static std::vector<std::string_view> VisibleTypeParamNames(
   return names;
 }
 
-void Elaborator::BindCheckerActuals(const ModuleDecl* decl, RtlirModule* mod) {
+void Elaborator::TakePendingCheckerActuals(const ModuleDecl* decl,
+                                           RtlirModule* mod) {
   mod->constant_formals = CheckerConstantFormals(
       decl, std::exchange(pending_checker_actuals_, {}), BuildParamScope(mod));
   SetCheckerFreeVariables(decl, mod);
   checker_tree_actuals_[mod] = std::exchange(pending_checker_tree_actuals_, {});
+}
+
+void Elaborator::LeaveModuleRecordingTypeParams(RtlirModule* mod) {
+  RecordTypeParamFacts(*mod, VisibleTypeParamNames(module_path_),
+                       {typedefs_, aggregate_typedef_names_, arena_});
+  module_path_.pop_back();
+  module_decl_path_.pop_back();
 }
 
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
@@ -503,7 +511,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
       std::exchange(pending_generic_port_interfaces_, {}));
   ElaborateParamPortList(decl, params, mod);
   if (decl->decl_kind == ModuleDeclKind::kChecker)
-    BindCheckerActuals(decl, mod);
+    TakePendingCheckerActuals(decl, mod);
 
   const InstanceParamAssignments kBodyAssignments{
       params, RegisteredModuleScope(), RegisteredModule(),
@@ -532,10 +540,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   }
 
   ElaborateItems(decl, mod);
-  RecordTypeParamFacts(*mod, VisibleTypeParamNames(module_path_),
-                       {typedefs_, aggregate_typedef_names_, arena_});
-  module_path_.pop_back();
-  module_decl_path_.pop_back();
+  LeaveModuleRecordingTypeParams(mod);
   generic_port_interfaces_.pop_back();
   ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));
   module_global_clocking_event_ = saved_global_clocking_event;

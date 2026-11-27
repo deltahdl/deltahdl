@@ -149,7 +149,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void ReportUndeclaredTypeName(const ModuleItem* item);
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
-  void BindCheckerActuals(const ModuleDecl* decl, RtlirModule* mod);
+  void TakePendingCheckerActuals(const ModuleDecl* decl, RtlirModule* mod);
+  void LeaveModuleRecordingTypeParams(RtlirModule* mod);
 
   void ElaborateParamPortList(const ModuleDecl* decl, const ParamList& params,
                               RtlirModule* mod);
