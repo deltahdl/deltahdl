@@ -10,6 +10,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/local_variable_paths.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
 #include "parser/ast_expr.h"
@@ -625,6 +626,10 @@ static void ValidateAutomaticVarRulesOfItems(
 void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
   ValidateAutomaticVarRulesOfItems(decl->items, decl->is_automatic,
                                    {class_names_, typedefs_}, diag_);
+}
+
+void Elaborator::ValidatePathsToLocalVariables(const ModuleDecl* decl) {
+  ReportPathsToUnreachableLocals(*decl, diag_);
 }
 
 void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,

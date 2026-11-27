@@ -631,10 +631,10 @@ TEST(DynamicElementLifetime, DynamicReadsInProceduresAccepted) {
              "endmodule\n"));
 }
 
-TEST(HierarchicalLifetime, DISABLED_PathToAnAutomaticLocalReported) {
+TEST(HierarchicalLifetime, PathToAnAutomaticLocalReported) {
   ExpectReportedOnEachLine(
       "module top;\n"
-      "  task automatic ta;\n"
+      "  task automatic ta(input int p);\n"
       "    int a;\n"
       "    a = 1;\n"
       "  endtask\n"
@@ -650,11 +650,12 @@ TEST(HierarchicalLifetime, DISABLED_PathToAnAutomaticLocalReported) {
       "  initial $display(ta.a);\n"
       "  initial $display(fa.v);\n"
       "  initial $display(ts.y);\n"
+      "  initial $display(ta.p);\n"
       "endmodule\n",
-      "automatic variable", {"ta.a", "fa.v", "ts.y"});
+      "automatic variable", {"ta.a", "fa.v", "ts.y", "ta.p"});
 }
 
-TEST(HierarchicalLifetime, DISABLED_PathIntoAnUnnamedBlockReported) {
+TEST(HierarchicalLifetime, PathIntoAnUnnamedBlockReported) {
   ExpectReportedOnEachLine(
       "module top;\n"
       "  initial begin : n\n"
@@ -686,11 +687,11 @@ TEST(HierarchicalLifetime, PathsToStaticLocalsAccepted) {
              "    static int s;\n"
              "    s++;\n"
              "  endtask\n"
-             "  task t;\n"
+             "  task t(input int r);\n"
              "    int y;\n"
-             "    y = 1;\n"
+             "    y = r;\n"
              "  endtask\n"
-             "  initial #1 $display(n.inner.x, ta.s, t.y);\n"
+             "  initial #1 $display(n.inner.x, ta.s, t.y, t.r);\n"
              "endmodule\n"));
 }
 

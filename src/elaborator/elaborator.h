@@ -613,6 +613,7 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateFunctionArgDefaultsScope(const ModuleItem* item);
 
   void ValidateAutomaticVarProcWrites(const ModuleDecl* decl);
+  void ValidatePathsToLocalVariables(const ModuleDecl* decl);
 
   void ValidateJumpStatements(const ModuleDecl* decl);
 
