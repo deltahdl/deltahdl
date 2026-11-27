@@ -8,7 +8,6 @@
 #include <vector>
 
 #include "common/arena.h"
-#include "elaborator/type_eval.h"
 #include "elaborator/type_spelled_by.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -132,7 +131,6 @@ static std::string_view WrittenName(const Expr* op) {
   if (op->type_value != nullptr)
     return IsBareTypeName(*op->type_value) ? op->type_value->type_name
                                            : std::string_view{};
-  if (!op->text.empty()) return op->text;
   if (op->lhs != nullptr && op->lhs->kind == ExprKind::kIdentifier &&
       op->lhs->scope_prefix.empty())
     return op->lhs->text;
@@ -166,15 +164,14 @@ static std::optional<RunningOperandType> PropertyType(const ClassMember& prop,
 static std::optional<RunningOperandType> TypeOfRunningOperand(const Expr* op,
                                                               SimContext& ctx) {
   const std::string_view kName = WrittenName(op);
-  if (const DataType* actual =
-          kName.empty() ? nullptr : RunningClassTypeParam(kName, ctx))
-    return RunningOperandType{*actual, true};
-  if (const ClassMember* prop =
-          kName.empty() ? nullptr : RunningClassProperty(kName, ctx))
-    return PropertyType(*prop, ctx);
-  if (op->type_value != nullptr) return RunningOperandType{*op->type_value};
-  if (kName.empty()) return std::nullopt;
-  return RunningOperandType{TypeNameToDataType(kName)};
+  if (!kName.empty()) {
+    if (const DataType* actual = RunningClassTypeParam(kName, ctx))
+      return RunningOperandType{*actual, true};
+    if (const ClassMember* prop = RunningClassProperty(kName, ctx))
+      return PropertyType(*prop, ctx);
+  }
+  if (op->type_value == nullptr) return std::nullopt;
+  return RunningOperandType{*op->type_value};
 }
 
 std::optional<bool> RunningClassTypeRefsMatch(const Expr* a, const Expr* b,

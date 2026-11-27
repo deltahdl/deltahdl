@@ -138,19 +138,22 @@ struct Specialization {
 };
 
 constexpr std::array kSpecializations = {
-    Specialization{"K", 0b101010},
-    Specialization{"K #()", 0b101010},
-    Specialization{"K #(int, 8)", 0b101010},
-    Specialization{"K #(int, 4)", 0b101001},
-    Specialization{"K #(byte, 8)", 0b010110},
-    Specialization{"K #(byte, 4)", 0b010101},
+    Specialization{"K", 0b1010'1010},
+    Specialization{"K #()", 0b1010'1010},
+    Specialization{"K #(int, 8)", 0b1010'1010},
+    Specialization{"K #(int, 4)", 0b1010'1001},
+    Specialization{"K #(byte, 8)", 0b0101'0110},
+    Specialization{"K #(byte, 4)", 0b0101'0101},
 };
 
 TEST(ClassMethodTypeRefSim, ParameterizedClassJudgesEachSpecialization) {
   const std::string kClass =
+      "  typedef int word_t;\n"
       "  class K #(type U = int, int N = 8);\n"
       "    U y;\n    logic [N-1:0] z;\n"
       "    function int check();\n      int r = 0;\n"
+      "      if (type(U) == type(word_t)) r[7] = 1'b1;\n"
+      "      if (type(word_t) != type(U)) r[6] = 1'b1;\n"
       "      if (type(U) == type(int)) r[5] = 1'b1;\n"
       "      if (type(U) != type(int)) r[4] = 1'b1;\n"
       "      if (type(y) == type(int)) r[3] = 1'b1;\n"
