@@ -113,6 +113,29 @@ bool ElaboratorOperationRules::ReportNonEquivalentArrayOperands(
   return true;
 }
 
+namespace {
+
+struct NamedAggregates {
+  const std::unordered_map<std::string_view, ElaboratorData::VarArrayInfo>&
+      arrays;
+  const TypedefMap& typedefs;
+
+  [[nodiscard]] bool IsAggregateVar(std::string_view name,
+                                    std::string_view type_name) const {
+    if (arrays.contains(name)) return true;
+    auto it = typedefs.find(type_name);
+    return it != typedefs.end() && IsAggregateType(it->second);
+  }
+
+  [[nodiscard]] bool IsStructType(std::string_view type_name) const {
+    auto it = typedefs.find(type_name);
+    return it != typedefs.end() &&
+           IsUnpackedStructOrUnionType(it->second, typedefs);
+  }
+};
+
+}  // namespace
+
 void ElaboratorOperationRules::CheckAggregateCompareOp(const Expr* expr) {
   if (!expr->lhs || !expr->rhs) return;
   auto l_name = AggregateOperandName(expr->lhs);
@@ -128,21 +151,12 @@ void ElaboratorOperationRules::CheckAggregateCompareOp(const Expr* expr) {
   auto rit = var_named_types_.find(r_name);
   if (lit == var_named_types_.end() || rit == var_named_types_.end()) return;
   if (lit->second == rit->second) return;
-
-  auto is_aggregate_var = [&](std::string_view name,
-                              std::string_view type_name) {
-    if (var_array_info_.count(name)) return true;
-    auto it = typedefs_.find(type_name);
-    return it != typedefs_.end() && IsAggregateType(it->second);
-  };
-  if (!is_aggregate_var(l_name, lit->second)) return;
-  if (!is_aggregate_var(r_name, rit->second)) return;
-  auto is_struct_type = [&](std::string_view type_name) {
-    auto it = typedefs_.find(type_name);
-    return it != typedefs_.end() &&
-           IsUnpackedStructOrUnionType(it->second, typedefs_);
-  };
-  if (is_struct_type(lit->second) && is_struct_type(rit->second)) return;
+  const NamedAggregates kNamed{var_array_info_, typedefs_};
+  if (!kNamed.IsAggregateVar(l_name, lit->second) ||
+      !kNamed.IsAggregateVar(r_name, rit->second))
+    return;
+  if (kNamed.IsStructType(lit->second) && kNamed.IsStructType(rit->second))
+    return;
 
   diag_.Error(expr->range.start,
               std::format("comparison of non-equivalent aggregate "
