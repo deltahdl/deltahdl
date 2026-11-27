@@ -126,15 +126,17 @@ TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthInEveryPlace) {
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_TypeNamesOfATypedefBaseEnumerationGiveItsWidthInAClass) {
-  ExpectOkIn({"class"}, kTypedefBaseDecls, kTypedefBaseTypeNamesCheck);
+     DISABLED_ClassTypeNamesOfATypedefBaseEnumerationGiveTheirWidths) {
+  ExpectOkIn({"class"},
+             std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
+             std::string(kTypedefBaseTypeNamesCheck) + " && $bits(s_t) == 7");
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_StructOfATypedefBaseEnumerationIsAsWideAsItsMembersInAClass) {
+     StructPropertyOfATypedefBaseEnumerationIsAsWideAsItsMembers) {
   ExpectOkIn({"class"},
              std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
-             "$bits(sv) == 7 && $bits(s_t) == 7");
+             "$bits(sv) == 7");
 }
 
 TEST(EnumerationTypedefBaseSimulation,
