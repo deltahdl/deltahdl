@@ -298,18 +298,7 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     AdoptReferencedType(dt, *returned);
     return {};
   }
-  if (!ref->scope_prefix.empty()) {
-    if (std::optional<DataType> scoped = TypeRefExprType(ref, mod)) {
-      AdoptExpressionType(dt, scoped, arena_);
-      return {};
-    }
-  }
-  if (ref->kind != ExprKind::kIdentifier) {
-    std::optional<DataType> type = TypeRefExprType(ref, mod);
-    if (!AdoptFoldedTypeRef(dt, ref, type, mod))
-      AdoptExpressionType(dt, type, arena_);
-    return {};
-  }
+  if (AdoptExpressionTypeRef(dt, ref, mod)) return {};
   std::string_view enumeration;
   if (const RtlirEnumMember* constant =
           EnumConstantNamed(mod, ref->text, enumeration)) {

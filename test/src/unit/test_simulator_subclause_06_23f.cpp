@@ -232,9 +232,11 @@ TEST(DeclarationTypeRefInstanceSim, ExpressionOperandTakesEachInstancesType) {
       const std::string kModule = ExpressionOperandModule(kind, spelling);
       const std::string kA = std::format("  w #({}) a();\n", kActuals[p][0]);
       const std::string kB = std::format("  w #({}) b();\n", kActuals[p][1]);
-      EXPECT_EQ(SortedOutput(kModule + "module t;\n" + kA + kB + "endmodule\n"),
+      EXPECT_EQ(SortedOutput(std::format("{}module t;\n{}{}endmodule\n",
+                                         kModule, kA, kB)),
                 kExpected);
-      EXPECT_EQ(SortedOutput(kModule + "module t;\n" + kB + kA + "endmodule\n"),
+      EXPECT_EQ(SortedOutput(std::format("{}module t;\n{}{}endmodule\n",
+                                         kModule, kB, kA)),
                 kExpected);
     }
   }

@@ -154,6 +154,8 @@ class Elaborator : public ElaboratorClassRules {
   void LeaveModuleRecordingTypeParams(RtlirModule* mod);
   bool FoldMayDifferByPlace() const;
   const void* FoldedTypeRefOwner() const;
+  bool AdoptExpressionTypeRef(DataType& dt, const Expr* ref,
+                              const RtlirModule* mod);
   bool AdoptFoldedTypeRef(DataType& dt, const Expr* ref,
                           const std::optional<DataType>& type,
                           const RtlirModule* mod);

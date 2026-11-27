@@ -679,7 +679,9 @@ void ResolveTypeRefArguments(std::vector<DataType>& args,
       DataType referenced;
       referenced.type_ref_expr = ref.lhs;
       if (ref.type_value != nullptr) referenced = *ref.type_value;
+      referenced.type_argument = true;
       resolve(referenced);
+      referenced.type_argument = false;
       referenced.param_arg_name = arg.param_arg_name;
       if (referenced.type_ref_expr == nullptr) arg = referenced;
     }
