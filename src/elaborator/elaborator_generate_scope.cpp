@@ -36,7 +36,6 @@ void Elaborator::ElaborateGenerateBlockBody(
   gen_body_owners_.push_back(&items);
   EnterFoldedTypeRefOwner(&items);
   ElaborateGenerateItems(items, mod, scope);
-  LeaveFoldedTypeRefOwner(&items, mod);
   gen_body_owners_.pop_back();
   enum_member_names_ = std::move(enclosing_enum_member_names);
 }
