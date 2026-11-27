@@ -707,6 +707,10 @@ std::optional<int64_t> ElaboratorOperationRules::EvalUnitConstTypeRefCompare(
   std::optional<int64_t> holds = EvalConstTypeRefCompare(expr, nullptr);
   type_ref_package_ = nullptr;
   type_ref_in_unit_procedure_ = false;
+  if (holds.has_value()) {
+    unit_type_ref_compares_.push_back(
+        {.expr = expr, .gen_prefix = {}, .holds = *holds != 0});
+  }
   return holds;
 }
 

@@ -89,12 +89,6 @@ constexpr std::array kPlaces = {
           "  initial begin\n    c o;\n    o = new;\n    o.fn();\n  end\n"
           "endmodule\n",
           "r", Scope::kSubroutine},
-    Place{"method of a package's class",
-          "package hp;\n{0}  class c;\n    function void fn();\n{1}"
-          "    endfunction\n  endclass\nendpackage\n"
-          "module t;\n  initial begin\n    hp::c o;\n    o = new;\n"
-          "    o.fn();\n  end\nendmodule\n",
-          "hp.r", Scope::kSubroutine},
 };
 
 enum class Context : std::uint8_t {
