@@ -14,7 +14,7 @@ namespace delta {
 
 void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
   if (e == nullptr) return;
-  if (IsTypeRefComparison(e) && fold(e).has_value()) return;
+  if (IsTypeRefComparison(e) && fold(e, e).has_value()) return;
   for (Expr* sub :
        {e->lhs, e->rhs, e->condition, e->true_expr, e->false_expr}) {
     FoldTypeRefComparesInExpr(sub, fold);
@@ -42,10 +42,25 @@ bool WritesAnAssignment(const Expr* e) {
 }
 
 TypeRefCompareFolder BarringAssignments(const TypeRefCompareFolder& fold) {
-  return [&fold](const Expr* e) -> std::optional<int64_t> {
+  return [&fold](const Expr* e,
+                 const Expr* recorded_as) -> std::optional<int64_t> {
     if (WritesAnAssignment(e)) return std::nullopt;
-    return fold(e);
+    return fold(e, recorded_as);
   };
+}
+
+static void FoldCaseItemTypeRef(Expr* selector, Expr* item,
+                                const TypeRefCompareFolder& fold) {
+  if (selector == nullptr || selector->kind != ExprKind::kTypeRef ||
+      item->kind != ExprKind::kTypeRef)
+    return;
+  Expr matches{};
+  matches.kind = ExprKind::kBinary;
+  matches.range = item->range;
+  matches.op = TokenKind::kEqEqEq;
+  matches.lhs = selector;
+  matches.rhs = item;
+  fold(&matches, item);
 }
 
 void FoldTypeRefComparesOfStmt(Stmt* s, const TypeRefCompareFolder& fold) {
@@ -59,6 +74,7 @@ void FoldTypeRefComparesOfStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   for (CaseItem& item : s->case_items) {
     for (Expr* pattern : item.patterns) {
       FoldTypeRefComparesInExpr(pattern, fold);
+      FoldCaseItemTypeRef(s->condition, pattern, fold);
     }
   }
   FoldTypeRefComparesInExpr(s->var_init, BarringAssignments(fold));

@@ -10,7 +10,8 @@ struct Expr;
 struct ModuleItem;
 struct Stmt;
 
-using TypeRefCompareFolder = std::function<std::optional<int64_t>(const Expr*)>;
+using TypeRefCompareFolder = std::function<std::optional<int64_t>(
+    const Expr* comparison, const Expr* recorded_as)>;
 
 void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold);
 

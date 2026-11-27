@@ -759,11 +759,12 @@ void ElaboratorOperationRules::ElaborateUnitScopeProcedures() {
       [this](DataType& dt, SourceLoc, std::span<const ProceduralLocal> locals) {
         return ResolveUnitScopeTypeRef(dt, locals);
       };
-  const TypeRefCompareFolder kFold = [this](const Expr* e) {
+  const TypeRefCompareFolder kFold = [this](const Expr* e,
+                                            const Expr* recorded_as) {
     std::optional<int64_t> holds = EvalConstTypeRefCompare(e, nullptr);
     if (holds.has_value()) {
       unit_type_ref_compares_.push_back(
-          {.expr = e, .gen_prefix = {}, .holds = *holds != 0});
+          {.expr = recorded_as, .gen_prefix = {}, .holds = *holds != 0});
     }
     return holds;
   };

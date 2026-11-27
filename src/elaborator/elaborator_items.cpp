@@ -303,11 +303,13 @@ void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
 static TypeRefCompareFolder RecordingInto(
     RtlirModule* mod, std::string_view gen_prefix,
     std::function<std::optional<int64_t>(const Expr*)> judge) {
-  return [mod, gen_prefix, judge = std::move(judge)](const Expr* e) {
+  return [mod, gen_prefix, judge = std::move(judge)](const Expr* e,
+                                                     const Expr* recorded_as) {
     std::optional<int64_t> holds = judge(e);
     if (holds.has_value()) {
-      mod->type_ref_compares.push_back(
-          {.expr = e, .gen_prefix = gen_prefix, .holds = *holds != 0});
+      mod->type_ref_compares.push_back({.expr = recorded_as,
+                                        .gen_prefix = gen_prefix,
+                                        .holds = *holds != 0});
     }
     return holds;
   };

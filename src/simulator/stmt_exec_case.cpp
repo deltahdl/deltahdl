@@ -177,8 +177,15 @@ static bool CaseItemMatches(const Logic4Vec& sel, const Logic4Vec& pat,
   return CaseExactMatch(sel, pat);
 }
 
+static bool SelectsByType(const Stmt* stmt) {
+  return !stmt->case_inside && !stmt->case_matches &&
+         stmt->condition != nullptr &&
+         stmt->condition->kind == ExprKind::kTypeRef;
+}
+
 static bool CasePatternMatch(CaseSubject& cs, const Expr* pat, const Stmt* stmt,
                              SimContext& ctx, Arena& arena) {
+  if (SelectsByType(stmt)) return ctx.TypeRefCompareHere(pat).value_or(false);
   if (stmt->case_inside) return CaseInsidePatternMatch(cs.sel, pat, ctx, arena);
   if (stmt->case_matches)
     return CaseMatchesPatternMatch(cs, pat, ctx, arena, stmt->case_kind);
@@ -268,7 +275,7 @@ CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     cs.sel = cs.pattern.value;
   } else if (stmt->case_inside) {
     cs.sel = EvalExpr(stmt->condition, ctx, arena);
-  } else {
+  } else if (!SelectsByType(stmt)) {
     SizeCaseStatement(stmt, ctx, cs);
     cs.sel = CaseOperandValue(stmt->condition, cs.length, ctx, arena);
   }

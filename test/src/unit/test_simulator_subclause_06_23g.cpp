@@ -444,25 +444,31 @@ Battery HoldsBattery(std::span<const Holds> tests) {
   return battery;
 }
 
-void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
-                            Context context,
-                            std::string_view parameter_keyword = "localparam") {
+void ExpectEveryProcedureGives(std::string_view names, std::string_view written,
+                               size_t width, uint64_t expected) {
   const std::string kModule = std::format(
       "  int x;\n  int m [5];\n  bit [3:0] a;\n  shortint n;\n"
       "  typedef struct packed {{ logic [4:0] f; logic [2:0] g; }} s_t;\n"
       "  typedef enum logic [2:0] {{E0, E1}} e_t;\n  typedef int i3_t [3];\n"
       "  bit [{}:0] r;\n",
-      battery.tests.size() - 1);
-  const std::string kWritten =
-      battery.declarations +
-      Writing(battery.tests, context, Scope::kSubroutine, parameter_keyword);
+      width - 1);
   for (const Procedure& procedure : kProcedures) {
     SCOPED_TRACE(procedure.name);
     const std::string kSrc = std::vformat(
-        procedure.text, std::make_format_args(kModule, names, kWritten));
+        procedure.text, std::make_format_args(kModule, names, written));
     SCOPED_TRACE(kSrc);
-    EXPECT_EQ(RunAndGet(kSrc, procedure.result), battery.under_bytes);
+    EXPECT_EQ(RunAndGet(kSrc, procedure.result), expected);
   }
+}
+
+void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
+                            Context context,
+                            std::string_view parameter_keyword = "localparam") {
+  ExpectEveryProcedureGives(
+      names,
+      battery.declarations + Writing(battery.tests, context, Scope::kSubroutine,
+                                     parameter_keyword),
+      battery.tests.size(), battery.under_bytes);
 }
 
 constexpr std::array kProcedureCompared = {
@@ -496,6 +502,46 @@ TEST(ProceduralNameTypeRefSim, ComparisonInAProceduralIf) {
 TEST(ProceduralNameTypeRefSim, ComparisonInAnAssignment) {
   ExpectInEveryProcedure(kProcedureNames, HoldsBattery(kProcedureCompared),
                          Context::kDeclaration);
+}
+
+struct TypeCase {
+  const char* selector;
+  std::array<const char*, 2> items;
+  bool has_default;
+  uint64_t taken;
+};
+
+constexpr std::array kTypeCases = {
+    TypeCase{"x", {"type(int)", "type(byte)"}, true, 2},
+    TypeCase{"v", {"type(logic [0:7])", "type(logic [7:0])"}, true, 2},
+    TypeCase{"a + b",
+             {"type(logic [31:0])", "type(bit [31:0]), type(int)"},
+             true,
+             2},
+    TypeCase{"s.f", {"type(logic [4:0])", "type(logic [2:0])"}, true, 1},
+    TypeCase{"w", {"type(bit [7:0])", "type(logic [8:1])"}, true, 3},
+    TypeCase{"e", {"type(int)", "type(logic [2:0])"}, false, 0},
+    TypeCase{"m[0]", {"type(int)", "type(i3_t)"}, false, 2},
+};
+
+TEST(ProceduralNameTypeRefSim, CaseStatementTakesTheItemWhoseTypeMatches) {
+  std::string written;
+  uint64_t expected = 0;
+  for (size_t k = 0; k < kTypeCases.size(); ++k) {
+    const TypeCase& test = kTypeCases[k];
+    const std::string kField = std::format("r[{}:{}]", 4 * k + 3, 4 * k);
+    written += std::format(
+        "    case (type({0}))\n      {1}: {3} = 4'd1;\n"
+        "      {2}: {3} = 4'd2;\n",
+        test.selector, test.items[0], test.items[1], kField);
+    if (test.has_default) {
+      written += std::format("      default: {} = 4'd3;\n", kField);
+    }
+    written += "    endcase\n";
+    expected |= test.taken << (4 * k);
+  }
+  ExpectEveryProcedureGives(kProcedureNames, written, 4 * kTypeCases.size(),
+                            expected);
 }
 
 constexpr std::array kProcedureParameters = {
