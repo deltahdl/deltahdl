@@ -189,7 +189,7 @@ TEST(ClassMethodTypeRefSim, ClassOfAnInstanceJudgesItsOwnTypeParameter) {
   }
 }
 
-enum class Holds { kAlways, kNever, kWhenUIsInt, kWhenNIs8 };
+enum class Holds : std::uint8_t { kAlways, kNever, kWhenUIsInt, kWhenNIs8 };
 
 struct SpecializedCompare {
   const char* left;
@@ -216,17 +216,17 @@ bool HoldsFor(Holds holds, const Actuals& actuals) {
          (holds == Holds::kWhenNIs8 && actuals.n_is_8);
 }
 
-template <size_t kCount>
+template <size_t Count>
 void ExpectEachSpecializationJudges(
     std::string_view members, std::string_view locals,
-    const std::array<SpecializedCompare, kCount>& compares) {
+    const std::array<SpecializedCompare, Count>& compares) {
   std::string checks;
-  for (size_t k = 0; k < kCount; ++k) {
+  for (size_t k = 0; k < Count; ++k) {
     const SpecializedCompare& c = compares[k];
     checks += std::format(
         "      if (type({0}) == type({1})) r[{2}] = 1'b1;\n"
         "      if (type({0}) != type({1})) r[{3}] = 1'b1;\n",
-        c.left, c.right, 2 * (kCount - k) - 1, 2 * (kCount - k) - 2);
+        c.left, c.right, 2 * (Count - k) - 1, 2 * (Count - k) - 2);
   }
   const std::string kClass = std::format(
       "  class K #(type U = int, int N = 8);\n{}"
