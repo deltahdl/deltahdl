@@ -692,9 +692,8 @@ TEST(ChandleDataType,
 TEST(ChandleDataType, PortsOfTypesHoldingNoChandleAreAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef int i_t;\nmodule m(input var i_t p);\nendmodule\n"));
-  EXPECT_TRUE(ElabOk(
-      "interface i(input int x);\nendinterface\nmodule t;\nendmodule\n"));
-  EXPECT_TRUE(ElabOk("checker c(int x);\nendchecker\nmodule t;\nendmodule\n"));
+  EXPECT_TRUE(ElabOk("interface i(input int x);\nendinterface\n"));
+  EXPECT_TRUE(ElabOk("checker c(int x);\nendchecker\n"));
   EXPECT_TRUE(
       ElabOk("typedef int i_t;\ntypedef struct { int a; i_t b; } S;\n"
              "module m(input var S s);\nendmodule\n"));

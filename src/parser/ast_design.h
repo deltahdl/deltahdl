@@ -149,7 +149,8 @@ struct CompilationUnit {
 
   bool DeclaresNothing() const {
     return modules.empty() && programs.empty() && packages.empty() &&
-           cu_items.empty() && classes.empty();
+           cu_items.empty() && classes.empty() && interfaces.empty() &&
+           checkers.empty();
   }
 
   std::vector<ScopePrefix> scope_prefixes;
