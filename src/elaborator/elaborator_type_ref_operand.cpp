@@ -30,6 +30,7 @@
 #include "elaborator/type_ref_compare_fold.h"
 #include "elaborator/type_ref_walks.h"
 #include "elaborator/type_spelled_by.h"
+#include "elaborator/unit_param_values.h"
 #include "elaborator/unpacked_array_type.h"
 #include "lexer/token.h"
 #include "parser/ast_class.h"
@@ -693,6 +694,20 @@ std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
   bool is_negated =
       expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
   return (*matched != is_negated) ? 1 : 0;
+}
+
+std::optional<int64_t> ElaboratorOperationRules::EvalUnitConstTypeRefCompare(
+    const Expr* expr) {
+  const std::string_view kPrefix = CurrentUnitNamePrefix();
+  auto pkg = std::ranges::find(unit_->packages, kPrefix, &PackageDecl::name);
+  if (!kPrefix.empty() && pkg == unit_->packages.end())
+    return EvalConstTypeRefCompare(expr, nullptr);
+  type_ref_in_unit_procedure_ = true;
+  type_ref_package_ = pkg == unit_->packages.end() ? nullptr : *pkg;
+  std::optional<int64_t> holds = EvalConstTypeRefCompare(expr, nullptr);
+  type_ref_package_ = nullptr;
+  type_ref_in_unit_procedure_ = false;
+  return holds;
 }
 
 static std::optional<DataType> SpecializationTypedefNamedBy(

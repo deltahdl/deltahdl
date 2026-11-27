@@ -60,8 +60,7 @@ TEST(MatchingTypeComparisonSim, BuiltInComparisonsHoldInEveryPlace) {
       "101 10 10 10 0\n");
 }
 
-TEST(MatchingTypeComparisonSim,
-     DISABLED_PackageObjectsMatchTheirTypesInsideThePackage) {
+TEST(MatchingTypeComparisonSim, PackageObjectsMatchTheirTypesInsideThePackage) {
   SimFixture f;
   EXPECT_EQ(
       RunCapture("package q;\n"
@@ -81,6 +80,27 @@ TEST(MatchingTypeComparisonSim,
                  "endmodule\n",
                  f),
       "1011\n");
+}
+
+TEST(MatchingTypeComparisonSim,
+     UnitObjectsMatchTheirTypesInTheCompilationUnit) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("struct packed {int A;} UA1, UA2;\n"
+                       "struct packed {int A;} UA3;\n"
+                       "typedef struct packed {int A;} ust;\n"
+                       "ust US1;\n"
+                       "byte UI1;\n"
+                       "localparam bit USame = type(UA1) == type(UA2);\n"
+                       "localparam bit UOther = type(UA1) == type(UA3);\n"
+                       "localparam bit UNamed = type(US1) == type(ust);\n"
+                       "localparam bit UBuiltIn = type(UI1) == type(byte);\n"
+                       "localparam bit UWider = type(UI1) == type(int);\n"
+                       "module top;\n"
+                       "  initial $display(\"%0d%0d%0d%0d%0d\", USame, UOther, "
+                       "UNamed, UBuiltIn, UWider);\n"
+                       "endmodule\n",
+                       f),
+            "10110\n");
 }
 
 TEST(MatchingTypeComparisonSim,

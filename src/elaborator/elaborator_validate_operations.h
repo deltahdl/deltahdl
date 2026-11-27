@@ -132,9 +132,12 @@ class ElaboratorOperationRules : public ElaboratorData {
                                          const RtlirModule* mod) const;
   std::optional<int64_t> EvalConstTypeRefCompare(
       const Expr* expr, const RtlirModule* mod = nullptr) const;
+  std::optional<int64_t> EvalUnitConstTypeRefCompare(const Expr* expr);
   TypeRefComparer type_ref_compare_ = [this](const Expr* expr,
                                              const RtlirModule* mod) {
-    return EvalConstTypeRefCompare(expr, mod);
+    if (mod != nullptr || type_ref_in_unit_procedure_)
+      return EvalConstTypeRefCompare(expr, mod);
+    return EvalUnitConstTypeRefCompare(expr);
   };
 
   void ValidateTypeRefArgs(const ModuleDecl* decl);
