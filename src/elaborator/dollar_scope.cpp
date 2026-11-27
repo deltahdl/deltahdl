@@ -96,6 +96,7 @@ static void NoteParamType(std::string_view name, const DataType& type,
                           const std::vector<Expr*>* dims, const Expr* value,
                           DollarScope& scope) {
   const bool kTyped = type.kind != DataTypeKind::kImplicit ||
+                      type.type_ref_expr != nullptr ||
                       type.packed_dim_left != nullptr || type.signing_written ||
                       (dims != nullptr && !dims->empty());
   if (kTyped) {
