@@ -71,6 +71,15 @@ static uint32_t SpecializedTypedefWidth(const DataType& type, SimContext& ctx) {
   return width;
 }
 
+static uint32_t OwnClassTypedefWidth(const ClassTypeInfo& cls,
+                                     std::string_view name, SimContext& ctx) {
+  std::string key = std::string(cls.name) + "::" + std::string(name);
+  if (uint32_t width = ctx.FindTypeWidth(key)) return width;
+  return cls.package.empty()
+             ? 0
+             : ctx.FindTypeWidth(std::string(cls.package) + "::" + key);
+}
+
 uint32_t MethodClassTypedefWidth(std::string_view name, SimContext& ctx) {
   if (const StructTypeInfo* layout =
           MethodClassTypedefLayout(name, ctx, nullptr)) {
@@ -79,9 +88,7 @@ uint32_t MethodClassTypedefWidth(std::string_view name, SimContext& ctx) {
   for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
        c = c->parent) {
     if (c->param_actuals != nullptr) return 0;
-    if (uint32_t width =
-            ctx.FindTypeWidth(std::string(c->name) + "::" + std::string(name)))
-      return width;
+    if (uint32_t width = OwnClassTypedefWidth(*c, name, ctx)) return width;
   }
   return 0;
 }

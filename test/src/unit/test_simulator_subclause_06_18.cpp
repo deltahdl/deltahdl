@@ -817,7 +817,8 @@ TEST(ClassScopeTypedefSim, BitsOfAClassTypedefInANestedPackageOrModuleClass) {
                  "  class PC;\n"
                  "    typedef logic [2:0] pt;\n"
                  "    static function int f();\n"
-                 "      return $bits(pt);\n"
+                 "      pt v;\n"
+                 "      return $bits(pt) * 10 + $bits(v);\n"
                  "    endfunction\n"
                  "  endclass\n"
                  "endpackage\n"
@@ -845,7 +846,7 @@ TEST(ClassScopeTypedefSim, BitsOfAClassTypedefInANestedPackageOrModuleClass) {
                  "  end\n"
                  "endmodule\n",
                  f),
-      "3 2 6\n");
+      "33 2 6\n");
 }
 
 }  // namespace
