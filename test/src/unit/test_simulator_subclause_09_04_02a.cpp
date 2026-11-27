@@ -425,7 +425,7 @@ TEST(EventControlSim, CompoundExprResultChangeFiresEvent) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
+TEST(EventControlSim, ChandleComparisonUnchangedByASameValueWriteIsNotEvent) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -436,7 +436,7 @@ TEST(EventControlSim, ChandleSameValueWriteIsNotEvent) {
       "    #5 h = null;\n"
       "    #5 $finish;\n"
       "  end\n"
-      "  initial @(h) x = 8'd99;\n"
+      "  initial @(h == null) x = 8'd99;\n"
       "endmodule\n",
       f, "x");
   ASSERT_NE(var, nullptr);
