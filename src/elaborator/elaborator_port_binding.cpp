@@ -476,7 +476,7 @@ void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
                       bind.port_name, conn_expr->text),
           Subclause("23.3.2.3"));
     }
-  } else if (!names_interface) {
+  } else if (!names_interface && !scope.item->inst_in_procedure) {
     MaybeCreateImplicitNet(conn_expr->text, scope.item->loc, scope.parent_mod);
   }
 }

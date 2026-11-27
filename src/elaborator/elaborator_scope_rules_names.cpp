@@ -418,6 +418,17 @@ static void CollectBoundProcRhsIdents(
   CollectProcRhsIdents(s, inner, out);
 }
 
+static void CollectCheckerActualReads(const Stmt* s,
+                                      std::vector<const Expr*>& refs) {
+  if (s->kind != StmtKind::kCheckerInstantiation) return;
+  const ModuleItem& inst = *s->decl_item;
+  for (size_t i = 0; i < inst.inst_ports.size(); ++i) {
+    if (!inst.inst_ports_implicit[i]) {
+      CollectBareIdents(inst.inst_ports[i].second, refs);
+    }
+  }
+}
+
 static void CollectProcRhsIdentsIn(
     const Stmt* s, const std::unordered_set<std::string_view>& locals,
     std::vector<const Expr*>& out) {
@@ -447,6 +458,7 @@ static void CollectProcRhsIdentsIn(
   }
   ForEachRandsequenceExpr(s,
                           [&](Expr* const& e) { CollectBareIdents(e, refs); });
+  CollectCheckerActualReads(s, refs);
   KeepUndeclaredReads(refs, {read, s->condition, s->for_cond}, locals, out);
   ForEachChildStmtWithBindings(
       s,

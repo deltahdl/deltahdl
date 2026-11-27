@@ -1,5 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "common/types.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
@@ -665,21 +670,99 @@ TEST(ImplicitDeclaration,
                             "implicit net 'n3' forbidden by", 10, "22.8"));
 }
 
-TEST(ImplicitDeclaration,
-     DISABLED_ProceduralCheckerInstanceDeclaresNoImplicitNet) {
+TEST(ImplicitDeclaration, ProceduralCheckerInstanceDeclaresNoImplicitNet) {
   ElabFixture f;
-  ElaborateSrcAllowingParseErrors(
+  auto* design = ElaborateSrc(
+      "package k;\n"
+      "  logic pv;\n"
+      "endpackage\n"
+      "logic cv;\n"
       "checker c(logic a);\n"
       "endchecker\n"
       "module top;\n"
-      "  logic clk;\n"
+      "  import k::*;\n"
+      "  logic clk, v, a;\n"
       "  always @(posedge clk) begin\n"
-      "    c cc(nproc);\n"
+      "    c c1(nproc);\n"
+      "    c c2(.a(nnamed));\n"
+      "    c c3(nexpr + 1'b1);\n"
+      "  end\n"
+      "  initial begin\n"
+      "    logic l;\n"
+      "    c c4(v);\n"
+      "    c c5(l);\n"
+      "    c c6(pv);\n"
+      "    c c7(cv);\n"
+      "    c c8(.a);\n"
+      "  end\n"
+      "  if (1) begin : g\n"
+      "    always @(posedge clk) begin\n"
+      "      c c9(ngen);\n"
+      "    end\n"
       "  end\n"
       "endmodule\n",
       f);
+  ASSERT_NE(design, nullptr);
+  const std::vector<std::pair<std::string, uint32_t>> kUndeclared = {
+      {"nproc", 11}, {"nnamed", 12}, {"nexpr", 13}, {"ngen", 25}};
+  for (const auto& [name, line] : kUndeclared) {
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "reference to unresolved identifier '" + name + "'", line, "23.9"));
+    for (const auto& n : design->top_modules[0]->nets) {
+      EXPECT_FALSE(n.name.ends_with(name)) << n.name;
+    }
+  }
+  const std::vector<std::pair<std::string, uint32_t>> kDeclared = {
+      {"v", 17}, {"l", 18}, {"pv", 19}, {"cv", 20}, {"a", 21}};
+  for (const auto& [name, line] : kDeclared) {
+    EXPECT_FALSE(ReportedError(
+        f.diag.Diagnostics(),
+        "reference to unresolved identifier '" + name + "'", line, "23.9"));
+  }
+}
+
+TEST(ImplicitDeclaration, ImportedNamesNeedNoImplicitNetUnderNone) {
+  ElabFixture f;
+  auto fid = f.mgr.AddFile("<test>",
+                           "package k;\n"
+                           "  logic x;\n"
+                           "  logic p;\n"
+                           "endpackage\n"
+                           "package j;\n"
+                           "  logic y;\n"
+                           "  logic q;\n"
+                           "endpackage\n"
+                           "module child(input logic a);\n"
+                           "endmodule\n"
+                           "module top;\n"
+                           "  import k::x;\n"
+                           "  import k::p;\n"
+                           "  import j::*;\n"
+                           "  child u1(.a(x));\n"
+                           "  child u2(y);\n"
+                           "  assign p = 1'b0;\n"
+                           "  assign q = 1'b0;\n"
+                           "  child u3(.a(nx));\n"
+                           "  assign nq = 1'b0;\n"
+                           "endmodule\n");
+  Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
+  Parser parser(lexer, f.arena, f.diag);
+  auto* cu = parser.Parse();
+  cu->default_nettype = NetType::kNone;
+  Elaborator elab(f.arena, f.diag, cu);
+  elab.Elaborate("top");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                            "undeclared identifier 'nproc'", 6, "23.9"));
+                            "implicit net 'nx' forbidden by", 19, "22.8"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "implicit net 'nq' forbidden by", 20, "22.8"));
+  const std::vector<std::pair<std::string, uint32_t>> kImported = {
+      {"x", 15}, {"y", 16}, {"p", 17}, {"q", 18}};
+  for (const auto& [name, line] : kImported) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "implicit net '" + name + "' forbidden by", line,
+                               "22.8"));
+  }
 }
 
 TEST(ImplicitDeclaration,

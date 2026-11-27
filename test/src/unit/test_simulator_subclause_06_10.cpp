@@ -63,7 +63,7 @@ TEST(ImplicitNetSimulation, CompilationUnitNamesAreNoImplicitNets) {
             "1 1\n");
 }
 
-TEST(ImplicitNetSimulation, DISABLED_ImportedNamesAreNoImplicitNets) {
+TEST(ImplicitNetSimulation, ImportedNamesAreNoImplicitNets) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package k;\n"
                        "  logic x = 1;\n"

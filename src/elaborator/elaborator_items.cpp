@@ -23,6 +23,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_node_attributes.h"
+#include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/implication_operator_rules.h"
 #include "elaborator/interconnect_uses.h"
@@ -114,6 +115,7 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
   if (IsNameDeclared(name, mod)) return true;
   if (IsParamDeclared(name, mod, gen_prefix_scopes_)) return true;
   if (UnitDeclaresData(unit_, name, loc)) return true;
+  if (ImportBringsInSignal(mod, unit_, name, true)) return true;
   if (mod->default_nettype == NetType::kNone) {
     diag_.Error(loc,
                 std::format("implicit net '{}' forbidden by "
