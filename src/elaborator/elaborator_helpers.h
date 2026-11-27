@@ -32,6 +32,7 @@ struct ClassDecl;
 struct InferenceFuncs;
 struct RtlirModule;
 struct RtlirParamDecl;
+struct TypeShapeTables;
 
 struct ResolvedAttribute;
 enum class RtlirProcessKind : uint8_t;
@@ -195,6 +196,10 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
 
 const ModuleItem* FindClassScopedTypedefItem(std::string_view cls_name,
                                              std::string_view type_name,
+                                             const CompilationUnit* unit);
+
+std::vector<Expr*> ScopedTypedefUnpackedDims(const Expr* ref,
+                                             const TypeShapeTables& tables,
                                              const CompilationUnit* unit);
 
 const ModuleItem* ResolveClassScopedDeclType(DataType& dtype,

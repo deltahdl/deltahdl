@@ -666,7 +666,7 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefValueArray(
 std::vector<Expr*> ElaboratorOperationRules::TypeRefUnpackedDims(
     const Expr* ref, const RtlirModule* mod) const {
   std::optional<UnpackedArrayType> array = TypeRefValueArray(ref, mod);
-  if (!array) return {};
+  if (!array) return ScopedTypedefUnpackedDims(ref, ArrayTables(), unit_);
   return std::move(array->dims);
 }
 

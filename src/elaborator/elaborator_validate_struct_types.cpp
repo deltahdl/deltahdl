@@ -15,6 +15,7 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_class_lookup.h"
 #include "elaborator/elaborator_helpers.h"
+#include "elaborator/net_data_type.h"
 #include "elaborator/net_or_variable_type.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
@@ -179,6 +180,15 @@ static bool NamesClassProperty(const Expr& ref, const TypeRefScope& scope) {
          });
 }
 
+static DataType PackageTypeNamedBy(const Expr& ref, const PackageDecl& pkg,
+                                   const ModuleItem& item,
+                                   const TypeRefScope& scope) {
+  const std::string kKey = NamedTypeKey(pkg.name, item.name);
+  auto base = item.unpacked_dims.empty() ? scope.typedefs.end()
+                                         : scope.typedefs.find(kKey);
+  return base != scope.typedefs.end() ? base->second : TypeSpelledBy(&ref);
+}
+
 static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
                                  const TypeRefScope& scope) {
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution ||
@@ -207,7 +217,7 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
   if (pkg == nullptr) return false;
   const ModuleItem& item = *ItemNamed(pkg->items, ref->rhs->text);
   AdoptReferencedType(dt, DeclaresAType(item)
-                              ? TypeSpelledBy(ref)
+                              ? PackageTypeNamedBy(*ref, *pkg, item, scope)
                               : ScopeValueType(item, pkg->items, scope.arena));
   return true;
 }
@@ -500,6 +510,22 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   const ModuleItem* td = FindClassScopedTypedefItem(cls_name, type_name, unit);
   if (td == nullptr) return nullptr;
   return &td->typedef_type;
+}
+
+std::vector<Expr*> ScopedTypedefUnpackedDims(const Expr* ref,
+                                             const TypeShapeTables& tables,
+                                             const CompilationUnit* unit) {
+  if (ref == nullptr || !IsPlainScopedName(*ref) ||
+      ref->lhs->kind != ExprKind::kIdentifier || ref->rhs == nullptr ||
+      ref->rhs->kind != ExprKind::kIdentifier)
+    return {};
+  if (const ModuleItem* td =
+          FindClassScopedTypedefItem(ref->lhs->text, ref->rhs->text, unit))
+    return td->unpacked_dims;
+  const std::string kKey = NamedTypeKey(ref->lhs->text, ref->rhs->text);
+  auto dims = tables.typedef_dims.find(kKey);
+  return dims != tables.typedef_dims.end() ? dims->second
+                                           : std::vector<Expr*>{};
 }
 
 const DataType* ClassTypedefNamedBy(const Expr& ref,

@@ -133,4 +133,28 @@ TEST(ParameterOfTypeReferenceSim, TakesTheOperandsUnpackedDimension) {
   }
 }
 
+TEST(ScopeDeclarationTypeRefSim, ScopedTypedefKeepsItsUnpackedDimensions) {
+  for (std::string_view place :
+       {"module", "interface", "program", "generate block"}) {
+    const std::string kSrc =
+        "package q;\n  typedef bit [3:0] pa [3];\nendpackage\n"
+        "class D;\n  typedef bit [3:0] a [3];\nendclass\n" +
+        InPlace(place,
+                "  typedef bit [3:0] la [3];\n"
+                "  var type(la) y;\n"
+                "  var type(q::pa) z;\n"
+                "  var type(D::a) c;\n"
+                "  typedef type(q::pa) tq;\n"
+                "  typedef type(D::a) tc;\n"
+                "  tq zt;\n"
+                "  tc ct;\n"
+                "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
+                "$bits(y), $bits(z), $bits(c), $bits(zt), $bits(ct), "
+                "$size(y), $size(z), $size(c));\n");
+    SCOPED_TRACE(kSrc);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), "12 12 12 12 12 3 3 3\n");
+  }
+}
+
 }  // namespace
