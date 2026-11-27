@@ -374,16 +374,28 @@ static Logic4Vec StreamIntoUnboundedType(const Expr* expr,
   }
   Logic4Vec out = OwnRhsWords(stream, arena);
   out.is_signed = false;
-  return out;
+  if (!type.is_string) return out;
+  uint32_t elems = (out.width + type.elem_width - 1) / type.elem_width;
+  return ResizeToWidth(out, elems * type.elem_width, arena);
+}
+
+static std::optional<UnboundedCastType> UnboundedArrayCastType(
+    const Expr* expr, SimContext& ctx) {
+  if (expr->kind != ExprKind::kCast || expr->lhs == nullptr ||
+      expr->lhs->kind == ExprKind::kAssignmentPattern)
+    return std::nullopt;
+  std::optional<UnboundedCastType> type = UnboundedCastTarget(expr, ctx);
+  return type && !type->is_string ? type : std::nullopt;
+}
+
+bool IsUnboundedArrayCast(const Expr* expr, SimContext& ctx) {
+  return UnboundedArrayCastType(expr, ctx).has_value();
 }
 
 bool CollectUnboundedCastElements(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out) {
-  std::optional<UnboundedCastType> type;
-  if (expr->kind == ExprKind::kCast && expr->lhs != nullptr &&
-      expr->lhs->kind != ExprKind::kAssignmentPattern)
-    type = UnboundedCastTarget(expr, ctx);
-  if (!type || type->is_string) return false;
+  std::optional<UnboundedCastType> type = UnboundedArrayCastType(expr, ctx);
+  if (!type) return false;
   Logic4Vec stream = EvalCast(expr, ctx, arena);
   uint32_t width = type->elem_width;
   for (uint32_t at = stream.width; at >= width; at -= width)

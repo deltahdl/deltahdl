@@ -97,7 +97,8 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
 }
 
 static bool IsQueueValuedRhs(const Expr* rhs, SimContext& ctx) {
-  if (rhs->kind == ExprKind::kConcatenation) return true;
+  if (rhs->kind == ExprKind::kConcatenation || IsUnboundedArrayCast(rhs, ctx))
+    return true;
   if (rhs->kind != ExprKind::kSelect || !rhs->base || !rhs->index_end)
     return false;
   return rhs->base->kind == ExprKind::kIdentifier &&
