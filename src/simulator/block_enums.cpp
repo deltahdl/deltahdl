@@ -225,7 +225,8 @@ struct BlockEnumWalk {
         continue;
       }
       Walk(s, aliases);
-      if (s->kind == StmtKind::kVarDecl) aliases.erase(s->var_name);
+      if (s != nullptr && s->kind == StmtKind::kVarDecl)
+        aliases.erase(s->var_name);
     }
   }
 
