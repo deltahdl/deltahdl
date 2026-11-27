@@ -172,6 +172,8 @@ std::string RootedReferenceKey(const Expr* expr);
 Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx);
 std::string_view ArrayRootKey(const Expr* base, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
+bool CollectUnboundedCastElements(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::vector<Logic4Vec>& out);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
 bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
                                std::vector<Logic4Vec>& out);

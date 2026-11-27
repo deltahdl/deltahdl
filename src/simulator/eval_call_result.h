@@ -88,6 +88,9 @@ bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key);
 bool ElementTagKey(const Expr* select, SimContext& ctx, Arena& arena,
                    std::string& key);
 
+const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
+                                             Arena& arena);
+
 bool TryCallResultArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 Logic4Vec ElementOfReturnedAggregate(const ReturnedAggregate& returned,

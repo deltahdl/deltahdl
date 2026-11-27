@@ -752,7 +752,7 @@ constexpr std::string_view kPacketDecls =
     "  endfunction\n"
     "  channel_type channel;\n";
 
-TEST(BitStreamCastSim, DISABLED_CastToAQueueTypeTakesEveryByte) {
+TEST(BitStreamCastSim, CastToAQueueTypeTakesEveryByte) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n" + std::string(kPacketDecls) +
                            "  Packet pk;\n"
@@ -768,7 +768,7 @@ TEST(BitStreamCastSim, DISABLED_CastToAQueueTypeTakesEveryByte) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(BitStreamCastSim, DISABLED_QueueSliceSourceStreamsItsElements) {
+TEST(BitStreamCastSim, QueueSliceSourceStreamsItsElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n" + std::string(kPacketDecls) +
                            "  Packet p;\n"
@@ -786,7 +786,7 @@ TEST(BitStreamCastSim, DISABLED_QueueSliceSourceStreamsItsElements) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-TEST(BitStreamCastSim, DISABLED_ClausePacketExampleSendsAndReceivesAPacket) {
+TEST(BitStreamCastSim, ClausePacketExampleSendsAndReceivesAPacket) {
   SimFixture f;
   EXPECT_EQ(
       RunCapture("module t;\n" + std::string(kPacketDecls) +
@@ -805,6 +805,109 @@ TEST(BitStreamCastSim, DISABLED_ClausePacketExampleSendsAndReceivesAPacket) {
                      "endmodule\n",
                  f),
       "3 beef 3 11 44 77 0\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, CastToADynamicArrayOrBoundedQueueTypeTakesEveryElement) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n" + std::string(kPacketDecls) +
+                     "  typedef byte bytes_t[];\n"
+                     "  typedef bytes_t alias_t;\n"
+                     "  typedef shortint words_t[$:7];\n"
+                     "  Packet pk; bytes_t d, e, n; words_t w;\n"
+                     "  byte q[$];\n"
+                     "  bytes_t i = bytes_t'(24'h0A0B0C);\n"
+                     "  initial begin\n"
+                     "    pk = genPkt();\n"
+                     "    d = bytes_t'(pk);\n"
+                     "    q = {8'hA1, 8'hB2, 8'hC3};\n"
+                     "    e = alias_t'(q);\n"
+                     "    w = words_t'(32'h1234_5678);\n"
+                     "    n <= bytes_t'(pk);\n"
+                     "    #1 $display(\"%0d %h %h %0d %h %h %0d %h %h %0d %h "
+                     "%0d %h\", d.size(), d[0], d[6], e.size(), e[0], "
+                     "e[2], w.size(), w[0], w[1], i.size(), i[2], "
+                     "n.size(), n[1]);\n"
+                     "  end\n"
+                     "endmodule\n",
+                 f),
+      "7 03 77 3 a1 c3 2 1234 5678 3 0c 7 be\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, CastToAStringTypeTakesEveryByte) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef struct {byte h; string s;} m_t;\n"
+                       "  typedef string str_t;\n"
+                       "  m_t m; string s; str_t u;\n"
+                       "  initial begin\n"
+                       "    m.h = \"X\"; m.s = \"YZWV\";\n"
+                       "    s = string'(m);\n"
+                       "    u = str_t'(m);\n"
+                       "    $display(\"%s %0d %s\", s, s.len(), u);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "XYZWV 5 XYZWV\n");
+  EXPECT_FALSE(f.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, CastToAQueueTypeOfPartElementsIsReported) {
+  SimFixture reported;
+  RunCapture(
+      "module t;\n"
+      "  typedef byte channel_type[$];\n"
+      "  channel_type channel;\n"
+      "  initial channel = channel_type'(20'h12345);\n"
+      "endmodule\n",
+      reported);
+  EXPECT_TRUE(ReportedError(
+      reported.diag.Diagnostics(),
+      "the 20-bit source is no whole number of its 8-bit elements", 4,
+      "6.24.3"));
+  SimFixture accepted;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  typedef byte channel_type[$];\n"
+                       "  channel_type channel;\n"
+                       "  initial begin\n"
+                       "    channel = channel_type'(24'h123456);\n"
+                       "    $display(\"%0d %h\", channel.size(), channel[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       accepted),
+            "3 56\n");
+  EXPECT_FALSE(accepted.diag.HasErrors());
+}
+
+TEST(BitStreamCastSim, DynamicAndFixedArraySliceSourcesStreamLeftToRight) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture(
+          "module t;\n" + std::string(kPacketDecls) +
+              "  Packet p, r, s;\n"
+              "  byte d[]; byte a[0:7]; byte g[7:0];\n"
+              "  initial begin\n"
+              "    d = {8'h09, 8'h03, 8'hBE, 8'hEF, 8'h11, 8'h22, 8'h44, "
+              "8'h77};\n"
+              "    a = '{8'h09, 8'h03, 8'hBE, 8'hEF, 8'h11, 8'h22, 8'h44, "
+              "8'h77};\n"
+              "    g = '{8'h03, 8'hBE, 8'hEF, 8'h11, 8'h22, 8'h44, 8'h77, "
+              "8'h09};\n"
+              "    p = Packet'(d[1 : 7]);\n"
+              "    r = Packet'(a[1 : 7]);\n"
+              "    s = Packet'(g[7 : 1]);\n"
+              "    $display(\"%0d %h %0d %h %h\", p.length, p.address, "
+              "p.payload.size(), p.payload[2], p.chksum);\n"
+              "    $display(\"%0d %h %0d %h %h\", r.length, r.address, "
+              "r.payload.size(), r.payload[2], r.chksum);\n"
+              "    $display(\"%0d %h %0d %h %h\", s.length, s.address, "
+              "s.payload.size(), s.payload[2], s.chksum);\n"
+              "  end\n"
+              "endmodule\n",
+          f),
+      "3 beef 3 44 77\n3 beef 3 44 77\n3 beef 3 44 77\n");
   EXPECT_FALSE(f.diag.HasErrors());
 }
 

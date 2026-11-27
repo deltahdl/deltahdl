@@ -286,7 +286,7 @@ void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
   } else if (init->kind == ExprKind::kAssignmentPattern) {
     for (auto* elem : init->elements)
       items.push_back(EvalExpr(elem, ctx, arena));
-  } else {
+  } else if (!CollectUnboundedCastElements(init, ctx, arena, items)) {
     return;
   }
   for (const auto& item : items)

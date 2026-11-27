@@ -567,6 +567,7 @@ static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
   }
   if (TryCollectLocatorResult(expr, ctx, arena, out)) return;
   if (CollectUnpackedSliceElements(expr, ctx, arena, out)) return;
+  if (CollectUnboundedCastElements(expr, ctx, arena, out)) return;
   out.push_back(EvalExpr(expr, ctx, arena));
 }
 

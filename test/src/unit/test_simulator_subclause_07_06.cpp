@@ -460,7 +460,7 @@ TEST(ArrayAssignmentSim, PackedArrayCastToAFixedArrayOfBytes) {
             "11 44\n");
 }
 
-TEST(ArrayAssignmentSim, DISABLED_PackedArrayCastToADynamicArrayOfBytes) {
+TEST(ArrayAssignmentSim, PackedArrayCastToADynamicArrayOfBytes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
                        "  bit [31:0] p = 32'h11223344; typedef byte d_t []; "

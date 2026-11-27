@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <format>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -11,15 +12,19 @@
 #include "common/diagnostic.h"
 #include "common/types.h"
 #include "elaborator/assoc_index_type.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/typename_writer.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
 #include "simulator/class_object.h"
 #include "simulator/clocking.h"
 #include "simulator/dyn_struct_member.h"
 #include "simulator/eval_array.h"
+#include "simulator/eval_array_class_queue.h"
+#include "simulator/eval_call_result.h"
 #include "simulator/eval_expr_internal.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/eval_member_path.h"
@@ -323,6 +328,69 @@ uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
   return tw > 0 ? tw : 32;
 }
 
+struct UnboundedCastType {
+  uint32_t elem_width = 0;
+  bool is_string = false;
+};
+
+static std::optional<UnboundedCastType> UnboundedTypeOfKey(std::string_view key,
+                                                           SimContext& ctx,
+                                                           int depth) {
+  if (key == "string") return UnboundedCastType{8, true};
+  const ModuleItem* item = ctx.FindTypedefItem(key);
+  if (item == nullptr || depth > 8) return std::nullopt;
+  const DataType& type = item->typedef_type;
+  if (item->unpacked_dims.empty()) {
+    if (type.kind == DataTypeKind::kString) return UnboundedCastType{8, true};
+    if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
+      return std::nullopt;
+    return UnboundedTypeOfKey(type.type_name, ctx, depth + 1);
+  }
+  const Expr* dim = item->unpacked_dims.front();
+  if (item->unpacked_dims.size() != 1 || (dim != nullptr && !IsQueueDim(dim)))
+    return std::nullopt;
+  uint32_t width = DeclaredTypeWidth(type, ctx);
+  return width == 0 ? std::nullopt
+                    : std::optional<UnboundedCastType>({width, false});
+}
+
+static std::optional<UnboundedCastType> UnboundedCastTarget(const Expr* expr,
+                                                            SimContext& ctx) {
+  return UnboundedTypeOfKey(CastTypeKey(expr, ctx), ctx, 0);
+}
+
+static Logic4Vec StreamIntoUnboundedType(const Expr* expr,
+                                         const Logic4Vec& stream,
+                                         const UnboundedCastType& type,
+                                         SimContext& ctx, Arena& arena) {
+  if (!type.is_string && stream.width % type.elem_width != 0) {
+    ctx.GetDiag().Error(
+        expr->range.start,
+        std::format("bit-stream cast to '{}': the {}-bit source is no whole "
+                    "number of its {}-bit elements",
+                    CastTypeKey(expr, ctx), stream.width, type.elem_width),
+        Subclause("6.24.3"));
+    return MakeLogic4Vec(arena, 0);
+  }
+  Logic4Vec out = OwnRhsWords(stream, arena);
+  out.is_signed = false;
+  return out;
+}
+
+bool CollectUnboundedCastElements(const Expr* expr, SimContext& ctx,
+                                  Arena& arena, std::vector<Logic4Vec>& out) {
+  std::optional<UnboundedCastType> type;
+  if (expr->kind == ExprKind::kCast && expr->lhs != nullptr &&
+      expr->lhs->kind != ExprKind::kAssignmentPattern)
+    type = UnboundedCastTarget(expr, ctx);
+  if (!type || type->is_string) return false;
+  Logic4Vec stream = EvalCast(expr, ctx, arena);
+  uint32_t width = type->elem_width;
+  for (uint32_t at = stream.width; at >= width; at -= width)
+    out.push_back(ExtractBitField(arena, stream, at - width, width));
+  return true;
+}
+
 static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
@@ -348,6 +416,11 @@ static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
     return false;
   }
 
+  if (std::optional<UnboundedCastType> type = UnboundedCastTarget(expr, ctx)) {
+    out = StreamIntoUnboundedType(
+        expr, PackBitStreamOperand(expr->lhs, ctx, arena), *type, ctx, arena);
+    return true;
+  }
   uint32_t target_width = ResolveCastWidth(expr->text, ctx);
   auto result = MakeLogic4Vec(arena, target_width);
   if (result.nwords > 0 && inner.nwords > 0) {
@@ -648,6 +721,32 @@ static bool TryCastIntoDynamicStruct(const Expr* expr, const Logic4Vec& stream,
   return true;
 }
 
+static bool StreamUnpackedSlice(const Expr* operand, SimContext& ctx,
+                                Arena& arena, Logic4Vec& out) {
+  if (operand->kind != ExprKind::kSelect || operand->base == nullptr ||
+      operand->index_end == nullptr)
+    return false;
+  const Expr* base = operand->base;
+  if (FindQueueOfBase(base, ctx, arena) == nullptr &&
+      (base->kind != ExprKind::kIdentifier ||
+       ctx.FindArrayInfo(base->text) == nullptr))
+    return false;
+  std::vector<Logic4Vec> parts;
+  CollectQueueElements(operand, ctx, arena, parts);
+  uint32_t width = 0;
+  for (const Logic4Vec& part : parts) width += part.width;
+  out = AssembleConcatParts(parts, width, arena);
+  return true;
+}
+
+static const StructTypeInfo* StreamedSourceLayout(const Expr* operand,
+                                                  SimContext& ctx,
+                                                  Arena& arena) {
+  if (const StructTypeInfo* layout = StructLayoutOfOperand(operand, ctx))
+    return layout;
+  return CallResultStructLayout(operand, ctx, arena);
+}
+
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (IsSelfDeterminedCast(expr)) return EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec stream_out;
@@ -659,16 +758,21 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TrySizeCast(expr, ctx, arena, size_out)) return size_out;
 
   std::string_view type_name = expr->text;
-  auto inner = EvalCastOperand(expr->lhs, type_name, ctx, arena);
+  Logic4Vec inner;
+  if (type_name == "const" ||
+      !StreamUnpackedSlice(expr->lhs, ctx, arena, inner))
+    inner = EvalCastOperand(expr->lhs, type_name, ctx, arena);
 
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
   std::vector<StreamedMember> streamed =
-      DynamicStructMembers(StructLayoutOfOperand(expr->lhs, ctx));
+      DynamicStructMembers(StreamedSourceLayout(expr->lhs, ctx, arena));
   if (!streamed.empty()) inner = StreamDynamicStruct(inner, streamed, arena);
   Logic4Vec struct_out;
   if (TryCastIntoDynamicStruct(expr, inner, ctx, arena, struct_out))
     return struct_out;
+  if (std::optional<UnboundedCastType> type = UnboundedCastTarget(expr, ctx))
+    return StreamIntoUnboundedType(expr, inner, *type, ctx, arena);
 
   CastTarget target;
   if (!TypeRefCastTarget(expr->rhs, ctx, target))
