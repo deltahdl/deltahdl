@@ -155,11 +155,27 @@ bool NamesPackageType(const Expr& ref, const CompilationUnit* unit) {
   return pkg != nullptr && DeclaresAType(*ItemNamed(pkg->items, ref.rhs->text));
 }
 
-static bool NamesClassProperty(const Expr& ref, const CompilationUnit* unit) {
+static const ClassDecl* ModuleClassNamed(const Expr* prefix,
+                                         const ModuleDecl* decl) {
+  if (decl == nullptr || prefix == nullptr ||
+      prefix->kind != ExprKind::kIdentifier)
+    return nullptr;
+  for (const ModuleItem* item : decl->items) {
+    if (item->kind == ModuleItemKind::kClassDecl &&
+        item->class_decl != nullptr && item->class_decl->name == prefix->text)
+      return item->class_decl;
+  }
+  return nullptr;
+}
+
+static bool NamesClassProperty(const Expr& ref, const TypeRefScope& scope) {
+  if (ref.rhs == nullptr) return false;
   const std::vector<const ClassDecl*> kChain =
-      ClassChainOfScopePrefix(ref.lhs, unit);
-  return !kChain.empty() && ref.rhs != nullptr &&
-         std::ranges::any_of(kChain.back()->members, [&](const ClassMember* m) {
+      ClassChainOfScopePrefix(ref.lhs, scope.unit);
+  const ClassDecl* cls =
+      kChain.empty() ? ModuleClassNamed(ref.lhs, scope.decl) : kChain.back();
+  return cls != nullptr &&
+         std::ranges::any_of(cls->members, [&](const ClassMember* m) {
            return m->kind == ClassMemberKind::kProperty &&
                   m->name == ref.rhs->text;
          });
@@ -168,7 +184,7 @@ static bool NamesClassProperty(const Expr& ref, const CompilationUnit* unit) {
 static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
                                  const TypeRefScope& scope) {
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution ||
-      NamesClassProperty(*ref, scope.unit)) {
+      NamesClassProperty(*ref, scope)) {
     return false;
   }
   if (ref->lhs->kind != ExprKind::kIdentifier || ref->lhs->has_param_spec) {

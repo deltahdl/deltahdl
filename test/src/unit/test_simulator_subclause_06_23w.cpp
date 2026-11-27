@@ -1,5 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <format>
+#include <string>
+
 #include "fixture_simulator.h"
 
 using namespace delta;
@@ -66,6 +70,49 @@ TEST(ScopeDeclarationTypeRefSim, PackageAndUnitVariablesTakeTheReferencedType) {
                  "endmodule\n",
                  f),
       "8 8 4 4 12 12 1 6\n");
+}
+
+TEST(ScopeDeclarationTypeRefSim, ClassStaticPropertyGivesItsWholeType) {
+  constexpr const char* kClasses =
+      "class K; static int sq [$]; static int sa [3]; endclass\n"
+      "class D; static byte sb; endclass\n"
+      "class C #(int W = 1);\n"
+      "  static byte sb;\n  static logic [W-1:0] sw;\nendclass\n";
+  struct Place {
+    const char* name;
+    const char* before_module;
+    const char* in_module;
+  };
+  constexpr std::array kPlaces = {
+      Place{"classes in the compilation unit", kClasses, ""},
+      Place{"classes in the module", "", kClasses},
+  };
+  for (const Place& place : kPlaces) {
+    SCOPED_TRACE(place.name);
+    const std::string kSrc = std::format(
+        "package q;\n  class D; static byte sb; endclass\nendpackage\n"
+        "{}"
+        "module top;\n"
+        "{}"
+        "  int mq [$];\n  int ma [3];\n  byte mb;\n"
+        "  typedef type(K::sq) TK;\n  typedef type(mq) TM;\n"
+        "  TK tk;\n  TM tm;\n"
+        "  var type(K::sa) ka;\n  var type(ma) mf;\n"
+        "  var type(D::sb) a;\n  var type(q::D::sb) b;\n"
+        "  var type(C#(1)::sb) c;\n  var type(C#(5)::sw) w;\n"
+        "  var type(mb) d;\n"
+        "  initial begin\n"
+        "    tk.push_back(1);\n    tk.push_back(2);\n    tm.push_back(1);\n"
+        "    $display(\"%0d %0d %0d %0d %0d %0d %0d %0d %0d\", tk.size(), "
+        "tm.size(), $size(ka), $size(mf), $bits(a), $bits(b), $bits(c), "
+        "$bits(w), $bits(d));\n"
+        "  end\n"
+        "endmodule\n",
+        place.before_module, place.in_module);
+    SCOPED_TRACE(kSrc);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), "2 1 3 3 8 8 8 5 8\n");
+  }
 }
 
 }  // namespace
