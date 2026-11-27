@@ -71,6 +71,8 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   auto saved_interface_inst_types =
       std::exchange(interface_inst_types_, pg.interface_inst_types);
   auto saved_decl_path = std::exchange(module_decl_path_, pg.module_decl_path);
+  auto saved_generic_ports =
+      std::exchange(generic_port_interfaces_, pg.generic_port_interfaces);
   const ScopeMap kScope = BuildConstantScope(pg.mod);
   const std::size_t kFirstParam = pg.mod->params.size();
   switch (pg.item->kind) {
@@ -98,6 +100,7 @@ void Elaborator::ProcessPendingGenerate(const PendingGenerate& pg) {
   property_registry_ = std::move(saved_property_registry);
   interface_inst_types_ = std::move(saved_interface_inst_types);
   module_decl_path_ = std::move(saved_decl_path);
+  generic_port_interfaces_ = std::move(saved_generic_ports);
   config_inst_path_ = std::move(saved_config_path);
   current_library_ = std::move(saved_library);
   SwapModuleScopeNames(enclosing);

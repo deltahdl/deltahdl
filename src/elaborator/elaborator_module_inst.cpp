@@ -26,6 +26,7 @@
 #include "elaborator/elaborator_port_binding_internal.h"
 #include "elaborator/implication_operator_rules.h"
 #include "elaborator/interconnect_uses.h"
+#include "elaborator/interface_port_typedef.h"
 #include "elaborator/property_instance.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
@@ -614,6 +615,13 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
     pending_checker_tree_actuals_ = CheckerTreeActuals(item, child_decl);
   }
   pending_type_param_types_ = std::move(applied_type_params.written);
+  pending_generic_port_interfaces_ = GenericPortInterfacesOf(
+      *item, *child_decl, [this](std::string_view actual) {
+        auto it = interface_inst_types_.find(actual);
+        if (it != interface_inst_types_.end()) return it->second;
+        return InterfaceTypeOfPort(actual, *module_decl_path_.back(),
+                                   CurrentGenericPortInterfaces());
+      });
   inst.resolved = ElaborateModule(child_decl, child_params);
   RestoreChildTypeParams(typedefs_, applied_type_params.saved);
   nested_module_decls_ = std::move(saved_nested);

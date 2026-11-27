@@ -237,7 +237,7 @@ TEST(ModportUnlistableObjectSim,
 }
 
 TEST(ModportUnlistableObjectSim,
-     DISABLED_TheSubclausesExampleRunsThroughAGenericModportPort) {
+     TheSubclausesExampleRunsThroughAGenericModportPort) {
   EXPECT_EQ(RunWithoutErrors("interface ebus_i;\n"
                              "  typedef enum {Y, N} choice;\n"
                              "  choice Q;\n"
@@ -323,7 +323,7 @@ TEST(ModportUnlistableObjectSim, AnEnumConstantReadThroughAModportPort) {
 }
 
 TEST(GenericPortTypedefSim,
-     DISABLED_ATypeTakenThroughAGenericPortIsTheConnectedInterfaces) {
+     ATypeTakenThroughAGenericPortIsTheConnectedInterfaces) {
   EXPECT_EQ(RunWithoutErrors(
                 "interface ia; typedef int IT [$]; logic Q; modport mp(input "
                 "Q); endinterface\n"
@@ -339,8 +339,7 @@ TEST(GenericPortTypedefSim,
             "top.ua 0\ntop.ub 2\n");
 }
 
-TEST(GenericPortTypedefSim,
-     DISABLED_AQueueTypeTakenThroughAGenericPortTakesAPush) {
+TEST(GenericPortTypedefSim, AQueueTypeTakenThroughAGenericPortTakesAPush) {
   EXPECT_EQ(RunWithoutErrors("interface ia; typedef int IT [$]; logic Q; "
                              "modport mp(input Q); endinterface\n"
                              "interface ib; typedef int IT [2]; logic Q; "
@@ -377,7 +376,7 @@ TEST(GenericPortTypedefSim, AQueueTypeTakenThroughANamedPortTakesAPush) {
 }
 
 TEST(GenericPortTypedefSim,
-     DISABLED_ATypeTakenThroughAGenericModportPortIsTheConnectedInterfaces) {
+     ATypeTakenThroughAGenericModportPortIsTheConnectedInterfaces) {
   EXPECT_EQ(
       RunWithoutErrors(
           "interface ia; typedef int IT [$]; logic Q; modport mp(input Q); "
@@ -394,8 +393,7 @@ TEST(GenericPortTypedefSim,
       "top.na 0\ntop.nb 2\n");
 }
 
-TEST(GenericPortTypedefSim,
-     DISABLED_ATypeTakenThroughAGenericPortInAGenerateBlock) {
+TEST(GenericPortTypedefSim, ATypeTakenThroughAGenericPortInAGenerateBlock) {
   EXPECT_EQ(RunWithoutErrors(
                 "interface ia; typedef int IT [$]; logic Q; modport mp(input "
                 "Q); endinterface\n"

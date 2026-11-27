@@ -431,6 +431,12 @@ class ElaboratorData {
       written_declarations_;
 
   std::vector<ModuleItem*> argument_typedefs_;
+
+  std::unordered_map<std::string_view, std::string_view>
+      pending_generic_port_interfaces_;
+  std::vector<std::unordered_map<std::string_view, std::string_view>>
+      generic_port_interfaces_;
+  std::unordered_set<std::string_view> interface_port_typedef_names_;
 };
 
 }  // namespace delta

@@ -338,6 +338,12 @@ static void AdoptMemberTypedefDims(
   }
 }
 
+const GenericPortInterfaces& Elaborator::CurrentGenericPortInterfaces() const {
+  static const GenericPortInterfaces kNone;
+  return generic_port_interfaces_.empty() ? kNone
+                                          : generic_port_interfaces_.back();
+}
+
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   std::vector<Expr*> taken_dims =
       TypeRefUnpackedDims(item->typedef_type.type_ref_expr, mod);
@@ -364,14 +370,19 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                 Subclause("6.18"));
   }
   if (!item->typedef_ifc_port.empty()) {
-    const ModuleItem* taken = InterfacePortTypedef(
-        item, module_decl_path_.back(),
+    const InterfacePortType kTaken = InterfacePortTypedef(
+        *item, *module_decl_path_.back(), CurrentGenericPortInterfaces(),
         [this](std::string_view name) { return FindModuleInScope(name); });
-    if (taken != nullptr) {
-      item->typedef_type = taken->typedef_type;
-      item->unpacked_dims.insert(item->unpacked_dims.end(),
-                                 taken->unpacked_dims.begin(),
-                                 taken->unpacked_dims.end());
+    if (kTaken.typedef_item != nullptr) {
+      interface_port_typedef_names_.insert(item->name);
+      item->typedef_type = kTaken.typedef_item->typedef_type;
+      item->unpacked_dims = kTaken.typedef_item->unpacked_dims;
+    } else if (kTaken.iface != nullptr) {
+      diag_.ErrorOnce(
+          item->loc,
+          std::format("interface port '{}' names no type '{}'",
+                      item->typedef_ifc_port, item->typedef_type.type_name),
+          Subclause("6.18"));
     }
   }
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);

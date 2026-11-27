@@ -28,6 +28,8 @@ struct PendingGenerate {
   std::unordered_map<std::string_view, std::string_view> interface_inst_types;
   std::vector<const ModuleDecl*> module_decl_path;
   std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims;
+  std::vector<std::unordered_map<std::string_view, std::string_view>>
+      generic_port_interfaces;
 };
 
 }  // namespace delta

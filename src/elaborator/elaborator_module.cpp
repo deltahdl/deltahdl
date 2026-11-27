@@ -465,6 +465,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   RegisterCuEnumLiterals(decl, mod, enum_ctx);
 
   module_decl_path_.push_back(decl);
+  generic_port_interfaces_.push_back(
+      std::exchange(pending_generic_port_interfaces_, {}));
   ElaborateParamPortList(decl, params, mod);
   if (decl->decl_kind == ModuleDeclKind::kChecker) {
     mod->constant_formals = CheckerConstantFormals(
@@ -503,6 +505,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
 
   ElaborateItems(decl, mod);
   module_decl_path_.pop_back();
+  generic_port_interfaces_.pop_back();
   ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));
   module_global_clocking_event_ = saved_global_clocking_event;
   if (own_gclk != nullptr) global_clocking_scopes_.pop_back();

@@ -343,7 +343,7 @@ TEST(UserDefinedTypeElaboration, PackageScopedTypeIsNoHierarchicalReference) {
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_InterfacePortTypedefOfATypeTheInterfaceLacksIsReported) {
+     InterfacePortTypedefOfATypeTheInterfaceLacksIsReported) {
   ElabFixture f;
   const std::string kSrc =
       "interface intf_i;\n"
@@ -361,6 +361,50 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "interface port 'p' names no type 'no_such_t'",
                             LineHolding(kSrc, "typedef p.no_such_t"), "6.18"));
+  ElabFixture g;
+  const std::string kGeneric =
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n"
+      "module sub(interface p);\n"
+      "  typedef p.data_t ok_t;\n"
+      "  typedef p.no_such_t t;\n"
+      "  t data;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  intf_i i();\n"
+      "  sub s1(i);\n"
+      "  sub s2(i);\n"
+      "endmodule\n";
+  ElaborateSrc(kGeneric, g);
+  EXPECT_TRUE(ReportedError(
+      g.diag.Diagnostics(), "interface port 'p' names no type 'no_such_t'",
+      LineHolding(kGeneric, "typedef p.no_such_t"), "6.18"));
+  EXPECT_FALSE(ReportedError(g.diag.Diagnostics(), "names no type",
+                             LineHolding(kGeneric, "typedef p.data_t"),
+                             "6.18"));
+}
+
+TEST(UserDefinedTypeElaboration,
+     InterfacePortTypedefOfATypeTheInterfaceDefinesIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("interface intf_i;\n"
+             "  typedef int data_t;\n"
+             "endinterface\n"
+             "module sub(intf_i p);\n"
+             "  typedef p.data_t t;\n"
+             "  t data;\n"
+             "endmodule\n"
+             "module gsub(interface p);\n"
+             "  typedef p.data_t t;\n"
+             "  t data;\n"
+             "endmodule\n"
+             "module top;\n"
+             "  intf_i i();\n"
+             "  sub s(i);\n"
+             "  gsub g1(i);\n"
+             "  gsub g2(i);\n"
+             "endmodule\n"));
 }
 
 TEST(UserDefinedTypeElaboration,

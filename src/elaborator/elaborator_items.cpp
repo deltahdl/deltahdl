@@ -436,8 +436,13 @@ ModuleItem* Elaborator::DeclarationOfInstance(ModuleItem* item,
   auto written = written_declarations_.find(item);
   if (written != written_declarations_.end())
     return arena_.Create<ModuleItem>(*written->second);
+  const bool kTakenThroughAnInterfacePort =
+      !item->typedef_ifc_port.empty() ||
+      (type.kind == DataTypeKind::kNamed &&
+       interface_port_typedef_names_.contains(type.type_name));
   if (WritesTypeRefArgument(item->typedef_type) ||
-      NamesATypedefOfANamedType(type, typedefs_)) {
+      NamesATypedefOfANamedType(type, typedefs_) ||
+      kTakenThroughAnInterfacePort) {
     written_declarations_[item] = arena_.Create<ModuleItem>(*item);
   }
   return item;
@@ -601,10 +606,11 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kGenerateIf:
     case ModuleItemKind::kGenerateCase:
     case ModuleItemKind::kGenerateFor:
-      pending_generates_.push_back(
-          {item, mod, typedefs_, cu_param_scope_, func_decls_,
-           property_registry_, config_inst_path_, current_library_,
-           interface_inst_types_, module_decl_path_, td_array_dims_});
+      pending_generates_.push_back({item, mod, typedefs_, cu_param_scope_,
+                                    func_decls_, property_registry_,
+                                    config_inst_path_, current_library_,
+                                    interface_inst_types_, module_decl_path_,
+                                    td_array_dims_, generic_port_interfaces_});
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
