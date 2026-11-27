@@ -577,9 +577,12 @@ TEST(DynamicElementLifetime, DynamicElementReadOutsideAProcedureReported) {
       "  assign w2 = q[$];\n"
       "  assign w3 = a[\"k\"];\n"
       "  wire [31:0] w4 = d[1] + 1;\n"
+      "  logic [1:3] dyn [];\n"
+      "  wire h, j, k;\n"
+      "  assign {h, j, k} = $getpattern(dyn[1]);\n"
       "endmodule\n",
       kDynamicReadOutsideAProcedure,
-      {"= d[0]", "= q[$]", "= a[\"k\"]", "= d[1]"});
+      {"= d[0]", "= q[$]", "= a[\"k\"]", "= d[1]", "$getpattern(dyn[1])"});
 }
 
 TEST(DynamicElementLifetime, DynamicElementAsAGateInputPortOrDelayReported) {

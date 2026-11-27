@@ -207,17 +207,15 @@ TEST(GetpatternPlacement, DISABLED_ASubarrayOrASliceIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoMemoryElement, 6, "D.3"));
 }
 
-TEST(GetpatternPlacement, ElementsOfRegBitAndDynamicMemoriesAreAccepted) {
+TEST(GetpatternPlacement, ElementsOfRegAndBitMemoriesAreAccepted) {
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
       "  reg [1:3] r [1:2];\n"
       "  bit [1:3] q [1:2];\n"
-      "  logic [1:3] dyn [];\n"
-      "  wire a, b, c, d, e, g, h, j, k;\n"
+      "  wire a, b, c, d, e, g;\n"
       "  assign {a, b, c} = $getpattern(r[1]);\n"
       "  assign {d, e, g} = $getpattern(q[1]);\n"
-      "  assign {h, j, k} = $getpattern(dyn[1]);\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);

@@ -197,7 +197,7 @@ class NbaDynamicElementWalk {
   }
 
   void ReportReads(const Expr* e) const {
-    if (e == nullptr) return;
+    if (e == nullptr || e->kind == ExprKind::kTypeRef) return;
     if (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
       std::optional<PathShape> shape = Resolve(e, no_locals_);
       if (shape && (shape->dynamic_element || shape->class_member)) {
@@ -218,7 +218,7 @@ class NbaDynamicElementWalk {
   const ShapeMap& module_vars_;
   const ClassDecl* cls_;
   DiagEngine& diag_;
-  const BodyDeclScopes no_locals_{false};
+  BodyDeclScopes no_locals_{false};
 };
 
 void CheckItemBodies(const ModuleItem* item, NbaDynamicElementWalk& walk) {
