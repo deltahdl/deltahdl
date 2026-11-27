@@ -358,6 +358,11 @@ std::vector<RandInfo> MakeScopeRandVariables(
     ri.var.is_signed = targets[i]->is_signed;
     ri.var.BindDomainToDeclaredRange();
     ri.var.value = ri.var.ValueFromBits(targets[i]->value.ToUint64());
+    if (targets[i]->is_real) {
+      ri.var.is_real = true;
+      ri.var.real_min = -2147483648.0;
+      ri.var.real_max = 2147483648.0;
+    }
     rands.push_back(std::move(ri));
   }
   return rands;
@@ -375,8 +380,13 @@ std::vector<ConstraintExpr> TranslateScopeWithBlock(
 
 void WriteBackScopeSolved(const std::vector<Variable*>& targets,
                           const std::vector<std::string>& names,
+                          const std::vector<RandInfo>& rands,
                           const ConstraintSolver& solver, Arena& arena) {
   for (size_t i = 0; i < targets.size(); ++i) {
+    if (rands[i].var.is_real) {
+      targets[i]->value = SolvedValue(rands[i], solver, "", arena);
+      continue;
+    }
     uint32_t w = targets[i]->value.width;
     if (w == 0) w = 32;
     targets[i]->value = MakeLogic4VecVal(
@@ -439,7 +449,7 @@ bool TryEvalScopeRandomizeCall(const Expr* expr, SimContext& ctx, Arena& arena,
   bool ok = solver.SolveWith(with_constraints);
 
   if (ok) {
-    WriteBackScopeSolved(targets, names, solver, arena);
+    WriteBackScopeSolved(targets, names, rands, solver, arena);
     for (const auto& [stand_in, field] : scope.properties)
       WriteResolvedField(field, stand_in->value, ctx, arena);
   }
