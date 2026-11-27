@@ -465,6 +465,13 @@ static std::vector<std::string_view> VisibleTypeParamNames(
   return names;
 }
 
+void Elaborator::BindCheckerActuals(const ModuleDecl* decl, RtlirModule* mod) {
+  mod->constant_formals = CheckerConstantFormals(
+      decl, std::exchange(pending_checker_actuals_, {}), BuildParamScope(mod));
+  SetCheckerFreeVariables(decl, mod);
+  checker_tree_actuals_[mod] = std::exchange(pending_checker_tree_actuals_, {});
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   UnitScopeTables::Switch unit_scope(*this, decl);
@@ -495,14 +502,8 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   generic_port_interfaces_.push_back(
       std::exchange(pending_generic_port_interfaces_, {}));
   ElaborateParamPortList(decl, params, mod);
-  if (decl->decl_kind == ModuleDeclKind::kChecker) {
-    mod->constant_formals = CheckerConstantFormals(
-        decl, std::exchange(pending_checker_actuals_, {}),
-        BuildParamScope(mod));
-    SetCheckerFreeVariables(decl, mod);
-    checker_tree_actuals_[mod] =
-        std::exchange(pending_checker_tree_actuals_, {});
-  }
+  if (decl->decl_kind == ModuleDeclKind::kChecker)
+    BindCheckerActuals(decl, mod);
 
   const InstanceParamAssignments kBodyAssignments{
       params, RegisteredModuleScope(), RegisteredModule(),

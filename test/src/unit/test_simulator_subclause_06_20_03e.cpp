@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "fixture_simulator.h"
 #include "helpers_final_output.h"
 
 using namespace delta;
@@ -110,9 +109,11 @@ std::vector<std::string> Expected(const std::vector<Bound>& bounds) {
   return lines;
 }
 
-const std::vector<Bound> kThree = {{"t.a", "44", "-1", "8"},
-                                   {"t.b", "300", "511", "32"},
-                                   {"t.c", "300", "511", "16"}};
+std::vector<std::string> ThreeInstancesExpected() {
+  return Expected({{"t.a", "44", "-1", "8"},
+                   {"t.b", "300", "511", "32"},
+                   {"t.c", "300", "511", "16"}});
+}
 
 TEST(ProceduralTypeParameterSim, EachInstanceDeclaresItsLocalsWithItsType) {
   for (const char* kind : {"module", "interface", "program"}) {
@@ -122,13 +123,13 @@ TEST(ProceduralTypeParameterSim, EachInstanceDeclaresItsLocalsWithItsType) {
                                        "  sub #(int) b();\n"
                                        "  sub #(shortint) c();\n"
                                        "endmodule\n"),
-              Expected(kThree));
+              ThreeInstancesExpected());
     EXPECT_EQ(SortedOutput(Sub(kind) + "module t;\n"
                                        "  sub #(shortint) c();\n"
                                        "  sub #(int) b();\n"
                                        "  sub #(byte) a();\n"
                                        "endmodule\n"),
-              Expected(kThree));
+              ThreeInstancesExpected());
   }
 }
 

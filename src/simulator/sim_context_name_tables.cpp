@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "common/packed_range.h"
+#include "elaborator/rtlir_typedef_facts.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
