@@ -423,9 +423,12 @@ static void CollectCheckerActualReads(const Stmt* s,
   if (s->kind != StmtKind::kCheckerInstantiation) return;
   const ModuleItem& inst = *s->decl_item;
   for (size_t i = 0; i < inst.inst_ports.size(); ++i) {
-    if (!inst.inst_ports_implicit[i]) {
-      CollectBareIdents(inst.inst_ports[i].second, refs);
+    const Expr* actual = inst.inst_ports[i].second;
+    if (inst.inst_ports_implicit[i] || actual == nullptr ||
+        actual->property_actual != nullptr) {
+      continue;
     }
+    CollectBareIdents(actual, refs);
   }
 }
 

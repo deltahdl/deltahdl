@@ -679,6 +679,9 @@ TEST(ImplicitDeclaration, ProceduralCheckerInstanceDeclaresNoImplicitNet) {
       "logic cv;\n"
       "checker c(logic a);\n"
       "endchecker\n"
+      "checker c2(x = 1'b0, logic b);\n"
+      "  a1: assert property (@(posedge b) x);\n"
+      "endchecker\n"
       "module top;\n"
       "  import k::*;\n"
       "  logic clk, v, a;\n"
@@ -694,6 +697,8 @@ TEST(ImplicitDeclaration, ProceduralCheckerInstanceDeclaresNoImplicitNet) {
       "    c c6(pv);\n"
       "    c c7(cv);\n"
       "    c c8(.a);\n"
+      "    c2 c10(, clk);\n"
+      "    c2 c11(v ##1 v, clk);\n"
       "  end\n"
       "  if (1) begin : g\n"
       "    always @(posedge clk) begin\n"
@@ -704,7 +709,7 @@ TEST(ImplicitDeclaration, ProceduralCheckerInstanceDeclaresNoImplicitNet) {
       f);
   ASSERT_NE(design, nullptr);
   const std::vector<std::pair<std::string, uint32_t>> kUndeclared = {
-      {"nproc", 11}, {"nnamed", 12}, {"nexpr", 13}, {"ngen", 25}};
+      {"nproc", 14}, {"nnamed", 15}, {"nexpr", 16}, {"ngen", 30}};
   for (const auto& [name, line] : kUndeclared) {
     EXPECT_TRUE(ReportedError(
         f.diag.Diagnostics(),
@@ -714,7 +719,8 @@ TEST(ImplicitDeclaration, ProceduralCheckerInstanceDeclaresNoImplicitNet) {
     }
   }
   const std::vector<std::pair<std::string, uint32_t>> kDeclared = {
-      {"v", 17}, {"l", 18}, {"pv", 19}, {"cv", 20}, {"a", 21}};
+      {"v", 20},  {"l", 21}, {"pv", 22},
+      {"cv", 23}, {"a", 24}, {"<property_actual>", 26}};
   for (const auto& [name, line] : kDeclared) {
     EXPECT_FALSE(ReportedError(
         f.diag.Diagnostics(),
