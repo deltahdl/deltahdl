@@ -157,9 +157,7 @@ bool NamesPackageType(const Expr& ref, const CompilationUnit* unit) {
 
 static const ClassDecl* ModuleClassNamed(const Expr* prefix,
                                          const ModuleDecl* decl) {
-  if (decl == nullptr || prefix == nullptr ||
-      prefix->kind != ExprKind::kIdentifier)
-    return nullptr;
+  if (decl == nullptr || prefix->kind != ExprKind::kIdentifier) return {};
   for (const ModuleItem* item : decl->items) {
     if (item->kind == ModuleItemKind::kClassDecl &&
         item->class_decl != nullptr && item->class_decl->name == prefix->text)
