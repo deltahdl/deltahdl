@@ -175,21 +175,25 @@ std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
 
 }  // namespace
 
+std::string TypeKey(const DataType& type, SimContext& ctx) {
+  PackedDims dims;
+  const DataType* builtin = BuiltinTypedefTarget(type, ctx, dims);
+  if (builtin == nullptr) return DeclaredTypeKey(type, ctx);
+  if (const auto kForm = IntegralKindForm(builtin->kind)) {
+    return IntegralTypeKey(*builtin, *kForm, dims, DeclaredTypeWidth(type, ctx),
+                           ctx);
+  }
+  if (builtin->kind == DataTypeKind::kRealtime) return "real";
+  return std::string(BuiltinTypeKeyword(builtin->kind));
+}
+
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
                           const DataType* actual, SimContext& ctx) {
   const DataType* type = actual;
   if (type == nullptr)
     type = i < decl->param_types.size() ? &decl->param_types[i] : nullptr;
   if (type == nullptr) return {};
-  PackedDims dims;
-  const DataType* builtin = BuiltinTypedefTarget(*type, ctx, dims);
-  if (builtin == nullptr) return DeclaredTypeKey(*type, ctx);
-  if (const auto kForm = IntegralKindForm(builtin->kind)) {
-    return IntegralTypeKey(*builtin, *kForm, dims,
-                           DeclaredTypeWidth(*type, ctx), ctx);
-  }
-  if (builtin->kind == DataTypeKind::kRealtime) return "real";
-  return std::string(BuiltinTypeKeyword(builtin->kind));
+  return TypeKey(*type, ctx);
 }
 
 }  // namespace delta

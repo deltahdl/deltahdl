@@ -20,6 +20,7 @@
 #include "simulator/class_specialization.h"
 #include "simulator/clocking.h"
 #include "simulator/eval_array_compare.h"
+#include "simulator/eval_class_scope_types.h"
 #include "simulator/eval_function_args_scoped.h"
 #include "simulator/eval_instance_task.h"
 #include "simulator/evaluation_internal.h"
@@ -483,6 +484,11 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
   if (!IsTypeRef(expr->lhs) || !IsTypeRef(expr->rhs)) return false;
   if (std::optional<bool> holds = ctx.TypeRefCompareHere(expr)) {
     out = MakeLogic4VecVal(arena, 1, *holds ? 1 : 0);
+    return true;
+  }
+  if (std::optional<bool> same =
+          RunningClassTypeRefsMatch(expr->lhs, expr->rhs, ctx)) {
+    out = MakeLogic4VecVal(arena, 1, *same == is_eq ? 1 : 0);
     return true;
   }
   TypeRefRuntimeId a = ResolveTypeRefRuntimeId(expr->lhs, ctx);

@@ -2,16 +2,20 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <vector>
 
 #include "common/arena.h"
+#include "elaborator/type_eval.h"
 #include "elaborator/type_spelled_by.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization.h"
+#include "simulator/class_specialization_key.h"
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_function_internal.h"
 #include "simulator/evaluation.h"
@@ -86,6 +90,91 @@ uint32_t ScopedTypeParamWidth(std::string_view name, SimContext& ctx) {
   }
   const DataType* def = TypeParamActual(nullptr, cls->decl, name);
   return def != nullptr ? DeclaredTypeWidth(*def, ctx) : 0;
+}
+
+static const DataType* RunningClassTypeParam(std::string_view name,
+                                             SimContext& ctx) {
+  if (const DataType* bound = ctx.FindScopeTypeActual(name)) return bound;
+  const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+  if (cls == nullptr || cls->decl == nullptr) return nullptr;
+  const ClassDecl* decl = cls->decl;
+  if (decl->type_param_names.count(name) == 0) return nullptr;
+  for (size_t i = 0; cls->param_actuals != nullptr && i < decl->params.size();
+       ++i) {
+    if (decl->params[i].first != name) continue;
+    const DataType* actual = ActualForParam(*cls->param_actuals, i, name);
+    if (actual != nullptr && actual->kind != DataTypeKind::kImplicit)
+      return actual;
+  }
+  return TypeParamActual(ctx.CurrentThis(), decl, name);
+}
+
+static const ClassMember* RunningClassProperty(std::string_view name,
+                                               SimContext& ctx) {
+  const ClassTypeInfo* cls = ctx.CurrentMethodClass();
+  if (cls == nullptr || cls->decl == nullptr || cls->decl->params.empty())
+    return nullptr;
+  for (const ClassMember* m : cls->decl->members) {
+    if (m->kind == ClassMemberKind::kProperty && !m->is_param &&
+        m->name == name)
+      return m;
+  }
+  return nullptr;
+}
+
+static bool IsBareTypeName(const DataType& type) {
+  return type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
+         type.packed_dim_left == nullptr && type.extra_packed_dims.empty() &&
+         type.type_params.empty();
+}
+
+static std::string_view WrittenName(const Expr* op) {
+  if (op->type_value != nullptr)
+    return IsBareTypeName(*op->type_value) ? op->type_value->type_name
+                                           : std::string_view{};
+  if (!op->text.empty()) return op->text;
+  if (op->lhs != nullptr && op->lhs->kind == ExprKind::kIdentifier &&
+      op->lhs->scope_prefix.empty())
+    return op->lhs->text;
+  return {};
+}
+
+struct RunningOperandType {
+  DataType type;
+  bool through_class = false;
+};
+
+static std::optional<RunningOperandType> PropertyType(const ClassMember& prop,
+                                                      SimContext& ctx) {
+  if (!prop.unpacked_dims.empty()) return std::nullopt;
+  const DataType* actual =
+      IsBareTypeName(prop.data_type)
+          ? RunningClassTypeParam(prop.data_type.type_name, ctx)
+          : nullptr;
+  return RunningOperandType{actual != nullptr ? *actual : prop.data_type, true};
+}
+
+static std::optional<RunningOperandType> TypeOfRunningOperand(const Expr* op,
+                                                              SimContext& ctx) {
+  const std::string_view kName = WrittenName(op);
+  if (const DataType* actual =
+          kName.empty() ? nullptr : RunningClassTypeParam(kName, ctx))
+    return RunningOperandType{*actual, true};
+  if (const ClassMember* prop =
+          kName.empty() ? nullptr : RunningClassProperty(kName, ctx))
+    return PropertyType(*prop, ctx);
+  if (op->type_value != nullptr) return RunningOperandType{*op->type_value};
+  if (kName.empty()) return std::nullopt;
+  return RunningOperandType{TypeNameToDataType(kName)};
+}
+
+std::optional<bool> RunningClassTypeRefsMatch(const Expr* a, const Expr* b,
+                                              SimContext& ctx) {
+  std::optional<RunningOperandType> type_a = TypeOfRunningOperand(a, ctx);
+  std::optional<RunningOperandType> type_b = TypeOfRunningOperand(b, ctx);
+  if (!type_a || !type_b || (!type_a->through_class && !type_b->through_class))
+    return std::nullopt;
+  return TypeKey(type_a->type, ctx) == TypeKey(type_b->type, ctx);
 }
 
 uint32_t SpecializationTypeParamWidth(const Expr* scope, SimContext& ctx,

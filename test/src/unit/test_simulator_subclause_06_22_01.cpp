@@ -104,7 +104,7 @@ TEST(MatchingTypeComparisonSim,
 }
 
 TEST(MatchingTypeComparisonSim,
-     DISABLED_ClassTypeParameterOverrideMatchesTheTypeItNames) {
+     ClassTypeParameterOverrideMatchesTheTypeItNames) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class K #(type T = int);\n"
                        "  localparam bit IsInt = type(T) == type(int);\n"

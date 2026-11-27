@@ -398,11 +398,13 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   const TypeRefCompareFolder kFold = RecordingInto(
       mod, {},
       [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
+  const bool kOneAnswerPerInstance = item->class_decl->params.empty();
   ResolveClassTypeRefs(*item->class_decl, kAmongLocals, unit_, arena_,
                        [&](Stmt* s, std::span<const ProceduralLocal> locals) {
                          InLocals(locals, [&] {
                            CheckDynamicElementArgsOfStmt(s, mod);
-                           FoldTypeRefComparesOfStmt(s, kFold);
+                           if (kOneAnswerPerInstance)
+                             FoldTypeRefComparesOfStmt(s, kFold);
                          });
                          CarryLocalOperandDims(s, mod);
                        });

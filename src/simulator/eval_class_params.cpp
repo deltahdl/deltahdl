@@ -450,7 +450,11 @@ void FoldClassBodyParams(ClassParamSizer sizer,
   ctx.PushScope();
   for (size_t i = 0; i < decl->params.size(); ++i) {
     std::string_view pname = decl->params[i].first;
-    if (decl->type_param_names.count(pname) != 0) continue;
+    if (decl->type_param_names.count(pname) != 0) {
+      if (const DataType* actual = sizer.TypeParamType(pname))
+        ctx.BindScopeTypeActual(pname, actual);
+      continue;
+    }
     const Logic4Vec* value = storage.header(pname);
     if (value == nullptr) continue;
     BindParamLocal({pname, ParamType(decl, i),

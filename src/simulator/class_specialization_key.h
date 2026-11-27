@@ -9,6 +9,8 @@ class SimContext;
 struct ClassDecl;
 struct DataType;
 
+std::string TypeKey(const DataType& type, SimContext& ctx);
+
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
                           const DataType* actual, SimContext& ctx);
 

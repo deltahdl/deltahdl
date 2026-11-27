@@ -46,9 +46,9 @@ class ClassParamSizer {
     type_actuals_ = actuals;
   }
 
- private:
   const DataType* TypeParamType(std::string_view name) const;
 
+ private:
   const ClassDecl* decl_;
   std::string_view type_scope_;
   ScopeMap scope_;

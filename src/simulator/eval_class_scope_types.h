@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 #include <string_view>
 
 namespace delta {
@@ -21,6 +22,9 @@ void BindClassScopeTypeActuals(const ClassTypeInfo* cls, const Expr* base,
 void BindStaticInitTypeActuals(const ClassTypeInfo* cls, SimContext& ctx);
 
 uint32_t ScopedTypeParamWidth(std::string_view name, SimContext& ctx);
+
+std::optional<bool> RunningClassTypeRefsMatch(const Expr* a, const Expr* b,
+                                              SimContext& ctx);
 
 uint32_t SpecializationTypeParamWidth(const Expr* scope, SimContext& ctx,
                                       Arena& arena);

@@ -66,16 +66,19 @@ uint64_t Expected() {
   return bits;
 }
 
-void ExpectInEveryPlace(const std::string& body) {
-  const std::string kClasses = Classes(body);
-  const std::string kHandle = "C";
+void ExpectEveryPlaceGives(const std::string& classes, std::string_view handle,
+                           uint64_t expected) {
   for (const ClassPlace& place : kClassPlaces) {
     SCOPED_TRACE(place.name);
     const std::string kSrc =
-        std::vformat(place.text, std::make_format_args(kClasses, kHandle));
+        std::vformat(place.text, std::make_format_args(classes, handle));
     SCOPED_TRACE(kSrc);
-    EXPECT_EQ(RunAndGet(kSrc, "res"), Expected());
+    EXPECT_EQ(RunAndGet(kSrc, "res"), expected);
   }
+}
+
+void ExpectInEveryPlace(const std::string& body) {
+  ExpectEveryPlaceGives(Classes(body), "C", Expected());
 }
 
 TEST(ClassMethodTypeRefSim, ComparisonInAProceduralIf) {
@@ -126,6 +129,60 @@ TEST(ClassMethodTypeRefSim, PackageValuesInAnotherScopesClass) {
         kPackage + std::vformat(host, std::make_format_args(kClass));
     SCOPED_TRACE(kSrc);
     EXPECT_EQ(RunAndGet(kSrc, "res"), 0b1011'1110u);
+  }
+}
+
+struct Specialization {
+  const char* handle;
+  uint64_t expected;
+};
+
+constexpr std::array kSpecializations = {
+    Specialization{"K", 0b101010},
+    Specialization{"K #()", 0b101010},
+    Specialization{"K #(int, 8)", 0b101010},
+    Specialization{"K #(int, 4)", 0b101001},
+    Specialization{"K #(byte, 8)", 0b010110},
+    Specialization{"K #(byte, 4)", 0b010101},
+};
+
+TEST(ClassMethodTypeRefSim, ParameterizedClassJudgesEachSpecialization) {
+  const std::string kClass =
+      "  class K #(type U = int, int N = 8);\n"
+      "    U y;\n    logic [N-1:0] z;\n"
+      "    function int check();\n      int r = 0;\n"
+      "      if (type(U) == type(int)) r[5] = 1'b1;\n"
+      "      if (type(U) != type(int)) r[4] = 1'b1;\n"
+      "      if (type(y) == type(int)) r[3] = 1'b1;\n"
+      "      if (type(y) != type(int)) r[2] = 1'b1;\n"
+      "      if (type(z) == type(logic [7:0])) r[1] = 1'b1;\n"
+      "      if (type(z) != type(logic [7:0])) r[0] = 1'b1;\n"
+      "      return r;\n    endfunction\n  endclass\n";
+  for (const Specialization& spec : kSpecializations) {
+    SCOPED_TRACE(spec.handle);
+    ExpectEveryPlaceGives(kClass, spec.handle, spec.expected);
+  }
+}
+
+TEST(ClassMethodTypeRefSim, ClassOfAnInstanceJudgesItsOwnTypeParameter) {
+  constexpr std::array kHosts = {"module", "interface", "program"};
+  for (const char* host : kHosts) {
+    const std::string kSrc = std::format(
+        "{0} sub #(type T = int);\n"
+        "  class c;\n    function int check();\n      int r = 0;\n"
+        "      if (type(T) == type(int)) r[1] = 1'b1;\n"
+        "      if (type(T) != type(int)) r[0] = 1'b1;\n"
+        "      return r;\n    endfunction\n  endclass\n"
+        "  int res;\n"
+        "  initial begin\n    c h;\n    h = new;\n    res = h.check();\n"
+        "  end\nend{0}\n"
+        "module top;\n  sub u0();\n  sub #(.T(byte)) u1();\n"
+        "  sub #(.T(int)) u2();\nendmodule\n",
+        host);
+    SCOPED_TRACE(kSrc);
+    EXPECT_EQ(RunAndGet(kSrc, "u0.res"), 0b10u);
+    EXPECT_EQ(RunAndGet(kSrc, "u1.res"), 0b01u);
+    EXPECT_EQ(RunAndGet(kSrc, "u2.res"), 0b10u);
   }
 }
 
