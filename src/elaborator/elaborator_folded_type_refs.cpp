@@ -43,8 +43,8 @@ void Elaborator::RecordFoldedTypeRef(std::string_view name,
 bool Elaborator::AdoptFoldedTypeRef(DataType& dt, const Expr* ref,
                                     const std::optional<DataType>& type,
                                     const RtlirModule* mod) {
-  if (dt.type_argument || !type || !IsFoldedVector(*type) ||
-      !FoldMayDifferByPlace()) {
+  if (dt.type_ref_use == TypeRefUse::kArgument || !type ||
+      !IsFoldedVector(*type) || !FoldMayDifferByPlace()) {
     return false;
   }
   auto [named, fresh] = folded_type_ref_names_.try_emplace(ref);
@@ -69,7 +69,10 @@ bool Elaborator::AdoptExpressionTypeRef(DataType& dt, const Expr* ref,
       return true;
     }
   }
-  if (ref->kind == ExprKind::kIdentifier) return false;
+  if (ref->kind == ExprKind::kIdentifier) {
+    return dt.type_ref_use == TypeRefUse::kIndex &&
+           AdoptFoldedTypeRef(dt, ref, TypeRefExprType(ref, mod), mod);
+  }
   std::optional<DataType> type = TypeRefExprType(ref, mod);
   if (!AdoptFoldedTypeRef(dt, ref, type, mod)) {
     AdoptExpressionType(dt, type, arena_);

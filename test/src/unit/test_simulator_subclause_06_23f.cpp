@@ -163,13 +163,13 @@ TEST(TypeRefOverrideSim, TypeReferenceOverridesATypeParameter) {
 }
 
 constexpr std::array<InstanceTypeSpelling, 2> kTypeParameterReferences{{
-    {"type T = int", "T", "type(y)"},
-    {"type T = int", "T", "type(y + y)"},
+    {"type T = int", "T", "type(y)", "var "},
+    {"type T = int", "T", "type(y + y)", "var "},
 }};
 
 constexpr std::array<InstanceTypeSpelling, 2> kWidthParameterReferences{{
-    {"int W = 32", "logic [W-1:0]", "type(y)"},
-    {"int W = 32", "logic [W-1:0]", "type(y + y)"},
+    {"int W = 32", "logic [W-1:0]", "type(y)", "var "},
+    {"int W = 32", "logic [W-1:0]", "type(y + y)", "var "},
 }};
 
 TEST(ProceduralTypeRefInstanceSim, EachInstanceDeclaresWithItsTypeParameter) {
@@ -252,12 +252,12 @@ TEST(DeclarationTypeRefInstanceSim, EachLoopIterationDeclaresWithItsWidth) {
                    "    typedef type(y + y) tt;\n"
                    "    tt v;\n"
                    "    function automatic int f();\n"
-                   "      type(y + y) l;\n"
+                   "      var type(y + y) l;\n"
                    "      return $bits(l);\n"
                    "    endfunction\n"
                    "    initial begin\n"
-                   "      type(y) l;\n"
-                   "      type(y + y) e;\n"
+                   "      var type(y) l;\n"
+                   "      var type(y + y) e;\n"
                    "      #1 $display(\"%m %0d %0d %0d %0d %0d %0d\", "
                    "$bits(z), $bits(me),\n"
                    "                  $bits(v), $bits(l), $bits(e), f());\n"
@@ -318,7 +318,7 @@ class TypeRefBlockVariableVpi : public VpiDesignRun {
     Run(std::string("module sub #(type T = int);\n"
                     "  T y;\n"
                     "  initial begin : blk\n"
-                    "    type(y) v;\n"
+                    "    var type(y) v;\n"
                     "    T w;\n"
                     "  end\n"
                     "endmodule\n") +

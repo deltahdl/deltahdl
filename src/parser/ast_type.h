@@ -18,6 +18,12 @@ enum class Direction : uint8_t {
   kRef,
 };
 
+enum class TypeRefUse : uint8_t {
+  kDeclared,
+  kArgument,
+  kIndex,
+};
+
 enum class DataTypeKind : uint8_t {
   kImplicit,
   kLogic,
@@ -130,7 +136,7 @@ struct DataType {
   std::vector<DataType> specialized_scopes;
   std::vector<Expr*> operand_unpacked_dims;
   const Expr* written_type_ref = nullptr;
-  bool type_argument = false;
+  TypeRefUse type_ref_use = TypeRefUse::kDeclared;
 };
 
 struct FunctionArg {

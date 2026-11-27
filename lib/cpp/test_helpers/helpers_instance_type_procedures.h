@@ -14,11 +14,13 @@ struct InstanceTypeSpelling {
   std::string_view parameter;
   std::string_view held;
   std::string_view declared;
+  std::string_view keyword;
 };
 
 inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
                                     bool in_program) {
   const std::string kType(spelling.declared);
+  const std::string kDecl = std::string(spelling.keyword) + kType;
   const std::string kRepeated =
       in_program ? "  initial begin\n" : "  always begin\n";
   const std::string kWaits = in_program ? "" : "    @(ai);\n";
@@ -27,7 +29,7 @@ inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
          "  checker ck;\n"
          "    final begin\n"
          "      " +
-         kType +
+         kDecl +
          " l;\n"
          "      l = 300;\n"
          "      $display(\"%m final %0d %0d\", l, $bits(l));\n"
@@ -38,20 +40,20 @@ inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
          "  int ai, bn, bk, bu, bf, bt, ba, br, bp;\n"
          "  function automatic int fl();\n"
          "    " +
-         kType +
+         kDecl +
          " l;\n"
          "    l = 300;\n"
          "    return l;\n"
          "  endfunction\n"
          "  task automatic tk(output int o);\n"
          "    " +
-         kType +
+         kDecl +
          " l;\n"
          "    l = 300;\n"
          "    o = l;\n"
          "  endtask\n"
          "  function automatic int fa(input " +
-         kType +
+         kDecl +
          " a);\n"
          "    return a;\n"
          "  endfunction\n"
@@ -60,7 +62,7 @@ inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
          " ret(int v);\n"
          "    return v;\n"
          "  endfunction\n" +
-         kRepeated + "    " + kType +
+         kRepeated + "    " + kDecl +
          " l;\n"
          "    l = 300;\n"
          "    bp = l;\n" +
@@ -68,20 +70,20 @@ inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
          "  end\n"
          "  final begin\n"
          "    " +
-         kType +
+         kDecl +
          " l;\n"
          "    l = 300;\n"
          "    $display(\"%m final %0d %0d\", l, $bits(l));\n"
          "  end\n"
          "  initial begin\n"
          "    " +
-         kType +
+         kDecl +
          " l;\n"
          "    l = 300;\n"
          "    y = 300;\n"
          "    begin\n"
          "      " +
-         kType +
+         kDecl +
          " n;\n"
          "      n = 300;\n"
          "      bn = n;\n"
@@ -89,14 +91,14 @@ inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
          "    fork\n"
          "      begin\n"
          "        " +
-         kType +
+         kDecl +
          " k;\n"
          "        k = 300;\n"
          "        bk = k;\n"
          "      end\n"
          "    join\n"
          "    for (" +
-         kType +
+         kDecl +
          " i = 300; i != 0; i = 0) bu = i;\n"
          "    bf = fl();\n"
          "    tk(bt);\n"

@@ -4,7 +4,7 @@
 
 namespace {
 
-constexpr InstanceTypeSpelling kTypeParameter{"type T = int", "T", "T"};
+constexpr InstanceTypeSpelling kTypeParameter{"type T = int", "T", "T", ""};
 
 TEST(ProceduralTypeParameterSim, EachInstanceDeclaresItsLocalsWithItsType) {
   ExpectEachInstanceTakesItsType(kTypeParameter, {"byte", "int", "shortint"},
