@@ -45,9 +45,8 @@ DataType ClassPropertyType(const DataType& type, const ClassDecl* cls,
     cur = *next;
     moved = true;
   }
-  bool aggregate = cur.kind == DataTypeKind::kStruct ||
-                   cur.kind == DataTypeKind::kUnion ||
-                   cur.kind == DataTypeKind::kEnum;
+  bool aggregate =
+      cur.kind == DataTypeKind::kStruct || cur.kind == DataTypeKind::kUnion;
   return moved && !aggregate ? cur : type;
 }
 

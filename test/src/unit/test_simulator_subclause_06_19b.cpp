@@ -128,8 +128,7 @@ TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthOutsideAClass) {
       kTypedefBaseDecls, kTypedefBaseVariablesCheck);
 }
 
-TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_TypedefBaseGivesItsWidthInAClass) {
+TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthInAClass) {
   ExpectOkIn({"class"},
              std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
              std::string(kTypedefBaseVariablesCheck) + " && " +
@@ -419,6 +418,19 @@ TEST(EnumerationClassSimulation, ClassEnumerationWithLiteralValuesReadsThem) {
                  "endmodule\n",
                  f),
       "3 4 7 8 B D 4\n");
+}
+
+TEST(EnumerationClassSimulation,
+     PropertyOfAClassEnumerationTypedefTakesItsBaseWidthAndStates) {
+  ExpectOkIn({"class"},
+             "  typedef enum bit [5:0] {A, B} b_t;\n"
+             "  typedef enum logic [2:0] {P, Q} l_t;\n"
+             "  typedef b_t c_t;\n"
+             "  b_t bv;\n"
+             "  l_t lv;\n"
+             "  c_t cv;\n",
+             "$bits(bv) == 6 && $bits(lv) == 3 && $bits(cv) == 6 && "
+             "!$isunknown(bv) && $isunknown(lv)");
 }
 
 constexpr std::string_view kFourStateConstantParameters =
