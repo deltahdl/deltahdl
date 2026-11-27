@@ -183,6 +183,10 @@ void Elaborator::ApplyConfigParamOverrides(
       assignment.second =
           ResolveParentReference(assignment.second, parent_path, parent_scope,
                                  config_ancestor_scopes_, arena_);
+      Expr* dollar = module_path_.empty() ? nullptr
+                                          : DollarPassedBy(assignment.second,
+                                                           module_path_.back());
+      if (dollar != nullptr) assignment.second = dollar;
     }
     ReportUnappliedOverrides(
         ApplyConfigOverrideParams(

@@ -715,18 +715,18 @@ TEST(DollarConstantElaboration,
 }
 
 TEST(DollarConstantElaboration,
-     ConfigurationOverrideNamingADollarLocalparamPassesDollarOn) {
+     ConfigurationOverrideNamingTheParentsDollarParameterPassesDollarOn) {
   ElabFixture f;
   auto* design =
       ConfigElab(f,
                  "module s #(parameter int N = 4, parameter int K = 4);\n"
                  "endmodule\n"
                  "module top;\n"
+                 "  parameter int P = $;\n"
+                 "  parameter int Q = 5;\n"
                  "  s u();\n"
                  "endmodule\n"
                  "config c;\n"
-                 "  localparam P = $;\n"
-                 "  localparam Q = 5;\n"
                  "  design top;\n"
                  "  instance top.u use #(.N(P), .K(Q));\n"
                  "endconfig\n");

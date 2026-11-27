@@ -89,17 +89,22 @@ bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
   return false;
 }
 
+Expr* Elaborator::DollarPassedBy(const Expr* value, const RtlirModule* mod) {
+  if (value == nullptr || value->kind != ExprKind::kIdentifier ||
+      !value->scope_prefix.empty() ||
+      !RefersToUnboundedParam(mod, value->text)) {
+    return nullptr;
+  }
+  auto* dollar = arena_.Create<Expr>(*value);
+  dollar->text = "$";
+  return dollar;
+}
+
 void Elaborator::PassDollarArguments(ParamList& child_params,
                                      const RtlirModule* mod) {
   for (ParamOverride& ovr : child_params) {
-    const Expr* value = ovr.value_expr;
-    if (!ovr.unfolded || value->kind != ExprKind::kIdentifier ||
-        !value->scope_prefix.empty() ||
-        !RefersToUnboundedParam(mod, value->text)) {
-      continue;
-    }
-    auto* dollar = arena_.Create<Expr>(*value);
-    dollar->text = "$";
+    Expr* dollar = ovr.unfolded ? DollarPassedBy(ovr.value_expr, mod) : nullptr;
+    if (dollar == nullptr) continue;
     ovr.value_expr = dollar;
     ovr.unfolded = false;
   }
