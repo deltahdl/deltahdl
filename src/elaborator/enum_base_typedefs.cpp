@@ -115,6 +115,8 @@ class EnumBaseTypedefs {
     if (!kVector && !kSizedAtom) return;
     DataType base = *named;
     StackDims(base, dt);
+    dt.enum_base_name_dim_left = dt.packed_dim_left;
+    dt.enum_base_name_dim_right = dt.packed_dim_right;
     dt.enum_base_kind = base.kind;
     dt.is_signed = base.is_signed;
     dt.packed_dim_left = base.packed_dim_left;
@@ -232,6 +234,21 @@ class EnumBaseTypedefs {
 };
 
 }  // namespace
+
+DataType EnumBaseAsWritten(const DataType& type) {
+  DataType base;
+  base.kind = type.enum_base_kind;
+  base.type_name = type.enum_base_name;
+  base.is_signed = type.is_signed;
+  base.packed_dim_left = type.packed_dim_left;
+  base.packed_dim_right = type.packed_dim_right;
+  if (type.enum_base_name.empty() || base.kind == DataTypeKind::kNamed)
+    return base;
+  base.kind = DataTypeKind::kNamed;
+  base.packed_dim_left = type.enum_base_name_dim_left;
+  base.packed_dim_right = type.enum_base_name_dim_right;
+  return base;
+}
 
 void ResolveEnumBaseTypedefs(const std::vector<CompilationUnit*>& units,
                              Arena& arena) {

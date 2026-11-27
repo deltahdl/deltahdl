@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "elaborator/const_eval.h"
+#include "elaborator/enum_base_typedefs.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/type_eval.h"
 #include "lexer/token.h"
@@ -68,12 +69,7 @@ DpiCrossingType EnumBase(const DataType& type, const RtlirDesign& design) {
     base.is_signed = true;
     return Written(base);
   }
-  base.kind = type.enum_base_kind;
-  base.type_name = type.enum_base_name;
-  base.is_signed = type.is_signed;
-  base.packed_dim_left = type.packed_dim_left;
-  base.packed_dim_right = type.packed_dim_right;
-  return DpiCrossingTypeOf(base, design);
+  return DpiCrossingTypeOf(EnumBaseAsWritten(type), design);
 }
 
 template <typename Value>

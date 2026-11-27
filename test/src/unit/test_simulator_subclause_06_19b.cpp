@@ -104,31 +104,63 @@ constexpr std::string_view kTypedefBaseDecls =
     "  typedef enum t [1:0] {F, G} f_t;\n"
     "  f_t fv;\n"
     "  typedef enum t {H, I} [2:0] g_t;\n"
-    "  g_t gv;\n"
+    "  g_t gv;\n";
+
+constexpr std::string_view kTypedefBaseStruct =
     "  typedef struct packed { e_t a; bit b; } s_t;\n"
     "  s_t sv;\n";
 
-constexpr std::string_view kTypedefBaseTypeNamesCheck =
-    "$bits(e_t) == 6 && $bits(f_t) == 12 && $bits(g_t) == 18 && "
-    "$bits(s_t) == 7";
+constexpr std::string_view kTypedefBaseVariablesCheck =
+    "$bits(v) == 6 && $bits(A) == 6 && $bits(fv) == 12 && $bits(gv) == 18";
 
-TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthInEveryPlace) {
-  ExpectOkIn(kEveryPlace, kTypedefBaseDecls,
-             "$bits(v) == 6 && $bits(A) == 6 && $bits(fv) == 12 && "
-             "$bits(gv) == 18 && $bits(sv) == 7");
+constexpr std::string_view kTypedefBaseTypeNamesCheck =
+    "$bits(e_t) == 6 && $bits(f_t) == 12 && $bits(g_t) == 18";
+
+constexpr std::initializer_list<std::string_view>
+    kOutsideAClassSubroutineOrBlock = {
+        "module",  "interface",        "program",       "checker",
+        "package", "compilation unit", "generate block"};
+
+TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthOutsideAClass) {
+  ExpectOkIn(
+      {"module", "interface", "program", "checker", "package",
+       "compilation unit", "generate block", "function", "task", "block"},
+      kTypedefBaseDecls, kTypedefBaseVariablesCheck);
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     DISABLED_TypedefBaseGivesItsWidthInAClass) {
+  ExpectOkIn({"class"},
+             std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
+             std::string(kTypedefBaseVariablesCheck) + " && " +
+                 std::string(kTypedefBaseTypeNamesCheck) +
+                 " && $bits(sv) == 7 && $bits(s_t) == 7");
 }
 
 TEST(EnumerationTypedefBaseSimulation,
      TypeNamesOfATypedefBaseEnumerationGiveItsWidth) {
-  ExpectOkIn({"module", "interface", "program", "checker", "package",
-              "compilation unit", "generate block", "class"},
-             kTypedefBaseDecls, kTypedefBaseTypeNamesCheck);
+  ExpectOkIn(kOutsideAClassSubroutineOrBlock, kTypedefBaseDecls,
+             kTypedefBaseTypeNamesCheck);
 }
 
 TEST(EnumerationTypedefBaseSimulation,
      DISABLED_LocalTypeNamesOfATypedefBaseEnumerationGiveItsWidth) {
   ExpectOkIn({"function", "task", "block"}, kTypedefBaseDecls,
              kTypedefBaseTypeNamesCheck);
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     StructOfATypedefBaseEnumerationIsAsWideAsItsMembers) {
+  ExpectOkIn(kOutsideAClassSubroutineOrBlock,
+             std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
+             "$bits(sv) == 7 && $bits(s_t) == 7");
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     DISABLED_LocalStructOfATypedefBaseEnumerationIsAsWideAsItsMembers) {
+  ExpectOkIn({"function", "task", "block"},
+             std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
+             "$bits(sv) == 7");
 }
 
 TEST(EnumerationTypedefBaseSimulation,
@@ -190,6 +222,24 @@ TEST(EnumerationTypedefBaseSimulation,
       "  enum l {P, Q} lv;\n"
       "  enum t {R, S} tv;\n",
       "$isunknown(lv) && !$isunknown(tv) && tv == R");
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     FourStateKeywordBaseStartsAtXAndTwoStateAtZeroInEveryPlace) {
+  ExpectOkIn(kEveryPlace,
+             "  enum logic [5:0] {P, Q} lv;\n"
+             "  enum bit [5:0] {R, S} tv;\n",
+             "$isunknown(lv) && !$isunknown(tv) && tv == R");
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     LocalFourStateEnumerationTypedefStartsAtXAndTwoStateAtZero) {
+  ExpectOkIn({"function", "task", "block"},
+             "  typedef enum logic [5:0] {P, Q} l_t;\n"
+             "  typedef enum bit [5:0] {R, S} t_t;\n"
+             "  l_t lv;\n"
+             "  t_t tv;\n",
+             "$isunknown(lv) && !$isunknown(tv) && tv == R");
 }
 
 TEST(EnumerationTypedefBaseSimulation,

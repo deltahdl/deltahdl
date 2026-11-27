@@ -407,7 +407,9 @@ static bool DeclIs4State(const DataType& type, const SimContext& ctx) {
   const bool kPackedInPlace = (type.kind == DataTypeKind::kStruct ||
                                type.kind == DataTypeKind::kUnion) &&
                               (type.is_packed || type.is_soft);
-  if (kPackedInPlace) return DeclaredTypeIs4State(type, ctx);
+  const bool kNamesAnEnum = type.kind == DataTypeKind::kNamed &&
+                            ctx.FindEnumType(TypeChainKey(type)) != nullptr;
+  if (kPackedInPlace || kNamesAnEnum) return DeclaredTypeIs4State(type, ctx);
   return Is4stateType(DeclaredTypeKind(type, ctx));
 }
 

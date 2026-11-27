@@ -16,6 +16,7 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/enum_base_typedefs.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_enum_member.h"
 #include "elaborator/rtlir_scopes.h"
@@ -255,14 +256,8 @@ class TypespecMaker {
         }
       }
     }
-    DataType base;
-    base.kind = type.enum_base_kind == DataTypeKind::kImplicit
-                    ? DataTypeKind::kInt
-                    : type.enum_base_kind;
-    base.is_signed = type.is_signed;
-    base.packed_dim_left = type.packed_dim_left;
-    base.packed_dim_right = type.packed_dim_right;
-    base.type_name = type.enum_base_name;
+    DataType base = EnumBaseAsWritten(type);
+    if (base.kind == DataTypeKind::kImplicit) base.kind = DataTypeKind::kInt;
     typespec->inner_typespec = Of(base, {}, std::string_view{}, typespec);
   }
 

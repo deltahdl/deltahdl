@@ -136,6 +136,8 @@ struct DataType {
   std::vector<Expr*> operand_unpacked_dims;
   const Expr* written_type_ref = nullptr;
   TypeRefUse type_ref_use = TypeRefUse::kDeclared;
+  Expr* enum_base_name_dim_left = nullptr;
+  Expr* enum_base_name_dim_right = nullptr;
 };
 
 struct FunctionArg {
