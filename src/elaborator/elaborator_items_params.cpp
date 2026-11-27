@@ -260,7 +260,11 @@ AssignedType Elaborator::BodyTypeParamDefault(ModuleItem* item,
 }
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
+  std::vector<Expr*> taken_dims =
+      TypeRefUnpackedDims(item->data_type.type_ref_expr, mod);
   ResolveTypeRef(item->data_type, item->loc, mod);
+  item->unpacked_dims.insert(item->unpacked_dims.end(), taken_dims.begin(),
+                             taken_dims.end());
   const AssignedType kDefaultType = BodyTypeParamDefault(item, mod);
   const bool kIsType = kDefaultType.written.kind != DataTypeKind::kImplicit;
 

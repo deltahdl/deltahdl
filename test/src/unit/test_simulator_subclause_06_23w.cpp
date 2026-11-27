@@ -3,8 +3,10 @@
 #include <array>
 #include <format>
 #include <string>
+#include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_declaration_places.h"
 
 using namespace delta;
 
@@ -112,6 +114,25 @@ TEST(ScopeDeclarationTypeRefSim, ClassStaticPropertyGivesItsWholeType) {
     SCOPED_TRACE(kSrc);
     SimFixture f;
     EXPECT_EQ(RunCapture(kSrc, f), "2 1 3 3 8 8 8 5 8\n");
+  }
+}
+
+TEST(ParameterOfTypeReferenceSim, TakesTheOperandsUnpackedDimension) {
+  for (std::string_view place :
+       {"module", "interface", "program", "generate block"}) {
+    const std::string kSrc =
+        InPlace(place,
+                "  int nq [$];\n  int na [3];\n"
+                "  localparam type(nq) PTQ = '{1, 2};\n"
+                "  localparam type(na) PTA = '{1, 2, 3};\n"
+                "  localparam int SQ [$] = '{1, 2};\n"
+                "  localparam int SA [3] = '{1, 2, 3};\n"
+                "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
+                "PTQ.size(), PTQ[$], $size(PTA), PTA[2], SQ.size(), SQ[$], "
+                "$size(SA), SA[2]);\n");
+    SCOPED_TRACE(kSrc);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(kSrc, f), "2 2 3 3 2 2 3 3\n");
   }
 }
 
