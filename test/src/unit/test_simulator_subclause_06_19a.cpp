@@ -652,8 +652,27 @@ TEST(EnumerationSimulation, XOrZMemberOfAFourStateEnumerationHoldsItsValue) {
 }
 
 TEST(EnumerationSimulation,
-     DISABLED_XOrZMemberOfAFourStateEnumerationInAClassHoldsItsValue) {
+     XOrZMemberOfAFourStateEnumerationInAClassHoldsItsValue) {
   EXPECT_EQ(LineOfValuesIn("class", 1), "x z 1");
+}
+
+TEST(EnumerationSimulation,
+     XOrZMemberOfAClassEnumerationHoldsItsValueThroughEveryName) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class K;\n"
+                       "  enum integer {xa = 'x, xb = 'z, xc = 1} y;\n"
+                       "  typedef enum logic [1:0] {la = 0, lz = 2'bz1} l_t;\n"
+                       "endclass\n"
+                       "module m;\n"
+                       "  K h;\n"
+                       "  initial begin\n"
+                       "    h = new;\n"
+                       "    $display(\"%0d %0d %0d %0d %0d %0d %b\", h.xa, "
+                       "h.xb, h.xc, K::xa, K::xb, K::xc, K::lz);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "x z 1 x z 1 z1\n");
 }
 
 TEST(EnumerationSimulation, MemberValuesStartAtZeroAndCountOnInAChecker) {

@@ -154,12 +154,25 @@ static const Variable* PackageVariableNamed(const Expr* e, SimContext& ctx) {
                           std::string(e->rhs->text));
 }
 
+static bool IsUnknownClassConstant(const Expr* e, SimContext& ctx) {
+  const ClassTypeInfo* cls =
+      e->is_scope_resolution && e->lhs != nullptr && e->rhs != nullptr
+          ? ctx.FindClassType(e->lhs->text)
+          : nullptr;
+  if (cls == nullptr) return false;
+  auto shape = cls->enum_literal_shapes.find(std::string(e->rhs->text));
+  return shape != cls->enum_literal_shapes.end() && shape->second.xz != 0;
+}
+
 static bool NamesAnUnknownValue(const Expr* expr, SimContext& ctx) {
   bool found = false;
   ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
     const Variable* v = nullptr;
     if (e->kind == ExprKind::kIdentifier) v = ctx.FindVariable(e->text);
-    if (e->kind == ExprKind::kMemberAccess) v = PackageVariableNamed(e, ctx);
+    if (e->kind == ExprKind::kMemberAccess) {
+      v = PackageVariableNamed(e, ctx);
+      if (IsUnknownClassConstant(e, ctx)) found = true;
+    }
     if (v != nullptr && HasUnknownBits(v->value)) found = true;
   });
   return found;

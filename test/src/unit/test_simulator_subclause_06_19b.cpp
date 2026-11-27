@@ -346,7 +346,7 @@ std::string ClassEnumerationDesign(std::string_view reads) {
 }
 
 TEST(EnumerationClassSimulation,
-     DISABLED_ClassEnumerationTakesTheClassLocalparamAndParameter) {
+     ClassEnumerationTakesTheClassLocalparamAndParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture(ClassEnumerationDesign(
                            "\"%0d %0d %0d %0d %s %s\", c#()::A, c#()::B, h.H, "
@@ -356,7 +356,7 @@ TEST(EnumerationClassSimulation,
 }
 
 TEST(EnumerationClassSimulation,
-     DISABLED_ClassEnumerationTakesEachSpecializationsOwnParameter) {
+     ClassEnumerationTakesEachSpecializationsOwnParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture(ClassEnumerationDesign(
                            "\"%0d %0d %0d %0d\", c#()::B, c#(9)::B, h.I, h9.I"),
@@ -364,8 +364,7 @@ TEST(EnumerationClassSimulation,
             "4 9 4 9\n");
 }
 
-TEST(EnumerationClassSimulation,
-     DISABLED_ClassEnumerationTakesPackageAndUnitConstants) {
+TEST(EnumerationClassSimulation, ClassEnumerationTakesPackageAndUnitConstants) {
   SimFixture f;
   EXPECT_EQ(RunCapture(ClassEnumerationDesign(
                            "\"%0d %0d %0d %0d\", c#()::C, c#()::D, c#()::E, "
@@ -375,7 +374,7 @@ TEST(EnumerationClassSimulation,
 }
 
 TEST(EnumerationClassSimulation,
-     DISABLED_ClassEnumerationValueOverEarlierMembersAndConstants) {
+     ClassEnumerationValueOverEarlierMembersAndConstants) {
   SimFixture f;
   EXPECT_EQ(RunCapture(ClassEnumerationDesign("\"%0d\", c#()::G"), f), "110\n");
 }
@@ -399,6 +398,23 @@ TEST(EnumerationClassSimulation,
                       "endmodule\n",
                       "ok"),
             1u);
+}
+
+TEST(EnumerationClassSimulation,
+     MemberOfABaseSizedByAClassConstantIsAsWideAsTheBase) {
+  EXPECT_EQ(
+      RunAndGet("class c #(int W = 3);\n"
+                "  localparam int L = 5;\n"
+                "  typedef enum logic [W-1:0] {A, B} e_t;\n"
+                "  typedef enum bit [L-1:0] {X, Y} f_t;\n"
+                "endclass\n"
+                "module m;\n"
+                "  bit ok;\n"
+                "  initial ok = $bits(c#()::A) == 3 && $bits(c#(7)::B) == "
+                "7 && $bits(c#()::Y) == 5;\n"
+                "endmodule\n",
+                "ok"),
+      1u);
 }
 
 TEST(EnumerationClassSimulation, ClassEnumerationWithLiteralValuesReadsThem) {
@@ -491,7 +507,7 @@ TEST(EnumerationParameterSimulation,
 }
 
 TEST(EnumerationParameterSimulation,
-     DISABLED_ParameterGivenAClassXEnumerationConstantKeepsItsBits) {
+     ParameterGivenAClassXEnumerationConstantKeepsItsBits) {
   EXPECT_EQ(RunAndGet(std::string(kFourStateConstantParameters), "class_ok"),
             1u);
 }

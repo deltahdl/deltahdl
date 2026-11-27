@@ -538,7 +538,8 @@ static void PopulateClassType(ClassTypeInfo* info, const ClassDecl* cls,
   BuildVTable(info, cls);
   CreateStaticProperties(info, arena);
   InitClassParams(info, cls, ctx, arena);
-  CollectClassEnumMembers(info, cls, ctx, arena);
+  CollectClassEnumMembers(info, cls, ClassParamScope(cls, scope.constants), ctx,
+                          arena);
   if (cls->is_interface) InheritInterfaceMembers(info);
 }
 

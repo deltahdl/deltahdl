@@ -19,6 +19,7 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
+#include "simulator/class_enum_members.h"
 #include "simulator/class_object.h"
 #include "simulator/class_specialization_key.h"
 #include "simulator/class_typedef_layout.h"
@@ -531,6 +532,8 @@ static ClassTypeInfo* MakeSpecialization(ClassTypeInfo* generic,
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
   SizeValueParamProperties(spec, values, spelled, ctx, arena);
+  CollectClassEnumMembers(spec, spec->decl,
+                          SpecializationParamScope(spec, values), ctx, arena);
   TakeParamArrayActuals(spec, spelled);
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;

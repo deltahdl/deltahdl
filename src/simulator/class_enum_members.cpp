@@ -34,19 +34,30 @@ static const DataType* DeclaredEnumOf(const ClassTypeInfo* info,
   return type != nullptr && !type->enum_members.empty() ? type : nullptr;
 }
 
-static void CollectEnumMembers(ClassTypeInfo* info, const DataType& decl_type,
-                               std::string key, SimContext& ctx, Arena& arena) {
+namespace {
+
+struct ClassEnumScope {
+  ClassTypeInfo* info;
+  const ScopeMap& constants;
+};
+
+}  // namespace
+
+static void CollectEnumMembers(const ClassEnumScope& scope,
+                               const DataType& decl_type, std::string key,
+                               SimContext& ctx, Arena& arena) {
+  ClassTypeInfo* info = scope.info;
   EnumTypeInfo type;
   type.type_name = *arena.Create<std::string>(std::move(key));
-  type.width = EvalTypeWidth(decl_type);
+  type.width = EvalTypeWidth(decl_type, TypedefMap{}, scope.constants);
   type.is_4state = Is4stateType(decl_type, TypedefMap{});
   type.is_signed = IsSignedType(decl_type, TypedefMap{});
   for (const RtlirEnumMember& m :
-       FoldEnumMembers(decl_type.enum_members, ScopeMap{}, arena)) {
+       FoldEnumMembers(decl_type.enum_members, scope.constants, arena)) {
     EnumMemberInfo member = EnumMemberInfoOf(m, type.width, ctx, arena);
     info->enum_members[std::string(m.name)] = member.value;
-    info->enum_literal_shapes[std::string(m.name)] = {type.width,
-                                                      type.is_signed};
+    info->enum_literal_shapes[std::string(m.name)] = {
+        type.width, type.is_signed, member.xz};
     type.members.push_back(member);
   }
   if (ctx.FindEnumType(type.type_name) == nullptr)
@@ -54,11 +65,13 @@ static void CollectEnumMembers(ClassTypeInfo* info, const DataType& decl_type,
 }
 
 void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
-                             SimContext& ctx, Arena& arena) {
+                             const ScopeMap& scope, SimContext& ctx,
+                             Arena& arena) {
+  const ClassEnumScope kScope{info, scope};
   for (std::size_t i = 0; i < cls->param_types.size(); ++i) {
     if (cls->param_types[i].enum_members.empty()) continue;
     CollectEnumMembers(
-        info, cls->param_types[i],
+        kScope, cls->param_types[i],
         std::string(info->name) + "::" + std::string(cls->params[i].first), ctx,
         arena);
   }
@@ -66,7 +79,7 @@ void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
     std::string key;
     const DataType* decl_type = DeclaredEnumOf(info, member, key);
     if (decl_type != nullptr)
-      CollectEnumMembers(info, *decl_type, std::move(key), ctx, arena);
+      CollectEnumMembers(kScope, *decl_type, std::move(key), ctx, arena);
   }
 }
 

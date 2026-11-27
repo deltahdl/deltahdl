@@ -150,6 +150,7 @@ struct ClassTypeInfo {
   struct EnumLiteralShape {
     uint32_t width = 32;
     bool is_signed = false;
+    uint64_t xz = 0;
   };
   std::unordered_map<std::string, EnumLiteralShape> enum_literal_shapes;
 };

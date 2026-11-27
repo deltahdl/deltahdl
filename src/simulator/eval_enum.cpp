@@ -27,6 +27,7 @@ Logic4Vec ClassEnumLiteral(const ClassTypeInfo& cls, const std::string& name,
       it == cls.enum_literal_shapes.end() ? ClassTypeInfo::EnumLiteralShape{}
                                           : it->second;
   Logic4Vec v = MakeLogic4VecVal(arena, shape.width, value);
+  v.words[0].bval = shape.xz;
   v.is_signed = shape.is_signed;
   return v;
 }
