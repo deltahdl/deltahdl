@@ -164,6 +164,9 @@ class Elaborator : public ElaboratorClassRules {
   void RefreshFoldedTypeRef(std::string_view name, const RtlirModule* mod);
   void EnterFoldedTypeRefOwner(const void* owner);
   void LeaveFoldedTypeRefOwner(const void* owner, const RtlirModule* mod);
+  void LeaveGenerateBodyTypeRefs(const std::vector<ModuleItem*>& items,
+                                 RtlirModule* mod);
+  void MovePlaceTypeFactsInto(RtlirModule* mod);
 
   void ElaborateParamPortList(const ModuleDecl* decl, const ParamList& params,
                               RtlirModule* mod);

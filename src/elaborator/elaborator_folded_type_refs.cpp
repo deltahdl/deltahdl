@@ -10,6 +10,7 @@
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
+#include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
 namespace delta {
@@ -100,6 +101,20 @@ void Elaborator::LeaveFoldedTypeRefOwner(const void* owner,
     if (folded.owner == owner) owned.push_back(name);
   }
   for (std::string_view name : owned) RefreshFoldedTypeRef(name, mod);
+}
+
+void Elaborator::LeaveGenerateBodyTypeRefs(
+    const std::vector<ModuleItem*>& items, RtlirModule* mod) {
+  if (gen_body_owners_.empty() || gen_body_owners_.back() != &items) return;
+  LeaveFoldedTypeRefOwner(&items, mod);
+  MovePlaceTypeFactsInto(mod);
+}
+
+void Elaborator::MovePlaceTypeFactsInto(RtlirModule* mod) {
+  auto placed = place_type_facts_.extract(mod);
+  if (placed.empty()) return;
+  mod->type_param_facts.insert(mod->type_param_facts.end(),
+                               placed.mapped().begin(), placed.mapped().end());
 }
 
 }  // namespace delta

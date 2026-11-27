@@ -481,11 +481,7 @@ void Elaborator::EnterModulePath(const ModuleDecl* decl, RtlirModule* mod) {
 
 void Elaborator::LeaveModuleRecordingTypeParams(RtlirModule* mod) {
   LeaveFoldedTypeRefOwner(module_decl_path_.back(), mod);
-  if (auto placed = place_type_facts_.extract(mod)) {
-    mod->type_param_facts.insert(mod->type_param_facts.end(),
-                                 placed.mapped().begin(),
-                                 placed.mapped().end());
-  }
+  MovePlaceTypeFactsInto(mod);
   RecordTypeParamFacts(*mod, VisibleTypeParamNames(module_path_),
                        {typedefs_, aggregate_typedef_names_, arena_});
   module_path_.pop_back();

@@ -352,9 +352,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
     }
   }
   ResolveModuleSubroutineFormalTypes(items, typedefs_, arena_);
-  if (!gen_body_owners_.empty() && gen_body_owners_.back() == &items) {
-    LeaveFoldedTypeRefOwner(&items, mod);
-  }
+  LeaveGenerateBodyTypeRefs(items, mod);
   RestoreEnclosingTypedefs(enclosing_typedefs, typedefs_,
                            forward_typedef_kinds_, td_array_dims_);
   gen_prefix_scopes_ = std::move(entry_prefix_scopes);
