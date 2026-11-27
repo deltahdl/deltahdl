@@ -366,21 +366,29 @@ TEST(DollarConstantElaboration,
       "  int pa [4];\n"
       "  int pq [$];\n"
       "  var type(pq) pw;\n"
+      "  var type(pa) pt;\n"
       "  function automatic int pf();\n"
       "    return pa[$];\n"
       "  endfunction\n"
       "  function automatic int pg();\n"
       "    return pw[$];\n"
       "  endfunction\n"
+      "  function automatic int ph();\n"
+      "    return pt[$];\n"
+      "  endfunction\n"
       "endpackage\n"
       "int ua [4];\n"
       "int uq [$];\n"
       "var type(uq) uw;\n"
+      "var type(ua) ut;\n"
       "function automatic int uf();\n"
       "  return ua[$];\n"
       "endfunction\n"
       "function automatic int ug();\n"
       "  return uw[$];\n"
+      "endfunction\n"
+      "function automatic int uh();\n"
+      "  return ut[$];\n"
       "endfunction\n"
       "module top;\n"
       "  int a [4];\n"
@@ -394,7 +402,7 @@ TEST(DollarConstantElaboration,
       "  end\n"
       "endmodule\n",
       f);
-  ExpectDollarReportedOnlyOn(f, {6, 16, 28}, {9, 19, 29});
+  ExpectDollarReportedOnlyOn(f, {7, 13, 21, 27, 36}, {10, 24, 37});
 }
 
 TEST(DollarConstantElaboration,

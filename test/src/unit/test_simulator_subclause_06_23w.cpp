@@ -37,4 +37,32 @@ TEST(MailboxOfTypeReferenceSim, WeakReferenceOfAHandlesType) {
             "5\n");
 }
 
+TEST(ScopeDeclarationTypeRefSim, PackageAndUnitVariablesTakeTheReferencedType) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  logic [7:0] pb;\n"
+                 "  int pa [4];\n"
+                 "  var type(pb) pv;\n"
+                 "  var type(pb[3:0]) ps;\n"
+                 "  var type(pa) pf;\n"
+                 "  function automatic int pbits();\n"
+                 "    return $bits(pv);\n"
+                 "  endfunction\n"
+                 "endpackage\n"
+                 "logic [11:0] ub;\n"
+                 "var type(ub) uv;\n"
+                 "var type(ub + 4'b0) ue;\n"
+                 "module top;\n"
+                 "  logic [5:0] mb;\n"
+                 "  var type(mb) mv;\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
+                 "$bits(pk::pv), pk::pbits(), $bits(pk::ps), "
+                 "$size(pk::pf), $bits(uv), $bits(ue), $isunknown(uv), "
+                 "$bits(mv));\n"
+                 "endmodule\n",
+                 f),
+      "8 8 4 4 12 12 1 6\n");
+}
+
 }  // namespace

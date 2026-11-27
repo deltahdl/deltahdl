@@ -955,7 +955,8 @@ void ResolveUnitScopeTypeNames(
           if (item->kind == ModuleItemKind::kTypedef) {
             ResolveTypedefTypeRef(*item, {}, resolve, arena);
           } else if (item->kind == ModuleItemKind::kVarDecl) {
-            ResolveItemArgumentTypeRefs(*item, resolve);
+            ResolveLocalTypeRef(item->data_type, item->unpacked_dims, item->loc,
+                                {}, resolve);
           } else if (item->kind == ModuleItemKind::kClassDecl) {
             ResolveClassTypeNames(*item->class_decl, resolve, unit, arena);
           }
