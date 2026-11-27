@@ -100,7 +100,7 @@ static const Logic4Vec* BoundInstanceValue(const Expr* expr, SimContext& ctx) {
 
 static void MarkDeclaredKinds(Logic4Vec& val, std::string_view name,
                               const Variable& var, SimContext& ctx) {
-  if (var.is_real || ctx.IsRealVariable(name)) val.is_real = true;
+  if (var.is_real || ctx.NameIsRealHere(name)) val.is_real = true;
   if (ctx.IsStringVariable(name)) val.is_string = true;
 }
 

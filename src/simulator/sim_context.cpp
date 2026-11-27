@@ -268,6 +268,12 @@ ModuleItem* SimContext::FindFunctionInPackageScope(std::string_view name) {
   return nullptr;
 }
 
+bool SimContext::NameIsRealHere(std::string_view name) {
+  if (!IsRealVariable(name)) return false;
+  auto keyed = variables_.find(name);
+  return keyed == variables_.end() || FindVariable(name) == keyed->second;
+}
+
 Variable* SimContext::FindVariable(std::string_view name) {
   constexpr std::string_view kRootPrefix = "$root.";
   if (name.substr(0, kRootPrefix.size()) == kRootPrefix) {

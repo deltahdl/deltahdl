@@ -69,6 +69,7 @@ class SimContext : public DeclaredNameTables,
   ~SimContext();
 
   Variable* FindVariable(std::string_view name);
+  bool NameIsRealHere(std::string_view name);
   Variable* FindInGenerateBlock(const std::string& inst_prefix,
                                 std::string_view name);
   void SetLoweringGenPrefixes(const std::vector<std::string>* prefixes) {

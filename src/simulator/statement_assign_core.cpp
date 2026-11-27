@@ -248,7 +248,7 @@ static Logic4Vec ElementStoreValue(const Logic4Vec& rhs_val, const Expr* lhs,
                                    const Variable& elem, SimContext& ctx,
                                    Arena& arena) {
   if (!rhs_val.is_real && !elem.is_real &&
-      !ctx.IsRealVariable(LhsIdentName(lhs)))
+      !ctx.NameIsRealHere(LhsIdentName(lhs)))
     return rhs_val;
   return ConvertRealOnAssign(rhs_val, lhs, elem, ctx, arena);
 }
@@ -326,7 +326,7 @@ Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
   uint32_t target_width = var.value.width;
   auto name = LhsIdentName(lhs);
   if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
-  bool lhs_is_real = var.is_real || ctx.IsRealVariable(name);
+  bool lhs_is_real = var.is_real || ctx.NameIsRealHere(name);
   return ConvertRealForKnownLhs(rhs_val, lhs_is_real, target_width, arena);
 }
 

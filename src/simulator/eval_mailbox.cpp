@@ -136,7 +136,7 @@ static MailboxMessageType VariableMessageType(std::string_view name,
   const Variable* var = ctx.FindVariable(name);
   if (var == nullptr) return {};
   if (var->is_string) return MailboxMessageType::String();
-  if (ctx.IsRealVariable(name) || var->value.is_real) {
+  if (ctx.NameIsRealHere(name) || var->value.is_real) {
     return MailboxMessageType::Real(var->value.width);
   }
   return MailboxMessageType::Integral(var->value.width, var->is_signed,
