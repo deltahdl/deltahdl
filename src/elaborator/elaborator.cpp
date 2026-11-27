@@ -17,6 +17,7 @@
 #include "elaborator/chandle_events.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/data_declared_before_use.h"
+#include "elaborator/dollar_contexts.h"
 #include "elaborator/elaborator_child_type_params.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_node_attributes.h"
@@ -216,6 +217,10 @@ bool HoldsItsLiteralAsWritten(const ConfigLocalparam& lp) {
          IsLiteralKind(lp.init_expr->kind) &&
          lp.data_type.kind == DataTypeKind::kImplicit &&
          lp.data_type.packed_dim_left == nullptr;
+}
+
+bool HoldsDollar(const ConfigLocalparam& lp) {
+  return !lp.is_type && lp.init_expr != nullptr && IsLoneDollar(lp.init_expr);
 }
 
 void ApplyConfigDefaultLiblist(const ConfigDecl* cfg,
@@ -592,7 +597,8 @@ OverridesWithLocalparamLiterals(
   for (auto& [pname, pexpr] : params) {
     if (pexpr == nullptr || pexpr->kind != ExprKind::kIdentifier) continue;
     for (const ConfigLocalparam& lp : cfg->local_params) {
-      if (lp.name == pexpr->text && HoldsItsLiteralAsWritten(lp)) {
+      if (lp.name == pexpr->text &&
+          (HoldsItsLiteralAsWritten(lp) || HoldsDollar(lp))) {
         pexpr = lp.init_expr;
         break;
       }

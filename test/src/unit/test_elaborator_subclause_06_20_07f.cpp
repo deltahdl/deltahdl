@@ -1,6 +1,9 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 #include "fixture_elaborator.h"
+#include "helpers_config_params.h"
 #include "helpers_dollar_param_reports.h"
 #include "helpers_reported_error.h"
 
@@ -671,6 +674,77 @@ TEST(DollarConstantElaboration,
   EXPECT_TRUE(ReportedError(
       diags, "reference to unresolved package or scope 'nopkg'", 20, "26.3"));
   ExpectDollarReportedOnlyOn(f, {12}, {13});
+}
+
+TEST(DollarConstantElaboration,
+     OverrideNamingADollarParameterOfAnotherTypeIsRejected) {
+  ElabFixture f;
+  Elaborate(
+      "module s #(parameter real R = 1.0, parameter int N = 1);\n"
+      "endmodule\n"
+      "module b;\n"
+      "  parameter real R = 1.0;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  parameter int P = $;\n"
+      "  s #(.R(P)) u1();\n"
+      "  s #(P, P) u2();\n"
+      "  b #(.R(P)) u3();\n"
+      "  s #(.N(P)) u4();\n"
+      "  if (1) begin : g\n"
+      "    s #(.R(P)) u5();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {8u, 9u, 10u, 13u}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "'$' may be assigned only to a parameter of a "
+                              "simple bit vector type, and parameter 'R' is "
+                              "not one",
+                              line, "6.20.7"))
+        << line;
+  }
+  for (uint32_t line : {9u, 11u}) {
+    EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
+                               "'$' may be assigned only to a parameter of a "
+                               "simple bit vector type, and parameter 'N' is "
+                               "not one",
+                               line, "6.20.7"))
+        << line;
+  }
+}
+
+TEST(DollarConstantElaboration,
+     ConfigurationOverrideNamingADollarLocalparamPassesDollarOn) {
+  ElabFixture f;
+  auto* design =
+      ConfigElab(f,
+                 "module s #(parameter int N = 4, parameter int K = 4);\n"
+                 "endmodule\n"
+                 "module top;\n"
+                 "  s u();\n"
+                 "endmodule\n"
+                 "config c;\n"
+                 "  localparam P = $;\n"
+                 "  localparam Q = 5;\n"
+                 "  design top;\n"
+                 "  instance top.u use #(.N(P), .K(Q));\n"
+                 "endconfig\n");
+  ASSERT_NE(design, nullptr);
+  ASSERT_FALSE(design->top_modules.empty());
+  ASSERT_FALSE(design->top_modules[0]->children.empty());
+  EXPECT_FALSE(f.has_errors);
+  const RtlirModule* u = design->top_modules[0]->children[0].resolved;
+  ASSERT_NE(u, nullptr);
+  bool n_unbounded = false;
+  bool k_unbounded = true;
+  for (const auto& p : u->params) {
+    if (p.name == "N") n_unbounded = p.is_unbounded;
+    if (p.name == "K") k_unbounded = p.is_unbounded;
+  }
+  EXPECT_TRUE(n_unbounded);
+  EXPECT_FALSE(k_unbounded);
+  EXPECT_EQ(ResolvedParam(u, "K"), 5);
 }
 
 }  // namespace

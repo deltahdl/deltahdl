@@ -381,6 +381,8 @@ class Elaborator : public ElaboratorClassRules {
   bool RefersToUnboundedParam(const RtlirModule* mod,
                               std::string_view name) const;
 
+  void PassDollarArguments(ParamList& child_params, const RtlirModule* mod);
+
   bool ContainsDollarSubexpr(const Expr* e) const;
 
   void ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,

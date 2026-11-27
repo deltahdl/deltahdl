@@ -594,6 +594,7 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   auto saved_nested = nested_module_decls_;
   Elaborator::ParamList child_params;
   ResolveInstParams(item, child_decl, parent_scope, child_params, diag_);
+  PassDollarArguments(child_params, mod);
 
   std::vector<std::string_view> config_locked;
   ApplyConfigParamOverrides(item, child_decl, child_params, parent_scope,
