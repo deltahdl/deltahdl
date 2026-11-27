@@ -92,16 +92,6 @@ void Elaborator::ValidateChandleContAssign(const ModuleItem* item) {
   }
 }
 
-void Elaborator::ValidateChandleSensitivity(const ModuleItem* item) {
-  if (!IsProceduralItemKind(item->kind)) return;
-  for (const auto& ev : item->sensitivity) {
-    if (IsChandleVar(ev.signal, var_types_)) {
-      diag_.Error(item->loc, "chandle cannot appear in event expression",
-                  Subclause("6.14"));
-    }
-  }
-}
-
 static bool IsNullLiteral(const Expr* e) {
   return e && e->kind == ExprKind::kIdentifier && e->text == "null";
 }

@@ -792,20 +792,35 @@ TEST(ChandleDataType, ChandleInEveryAlwaysEventExpressionIsReported) {
       kEvent);
 }
 
-TEST(ChandleDataType,
-     DISABLED_ChandleInProceduralClockingAndAssertionEventsIsReported) {
-  ExpectEachReported(
-      {"initial @(h);", "task tk;\n    @(h);\n  endtask",
-       "function void f;\n    fork @(h); join_none\n  endfunction",
-       "initial y = @(h) 1;", "clocking cb @(h); endclocking",
-       "a1: assert property (@(h) x);"},
-      kEvent);
+TEST(ChandleDataType, ChandleInProceduralClockingAndAssertionEventsIsReported) {
+  for (const char* item :
+       {"initial @(h);", "task tk;\n    @(h);\n  endtask",
+        "function void f;\n    fork @(h); join_none\n  endfunction",
+        "initial y = @(h) 1;", "clocking cb @(h); endclocking",
+        "a1: assert property (@(h) x);", "always assert property (@(h) x);",
+        "task tk(chandle a);\n    @(a);\n  endtask",
+        "task tk;\n    chandle l;\n    @(l);\n  endtask",
+        "typedef chandle h_t;\n  h_t th;\n  always @(th) y = 0;",
+        "if (1) begin : gb\n    always @(h) y = 0;\n  end",
+        "if (1) begin : gb\n    chandle gh;\n    always @(gh) y = 0;\n  end"}) {
+    SCOPED_TRACE(item);
+    EXPECT_TRUE(ReportedOn(InModule(item), "@(", kEvent));
+  }
 }
 
 TEST(ChandleDataType, EventsOnAnEventOrAChandleComparisonAreAccepted) {
   EXPECT_TRUE(ElabOk(InModule(
       "initial @(e);\n  always @(h == null) y = 0;\n"
       "  initial wait (h != null);\n  clocking cb @(posedge x); endclocking")));
+  for (const char* item :
+       {"always assert property (@(x) x);",
+        "task tk(logic a);\n    @(a);\n  endtask",
+        "task tk;\n    logic h;\n    @(h);\n  endtask",
+        "typedef int i_t;\n  i_t ti;\n  always @(ti) y = 0;",
+        "if (1) begin : gb\n    logic h;\n    always @(h) y = 0;\n  end"}) {
+    SCOPED_TRACE(item);
+    EXPECT_TRUE(ElabOk(InModule(item)));
+  }
 }
 
 TEST(ChandleDataType, ChandleInAnInterfaceEventExpressionIsReported) {
@@ -815,8 +830,7 @@ TEST(ChandleDataType, ChandleInAnInterfaceEventExpressionIsReported) {
       "@(h)", kEvent));
 }
 
-TEST(ChandleDataType,
-     DISABLED_ChandleInAClassPackageUnitOrProgramEventIsReported) {
+TEST(ChandleDataType, ChandleInAClassPackageUnitOrProgramEventIsReported) {
   EXPECT_TRUE(
       ReportedOn("class C;\n  chandle h;\n  task tk();\n    @(h);\n  endtask\n"
                  "endclass\nmodule t;\nendmodule\n",
@@ -833,6 +847,21 @@ TEST(ChandleDataType,
       ReportedOn("program p;\n  chandle h;\n  initial @(h);\nendprogram\n"
                  "module t;\n  p u();\nendmodule\n",
                  "@(h)", kEvent));
+}
+
+TEST(ChandleDataType, EventsOnAnEventInAClassPackageUnitOrProgramAreAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class C;\n  event h;\n  task tk();\n    @(h);\n  endtask\n"
+             "endclass\nmodule t;\nendmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("package k;\n  event h;\n  task automatic tk();\n    @(h);\n"
+             "  endtask\nendpackage\nmodule t;\nendmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("event h;\ntask automatic tk();\n  @(h);\nendtask\n"
+             "module t;\nendmodule\n"));
+  EXPECT_TRUE(
+      ElabOk("program p;\n  event h;\n  initial @(h);\nendprogram\n"
+             "module t;\n  p u();\nendmodule\n"));
 }
 
 std::string WithChandleHolders(std::string_view use) {

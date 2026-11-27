@@ -116,7 +116,6 @@ void Elaborator::ValidateItemRules(const ModuleItem* item,
     CheckLhsPatternNamedKeys(item->assign_lhs, diag_);
   ValidateEdgeOnReal(item);
   ValidateChandleContAssign(item);
-  ValidateChandleSensitivity(item);
   ValidateVirtualInterfaceContAssign(item);
   ValidateVirtualInterfaceSensitivity(item);
   ValidateClassHandleContAssign(item);

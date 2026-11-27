@@ -14,6 +14,7 @@
 #include "common/arena.h"
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
+#include "elaborator/chandle_events.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/data_declared_before_use.h"
 #include "elaborator/elaborator_child_type_params.h"
@@ -364,6 +365,8 @@ void Elaborator::RunPreElaborationValidations() {
   RegisterCuScopeItems();
 
   ValidatePortAndModportDeclarations();
+
+  ReportChandleEvents(*unit_, typedefs_, diag_);
 
   ValidateProgramWideSpaceAccessInPackageAndCuScopes();
 

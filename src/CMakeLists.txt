@@ -603,6 +603,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/interconnect_merges.cpp
     elaborator/interconnect_uses.cpp
     elaborator/chandle_ports.cpp
+    elaborator/chandle_events.cpp
     elaborator/packed_bound_rules.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp

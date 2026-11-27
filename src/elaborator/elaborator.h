@@ -547,8 +547,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateChandleContAssign(const ModuleItem* item);
 
-  void ValidateChandleSensitivity(const ModuleItem* item);
-
   void ValidateChandleOps(const ModuleDecl* decl);
   void WalkStmtsForChandleOps(const Stmt* s);
 
