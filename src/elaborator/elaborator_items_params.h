@@ -35,6 +35,8 @@ void ResolveConstantValue(RtlirParamDecl& pd, const Expr* init,
 
 bool HasRealOperand(const Expr* expr);
 
+bool IsShortrealValue(const Expr* expr);
+
 bool TakesItsTypeFromItsValue(const DataType& type);
 
 bool HoldsRealValue(const DataType& type, const Expr* value);

@@ -386,7 +386,8 @@ static DataType ParamValueType(const RtlirParamDecl& param, Arena& arena) {
   if (param.decl_type != nullptr && !param.decl_type_implicit) {
     return *param.decl_type;
   }
-  if (param.is_real_value) return TypeNameToDataType("real");
+  if (param.is_real_value)
+    return TypeNameToDataType(param.value_is_shortreal ? "shortreal" : "real");
   ParamStorageShape shape = ParamStorageShapeOf(param);
   return VectorType(shape.width, shape.is_signed, true, arena);
 }

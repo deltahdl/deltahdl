@@ -189,6 +189,15 @@ static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
   return std::nullopt;
 }
 
+static std::optional<double> ConstEvalRealCast(const Expr* expr,
+                                               const ScopeMap& scope) {
+  const bool kRealType = expr->text == "shortreal" || expr->text == "real";
+  std::optional<double> value =
+      kRealType ? ConstEvalReal(expr->lhs, scope) : std::nullopt;
+  if (!value || expr->text == "real") return value;
+  return static_cast<double>(static_cast<float>(*value));
+}
+
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
   if (!expr) return std::nullopt;
 
@@ -225,6 +234,8 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
     case ExprKind::kSelect:
     case ExprKind::kMemberAccess:
       return ConstEvalAggregatePartReal(expr, scope);
+    case ExprKind::kCast:
+      return ConstEvalRealCast(expr, scope);
     default:
       return std::nullopt;
   }

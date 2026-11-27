@@ -28,6 +28,7 @@
 #include "elaborator/type_param_scope_prefix.h"
 #include "elaborator/type_parameter_values.h"
 #include "elaborator/unpacked_array_type.h"
+#include "lexer/token.h"
 #include "parser/ast_class.h"
 #include "parser/ast_design.h"
 #include "parser/ast_expr.h"
@@ -73,6 +74,45 @@ bool HasRealOperand(const Expr* e) {
     if (HasRealOperand(a)) return true;
   }
   return false;
+}
+
+static bool IsShortrealIdentifier(const Expr* e) {
+  const RtlirParamDecl* pd =
+      e->scope_prefix.empty() ? RegisteredParamNamed(e->text) : nullptr;
+  return pd != nullptr && (pd->decl_is_shortreal || pd->value_is_shortreal);
+}
+
+static bool IsShortrealOperation(const Expr* e) {
+  switch (e->op) {
+    case TokenKind::kPlus:
+    case TokenKind::kMinus:
+    case TokenKind::kStar:
+    case TokenKind::kSlash:
+    case TokenKind::kPower:
+      return IsShortrealValue(e->lhs) &&
+             (e->kind == ExprKind::kUnary || IsShortrealValue(e->rhs));
+    default:
+      return false;
+  }
+}
+
+bool IsShortrealValue(const Expr* e) {
+  if (e == nullptr) return false;
+  switch (e->kind) {
+    case ExprKind::kCast:
+      return e->text == "shortreal";
+    case ExprKind::kSystemCall:
+      return e->callee == "$bitstoshortreal";
+    case ExprKind::kIdentifier:
+      return IsShortrealIdentifier(e);
+    case ExprKind::kUnary:
+    case ExprKind::kBinary:
+      return IsShortrealOperation(e);
+    case ExprKind::kTernary:
+      return IsShortrealValue(e->true_expr) && IsShortrealValue(e->false_expr);
+    default:
+      return false;
+  }
 }
 
 bool TakesItsTypeFromItsValue(const DataType& type) {

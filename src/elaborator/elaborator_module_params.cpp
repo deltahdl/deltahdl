@@ -184,8 +184,9 @@ static bool TakesRealFromValue(const RtlirParamDecl& pd, const Expr* init,
 }
 
 static double HeldAsDeclaredReal(const RtlirParamDecl& pd, double value) {
-  return pd.decl_is_shortreal ? static_cast<double>(static_cast<float>(value))
-                              : value;
+  return pd.decl_is_shortreal || pd.value_is_shortreal
+             ? static_cast<double>(static_cast<float>(value))
+             : value;
 }
 
 bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
@@ -195,6 +196,8 @@ bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
     return false;
   auto rval = ConstEvalReal(init, scope);
   if (!rval) return false;
+  pd.value_is_shortreal =
+      TakesRealFromValue(pd, init, dtype) && IsShortrealValue(init);
   pd.resolved_real = HeldAsDeclaredReal(pd, *rval);
   pd.is_real_value = true;
   pd.is_resolved = true;
@@ -357,6 +360,9 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   pd.resolved_value = ConvertOverrideValue(ovr->value, pd);
   pd.is_resolved = true;
   pd.from_override = true;
+  pd.value_is_shortreal = ovr->real && !pd.has_decl_range &&
+                          !pd.has_decl_type &&
+                          IsShortrealValue(ovr->value_expr);
   ApplyOverrideRealness(pd, ovr->real);
   if (ovr->real) return true;
   if (ovr->value_expr != pd.default_value) pd.override_expr = ovr->value_expr;

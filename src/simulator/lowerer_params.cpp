@@ -173,8 +173,9 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   }
   if (!p.is_resolved && !UnfoldedParamEvaluable(p, ctx_)) return;
   if (p.is_real_value) {
-    Logic4Vec real = ToDeclaredReal(MakeRealVec(arena_, p.resolved_real, 64),
-                                    ParamValueType(p), ctx_, arena_);
+    Logic4Vec real = ToDeclaredReal(
+        MakeRealVec(arena_, p.resolved_real, p.value_is_shortreal ? 32 : 64),
+        ParamValueType(p), ctx_, arena_);
     auto* rvar = ctx_.CreateVariable(full, real.width);
     rvar->value = real;
     rvar->is_real = true;

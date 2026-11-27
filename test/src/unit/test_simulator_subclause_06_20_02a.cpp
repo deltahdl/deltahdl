@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/variable.h"
 
@@ -684,6 +686,101 @@ TEST(ValueParameterSimulation, RealTypedefModuleParameterIsReal) {
                        "endmodule\n",
                        f),
             "2.5 3.5 64\n");
+}
+
+constexpr std::string_view kTypelessRealParams =
+    "  parameter P1 = shortreal'(0.1);\n"
+    "  localparam P2 = shortreal'(0.1);\n"
+    "  parameter R1 = 0.1;\n"
+    "  localparam P3 = $bitstoshortreal(32'h3DCCCCCD);\n"
+    "  localparam R3 = $bitstoreal(64'h3FB999999999999A);\n"
+    "  localparam shortreal S = 0.1;\n"
+    "  localparam real T = 0.1;\n"
+    "  localparam P4 = S;\n"
+    "  localparam R4 = T;\n"
+    "  localparam P5 = S * S;\n"
+    "  localparam P6 = -S;\n"
+    "  localparam P7 = 1 ? S : S;\n"
+    "  localparam R5 = S * 2.0;\n"
+    "  localparam R6 = real'(S);\n"
+    "  localparam R7 = (S < 1.0) + 0.5;\n";
+
+std::string TypelessRealShapes() {
+  std::string shown;
+  for (std::string_view name : {"P1", "P2", "R1", "P3", "R3", "P4", "R4", "P5",
+                                "P6", "P7", "R5", "R6", "R7"}) {
+    const std::string kName(name);
+    shown += "    $display(\"%0d %0d %0d %h\", $bits(" + kName + "), type(" +
+             kName + ") == type(shortreal), type(" + kName +
+             ") == type(real), $shortrealtobits(" + kName + "));\n";
+  }
+  return shown;
+}
+
+std::string TypelessRealParamsIn(std::string_view place) {
+  const std::string kBody = std::string(kTypelessRealParams) +
+                            "  initial begin\n" + TypelessRealShapes() +
+                            "  end\n";
+  if (place == "interface") {
+    return "interface i;\n" + kBody +
+           "endinterface\nmodule t;\n  i u();\nendmodule\n";
+  }
+  if (place == "program") return "program t;\n" + kBody + "endprogram\n";
+  if (place == "generate block") {
+    return "module t;\n  if (1) begin : g\n" + kBody + "  end\nendmodule\n";
+  }
+  return "module t;\n" + kBody + "endmodule\n";
+}
+
+TEST(ValueParameterSimulation,
+     ParameterOfNoTypeTakesAShortrealFinalValuesTypeInEveryPlace) {
+  for (std::string_view place :
+       {"module", "interface", "program", "generate block"}) {
+    SCOPED_TRACE(place);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(TypelessRealParamsIn(place), f),
+              "32 1 0 3dcccccd\n"
+              "32 1 0 3dcccccd\n"
+              "64 0 1 3dcccccd\n"
+              "32 1 0 3dcccccd\n"
+              "64 0 1 3dcccccd\n"
+              "32 1 0 3dcccccd\n"
+              "64 0 1 3dcccccd\n"
+              "32 1 0 3c23d70b\n"
+              "32 1 0 bdcccccd\n"
+              "32 1 0 3dcccccd\n"
+              "64 0 1 3e4ccccd\n"
+              "64 0 1 3dcccccd\n"
+              "64 0 1 3fc00000\n");
+  }
+}
+
+constexpr std::string_view kTypelessOverrides =
+    "module m #(parameter P = 1.5);\n"
+    "  bit [2:0] shape;\n"
+    "  logic [31:0] sb;\n"
+    "  initial begin\n"
+    "    shape = {$bits(P) == 32, type(P) == type(shortreal), "
+    "type(P) == type(real)};\n"
+    "    sb = $shortrealtobits(P);\n"
+    "  end\n"
+    "endmodule\n"
+    "module t;\n"
+    "  m #(.P(shortreal'(0.1))) a();\n"
+    "  m #(0.1) b();\n"
+    "  m #(.P(4)) c();\n"
+    "endmodule\n";
+
+TEST(ValueParameterSimulation,
+     ParameterPortOfNoTypeOverriddenWithAShortrealIsAShortreal) {
+  EXPECT_EQ(RunAndGet(std::string(kTypelessOverrides), "a.shape"), 0b110u);
+  EXPECT_EQ(RunAndGet(std::string(kTypelessOverrides), "a.sb"), 0x3DCCCCCDu);
+}
+
+TEST(ValueParameterSimulation,
+     ParameterPortOfNoTypeOverriddenWithARealOrAnIntegerIsNoShortreal) {
+  EXPECT_EQ(RunAndGet(std::string(kTypelessOverrides), "b.shape"), 0b001u);
+  EXPECT_EQ(RunAndGet(std::string(kTypelessOverrides), "c.shape"), 0b100u);
 }
 
 }  // namespace
