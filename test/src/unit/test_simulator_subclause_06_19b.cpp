@@ -126,7 +126,7 @@ TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthInEveryPlace) {
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_ClassTypeNamesOfATypedefBaseEnumerationGiveTheirWidths) {
+     ClassTypeNamesOfATypedefBaseEnumerationGiveTheirWidths) {
   ExpectOkIn({"class"},
              std::string(kTypedefBaseDecls) + std::string(kTypedefBaseStruct),
              std::string(kTypedefBaseTypeNamesCheck) + " && $bits(s_t) == 7");

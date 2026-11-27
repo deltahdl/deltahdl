@@ -474,8 +474,8 @@ static int64_t FixedDimCount(const Expr* dim, SimContext& ctx, Arena& arena) {
   return (left > right ? left - right : right - left) + 1;
 }
 
-static uint64_t UnpackedDimsTimes(uint64_t bits, const std::vector<Expr*>& dims,
-                                  SimContext& ctx, Arena& arena) {
+uint64_t UnpackedDimsTimes(uint64_t bits, const std::vector<Expr*>& dims,
+                           SimContext& ctx, Arena& arena) {
   for (const Expr* dim : dims) {
     int64_t count = FixedDimCount(dim, ctx, arena);
     if (count <= 0) return 0;

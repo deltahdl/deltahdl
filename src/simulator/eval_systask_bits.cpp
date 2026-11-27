@@ -70,9 +70,38 @@ static std::string ScopedTypeName(const Expr* arg) {
   return scope + "::" + std::string(arg->rhs->text);
 }
 
+static const ModuleItem* OwnTypedefItem(const ClassDecl& decl,
+                                        std::string_view name) {
+  for (const ClassMember* m : decl.members) {
+    if (m->kind == ClassMemberKind::kTypedef && m->name == name)
+      return m->typedef_item;
+  }
+  return nullptr;
+}
+
+static const ModuleItem* RunningClassTypedefItem(std::string_view name,
+                                                 SimContext& ctx) {
+  for (const ClassTypeInfo* c = ctx.CurrentMethodClass(); c != nullptr;
+       c = c->parent) {
+    const ModuleItem* item =
+        c->decl != nullptr ? OwnTypedefItem(*c->decl, name) : nullptr;
+    if (item != nullptr) return item;
+  }
+  return nullptr;
+}
+
+static uint64_t RunningClassTypedefBits(std::string_view name, SimContext& ctx,
+                                        Arena& arena) {
+  const ModuleItem* item = RunningClassTypedefItem(name, ctx);
+  uint32_t width = item != nullptr ? MethodClassTypedefWidth(name, ctx) : 0;
+  return width > 0 ? UnpackedDimsTimes(width, item->unpacked_dims, ctx, arena)
+                   : 0;
+}
+
 static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kIdentifier) {
-    uint32_t tw = BoundTypeParamWidth(arg->text, ctx);
+    uint64_t tw = BoundTypeParamWidth(arg->text, ctx);
+    if (tw == 0) tw = RunningClassTypedefBits(arg->text, ctx, arena);
     return tw > 0 ? tw : TypedefBits(arg->text, ctx, arena);
   }
   if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution)

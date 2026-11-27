@@ -71,8 +71,7 @@ static uint32_t SpecializedTypedefWidth(const DataType& type, SimContext& ctx) {
   return width;
 }
 
-static uint32_t MethodClassTypedefWidth(std::string_view name,
-                                        SimContext& ctx) {
+uint32_t MethodClassTypedefWidth(std::string_view name, SimContext& ctx) {
   if (const StructTypeInfo* layout =
           MethodClassTypedefLayout(name, ctx, nullptr)) {
     return layout->total_width;

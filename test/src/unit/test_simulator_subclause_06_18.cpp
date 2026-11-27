@@ -711,4 +711,141 @@ TEST(TypedefSim, TypeParameterGivenAnUnpackedArrayTypedefKeepsItsDimensions) {
             "4 32\n");
 }
 
+TEST(ClassScopeTypedefSim, BitsOfAClassTypedefAndBodyTypeParameterInAMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("typedef logic [9:0] U;\n"
+                       "class C;\n"
+                       "  typedef logic [4:0] U;\n"
+                       "  parameter type V = logic [6:0];\n"
+                       "  function int f();\n"
+                       "    return $bits(U) * 100 + $bits(V);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    C c;\n"
+                       "    c = new;\n"
+                       "    $display(\"%0d %0d\", c.f(), $bits(U));\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "507 10\n");
+}
+
+TEST(ClassScopeTypedefSim, BitsOfAClassAggregateEnumOrArrayTypedefInAMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture(
+                "class C;\n"
+                "  typedef struct packed { logic [7:0] a; logic [2:0] b; } S;\n"
+                "  typedef enum shortint {EA, EB} E;\n"
+                "  typedef byte A [3];\n"
+                "  function int names();\n"
+                "    return $bits(S) * 10000 + $bits(E) * 100 + $bits(A);\n"
+                "  endfunction\n"
+                "  function int vars();\n"
+                "    S x;\n"
+                "    E y;\n"
+                "    A z;\n"
+                "    return $bits(x) * 10000 + $bits(y) * 100 + $bits(z);\n"
+                "  endfunction\n"
+                "endclass\n"
+                "module t;\n"
+                "  initial begin\n"
+                "    C c;\n"
+                "    c = new;\n"
+                "    $display(\"%0d %0d\", c.names(), c.vars());\n"
+                "  end\n"
+                "endmodule\n",
+                f),
+            "111624 111624\n");
+}
+
+TEST(ClassScopeTypedefSim, BitsOfABaseClassTypedefInADerivedMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class B;\n"
+                       "  typedef logic [3:0] bt;\n"
+                       "endclass\n"
+                       "class D extends B;\n"
+                       "  function int f();\n"
+                       "    bt v;\n"
+                       "    return $bits(bt) * 100 + $bits(v);\n"
+                       "  endfunction\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    D d;\n"
+                       "    d = new;\n"
+                       "    $display(\"%0d\", d.f());\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "404\n");
+}
+
+TEST(ClassScopeTypedefSim, BitsOfAClassTypedefInEveryKindOfMethod) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class C;\n"
+                       "  typedef logic [4:0] U;\n"
+                       "  int r;\n"
+                       "  function new();\n"
+                       "    r = $bits(U);\n"
+                       "  endfunction\n"
+                       "  static function int s();\n"
+                       "    return $bits(U);\n"
+                       "  endfunction\n"
+                       "  task t(output int o);\n"
+                       "    o = $bits(U);\n"
+                       "  endtask\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    C c;\n"
+                       "    int o;\n"
+                       "    c = new;\n"
+                       "    c.t(o);\n"
+                       "    $display(\"%0d %0d %0d\", c.r, C::s(), o);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "5 5 5\n");
+}
+
+TEST(ClassScopeTypedefSim, BitsOfAClassTypedefInANestedPackageOrModuleClass) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package p;\n"
+                 "  class PC;\n"
+                 "    typedef logic [2:0] pt;\n"
+                 "    static function int f();\n"
+                 "      return $bits(pt);\n"
+                 "    endfunction\n"
+                 "  endclass\n"
+                 "endpackage\n"
+                 "class Outer;\n"
+                 "  class Inner;\n"
+                 "    typedef logic [1:0] nt;\n"
+                 "    function int f();\n"
+                 "      return $bits(nt);\n"
+                 "    endfunction\n"
+                 "  endclass\n"
+                 "endclass\n"
+                 "module t;\n"
+                 "  class M;\n"
+                 "    typedef logic [5:0] mt;\n"
+                 "    function int f();\n"
+                 "      return $bits(mt);\n"
+                 "    endfunction\n"
+                 "  endclass\n"
+                 "  initial begin\n"
+                 "    Outer::Inner n;\n"
+                 "    M m;\n"
+                 "    n = new;\n"
+                 "    m = new;\n"
+                 "    $display(\"%0d %0d %0d\", p::PC::f(), n.f(), m.f());\n"
+                 "  end\n"
+                 "endmodule\n",
+                 f),
+      "3 2 6\n");
+}
+
 }  // namespace

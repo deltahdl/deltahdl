@@ -43,6 +43,8 @@ uint32_t LiteralWidth(std::string_view text, uint64_t val);
 
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 
+uint32_t MethodClassTypedefWidth(std::string_view name, SimContext& ctx);
+
 uint32_t NamedMemberWidth(const StructMember& m, SimContext& ctx);
 
 uint32_t RunningDimsWidth(const DataType& type, SimContext& ctx);

@@ -46,6 +46,8 @@ std::optional<Logic4Vec> EvalCoverageSysCall(const Expr* expr, SimContext& ctx,
 uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
                      int depth = 0);
 uint64_t TypedefItemBits(const ModuleItem& item, SimContext& ctx, Arena& arena);
+uint64_t UnpackedDimsTimes(uint64_t bits, const std::vector<Expr*>& dims,
+                           SimContext& ctx, Arena& arena);
 void WriteFileOutputTask(const Expr* expr, uint32_t descriptor,
                          std::string_view name, SimContext& ctx, Arena& arena);
 Logic4Vec EvalFmonitor(const Expr* expr, uint32_t descriptor,
