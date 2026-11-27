@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <format>
 #include <string>
 #include <string_view>
 
@@ -709,27 +710,32 @@ std::string TypelessRealShapes() {
   std::string shown;
   for (std::string_view name : {"P1", "P2", "R1", "P3", "R3", "P4", "R4", "P5",
                                 "P6", "P7", "R5", "R6", "R7"}) {
-    const std::string kName(name);
-    shown += "    $display(\"%0d %0d %0d %h\", $bits(" + kName + "), type(" +
-             kName + ") == type(shortreal), type(" + kName +
-             ") == type(real), $shortrealtobits(" + kName + "));\n";
+    shown += std::format(
+        "    $display(\"%0d %0d %0d %h\", $bits({0}), "
+        "type({0}) == type(shortreal), type({0}) == type(real), "
+        "$shortrealtobits({0}));\n",
+        name);
   }
   return shown;
 }
 
 std::string TypelessRealParamsIn(std::string_view place) {
-  const std::string kBody = std::string(kTypelessRealParams) +
-                            "  initial begin\n" + TypelessRealShapes() +
-                            "  end\n";
+  const std::string kBody =
+      std::format("{}  initial begin\n{}  end\n", kTypelessRealParams,
+                  TypelessRealShapes());
   if (place == "interface") {
-    return "interface i;\n" + kBody +
-           "endinterface\nmodule t;\n  i u();\nendmodule\n";
+    return std::format(
+        "interface i;\n{}endinterface\nmodule t;\n  i u();\nendmodule\n",
+        kBody);
   }
-  if (place == "program") return "program t;\n" + kBody + "endprogram\n";
+  if (place == "program") {
+    return std::format("program t;\n{}endprogram\n", kBody);
+  }
   if (place == "generate block") {
-    return "module t;\n  if (1) begin : g\n" + kBody + "  end\nendmodule\n";
+    return std::format("module t;\n  if (1) begin : g\n{}  end\nendmodule\n",
+                       kBody);
   }
-  return "module t;\n" + kBody + "endmodule\n";
+  return std::format("module t;\n{}endmodule\n", kBody);
 }
 
 TEST(ValueParameterSimulation,
