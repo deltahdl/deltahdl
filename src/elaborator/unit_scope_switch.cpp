@@ -15,6 +15,7 @@
 #include "elaborator/elaborator_scope_rules_names.h"
 #include "elaborator/elaborator_type_facts.h"
 #include "elaborator/elaborator_validate_classes.h"
+#include "elaborator/enum_base_typedefs.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/time_literal_scale.h"
 #include "parser/ast_design.h"
@@ -55,8 +56,10 @@ void UnitScopeTables::Put(UnitScopeTables tables, Elaborator& e) {
 void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   auto& units = e.units_;
   if (units.units.empty()) {
+    ResolveEnumBaseTypedefs({e.unit_}, e.arena_);
     ScaleTimeLiterals(*e.unit_);
   } else {
+    ResolveEnumBaseTypedefs(units.units, e.arena_);
     for (const CompilationUnit* unit : units.units) ScaleTimeLiterals(*unit);
   }
   if (units.views.empty()) {

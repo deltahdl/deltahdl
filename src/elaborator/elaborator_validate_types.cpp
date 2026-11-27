@@ -116,7 +116,10 @@ bool Elaborator::ValidateEnumLiteral(const EnumMember& member,
 
 static void CheckEnumBaseType(const DataType& dtype, SourceLoc loc,
                               const TypedefMap& typedefs, DiagEngine& diag) {
-  if (dtype.enum_base_name.empty()) return;
+  if (dtype.enum_base_name.empty() ||
+      dtype.enum_base_kind != DataTypeKind::kNamed) {
+    return;
+  }
   auto it = typedefs.find(dtype.enum_base_name);
   if (it == typedefs.end()) return;
   auto k = it->second.kind;

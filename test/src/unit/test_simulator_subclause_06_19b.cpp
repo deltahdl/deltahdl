@@ -97,21 +97,73 @@ void ExpectOkIn(std::initializer_list<std::string_view> places,
   }
 }
 
-TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_TypedefBaseGivesItsWidthInEveryPlace) {
-  ExpectOkIn(kEveryPlace,
-             "  typedef bit [5:0] t;\n"
-             "  typedef enum t {A, B} e_t;\n"
-             "  e_t v;\n"
-             "  typedef enum t [1:0] {F, G} f_t;\n"
-             "  typedef enum t {H, I} [2:0] g_t;\n"
-             "  typedef struct packed { e_t a; bit b; } s_t;\n",
-             "$bits(e_t) == 6 && $bits(v) == 6 && $bits(A) == 6 && "
-             "$bits(f_t) == 12 && $bits(g_t) == 18 && $bits(s_t) == 7");
+constexpr std::string_view kTypedefBaseDecls =
+    "  typedef bit [5:0] t;\n"
+    "  typedef enum t {A, B} e_t;\n"
+    "  e_t v;\n"
+    "  typedef enum t [1:0] {F, G} f_t;\n"
+    "  f_t fv;\n"
+    "  typedef enum t {H, I} [2:0] g_t;\n"
+    "  g_t gv;\n"
+    "  typedef struct packed { e_t a; bit b; } s_t;\n"
+    "  s_t sv;\n";
+
+constexpr std::string_view kTypedefBaseTypeNamesCheck =
+    "$bits(e_t) == 6 && $bits(f_t) == 12 && $bits(g_t) == 18 && "
+    "$bits(s_t) == 7";
+
+TEST(EnumerationTypedefBaseSimulation, TypedefBaseGivesItsWidthInEveryPlace) {
+  ExpectOkIn(kEveryPlace, kTypedefBaseDecls,
+             "$bits(v) == 6 && $bits(A) == 6 && $bits(fv) == 12 && "
+             "$bits(gv) == 18 && $bits(sv) == 7");
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_ShortintTypedefBaseIsSixteenBitsAndSignedInEveryPlace) {
+     TypeNamesOfATypedefBaseEnumerationGiveItsWidth) {
+  ExpectOkIn({"module", "interface", "program", "checker", "package",
+              "compilation unit", "generate block", "class"},
+             kTypedefBaseDecls, kTypedefBaseTypeNamesCheck);
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     DISABLED_LocalTypeNamesOfATypedefBaseEnumerationGiveItsWidth) {
+  ExpectOkIn({"function", "task", "block"}, kTypedefBaseDecls,
+             kTypedefBaseTypeNamesCheck);
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     TypedefOfATypedefGivesItsWidthInEveryPlace) {
+  ExpectOkIn(kEveryPlace,
+             "  typedef logic [5:0] t;\n"
+             "  typedef t u;\n"
+             "  typedef t [1:0] w;\n"
+             "  typedef shortint s;\n"
+             "  typedef s z;\n"
+             "  enum u {UA, UB} uv;\n"
+             "  enum w {WA, WB} wv;\n"
+             "  enum u [2:0] {XA, XB} xv;\n"
+             "  enum z {ZA = -3, ZB} zv;\n",
+             "$bits(uv) == 6 && $bits(wv) == 12 && $bits(xv) == 18 && "
+             "$bits(zv) == 16 && $isunknown(uv) && int'(ZA) == -3");
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     WildcardImportedTypedefBaseGivesItsWidth) {
+  EXPECT_EQ(RunAndGet("package p;\n"
+                      "  typedef bit [5:0] t;\n"
+                      "endpackage\n"
+                      "module m;\n"
+                      "  import p::*;\n"
+                      "  enum t {A, B} v;\n"
+                      "  bit ok;\n"
+                      "  initial ok = $bits(v) == 6;\n"
+                      "endmodule\n",
+                      "ok"),
+            1u);
+}
+
+TEST(EnumerationTypedefBaseSimulation,
+     ShortintTypedefBaseIsSixteenBitsAndSignedInEveryPlace) {
   ExpectOkIn(kEveryPlace,
              "  typedef shortint s;\n"
              "  enum s {N = -5, O} v;\n",
@@ -130,7 +182,7 @@ TEST(EnumerationTypedefBaseSimulation,
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_FourStateTypedefBaseStartsAtXAndTwoStateAtZeroElsewhere) {
+     FourStateTypedefBaseStartsAtXAndTwoStateAtZeroElsewhere) {
   ExpectOkIn(
       {"package", "compilation unit", "class", "function", "task", "block"},
       "  typedef logic [5:0] l;\n"
@@ -141,15 +193,14 @@ TEST(EnumerationTypedefBaseSimulation,
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_FourStateTypedefBaseIsAsWideAsItsTypedefInEveryPlace) {
+     FourStateTypedefBaseIsAsWideAsItsTypedefInEveryPlace) {
   ExpectOkIn(kEveryPlace,
              "  typedef logic [5:0] l;\n"
              "  enum l {P, Q} lv;\n",
              "$bits(lv) == 6 && $bits(P) == 6");
 }
 
-TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_ImportedTypedefBaseGivesItsWidth) {
+TEST(EnumerationTypedefBaseSimulation, ImportedTypedefBaseGivesItsWidth) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  typedef bit [5:0] t;\n"
                       "endpackage\n"
@@ -165,7 +216,7 @@ TEST(EnumerationTypedefBaseSimulation,
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_LocalTypedefBaseHidesTheImportedOneOfItsName) {
+     LocalTypedefBaseHidesTheImportedOneOfItsName) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  typedef bit [5:0] t;\n"
                       "endpackage\n"
@@ -181,7 +232,7 @@ TEST(EnumerationTypedefBaseSimulation,
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_StructMembersOfATypedefBaseEnumerationTakeTheirOffsets) {
+     StructMembersOfATypedefBaseEnumerationTakeTheirOffsets) {
   EXPECT_EQ(RunAndGet("module m;\n"
                       "  typedef bit [5:0] t;\n"
                       "  typedef enum t {A, B} e_t;\n"
@@ -200,7 +251,7 @@ TEST(EnumerationTypedefBaseSimulation,
 }
 
 TEST(EnumerationTypedefBaseSimulation,
-     DISABLED_MethodsOfATypedefBaseEnumerationAreAsWideAsItsBase) {
+     MethodsOfATypedefBaseEnumerationAreAsWideAsItsBase) {
   EXPECT_EQ(RunAndGet("module m;\n"
                       "  typedef bit [5:0] t;\n"
                       "  typedef enum t {A, B} e_t;\n"
