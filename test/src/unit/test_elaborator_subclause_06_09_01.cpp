@@ -382,6 +382,36 @@ TEST(VectorSpecification, RealParameterBoundIsErrorInAPackageAndTheUnit) {
   }
 }
 
+TEST(VectorSpecification, ScopedOrTypedefBoundIsCheckedInAPackageAndAClass) {
+  ElabFixture f;
+  Elaborate(
+      "package q;\n"
+      "  int qn;\n"
+      "  localparam int QK = 3;\n"
+      "endpackage\n"
+      "package p;\n"
+      "  logic [q::qn:0] a;\n"
+      "  logic [q::QK:0] b;\n"
+      "endpackage\n"
+      "class C;\n"
+      "  int n;\n"
+      "  localparam int K = 3;\n"
+      "  logic [q::qn:0] a;\n"
+      "  logic [q::QK:0] b;\n"
+      "  typedef logic [n:0] T;\n"
+      "  typedef logic [K:0] U;\n"
+      "endclass\n",
+      f);
+  for (uint32_t line : {6U, 12U, 14U}) {
+    EXPECT_TRUE(
+        ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
+  }
+  for (uint32_t line : {7U, 13U, 15U}) {
+    EXPECT_FALSE(
+        ReportedError(f.diag.Diagnostics(), kNonConstantRange, line, "7.4.1"));
+  }
+}
+
 TEST(VectorSpecification, ClassScopedParameterBoundIsAccepted) {
   ElabFixture f;
   Elaborate(
