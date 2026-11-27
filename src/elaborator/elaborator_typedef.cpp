@@ -344,13 +344,10 @@ const GenericPortInterfaces& Elaborator::CurrentGenericPortInterfaces() const {
                                           : generic_port_interfaces_.back();
 }
 
-bool Elaborator::IsDataPort(const PortDecl& port,
-                            const ModuleDecl& decl) const {
+bool Elaborator::IsDataPort(const PortDecl& port) const {
   const std::string_view kType = port.data_type.type_name;
-  return port.direction != Direction::kNone ||
-         (kType.empty() && !port.is_interface_port &&
-          !decl.is_non_ansi_ports) ||
-         typedefs_.contains(kType) || class_names_.contains(kType);
+  return port.direction != Direction::kNone || typedefs_.contains(kType) ||
+         class_names_.contains(kType);
 }
 
 void Elaborator::ResolveInterfacePortTypedef(ModuleItem* item) {
@@ -358,7 +355,7 @@ void Elaborator::ResolveInterfacePortTypedef(ModuleItem* item) {
   const InterfacePortType kTaken = InterfacePortTypedef(
       *item, decl, CurrentGenericPortInterfaces(),
       [this](std::string_view name) { return FindModuleInScope(name); });
-  if (kTaken.port == nullptr || IsDataPort(*kTaken.port, decl)) {
+  if (kTaken.port == nullptr || IsDataPort(*kTaken.port)) {
     diag_.ErrorOnce(item->loc,
                     std::format("'{}' is not an interface port of '{}'",
                                 item->typedef_ifc_port, decl.name),
