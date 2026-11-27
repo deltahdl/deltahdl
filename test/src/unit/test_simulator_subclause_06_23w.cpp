@@ -49,6 +49,9 @@ TEST(ScopeDeclarationTypeRefSim, PackageAndUnitVariablesTakeTheReferencedType) {
                  "  function automatic int pbits();\n"
                  "    return $bits(pv);\n"
                  "  endfunction\n"
+                 "  function automatic int psize();\n"
+                 "    return $size(pf);\n"
+                 "  endfunction\n"
                  "endpackage\n"
                  "logic [11:0] ub;\n"
                  "var type(ub) uv;\n"
@@ -58,7 +61,7 @@ TEST(ScopeDeclarationTypeRefSim, PackageAndUnitVariablesTakeTheReferencedType) {
                  "  var type(mb) mv;\n"
                  "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
                  "$bits(pk::pv), pk::pbits(), $bits(pk::ps), "
-                 "$size(pk::pf), $bits(uv), $bits(ue), $isunknown(uv), "
+                 "pk::psize(), $bits(uv), $bits(ue), $isunknown(uv), "
                  "$bits(mv));\n"
                  "endmodule\n",
                  f),
