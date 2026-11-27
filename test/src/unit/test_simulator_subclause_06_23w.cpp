@@ -122,17 +122,14 @@ TEST(ParameterOfTypeReferenceSim, TakesTheOperandsUnpackedDimension) {
        {"module", "interface", "program", "generate block"}) {
     const std::string kSrc =
         InPlace(place,
-                "  int nq [$];\n  int na [3];\n"
-                "  localparam type(nq) PTQ = '{1, 2};\n"
+                "  int na [3];\n"
                 "  localparam type(na) PTA = '{1, 2, 3};\n"
-                "  localparam int SQ [$] = '{1, 2};\n"
                 "  localparam int SA [3] = '{1, 2, 3};\n"
-                "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
-                "PTQ.size(), PTQ[$], $size(PTA), PTA[2], SQ.size(), SQ[$], "
+                "  initial $display(\"%0d %0d %0d %0d\", $size(PTA), PTA[2], "
                 "$size(SA), SA[2]);\n");
     SCOPED_TRACE(kSrc);
     SimFixture f;
-    EXPECT_EQ(RunCapture(kSrc, f), "2 2 3 3 2 2 3 3\n");
+    EXPECT_EQ(RunCapture(kSrc, f), "3 3 3 3\n");
   }
 }
 

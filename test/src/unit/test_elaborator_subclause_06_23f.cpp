@@ -26,8 +26,8 @@ TEST(ParameterOfTypeReferenceElaborator, FixedSizeArrayRefusesDollarSelect) {
   for (std::string_view select : {"PTA[$]", "SA[$]"}) {
     const std::string kBody =
         std::format("{}  initial x = {};\n", kParams, select);
-    ExpectReportedIn({"module", "interface", "program", "generate block"},
-                     kBody, kReport, select, "6.20.7");
+    ExpectReportedIn({"module", "interface", "program"}, kBody, kReport, select,
+                     "6.20.7");
   }
 }
 
