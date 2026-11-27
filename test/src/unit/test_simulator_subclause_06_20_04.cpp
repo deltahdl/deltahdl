@@ -50,16 +50,16 @@ std::string Placed(const std::string& place) {
     return std::string(kUnit) + "class C;\n" + kReads +
            "endclass\n"
            "module top;\n"
-           "  initial " +
+           "  initial #2 " +
            Show("C::") + kTop;
   }
   if (place == "generate") {
     return std::string(kUnit) +
            "module top;\n"
            "  if (1) begin : g\n" +
-           kReads + "    initial " + Show("") + "  end\n" + kTop;
+           kReads + "    initial #2 " + Show("") + "  end\n" + kTop;
   }
-  return std::string(kUnit) + place + " m;\n" + kReads + "  initial " +
+  return std::string(kUnit) + place + " m;\n" + kReads + "  initial #2 " +
          Show("") + "end" + place +
          "\n"
          "module top;\n"
@@ -73,8 +73,8 @@ TEST(LocalparamSimulation, RealPackageAndUnitParametersAreConstants) {
     SCOPED_TRACE(place);
     SimFixture f;
     EXPECT_EQ(RunCapture(Placed(place), f),
-              "0.10 1 1 0.100000001 0 1.00 0.20 1.50 0.25\n"
-              "0.200000003 0\n");
+              "0.200000003 0\n"
+              "0.10 1 1 0.100000001 0 1.00 0.20 1.50 0.25\n");
     EXPECT_FALSE(f.diag.HasErrors());
   }
 }
