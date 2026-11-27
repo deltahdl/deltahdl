@@ -329,8 +329,15 @@ constexpr std::string_view kFourStateConstantParameters =
     "  typedef enum logic [1:0] {KA = 0, KX = 'x} k_t;\n"
     "endclass\n"
     "module s #(parameter logic [1:0] Q = 0);\n"
+    "  typedef enum logic [1:0] {SA = 0, SX = 2'b1x} s_t;\n"
+    "  localparam logic [1:0] SP = SX;\n"
+    "  logic [1:0] sw = SP;\n"
     "  bit ok;\n"
-    "  initial ok = Q === 2'bxx;\n"
+    "  bit own_ok;\n"
+    "  initial begin\n"
+    "    ok = Q === 2'bxx;\n"
+    "    own_ok = SP === 2'b1x && sw === 2'b1x;\n"
+    "  end\n"
     "endmodule\n"
     "module m;\n"
     "  typedef enum logic [1:0] {A = 0, XX = 'x, ZZ = 'z} m_t;\n"
@@ -343,19 +350,34 @@ constexpr std::string_view kFourStateConstantParameters =
     "  localparam P6 = UZ;\n"
     "  localparam P7 = K::KX;\n"
     "  localparam bit [1:0] P8 = XX;\n"
+    "  logic [1:0] w1 = P1;\n"
     "  s #(.Q(XX)) u();\n"
     "  bit ok;\n"
+    "  bit class_ok;\n"
     "  bit two_state_ok;\n"
     "  initial begin\n"
     "    ok = P1 === 2'bxx && P2 === 2'bzz && P3 === 2'bxx && P4 === 2'bx0 &&\n"
-    "         P5 === 2'bx1 && P6 === 2'bzz && P7 === 2'bxx;\n"
+    "         P5 === 2'bx1 && P6 === 2'bzz && w1 === 2'bxx;\n"
+    "    class_ok = P7 === 2'bxx;\n"
     "    two_state_ok = P8 === 2'b00;\n"
     "  end\n"
     "endmodule\n";
 
 TEST(EnumerationParameterSimulation,
-     DISABLED_ParameterGivenAnXOrZEnumerationConstantKeepsItsBits) {
+     ParameterGivenAnXOrZEnumerationConstantKeepsItsBits) {
   EXPECT_EQ(RunAndGet(std::string(kFourStateConstantParameters), "ok"), 1u);
+}
+
+TEST(EnumerationParameterSimulation,
+     ChildParameterGivenItsOwnXEnumerationConstantKeepsItsBits) {
+  EXPECT_EQ(RunAndGet(std::string(kFourStateConstantParameters), "u.own_ok"),
+            1u);
+}
+
+TEST(EnumerationParameterSimulation,
+     DISABLED_ParameterGivenAClassXEnumerationConstantKeepsItsBits) {
+  EXPECT_EQ(RunAndGet(std::string(kFourStateConstantParameters), "class_ok"),
+            1u);
 }
 
 TEST(EnumerationParameterSimulation,

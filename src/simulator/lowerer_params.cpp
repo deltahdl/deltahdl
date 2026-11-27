@@ -199,10 +199,17 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
   var->is_signed = shape.is_signed;
   FillParamValue(p, [this, &mod, &p, full, var, shape] {
-    if (!HoldStructParamValue(p, full, var, ctx_, arena_) &&
-        (p.override_expr != nullptr ||
-         !NamesOwnEnumConstant(p.default_value, mod)))
+    const bool kHeld = HoldStructParamValue(p, full, var, ctx_, arena_);
+    const bool kNamesOwnConstant = p.override_expr == nullptr &&
+                                   NamesOwnEnumConstant(p.default_value, mod);
+    if (!kHeld && !kNamesOwnConstant)
       ReevaluateParamValue(p, var, ctx_, arena_);
+    if (!kHeld && kNamesOwnConstant && p.defparam_module == nullptr) {
+      enum_constant_param_fills_.emplace_back([this, &p, var, shape] {
+        ReevaluateParamValue(p, var, ctx_, arena_);
+        var->value.is_signed = shape.is_signed;
+      });
+    }
     var->value.is_signed = shape.is_signed;
   });
 }

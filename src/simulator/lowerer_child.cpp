@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <map>
 #include <optional>
 #include <string>
@@ -34,13 +35,26 @@
 
 namespace delta {
 
+void Lowerer::LowerModuleVariables(const std::string& inst_prefix,
+                                   const RtlirModule* mod) {
+  auto lower = [&](bool constants) {
+    for (const auto& var : mod->variables) {
+      if (var.is_enum_constant != constants) continue;
+      auto* name =
+          arena_.Create<std::string>(inst_prefix + std::string(var.name));
+      LowerVar(*name, var);
+    }
+  };
+  lower(true);
+  std::vector<std::function<void()>> fills;
+  fills.swap(enum_constant_param_fills_);
+  for (const auto& fill : fills) fill();
+  lower(false);
+}
+
 void Lowerer::CreateChildModuleVariables(const std::string& inst_prefix,
                                          const RtlirModule* resolved) {
-  for (const auto& var : resolved->variables) {
-    auto* name =
-        arena_.Create<std::string>(inst_prefix + std::string(var.name));
-    LowerVar(*name, var);
-  }
+  LowerModuleVariables(inst_prefix, resolved);
 }
 
 static void CreateChildModulePorts(const std::string& inst_prefix,

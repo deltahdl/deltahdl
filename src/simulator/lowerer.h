@@ -90,6 +90,8 @@ class Lowerer {
   void LowerModuleProcesses(const RtlirModule* mod);
   const std::vector<EventExpr>& ClockOf(const RtlirProcess& proc);
   void LowerVar(std::string_view name, const RtlirVariable& var);
+  void LowerModuleVariables(const std::string& inst_prefix,
+                            const RtlirModule* mod);
   void LowerBlockScopedVarInit(std::string_view name, const RtlirVariable& var,
                                Variable* v, uint32_t width);
   void LowerVarInit(std::string_view name, const RtlirVariable& var,
@@ -253,6 +255,7 @@ class Lowerer {
   std::unordered_set<std::string> path_delayed_ports_;
   std::unordered_map<const RtlirModule*, std::string> instance_prefixes_;
   std::vector<std::function<void()>> deferred_param_fills_;
+  std::vector<std::function<void()>> enum_constant_param_fills_;
   std::vector<std::function<void()>> deferred_var_inits_;
   std::unordered_set<const Variable*> deferred_init_vars_;
   bool var_inits_ran_ = false;

@@ -15,6 +15,7 @@
 #include "simulator/eval_class_params.h"
 #include "simulator/lowerer_register.h"
 #include "simulator/sim_context.h"
+#include "simulator/sim_context_types.h"
 #include "simulator/unit_scope_items.h"
 #include "simulator/variable.h"
 #include "simulator/vcd_dump_state.h"
@@ -45,8 +46,9 @@ static void RegisterItemEnumConstantVariables(const ModuleItem* item,
                                               std::string(m.name));
       ctx.Vcd().MarkVcdEnumConstant(*qname);
       Variable* constant = ctx.CreateVariable(*qname, width);
-      constant->value =
-          MakeLogic4VecVal(arena, width, static_cast<uint64_t>(m.value));
+      const EnumMemberInfo kHeld = EnumMemberInfoOf(m, width, ctx, arena);
+      constant->value = MakeLogic4VecVal(arena, width, kHeld.value);
+      constant->value.words[0].bval = kHeld.xz;
       constant->is_signed = is_signed;
     }
   });

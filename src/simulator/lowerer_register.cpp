@@ -144,11 +144,22 @@ static bool HoldsXZLiteral(const Expr* expr) {
   return found;
 }
 
+static const Variable* PackageVariableNamed(const Expr* e, SimContext& ctx) {
+  const bool kPackageName = e->is_scope_resolution && e->lhs != nullptr &&
+                            e->lhs->kind == ExprKind::kIdentifier &&
+                            e->rhs != nullptr &&
+                            e->rhs->kind == ExprKind::kIdentifier;
+  if (!kPackageName) return nullptr;
+  return ctx.FindVariable(std::string(e->lhs->text) + "." +
+                          std::string(e->rhs->text));
+}
+
 static bool NamesAnUnknownValue(const Expr* expr, SimContext& ctx) {
   bool found = false;
   ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
-    if (e->kind != ExprKind::kIdentifier) return;
-    const Variable* v = ctx.FindVariable(e->text);
+    const Variable* v = nullptr;
+    if (e->kind == ExprKind::kIdentifier) v = ctx.FindVariable(e->text);
+    if (e->kind == ExprKind::kMemberAccess) v = PackageVariableNamed(e, ctx);
     if (v != nullptr && HasUnknownBits(v->value)) found = true;
   });
   return found;
