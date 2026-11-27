@@ -176,11 +176,17 @@ std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
 }  // namespace
 
 std::string TypeKey(const DataType& type, SimContext& ctx) {
+  return TypeKeyOfWidth(type, 0, ctx);
+}
+
+std::string TypeKeyOfWidth(const DataType& type, uint32_t width,
+                           SimContext& ctx) {
   PackedDims dims;
   const DataType* builtin = BuiltinTypedefTarget(type, ctx, dims);
   if (builtin == nullptr) return DeclaredTypeKey(type, ctx);
   if (const auto kForm = IntegralKindForm(builtin->kind)) {
-    return IntegralTypeKey(*builtin, *kForm, dims, DeclaredTypeWidth(type, ctx),
+    return IntegralTypeKey(*builtin, *kForm, dims,
+                           width != 0 ? width : DeclaredTypeWidth(type, ctx),
                            ctx);
   }
   if (builtin->kind == DataTypeKind::kRealtime) return "real";

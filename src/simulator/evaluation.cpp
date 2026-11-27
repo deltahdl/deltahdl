@@ -475,6 +475,15 @@ static bool IsTypeRef(const Expr* operand) {
   return operand != nullptr && operand->kind == ExprKind::kTypeRef;
 }
 
+static std::optional<bool> SpelledTypeRefsMatch(const Expr* lhs,
+                                                const Expr* rhs,
+                                                SimContext& ctx) {
+  TypeRefRuntimeId a = ResolveTypeRefRuntimeId(lhs, ctx);
+  TypeRefRuntimeId b = ResolveTypeRefRuntimeId(rhs, ctx);
+  if (!a.resolved || !b.resolved) return std::nullopt;
+  return a.is_class == b.is_class && a.name == b.name;
+}
+
 static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   bool is_eq = expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq;
@@ -486,17 +495,11 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
     out = MakeLogic4VecVal(arena, 1, *holds ? 1 : 0);
     return true;
   }
-  if (std::optional<bool> same =
-          RunningClassTypeRefsMatch(expr->lhs, expr->rhs, ctx)) {
-    out = MakeLogic4VecVal(arena, 1, *same == is_eq ? 1 : 0);
-    return true;
-  }
-  TypeRefRuntimeId a = ResolveTypeRefRuntimeId(expr->lhs, ctx);
-  TypeRefRuntimeId b = ResolveTypeRefRuntimeId(expr->rhs, ctx);
-  if (!a.resolved || !b.resolved) return false;
-  bool matched = a.is_class == b.is_class && a.name == b.name;
-  bool result = is_eq ? matched : !matched;
-  out = MakeLogic4VecVal(arena, 1, result ? 1 : 0);
+  std::optional<bool> same =
+      RunningClassTypeRefsMatch(expr->lhs, expr->rhs, ctx);
+  if (!same) same = SpelledTypeRefsMatch(expr->lhs, expr->rhs, ctx);
+  if (!same) return false;
+  out = MakeLogic4VecVal(arena, 1, *same == is_eq ? 1 : 0);
   return true;
 }
 

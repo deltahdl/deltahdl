@@ -142,7 +142,15 @@ static std::string_view WrittenName(const Expr* op) {
 struct RunningOperandType {
   DataType type;
   bool through_class = false;
+  uint32_t held_width = 0;
 };
+
+static uint32_t HeldWidth(std::string_view name, SimContext& ctx) {
+  const ClassObject* self = ctx.CurrentThis();
+  if (self == nullptr) return 0;
+  auto held = self->properties.find(std::string(name));
+  return held != self->properties.end() ? held->second.width : 0;
+}
 
 static std::optional<RunningOperandType> PropertyType(const ClassMember& prop,
                                                       SimContext& ctx) {
@@ -151,7 +159,8 @@ static std::optional<RunningOperandType> PropertyType(const ClassMember& prop,
       IsBareTypeName(prop.data_type)
           ? RunningClassTypeParam(prop.data_type.type_name, ctx)
           : nullptr;
-  return RunningOperandType{actual != nullptr ? *actual : prop.data_type, true};
+  if (actual != nullptr) return RunningOperandType{*actual, true};
+  return RunningOperandType{prop.data_type, true, HeldWidth(prop.name, ctx)};
 }
 
 static std::optional<RunningOperandType> TypeOfRunningOperand(const Expr* op,
@@ -174,7 +183,8 @@ std::optional<bool> RunningClassTypeRefsMatch(const Expr* a, const Expr* b,
   std::optional<RunningOperandType> type_b = TypeOfRunningOperand(b, ctx);
   if (!type_a || !type_b || (!type_a->through_class && !type_b->through_class))
     return std::nullopt;
-  return TypeKey(type_a->type, ctx) == TypeKey(type_b->type, ctx);
+  return TypeKeyOfWidth(type_a->type, type_a->held_width, ctx) ==
+         TypeKeyOfWidth(type_b->type, type_b->held_width, ctx);
 }
 
 uint32_t SpecializationTypeParamWidth(const Expr* scope, SimContext& ctx,
