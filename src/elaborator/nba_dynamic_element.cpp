@@ -142,7 +142,7 @@ class NbaDynamicElementWalk {
       if (member) member->dynamic_element = obj->dynamic_element;
       return member;
     }
-    if (e->kind != ExprKind::kSelect) return std::nullopt;
+    if (e->kind != ExprKind::kSelect || e->base == nullptr) return std::nullopt;
     std::optional<PathShape> shape = Resolve(e->base, scopes);
     if (!shape) return std::nullopt;
     if (shape->next_dim < shape->dims->size() &&
