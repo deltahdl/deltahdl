@@ -562,7 +562,7 @@ TEST(ValueParameterSimulation, NameHidingAFourStateParameterKeepsItsValue) {
 
 TEST(ValueParameterSimulation,
      ChildIntegralNameIsNotTakenAsTheTopModulesSameNamedReal) {
-  for (const char* kind : {"module", "interface"}) {
+  for (const char* kind : {"module", "interface", "program"}) {
     SCOPED_TRACE(kind);
     const std::string kSrc = std::format(
         "{0} m #(parameter int PI = 6, parameter bit [3:0] PB = 4'd9,\n"
@@ -576,7 +576,17 @@ TEST(ValueParameterSimulation,
         "  int A [2];\n"
         "  int Q;\n"
         "  mailbox mb = new;\n"
+        "  if (1) begin : g\n"
+        "    int GV = 16;\n"
+        "    initial #3 $display(\"%0d\", GV);\n"
+        "  end\n"
+        "  task automatic show();\n"
+        "    int TL;\n"
+        "    TL = 17;\n"
+        "    $display(\"%0d\", TL);\n"
+        "  endtask\n"
         "  initial begin\n"
+        "    show();\n"
         "    W = 13;\n"
         "    A[1] = 14;\n"
         "    mb.put(15);\n"
@@ -596,18 +606,21 @@ TEST(ValueParameterSimulation,
         "  real W = 8.5;\n"
         "  real A [2];\n"
         "  real Q;\n"
+        "  real GV = 10.5;\n"
+        "  real TL = 11.5;\n"
         "  m u();\n"
         "  initial begin\n"
         "    A[1] = 9.5;\n"
-        "    #2 $display(\"%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\",\n"
-        "                PI, PB, PU, LI, LB, LU, V, W, A[1]);\n"
+        "    #2 $display(\"%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f "
+        "%.1f\",\n"
+        "                PI, PB, PU, LI, LB, LU, V, W, A[1], GV, TL);\n"
         "  end\n"
         "endmodule\n",
         kind);
     SimFixture f;
     EXPECT_EQ(RunCapture(kSrc, f),
-              "1 15\n6 9 5 7 3 11 12 13 7 14\n"
-              "2.5 1.5 3.5 4.5 0.5 6.5 7.5 8.5 9.5\n");
+              "17\n1 15\n6 9 5 7 3 11 12 13 7 14\n"
+              "2.5 1.5 3.5 4.5 0.5 6.5 7.5 8.5 9.5 10.5 11.5\n16\n");
   }
 }
 
