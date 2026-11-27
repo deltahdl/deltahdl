@@ -66,7 +66,8 @@ std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
   }
 }
 
-const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx,
+const DataType* BuiltinTypedefTarget(const DataType& type,
+                                     const ClassTypeInfo* from, SimContext& ctx,
                                      PackedDims& dims) {
   const DataType* step = &type;
   for (size_t hops = 0; hops <= ctx.TypeDeclarationCount(); ++hops) {
@@ -78,7 +79,7 @@ const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx,
     if (step->kind != DataTypeKind::kNamed)
       return BuiltinTypeKeyword(step->kind).empty() ? nullptr : step;
     if (!step->type_params.empty()) return nullptr;
-    const ModuleItem* item = TypedefItemSeenFrom(*step, nullptr, ctx);
+    const ModuleItem* item = TypedefItemSeenFrom(*step, from, ctx);
     if (item == nullptr || !item->unpacked_dims.empty()) return nullptr;
     step = &item->typedef_type;
   }
@@ -155,14 +156,15 @@ std::string PlaceKey(const SourceLoc& at) {
          ":" + std::to_string(at.column);
 }
 
-std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
+std::string DeclaredTypeKey(const DataType& type, const ClassTypeInfo* from,
+                            SimContext& ctx) {
   const DataType* step = &type;
   const ModuleItem* declared = nullptr;
   for (size_t hops = 0; hops <= ctx.TypeDeclarationCount(); ++hops) {
     if (step->kind != DataTypeKind::kNamed) break;
     if (ClassTypeInfo* cls = ctx.FindClassType(TypeChainKey(*step)))
       return ClassKey(cls, *step, ctx);
-    const ModuleItem* item = TypedefItemSeenFrom(*step, nullptr, ctx);
+    const ModuleItem* item = TypedefItemSeenFrom(*step, from, ctx);
     if (item == nullptr) break;
     declared = item;
     step = &item->typedef_type;
@@ -176,14 +178,14 @@ std::string DeclaredTypeKey(const DataType& type, SimContext& ctx) {
 }  // namespace
 
 std::string TypeKey(const DataType& type, SimContext& ctx) {
-  return TypeKeyOfWidth(type, 0, ctx);
+  return TypeKeySeenFrom(type, nullptr, 0, ctx);
 }
 
-std::string TypeKeyOfWidth(const DataType& type, uint32_t width,
-                           SimContext& ctx) {
+std::string TypeKeySeenFrom(const DataType& type, const ClassTypeInfo* from,
+                            uint32_t width, SimContext& ctx) {
   PackedDims dims;
-  const DataType* builtin = BuiltinTypedefTarget(type, ctx, dims);
-  if (builtin == nullptr) return DeclaredTypeKey(type, ctx);
+  const DataType* builtin = BuiltinTypedefTarget(type, from, ctx, dims);
+  if (builtin == nullptr) return DeclaredTypeKey(type, from, ctx);
   if (const auto kForm = IntegralKindForm(builtin->kind)) {
     return IntegralTypeKey(*builtin, *kForm, dims,
                            width != 0 ? width : DeclaredTypeWidth(type, ctx),

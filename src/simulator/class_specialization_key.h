@@ -8,12 +8,13 @@ namespace delta {
 
 class SimContext;
 struct ClassDecl;
+struct ClassTypeInfo;
 struct DataType;
 
 std::string TypeKey(const DataType& type, SimContext& ctx);
 
-std::string TypeKeyOfWidth(const DataType& type, uint32_t width,
-                           SimContext& ctx);
+std::string TypeKeySeenFrom(const DataType& type, const ClassTypeInfo* from,
+                            uint32_t width, SimContext& ctx);
 
 std::string TypeActualKey(const ClassDecl* decl, size_t i,
                           const DataType* actual, SimContext& ctx);

@@ -180,8 +180,9 @@ std::optional<bool> RunningClassTypeRefsMatch(const Expr* a, const Expr* b,
   std::optional<RunningOperandType> type_b = TypeOfRunningOperand(b, ctx);
   if (!type_a || !type_b || (!type_a->through_class && !type_b->through_class))
     return std::nullopt;
-  return TypeKeyOfWidth(type_a->type, type_a->held_width, ctx) ==
-         TypeKeyOfWidth(type_b->type, type_b->held_width, ctx);
+  const ClassTypeInfo* from = ctx.CurrentMethodClass();
+  return TypeKeySeenFrom(type_a->type, from, type_a->held_width, ctx) ==
+         TypeKeySeenFrom(type_b->type, from, type_b->held_width, ctx);
 }
 
 uint32_t SpecializationTypeParamWidth(const Expr* scope, SimContext& ctx,
