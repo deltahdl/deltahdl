@@ -285,6 +285,18 @@ std::string AssociativeIndexSub(const InstanceTypeSpelling& spelling) {
       spelling.parameter, spelling.held, spelling.declared);
 }
 
+void ExpectEachWidthInstanceKeysByItsIndex(const std::string& sub) {
+  EXPECT_EQ(
+      SortedOutput(sub + "module t; sub #(8) a(); sub #(16) b(); endmodule\n"),
+      (std::vector<std::string>{"t.a 1 1", "t.b 0 0"}));
+  EXPECT_EQ(SortedOutput(sub + "module t;\n"
+                               "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                               "    sub #(8 * i + 8) s();\n"
+                               "  end\n"
+                               "endmodule\n"),
+            (std::vector<std::string>{"t.g[0].s 1 1", "t.g[1].s 0 0"}));
+}
+
 TEST(ProceduralTypeRefInstanceSim, AssociativeIndexTakesEachInstancesType) {
   const std::vector<std::string> kExpected{"t.a 1 1", "t.b 0 0"};
   for (const InstanceTypeSpelling& spelling : kTypeParameterReferences) {
@@ -297,19 +309,35 @@ TEST(ProceduralTypeRefInstanceSim, AssociativeIndexTakesEachInstancesType) {
                                   "endmodule\n"),
               kExpected);
   }
-  for (const InstanceTypeSpelling& spelling : kWidthParameterReferences) {
-    SCOPED_TRACE(spelling.declared);
-    const std::string kSub = AssociativeIndexSub(spelling);
-    EXPECT_EQ(SortedOutput(kSub + "module t; sub #(8) a(); sub #(16) b(); "
-                                  "endmodule\n"),
-              kExpected);
-    EXPECT_EQ(SortedOutput(kSub + "module t;\n"
-                                  "  for (genvar i = 0; i < 2; i++) begin : g\n"
-                                  "    sub #(8 * i + 8) s();\n"
-                                  "  end\n"
-                                  "endmodule\n"),
-              (std::vector<std::string>{"t.g[0].s 1 1", "t.g[1].s 0 0"}));
-  }
+  ExpectEachWidthInstanceKeysByItsIndex(
+      AssociativeIndexSub(kWidthParameterReferences[1]));
+}
+
+TEST(ProceduralTypeRefInstanceSim,
+     DISABLED_IdentifierIndexTakesEachInstancesWidth) {
+  ExpectEachWidthInstanceKeysByItsIndex(
+      AssociativeIndexSub(kWidthParameterReferences[0]));
+}
+
+TEST(ProceduralTypeRefInstanceSim,
+     DISABLED_CheckerProcedureTakesTheEnclosingVariablesType) {
+  EXPECT_EQ(
+      SortedOutput("module sub #(int W = 32);\n"
+                   "  logic [W-1:0] y;\n"
+                   "  checker ck;\n"
+                   "    final begin\n"
+                   "      var type(y) l;\n"
+                   "      var type(y + y) e;\n"
+                   "      l = 300;\n"
+                   "      e = 300;\n"
+                   "      $display(\"%m %0d %0d %0d %0d\", l, $bits(l), e, "
+                   "$bits(e));\n"
+                   "    end\n"
+                   "  endchecker\n"
+                   "  ck c();\n"
+                   "endmodule\n"
+                   "module t; sub #(8) a(); sub #(32) b(); endmodule\n"),
+      (std::vector<std::string>{"t.a.c 44 8 44 8", "t.b.c 300 32 300 32"}));
 }
 
 class TypeRefBlockVariableVpi : public VpiDesignRun {

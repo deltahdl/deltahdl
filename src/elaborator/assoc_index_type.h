@@ -27,9 +27,7 @@ void ResolveTypeRefIndexDims(const std::vector<Expr*>& dims, Resolve resolve,
     }
     DataType referenced;
     referenced.type_ref_expr = dim->lhs;
-    referenced.type_ref_use = TypeRefUse::kIndex;
     resolve(referenced);
-    referenced.type_ref_use = TypeRefUse::kDeclared;
     dim->type_value = arena.Create<DataType>(referenced);
   }
 }

@@ -21,7 +21,6 @@ enum class Direction : uint8_t {
 enum class TypeRefUse : uint8_t {
   kDeclared,
   kArgument,
-  kIndex,
 };
 
 enum class DataTypeKind : uint8_t {

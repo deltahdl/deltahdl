@@ -69,10 +69,7 @@ bool Elaborator::AdoptExpressionTypeRef(DataType& dt, const Expr* ref,
       return true;
     }
   }
-  if (ref->kind == ExprKind::kIdentifier) {
-    return dt.type_ref_use == TypeRefUse::kIndex &&
-           AdoptFoldedTypeRef(dt, ref, TypeRefExprType(ref, mod), mod);
-  }
+  if (ref->kind == ExprKind::kIdentifier) return false;
   std::optional<DataType> type = TypeRefExprType(ref, mod);
   if (!AdoptFoldedTypeRef(dt, ref, type, mod)) {
     AdoptExpressionType(dt, type, arena_);

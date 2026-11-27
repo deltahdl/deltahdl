@@ -29,7 +29,7 @@ inline std::string InstanceTypeBody(const InstanceTypeSpelling& spelling,
          "  checker ck;\n"
          "    final begin\n"
          "      " +
-         kDecl +
+         std::string(spelling.held) +
          " l;\n"
          "      l = 300;\n"
          "      $display(\"%m final %0d %0d\", l, $bits(l));\n"
