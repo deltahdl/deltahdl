@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 #include <string_view>
@@ -737,12 +738,42 @@ TEST(ChandleDataType, ChandleInPackedOrUntaggedUnionsInEveryPlaceIsReported) {
                  "chandle h", kUntagged, "7.3.2"));
 }
 
-TEST(ChandleDataType,
-     DISABLED_ChandleNestedInAStructInsideAnUntaggedUnionIsReported) {
+TEST(ChandleDataType, ChandleNestedInAStructInsideAnUntaggedUnionIsReported) {
   EXPECT_TRUE(
       ReportedOn("module t;\n  typedef struct { chandle h; } s_t;\n"
                  "  union { s_t s; int i; } u;\nendmodule\n",
                  "s_t s;", kUntagged, "7.3.2"));
+  ElabFixture f;
+  ElaborateSrc(
+      "union { struct { chandle h; } s; int i; } cu;\n"
+      "package pk; union { struct { chandle h; } s; int i; } pu; endpackage\n"
+      "interface I; union { struct { chandle h; } s; int i; } a; "
+      "endinterface\n"
+      "checker ck; union { struct { chandle h; } s; int i; } d; endchecker\n"
+      "program P; union { struct { chandle h; } s; int i; } c; endprogram\n"
+      "module t;\n"
+      "  typedef struct { chandle h; } s_t;\n"
+      "  I ii(); ck c1(); P pp();\n"
+      "  class C; union { s_t s; int i; } cu; endclass\n"
+      "  function automatic void f(); union { s_t s[2]; int i; } u; "
+      "endfunction\n"
+      "  if (1) begin : g union { struct { s_t in; } s; int i; } gu; end\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  for (uint32_t line : {1u, 2u, 3u, 4u, 5u, 9u, 10u, 11u}) {
+    EXPECT_TRUE(ReportedError(diags, kUntagged, line, "7.3.2")) << line;
+  }
+}
+
+TEST(ChandleDataType, NestedStructInATaggedUnionOrHoldingNoChandleIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n  typedef struct { chandle h; } s_t;\n"
+             "  typedef struct { int a; logic [3:0] b; } n_t;\n"
+             "  union tagged { s_t s; int i; } tu;\n"
+             "  union tagged { struct { s_t in; } s; int i; } tn;\n"
+             "  union { n_t s; int i; } u;\n"
+             "  union { struct { n_t in; } s; int i; } un;\nendmodule\n"));
 }
 
 TEST(ChandleDataType, ChandleInUnpackedStructsArraysAndTaggedUnionsIsAccepted) {

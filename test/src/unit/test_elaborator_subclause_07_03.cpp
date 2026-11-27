@@ -291,6 +291,37 @@ TEST(UnionDeclarationValidation, DynamicAndChandleMembersReportedInEveryPlace) {
                             "7.3.2"));
 }
 
+TEST(UnionDeclarationValidation, DynamicMemberOfANestedStructureIsReported) {
+  ElabFixture f;
+  ElaborateSrc(
+      "module t;\n"
+      "  typedef struct { string s; } ss_t;\n"
+      "  union { ss_t m; int i; } a;\n"
+      "  union { struct { event e; } m; int i; } b;\n"
+      "  union { struct { int d []; } m; int i; } c;\n"
+      "  union { struct { int q [$]; } m; int i; } d;\n"
+      "  union { struct { int x [string]; } m; int i; } e;\n"
+      "  union tagged { ss_t m; struct { event e; int d []; } n; int i; } t1;\n"
+      "  union { struct { int x; logic [3:0] y; } m; int i; } ok;\n"
+      "endmodule\n",
+      f);
+  const auto& diags = f.diag.Diagnostics();
+  EXPECT_TRUE(ReportedError(diags, "string type can only be used in tagged", 3,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "event type can only be used in tagged", 4,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'd' can only be used in tagged", 5,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'q' can only be used in tagged", 6,
+                            "7.3.2"));
+  EXPECT_TRUE(ReportedError(diags, "member 'x' can only be used in tagged", 7,
+                            "7.3.2"));
+  for (const auto& d : diags) {
+    EXPECT_NE(d.loc.line, 8u) << d.message;
+    EXPECT_NE(d.loc.line, 9u) << d.message;
+  }
+}
+
 TEST(UnionDeclarationValidation,
      DISABLED_TypedefOfADynamicArrayQueueOrAssociativeArrayIsReported) {
   ElabFixture f;

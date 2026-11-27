@@ -205,7 +205,29 @@ static bool HasDynamicDimension(const StructMember& m,
 }
 
 static std::string UntaggedUnionMemberReport(const StructMember& m,
-                                             const TypeShapeTables& tables) {
+                                             const TypeShapeTables& tables,
+                                             int depth);
+
+static constexpr int kMaxNestedStructDepth = 32;
+
+static std::string NestedStructMemberReport(const StructMember& m,
+                                            const TypeShapeTables& tables,
+                                            int depth) {
+  const DataType* own = MemberOwnType(m, tables.typedefs);
+  if (own == nullptr || own->kind != DataTypeKind::kStruct ||
+      depth == kMaxNestedStructDepth) {
+    return {};
+  }
+  for (const auto& inner : own->struct_members) {
+    std::string report = UntaggedUnionMemberReport(inner, tables, depth + 1);
+    if (!report.empty()) return report;
+  }
+  return {};
+}
+
+static std::string UntaggedUnionMemberReport(const StructMember& m,
+                                             const TypeShapeTables& tables,
+                                             int depth) {
   if (HasDynamicDimension(m, tables)) {
     return std::format(
         "dynamic array, associative array or queue member '{}' can only be "
@@ -220,7 +242,7 @@ static std::string UntaggedUnionMemberReport(const StructMember& m,
     case DataTypeKind::kEvent:
       return "event type can only be used in tagged unions";
     default:
-      return {};
+      return NestedStructMemberReport(m, tables, depth);
   }
 }
 
@@ -229,7 +251,7 @@ static void CheckUntaggedUnionMembers(const DataType& dtype, SourceLoc loc,
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (dtype.is_tagged) return;
   for (const auto& m : dtype.struct_members) {
-    std::string report = UntaggedUnionMemberReport(m, ctx.tables);
+    std::string report = UntaggedUnionMemberReport(m, ctx.tables, 0);
     if (!report.empty()) {
       ctx.diag.Error(loc, report, Subclause("7.3.2"));
       return;
