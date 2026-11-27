@@ -344,6 +344,38 @@ const GenericPortInterfaces& Elaborator::CurrentGenericPortInterfaces() const {
                                           : generic_port_interfaces_.back();
 }
 
+bool Elaborator::IsDataPort(const PortDecl& port,
+                            const ModuleDecl& decl) const {
+  const std::string_view kType = port.data_type.type_name;
+  return port.direction != Direction::kNone ||
+         (kType.empty() && !port.is_interface_port &&
+          !decl.is_non_ansi_ports) ||
+         typedefs_.contains(kType) || class_names_.contains(kType);
+}
+
+void Elaborator::ResolveInterfacePortTypedef(ModuleItem* item) {
+  const ModuleDecl& decl = *module_decl_path_.back();
+  const InterfacePortType kTaken = InterfacePortTypedef(
+      *item, decl, CurrentGenericPortInterfaces(),
+      [this](std::string_view name) { return FindModuleInScope(name); });
+  if (kTaken.port == nullptr || IsDataPort(*kTaken.port, decl)) {
+    diag_.ErrorOnce(item->loc,
+                    std::format("'{}' is not an interface port of '{}'",
+                                item->typedef_ifc_port, decl.name),
+                    Subclause("6.18"));
+  } else if (kTaken.typedef_item != nullptr) {
+    interface_port_typedef_names_.insert(item->name);
+    item->typedef_type = kTaken.typedef_item->typedef_type;
+    item->unpacked_dims = kTaken.typedef_item->unpacked_dims;
+  } else if (kTaken.iface != nullptr) {
+    diag_.ErrorOnce(
+        item->loc,
+        std::format("interface port '{}' names no type '{}'",
+                    item->typedef_ifc_port, item->typedef_type.type_name),
+        Subclause("6.18"));
+  }
+}
+
 void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
   std::vector<Expr*> taken_dims =
       TypeRefUnpackedDims(item->typedef_type.type_ref_expr, mod);
@@ -369,22 +401,7 @@ void Elaborator::ElaborateTypedef(ModuleItem* item, RtlirModule* mod) {
                             item->name, TypedefKindName(it->second)),
                 Subclause("6.18"));
   }
-  if (!item->typedef_ifc_port.empty()) {
-    const InterfacePortType kTaken = InterfacePortTypedef(
-        *item, *module_decl_path_.back(), CurrentGenericPortInterfaces(),
-        [this](std::string_view name) { return FindModuleInScope(name); });
-    if (kTaken.typedef_item != nullptr) {
-      interface_port_typedef_names_.insert(item->name);
-      item->typedef_type = kTaken.typedef_item->typedef_type;
-      item->unpacked_dims = kTaken.typedef_item->unpacked_dims;
-    } else if (kTaken.iface != nullptr) {
-      diag_.ErrorOnce(
-          item->loc,
-          std::format("interface port '{}' names no type '{}'",
-                      item->typedef_ifc_port, item->typedef_type.type_name),
-          Subclause("6.18"));
-    }
-  }
+  if (!item->typedef_ifc_port.empty()) ResolveInterfacePortTypedef(item);
   AdoptMemberTypedefDims(item->typedef_type, td_array_dims_);
   SizeClassHandleMembers(item->typedef_type, typedefs_, class_names_);
   ScopeMap scope = BuildParamScope(mod);

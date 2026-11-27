@@ -4,6 +4,7 @@
 #include <initializer_list>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
@@ -386,10 +387,67 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration,
+     InterfacePortTypedefThroughANameThatIsNoInterfacePortIsReported) {
+  ElabFixture f;
+  const std::string kSrc =
+      "typedef logic [3:0] word_t;\n"
+      "class C; endclass\n"
+      "interface intf_i;\n"
+      "  typedef int data_t;\n"
+      "endinterface\n"
+      "module no_port(intf_i p);\n"
+      "  typedef q.data_t t_no_port;\n"
+      "endmodule\n"
+      "module data_in(input logic p);\n"
+      "  typedef p.data_t t_data_in;\n"
+      "endmodule\n"
+      "module data_out(output int p);\n"
+      "  typedef p.data_t t_data_out;\n"
+      "endmodule\n"
+      "module typedef_port(word_t p);\n"
+      "  typedef p.data_t t_typedef_port;\n"
+      "endmodule\n"
+      "module class_port(C p);\n"
+      "  typedef p.data_t t_class_port;\n"
+      "endmodule\n"
+      "module top;\n"
+      "  intf_i i();\n"
+      "  logic l;\n"
+      "  int n;\n"
+      "  word_t w;\n"
+      "  C c;\n"
+      "  no_port u0(i);\n"
+      "  data_in u1(l);\n"
+      "  data_out u2(n);\n"
+      "  typedef_port u3(w);\n"
+      "  class_port u4(c);\n"
+      "endmodule\n";
+  ElaborateSrc(kSrc, f);
+  const std::pair<const char*, const char*> kCases[] = {
+      {"'q' is not an interface port of 'no_port'", "typedef q.data_t"},
+      {"'p' is not an interface port of 'data_in'",
+       "typedef p.data_t t_data_in"},
+      {"'p' is not an interface port of 'data_out'",
+       "typedef p.data_t t_data_out"},
+      {"'p' is not an interface port of 'typedef_port'",
+       "typedef p.data_t t_typedef_port"},
+      {"'p' is not an interface port of 'class_port'",
+       "typedef p.data_t t_class_port"},
+  };
+  for (const auto& [message, marker] : kCases) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message,
+                              LineHolding(kSrc, marker), "6.18"))
+        << message;
+  }
+}
+
+TEST(UserDefinedTypeElaboration,
      InterfacePortTypedefOfATypeTheInterfaceDefinesIsAccepted) {
   EXPECT_TRUE(
       ElabOk("interface intf_i;\n"
              "  typedef int data_t;\n"
+             "  logic x;\n"
+             "  modport mp(input x);\n"
              "endinterface\n"
              "module sub(intf_i p);\n"
              "  typedef p.data_t t;\n"
@@ -399,11 +457,21 @@ TEST(UserDefinedTypeElaboration,
              "  typedef p.data_t t;\n"
              "  t data;\n"
              "endmodule\n"
+             "module msub(intf_i.mp p);\n"
+             "  typedef p.data_t t;\n"
+             "  t data;\n"
+             "endmodule\n"
+             "module gmsub(interface.mp p);\n"
+             "  typedef p.data_t t;\n"
+             "  t data;\n"
+             "endmodule\n"
              "module top;\n"
              "  intf_i i();\n"
              "  sub s(i);\n"
              "  gsub g1(i);\n"
              "  gsub g2(i);\n"
+             "  msub m(i.mp);\n"
+             "  gmsub gm(i.mp);\n"
              "endmodule\n"));
 }
 

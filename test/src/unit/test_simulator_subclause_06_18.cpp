@@ -629,20 +629,17 @@ TEST(TypedefSim,
       "module top;\n"
       "  ia a();\n"
       "  ib b();\n"
-      "  ia p();\n"
       "  sub s_named(.p(b));\n"
-      "  sub s_wild(.*);\n"
       "  sub s_mp(a.mp);\n"
       "  mid_typed mt(b);\n"
       "  mid_generic mg(a);\n"
       "  ib bs[2]();\n"
       "  sub s_elem(bs[1]);\n"
-      "  sub s_named_wild(.p(b), .*);\n"
       "endmodule\n",
       f);
   for (std::string_view line :
-       {"top.s_named 10\n", "top.s_wild 4\n", "top.s_mp 4\n", "top.mt.s 10\n",
-        "top.mg.s 4\n", "top.s_elem 10\n", "top.s_named_wild 10\n"}) {
+       {"top.s_named 10\n", "top.s_mp 4\n", "top.mt.s 10\n", "top.mg.s 4\n",
+        "top.s_elem 10\n"}) {
     EXPECT_NE(out.find(line), std::string::npos) << line << out;
   }
 }

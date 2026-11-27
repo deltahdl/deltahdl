@@ -249,6 +249,8 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateSpecparam(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateTypedef(ModuleItem* item, RtlirModule* mod);
+  void ResolveInterfacePortTypedef(ModuleItem* item);
+  bool IsDataPort(const PortDecl& port, const ModuleDecl& decl) const;
   const std::unordered_map<std::string_view, std::string_view>&
   CurrentGenericPortInterfaces() const;
   void ValidateTypedefShape(const DataType& dtype, SourceLoc loc,

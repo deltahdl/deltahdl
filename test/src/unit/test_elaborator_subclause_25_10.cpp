@@ -283,7 +283,7 @@ TEST(InterfaceObjectAccessElaboration,
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersElaborate) {
+TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersAreReportedAndElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
       "interface ifc; typedef enum {Y, N} choice; endinterface\n"
@@ -294,6 +294,13 @@ TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersElaborate) {
       f, "top");
   ASSERT_NE(design, nullptr);
   EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "interface port 'i' names no type 'other'", 3,
+                            "6.18"));
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "'j' is not an interface port of 'none'", 4,
+                            "6.18"));
+  EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
 constexpr const char* kDollarMsg =

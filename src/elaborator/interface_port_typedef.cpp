@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <functional>
 #include <string_view>
+#include <utility>
 
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -13,17 +14,17 @@ namespace delta {
 
 namespace {
 
-std::string_view ConnectedActualName(const ModuleItem& inst, size_t index,
-                                     std::string_view port) {
-  const Expr* conn = nullptr;
-  for (const auto& [name, actual] : inst.inst_ports) {
-    if (name == port) conn = actual;
-  }
-  if (conn == nullptr && index < inst.inst_ports.size() &&
-      inst.inst_ports[index].first.empty()) {
-    conn = inst.inst_ports[index].second;
-  }
-  if (conn == nullptr) return inst.inst_wildcard ? port : std::string_view{};
+const Expr* ConnectionOfPort(const ModuleItem& inst, size_t index,
+                             std::string_view port) {
+  auto named = std::ranges::find(inst.inst_ports, port,
+                                 &std::pair<std::string_view, Expr*>::first);
+  if (named != inst.inst_ports.end()) return named->second;
+  const bool kPositional =
+      index < inst.inst_ports.size() && inst.inst_ports[index].first.empty();
+  return kPositional ? inst.inst_ports[index].second : nullptr;
+}
+
+std::string_view NamedInstance(const Expr* conn) {
   while (conn != nullptr && conn->kind != ExprKind::kIdentifier) {
     conn = conn->kind == ExprKind::kMemberAccess ? conn->lhs
            : conn->kind == ExprKind::kSelect     ? conn->base
@@ -50,6 +51,10 @@ InterfacePortType InterfacePortTypedef(
     const GenericPortInterfaces& generic,
     const std::function<const ModuleDecl*(std::string_view)>& find_module) {
   InterfacePortType found;
+  auto port =
+      std::ranges::find(decl.ports, item.typedef_ifc_port, &PortDecl::name);
+  if (port == decl.ports.end()) return found;
+  found.port = &*port;
   const std::string_view kType =
       InterfaceTypeOfPort(item.typedef_ifc_port, decl, generic);
   if (kType.empty()) return found;
@@ -71,8 +76,8 @@ GenericPortInterfaces GenericPortInterfacesOf(
   for (size_t i = 0; i < child.ports.size(); ++i) {
     const PortDecl& port = child.ports[i];
     if (!port.is_interface_port || !port.data_type.type_name.empty()) continue;
-    const std::string_view kType =
-        interface_of_actual(ConnectedActualName(inst, i, port.name));
+    const std::string_view kType = interface_of_actual(
+        NamedInstance(ConnectionOfPort(inst, i, port.name)));
     if (!kType.empty()) found[port.name] = kType;
   }
   return found;

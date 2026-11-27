@@ -12,6 +12,7 @@ using GenericPortInterfaces =
     std::unordered_map<std::string_view, std::string_view>;
 
 struct InterfacePortType {
+  const PortDecl* port = nullptr;
   const ModuleDecl* iface = nullptr;
   const ModuleItem* typedef_item = nullptr;
 };
