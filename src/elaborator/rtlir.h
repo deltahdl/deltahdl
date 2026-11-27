@@ -372,6 +372,7 @@ struct RtlirModule {
   std::vector<TypeRefCompareResult> type_ref_compares;
   std::vector<RtlirEnumMember> enum_constants;
   std::vector<RtlirParamDecl> specparams;
+  std::vector<RtlirTypeParamFacts> type_param_facts;
 };
 
 struct RtlirDesign : RtlirTypedefFacts {

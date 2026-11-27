@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 
@@ -8,6 +9,14 @@
 #include "parser/ast_type.h"
 
 namespace delta {
+
+struct RtlirTypeParamFacts {
+  std::string_view name;
+  uint32_t width = 0;
+  DataTypeKind kind = DataTypeKind::kNamed;
+  bool is_signed = false;
+  std::optional<PackedRange> range;
+};
 
 struct RtlirTypedefFacts {
   std::unordered_map<std::string_view, uint32_t> type_widths;

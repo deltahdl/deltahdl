@@ -64,6 +64,7 @@ class SimContext : public DeclaredNameTables,
       : scheduler_(sched), arena_(arena), diag_(diag), default_seed_(seed) {
     scheduler_.SetContext(this);
     running_unit_scope_ = [this] { return ActiveUnitScope(); };
+    running_instance_prefix_ = [this] { return ActiveInstancePrefix(); };
   }
 
   ~SimContext();

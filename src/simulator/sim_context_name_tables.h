@@ -14,6 +14,7 @@
 
 #include "common/packed_range.h"
 #include "common/types.h"
+#include "elaborator/rtlir_typedef_facts.h"
 #include "parser/ast_type.h"
 #include "parser/expr_substitute.h"
 #include "simulator/sim_context_types.h"
@@ -153,6 +154,8 @@ class DeclaredNameTables {
   bool FindTypeSigned(std::string_view name) const;
 
   void RegisterTypeRange(std::string_view name, PackedRange range);
+  void RegisterInstanceType(const std::string& key,
+                            const RtlirTypeParamFacts& facts);
   std::optional<PackedRange> FindTypeRange(std::string_view name) const;
 
   void RegisterTypeTarget(std::string_view name, std::string_view target);
@@ -233,6 +236,20 @@ class DeclaredNameTables {
     scoped += "::";
     scoped += name;
     return table.contains(scoped) ? std::string_view(scoped) : name;
+  }
+  std::function<std::string()> running_instance_prefix_;
+  std::unordered_set<std::string> instance_type_keys_;
+  template <typename Table>
+  std::string_view TypeKeyIn(const Table& table, std::string_view name,
+                             std::string& scoped) const {
+    if (!instance_type_keys_.empty()) {
+      std::string held = running_instance_prefix_() + std::string(name);
+      if (instance_type_keys_.contains(held)) {
+        scoped = std::move(held);
+        return scoped;
+      }
+    }
+    return UnitKeyIn(table, name, scoped);
   }
 
   std::unordered_map<std::string_view, ModuleItem*> functions_;

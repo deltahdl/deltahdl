@@ -4,6 +4,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "common/arena.h"
 #include "common/packed_range.h"
@@ -29,6 +30,11 @@ struct TypeNameSources {
   Arena& arena;
 };
 
+struct RtlirModule;
+
 void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out);
+void RecordTypeParamFacts(RtlirModule& mod,
+                          const std::vector<std::string_view>& names,
+                          const TypeNameSources& src);
 
 }  // namespace delta

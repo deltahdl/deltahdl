@@ -480,7 +480,7 @@ TEST(CastOperatorSim, DISABLED_StructureConvertsThroughATypeSizedByItsBits) {
       "36 891a2b3c4 1x0 1 12345678 100 1x0\n");
 }
 
-TEST(CastOperatorSim, DISABLED_TypeParameterCastTakesEachInstancesType) {
+TEST(CastOperatorSim, TypeParameterCastTakesEachInstancesType) {
   SimFixture f;
   const std::string kModule =
       "module sub #(type T = int);\n"

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -15,6 +16,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/elaborator_items_params.h"
+#include "elaborator/elaborator_type_facts.h"
 #include "elaborator/global_clock_assertion_event.h"
 #include "elaborator/global_clocking_declaration.h"
 #include "elaborator/rtlir.h"
@@ -439,6 +441,30 @@ static const std::vector<EventExpr>* EnterGlobalClockingChain(
                                       inst_path, arena);
 }
 
+static bool DeclaresNested(const ModuleDecl* outer, const ModuleDecl* inner) {
+  return std::any_of(outer->items.begin(), outer->items.end(),
+                     [inner](const ModuleItem* item) {
+                       return item->nested_module_decl == inner;
+                     });
+}
+
+static std::vector<std::string_view> VisibleTypeParamNames(
+    const std::vector<const RtlirModule*>& path) {
+  std::vector<std::string_view> names;
+  for (std::size_t i = path.size(); i > 0; --i) {
+    const RtlirModule* cur = path[i - 1];
+    for (const RtlirParamDecl& param : cur->params) {
+      if (param.is_type_param && param.gen_block_prefix.empty())
+        names.push_back(param.name);
+    }
+    if (cur->decl->decl_kind != ModuleDeclKind::kChecker || i < 2 ||
+        !DeclaresNested(path[i - 2]->decl, cur->decl)) {
+      break;
+    }
+  }
+  return names;
+}
+
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
   UnitScopeTables::Switch unit_scope(*this, decl);
@@ -465,6 +491,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   RegisterCuEnumLiterals(decl, mod, enum_ctx);
 
   module_decl_path_.push_back(decl);
+  module_path_.push_back(mod);
   generic_port_interfaces_.push_back(
       std::exchange(pending_generic_port_interfaces_, {}));
   ElaborateParamPortList(decl, params, mod);
@@ -504,6 +531,9 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   }
 
   ElaborateItems(decl, mod);
+  RecordTypeParamFacts(*mod, VisibleTypeParamNames(module_path_),
+                       {typedefs_, aggregate_typedef_names_, arena_});
+  module_path_.pop_back();
   module_decl_path_.pop_back();
   generic_port_interfaces_.pop_back();
   ResolveExplicitPortTypes(decl, mod, BuildParamScope(mod));

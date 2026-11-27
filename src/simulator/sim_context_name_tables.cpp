@@ -396,7 +396,7 @@ void DeclaredNameTables::RegisterTypeWidth(std::string_view name,
 
 uint32_t DeclaredNameTables::FindTypeWidth(std::string_view name) const {
   std::string scoped;
-  auto it = type_widths_.find(UnitKeyIn(type_widths_, name, scoped));
+  auto it = type_widths_.find(TypeKeyIn(type_widths_, name, scoped));
   return (it != type_widths_.end()) ? it->second : 0;
 }
 
@@ -418,7 +418,7 @@ void DeclaredNameTables::RegisterTypeKind(std::string_view name,
 
 DataTypeKind DeclaredNameTables::FindTypeKind(std::string_view name) const {
   std::string scoped;
-  auto it = type_kinds_.find(UnitKeyIn(type_kinds_, name, scoped));
+  auto it = type_kinds_.find(TypeKeyIn(type_kinds_, name, scoped));
   return (it != type_kinds_.end()) ? it->second : DataTypeKind::kNamed;
 }
 
@@ -429,7 +429,7 @@ void DeclaredNameTables::RegisterTypeSigned(std::string_view name,
 
 bool DeclaredNameTables::FindTypeSigned(std::string_view name) const {
   std::string scoped;
-  auto it = type_signed_.find(UnitKeyIn(type_signed_, name, scoped));
+  auto it = type_signed_.find(TypeKeyIn(type_signed_, name, scoped));
   return it != type_signed_.end() && it->second;
 }
 
@@ -438,10 +438,23 @@ void DeclaredNameTables::RegisterTypeRange(std::string_view name,
   type_ranges_[name] = range;
 }
 
+void DeclaredNameTables::RegisterInstanceType(
+    const std::string& key, const RtlirTypeParamFacts& facts) {
+  std::string_view held = *instance_type_keys_.insert(key).first;
+  type_widths_[held] = facts.width;
+  type_kinds_[held] = facts.kind;
+  type_signed_[held] = facts.is_signed;
+  if (facts.range) {
+    type_ranges_[held] = *facts.range;
+  } else {
+    type_ranges_.erase(held);
+  }
+}
+
 std::optional<PackedRange> DeclaredNameTables::FindTypeRange(
     std::string_view name) const {
   std::string scoped;
-  auto it = type_ranges_.find(UnitKeyIn(type_ranges_, name, scoped));
+  auto it = type_ranges_.find(TypeKeyIn(type_ranges_, name, scoped));
   if (it == type_ranges_.end()) return std::nullopt;
   return it->second;
 }

@@ -17,6 +17,7 @@
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_alias.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/rtlir_typedef_facts.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
@@ -45,6 +46,9 @@ void Lowerer::LowerModuleVariables(const std::string& inst_prefix,
       LowerVar(*name, var);
     }
   };
+  for (const RtlirTypeParamFacts& facts : mod->type_param_facts) {
+    ctx_.RegisterInstanceType(inst_prefix + std::string(facts.name), facts);
+  }
   lower(true);
   std::vector<std::function<void()>> fills;
   fills.swap(enum_constant_param_fills_);

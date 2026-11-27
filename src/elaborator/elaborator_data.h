@@ -210,6 +210,7 @@ class ElaboratorData {
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
   InferenceFuncs inference_funcs_;
   std::vector<const ModuleDecl*> module_decl_path_;
+  std::vector<const RtlirModule*> module_path_;
   std::unordered_set<std::string_view> chandle_result_funcs_;
   std::unordered_map<std::string_view, std::string_view> var_named_types_;
   using AliasBitRef = std::pair<std::string_view, uint32_t>;
