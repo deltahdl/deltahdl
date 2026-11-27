@@ -613,7 +613,8 @@ bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
   const ClassTypeInfo* spec = ScopeNamedSpecialization(expr->lhs, ctx, arena);
   if (spec == nullptr) return false;
   const ClassTypeInfo* declarer = spec->StaticPropertyDeclarer(expr->rhs->text);
-  if (declarer == nullptr) return false;
+  if (declarer == nullptr)
+    return TryClassScopeEnumLiteral(expr->rhs->text, spec, arena, out);
   out = declarer->static_properties.find(std::string(expr->rhs->text))->second;
   return true;
 }

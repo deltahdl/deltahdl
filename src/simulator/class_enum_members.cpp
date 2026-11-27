@@ -49,7 +49,8 @@ static void CollectEnumMembers(const ClassEnumScope& scope,
   ClassTypeInfo* info = scope.info;
   EnumTypeInfo type;
   type.type_name = *arena.Create<std::string>(std::move(key));
-  type.width = EvalTypeWidth(decl_type, TypedefMap{}, scope.constants);
+  type.width =
+      EvalTypeWidth(EnumArrayElement(decl_type), TypedefMap{}, scope.constants);
   type.is_4state = Is4stateType(decl_type, TypedefMap{});
   type.is_signed = IsSignedType(decl_type, TypedefMap{});
   for (const RtlirEnumMember& m :
@@ -60,8 +61,7 @@ static void CollectEnumMembers(const ClassEnumScope& scope,
         type.width, type.is_signed, member.xz};
     type.members.push_back(member);
   }
-  if (ctx.FindEnumType(type.type_name) == nullptr)
-    ctx.RegisterEnumType(type.type_name, type);
+  ctx.RegisterEnumType(type.type_name, type);
 }
 
 void CollectClassEnumMembers(ClassTypeInfo* info, const ClassDecl* cls,
