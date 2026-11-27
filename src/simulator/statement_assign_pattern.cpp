@@ -536,6 +536,13 @@ void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
   }
 }
 
+static bool CollectSliceOrCastElements(const Expr* expr, SimContext& ctx,
+                                       Arena& arena,
+                                       std::vector<Logic4Vec>& out) {
+  return CollectUnpackedSliceElements(expr, ctx, arena, out) ||
+         CollectUnboundedCastElements(expr, ctx, arena, out);
+}
+
 static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   if (CollectFromQueueSlice(expr, ctx, arena, out)) return;
@@ -566,8 +573,7 @@ static void CollectQueueItem(const Expr* expr, SimContext& ctx, Arena& arena,
     }
   }
   if (TryCollectLocatorResult(expr, ctx, arena, out)) return;
-  if (CollectUnpackedSliceElements(expr, ctx, arena, out)) return;
-  if (CollectUnboundedCastElements(expr, ctx, arena, out)) return;
+  if (CollectSliceOrCastElements(expr, ctx, arena, out)) return;
   out.push_back(EvalExpr(expr, ctx, arena));
 }
 

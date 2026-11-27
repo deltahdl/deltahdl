@@ -747,38 +747,24 @@ static const StructTypeInfo* StreamedSourceLayout(const Expr* operand,
   return CallResultStructLayout(operand, ctx, arena);
 }
 
-Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
-  if (IsSelfDeterminedCast(expr)) return EvalExpr(expr->lhs, ctx, arena);
-  Logic4Vec stream_out;
-  if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
-  Logic4Vec pattern_out;
-  if (TryTypedPatternCast(expr, ctx, arena, pattern_out)) return pattern_out;
-
-  Logic4Vec size_out;
-  if (TrySizeCast(expr, ctx, arena, size_out)) return size_out;
-
-  std::string_view type_name = expr->text;
+static Logic4Vec EvalCastSource(const Expr* expr, SimContext& ctx,
+                                Arena& arena) {
   Logic4Vec inner;
-  if (type_name == "const" ||
+  if (expr->text == "const" ||
       !StreamUnpackedSlice(expr->lhs, ctx, arena, inner))
-    inner = EvalCastOperand(expr->lhs, type_name, ctx, arena);
+    inner = EvalCastOperand(expr->lhs, expr->text, ctx, arena);
+  return inner;
+}
 
-  Logic4Vec kw_out;
-  if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
-  std::vector<StreamedMember> streamed =
-      DynamicStructMembers(StreamedSourceLayout(expr->lhs, ctx, arena));
-  if (!streamed.empty()) inner = StreamDynamicStruct(inner, streamed, arena);
-  Logic4Vec struct_out;
-  if (TryCastIntoDynamicStruct(expr, inner, ctx, arena, struct_out))
-    return struct_out;
-  if (std::optional<UnboundedCastType> type = UnboundedCastTarget(expr, ctx))
-    return StreamIntoUnboundedType(expr, inner, *type, ctx, arena);
-
+static Logic4Vec ConvertToCastTarget(const Expr* expr, const Logic4Vec& inner,
+                                     bool streamed, SimContext& ctx,
+                                     Arena& arena) {
+  std::string_view type_name = expr->text;
   CastTarget target;
   if (!TypeRefCastTarget(expr->rhs, ctx, target))
     target = ResolveCastTarget(CastTypeKey(expr, ctx), ctx);
   uint32_t target_width = target.width;
-  if (!streamed.empty() && inner.width != target_width) {
+  if (streamed && inner.width != target_width) {
     ctx.GetDiag().Error(
         expr->range.start,
         std::format("bit-stream cast to '{}': the source streams {} bits, "
@@ -798,6 +784,32 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!target.is_4state) CoerceTo2State(result);
   result.is_signed = target.is_signed;
   return result;
+}
+
+Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
+  if (IsSelfDeterminedCast(expr)) return EvalExpr(expr->lhs, ctx, arena);
+  Logic4Vec stream_out;
+  if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
+  Logic4Vec pattern_out;
+  if (TryTypedPatternCast(expr, ctx, arena, pattern_out)) return pattern_out;
+
+  Logic4Vec size_out;
+  if (TrySizeCast(expr, ctx, arena, size_out)) return size_out;
+
+  std::string_view type_name = expr->text;
+  Logic4Vec inner = EvalCastSource(expr, ctx, arena);
+
+  Logic4Vec kw_out;
+  if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
+  std::vector<StreamedMember> streamed =
+      DynamicStructMembers(StreamedSourceLayout(expr->lhs, ctx, arena));
+  if (!streamed.empty()) inner = StreamDynamicStruct(inner, streamed, arena);
+  Logic4Vec struct_out;
+  if (TryCastIntoDynamicStruct(expr, inner, ctx, arena, struct_out))
+    return struct_out;
+  if (std::optional<UnboundedCastType> type = UnboundedCastTarget(expr, ctx))
+    return StreamIntoUnboundedType(expr, inner, *type, ctx, arena);
+  return ConvertToCastTarget(expr, inner, !streamed.empty(), ctx, arena);
 }
 
 }  // namespace delta

@@ -123,14 +123,6 @@ std::optional<ReturnedAggregate> CaptureAggregate(const Expr* returned,
   return agg;
 }
 
-const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
-                                             Arena& arena) {
-  if (call->kind != ExprKind::kCall) return nullptr;
-  const ModuleItem* func = FindSubroutineTarget(call, ctx, arena).func;
-  if (func == nullptr || func->return_type.type_name.empty()) return nullptr;
-  return ctx.FindStructType(func->return_type.type_name);
-}
-
 bool ReadLayoutMember(const StructTypeInfo* layout, const Expr* expr,
                       const Logic4Vec& value, Arena& arena, Logic4Vec& out) {
   if (layout == nullptr) return false;
@@ -234,6 +226,14 @@ bool TryReturnedAggregateMethod(const ReturnedAggregate& returned,
 }
 
 }  // namespace
+
+const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
+                                             Arena& arena) {
+  if (call->kind != ExprKind::kCall) return nullptr;
+  const ModuleItem* func = FindSubroutineTarget(call, ctx, arena).func;
+  if (func == nullptr || func->return_type.type_name.empty()) return nullptr;
+  return ctx.FindStructType(func->return_type.type_name);
+}
 
 CallResultReceiverScope::CallResultReceiverScope(const Expr* call,
                                                  SimContext& ctx, Arena& arena)
