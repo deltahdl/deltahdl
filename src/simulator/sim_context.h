@@ -65,6 +65,7 @@ class SimContext : public DeclaredNameTables,
     scheduler_.SetContext(this);
     running_unit_scope_ = [this] { return ActiveUnitScope(); };
     running_instance_prefix_ = [this] { return ActiveInstancePrefix(); };
+    running_place_prefix_ = [this] { return PlacePrefixHere(); };
   }
 
   ~SimContext();
@@ -230,6 +231,7 @@ class SimContext : public DeclaredNameTables,
   std::string ActiveUnitScope() const;
   static std::string_view GenBlockPrefixOf(const Process& proc);
   std::optional<bool> TypeRefCompareHere(const Expr* expr) const;
+  std::string PlacePrefixHere() const;
 
   InstancePrefixOverrideState& InstancePrefixOverride() {
     return prefix_override_;

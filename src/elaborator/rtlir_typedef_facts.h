@@ -16,6 +16,7 @@ struct RtlirTypeParamFacts {
   DataTypeKind kind = DataTypeKind::kNamed;
   bool is_signed = false;
   std::optional<PackedRange> range;
+  std::string_view gen_prefix;
 };
 
 struct RtlirTypedefFacts {

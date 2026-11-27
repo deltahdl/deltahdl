@@ -1,11 +1,19 @@
 #include <gtest/gtest.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <format>
 #include <string>
 #include <string_view>
+#include <vector>
 
+#include "fixture_vpi_run.h"
+#include "helpers_final_output.h"
+#include "helpers_instance_type_procedures.h"
 #include "helpers_scheduler.h"
+#include "simulator/sv_vpi_user.h"
+#include "simulator/vpi_user.h"
 
 using namespace delta;
 
@@ -152,6 +160,186 @@ TEST(TypeRefOverrideSim, TypeReferenceOverridesATypeParameter) {
                       "endmodule\n",
                       "r"),
             6411305u);
+}
+
+constexpr std::array<InstanceTypeSpelling, 2> kTypeParameterReferences{{
+    {"type T = int", "T", "type(y)"},
+    {"type T = int", "T", "type(y + y)"},
+}};
+
+constexpr std::array<InstanceTypeSpelling, 2> kWidthParameterReferences{{
+    {"int W = 32", "logic [W-1:0]", "type(y)"},
+    {"int W = 32", "logic [W-1:0]", "type(y + y)"},
+}};
+
+TEST(ProceduralTypeRefInstanceSim, EachInstanceDeclaresWithItsTypeParameter) {
+  for (const InstanceTypeSpelling& spelling : kTypeParameterReferences) {
+    SCOPED_TRACE(spelling.declared);
+    ExpectEachInstanceTakesItsType(spelling, {"byte", "int", "shortint"},
+                                   ByteIntShortintExpected());
+  }
+}
+
+TEST(ProceduralTypeRefInstanceSim, EachInstanceDeclaresWithItsWidth) {
+  for (const InstanceTypeSpelling& spelling : kWidthParameterReferences) {
+    SCOPED_TRACE(spelling.declared);
+    ExpectEachInstanceTakesItsType(
+        spelling, {"8", "32", "16"},
+        InstanceTypeExpected({{"t.a", "44", "255", "8"},
+                              {"t.b", "300", "511", "32"},
+                              {"t.c", "300", "511", "16"}}));
+  }
+}
+
+TEST(ProceduralTypeRefInstanceSim, EachLoopInstanceDeclaresWithItsType) {
+  for (const InstanceTypeSpelling& spelling : kTypeParameterReferences) {
+    SCOPED_TRACE(spelling.declared);
+    ExpectEachLoopInstanceTakesItsType(spelling, "T(logic [4*i+3:0])");
+  }
+  for (const InstanceTypeSpelling& spelling : kWidthParameterReferences) {
+    SCOPED_TRACE(spelling.declared);
+    ExpectEachLoopInstanceTakesItsType(spelling, "W(4*i+4)");
+  }
+}
+
+std::string ExpressionOperandModule(std::string_view kind,
+                                    const InstanceTypeSpelling& spelling) {
+  return std::format(
+      "{0} w #({1});\n"
+      "  {2} y;\n"
+      "  var type(y + y) me;\n"
+      "  typedef type(y + y) tt;\n"
+      "  tt v;\n"
+      "  initial begin\n"
+      "    me = 300;\n"
+      "    v = 300;\n"
+      "    #1 $display(\"%m %0d %0d %0d %0d\", $bits(me), $bits(v), me, v);\n"
+      "  end\n"
+      "end{0}\n",
+      kind, spelling.parameter, spelling.held);
+}
+
+TEST(DeclarationTypeRefInstanceSim, ExpressionOperandTakesEachInstancesType) {
+  const std::array<std::array<std::string_view, 2>, 2> kActuals{
+      {{"byte", "int"}, {"8", "32"}}};
+  const std::vector<std::string> kExpected{"t.a 8 8 44 44",
+                                           "t.b 32 32 300 300"};
+  for (std::size_t p = 0; p < kActuals.size(); ++p) {
+    const InstanceTypeSpelling& spelling =
+        p == 0 ? kTypeParameterReferences[1] : kWidthParameterReferences[1];
+    for (const char* kind : {"module", "interface", "program"}) {
+      SCOPED_TRACE(std::format("{} {}", kind, spelling.held));
+      const std::string kModule = ExpressionOperandModule(kind, spelling);
+      const std::string kA = std::format("  w #({}) a();\n", kActuals[p][0]);
+      const std::string kB = std::format("  w #({}) b();\n", kActuals[p][1]);
+      EXPECT_EQ(SortedOutput(kModule + "module t;\n" + kA + kB + "endmodule\n"),
+                kExpected);
+      EXPECT_EQ(SortedOutput(kModule + "module t;\n" + kB + kA + "endmodule\n"),
+                kExpected);
+    }
+  }
+}
+
+TEST(DeclarationTypeRefInstanceSim, EachLoopIterationDeclaresWithItsWidth) {
+  EXPECT_EQ(
+      SortedOutput("module t;\n"
+                   "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                   "    logic [4*i+3:0] y;\n"
+                   "    var type(y) z;\n"
+                   "    var type(y + y) me;\n"
+                   "    typedef type(y + y) tt;\n"
+                   "    tt v;\n"
+                   "    function automatic int f();\n"
+                   "      type(y + y) l;\n"
+                   "      return $bits(l);\n"
+                   "    endfunction\n"
+                   "    initial begin\n"
+                   "      type(y) l;\n"
+                   "      type(y + y) e;\n"
+                   "      #1 $display(\"%m %0d %0d %0d %0d %0d %0d\", "
+                   "$bits(z), $bits(me),\n"
+                   "                  $bits(v), $bits(l), $bits(e), f());\n"
+                   "    end\n"
+                   "  end\n"
+                   "endmodule\n"),
+      (std::vector<std::string>{"t.g[0] 4 4 4 4 4 4", "t.g[1] 8 8 8 8 8 8"}));
+}
+
+std::string AssociativeIndexSub(const InstanceTypeSpelling& spelling) {
+  return std::format(
+      "module sub #({0});\n"
+      "  {1} y;\n"
+      "  function automatic int fk();\n"
+      "    int aa[{2}];\n"
+      "    aa[300] = 1;\n"
+      "    return aa.exists(44);\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    int aa[{2}];\n"
+      "    aa[300] = 1;\n"
+      "    #1 $display(\"%m %0d %0d\", aa.exists(44), fk());\n"
+      "  end\n"
+      "endmodule\n",
+      spelling.parameter, spelling.held, spelling.declared);
+}
+
+TEST(ProceduralTypeRefInstanceSim, AssociativeIndexTakesEachInstancesType) {
+  const std::vector<std::string> kExpected{"t.a 1 1", "t.b 0 0"};
+  for (const InstanceTypeSpelling& spelling : kTypeParameterReferences) {
+    SCOPED_TRACE(spelling.declared);
+    const std::string kSub = AssociativeIndexSub(spelling);
+    EXPECT_EQ(SortedOutput(kSub + "module t; sub #(byte) a(); sub #(int) b(); "
+                                  "endmodule\n"),
+              kExpected);
+    EXPECT_EQ(SortedOutput(kSub + "module t; sub #(int) b(); sub #(byte) a(); "
+                                  "endmodule\n"),
+              kExpected);
+  }
+  for (const InstanceTypeSpelling& spelling : kWidthParameterReferences) {
+    SCOPED_TRACE(spelling.declared);
+    const std::string kSub = AssociativeIndexSub(spelling);
+    EXPECT_EQ(SortedOutput(kSub + "module t; sub #(8) a(); sub #(16) b(); "
+                                  "endmodule\n"),
+              kExpected);
+    EXPECT_EQ(SortedOutput(kSub + "module t;\n"
+                                  "  for (genvar i = 0; i < 2; i++) begin : g\n"
+                                  "    sub #(8 * i + 8) s();\n"
+                                  "  end\n"
+                                  "endmodule\n"),
+              (std::vector<std::string>{"t.g[0].s 1 1", "t.g[1].s 0 0"}));
+  }
+}
+
+class TypeRefBlockVariableVpi : public VpiDesignRun {
+ protected:
+  void ExpectEachInstancesKinds(const std::string& top) {
+    Run(std::string("module sub #(type T = int);\n"
+                    "  T y;\n"
+                    "  initial begin : blk\n"
+                    "    type(y) v;\n"
+                    "    T w;\n"
+                    "  end\n"
+                    "endmodule\n") +
+        top);
+    for (const char* name : {"t.a.blk.v", "t.a.blk.w"}) {
+      ASSERT_NE(By(name), nullptr) << name;
+      EXPECT_EQ(vpi_get(vpiType, By(name)), vpiByteVar) << name;
+    }
+    for (const char* name : {"t.b.blk.v", "t.b.blk.w"}) {
+      ASSERT_NE(By(name), nullptr) << name;
+      EXPECT_EQ(vpi_get(vpiType, By(name)), vpiIntVar) << name;
+    }
+  }
+};
+
+TEST_F(TypeRefBlockVariableVpi, EachInstanceHasItsKindWhenTheByteOneIsFirst) {
+  ExpectEachInstancesKinds(
+      "module t; sub #(byte) a(); sub #(int) b(); endmodule\n");
+}
+
+TEST_F(TypeRefBlockVariableVpi, EachInstanceHasItsKindWhenTheIntOneIsFirst) {
+  ExpectEachInstancesKinds(
+      "module t; sub #(int) b(); sub #(byte) a(); endmodule\n");
 }
 
 }  // namespace

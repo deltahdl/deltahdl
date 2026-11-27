@@ -148,14 +148,18 @@ std::optional<bool> TypeRefCompares::TypeRefCompareIn(
   return found->second;
 }
 
-std::optional<bool> SimContext::TypeRefCompareHere(const Expr* expr) const {
+std::string SimContext::PlacePrefixHere() const {
   std::string scope = ActiveInstancePrefix();
   if (current_process_ != nullptr) {
     scope += ActiveGenBlockPrefix();
   } else {
     scope += LoweringGenBlockPrefix();
   }
-  return TypeRefCompareIn(expr, scope);
+  return scope;
+}
+
+std::optional<bool> SimContext::TypeRefCompareHere(const Expr* expr) const {
+  return TypeRefCompareIn(expr, PlacePrefixHere());
 }
 
 std::string_view SimContext::GenBlockPrefixOf(const Process& proc) {

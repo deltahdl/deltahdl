@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -238,15 +239,20 @@ class DeclaredNameTables {
     return table.contains(scoped) ? std::string_view(scoped) : name;
   }
   std::function<std::string()> running_instance_prefix_;
+  std::function<std::string()> running_place_prefix_;
   std::unordered_set<std::string> instance_type_keys_;
   template <typename Table>
   std::string_view TypeKeyIn(const Table& table, std::string_view name,
                              std::string& scoped) const {
     if (!instance_type_keys_.empty()) {
-      std::string held = running_instance_prefix_() + std::string(name);
-      if (instance_type_keys_.contains(held)) {
-        scoped = std::move(held);
-        return scoped;
+      std::array<std::string, 2> candidates{
+          running_place_prefix_() + std::string(name),
+          running_instance_prefix_() + std::string(name)};
+      for (std::string& held : candidates) {
+        if (instance_type_keys_.contains(held)) {
+          scoped = std::move(held);
+          return scoped;
+        }
       }
     }
     return UnitKeyIn(table, name, scoped);

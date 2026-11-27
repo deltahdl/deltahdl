@@ -47,7 +47,9 @@ void Lowerer::LowerModuleVariables(const std::string& inst_prefix,
     }
   };
   for (const RtlirTypeParamFacts& facts : mod->type_param_facts) {
-    ctx_.RegisterInstanceType(inst_prefix + std::string(facts.name), facts);
+    ctx_.RegisterInstanceType(
+        inst_prefix + std::string(facts.gen_prefix) + std::string(facts.name),
+        facts);
   }
   lower(true);
   std::vector<std::function<void()>> fills;

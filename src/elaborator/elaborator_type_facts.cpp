@@ -99,4 +99,14 @@ void RecordTypeParamFacts(RtlirModule& mod,
   }
 }
 
+void RecordPlaceTypeFacts(std::vector<RtlirTypeParamFacts>& out,
+                          std::string_view name, std::string_view gen_prefix,
+                          const TypeNameSources& src) {
+  auto bound = src.typedefs.find(name);
+  if (bound == src.typedefs.end()) return;
+  RtlirTypeParamFacts facts = NamedTypeFacts(name, bound->second, src);
+  facts.gen_prefix = gen_prefix;
+  out.push_back(facts);
+}
+
 }  // namespace delta

@@ -27,6 +27,7 @@
 #include "elaborator/property_rewrite.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
+#include "elaborator/rtlir_typedef_facts.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/unit_param_values.h"
@@ -106,12 +107,14 @@ class ElaboratorData {
           scopes_(std::move(e.gen_prefix_scopes_)),
           path_(std::move(e.gen_block_path_)),
           consts_(std::move(e.gen_loop_consts_)),
-          const_scope_(std::move(e.gen_const_scope_)) {
+          const_scope_(std::move(e.gen_const_scope_)),
+          owners_(std::move(e.gen_body_owners_)) {
       e.gen_prefix_.clear();
       e.gen_prefix_scopes_.clear();
       e.gen_block_path_.clear();
       e.gen_loop_consts_.clear();
       e.gen_const_scope_.clear();
+      e.gen_body_owners_.clear();
     }
     ~GenerateScopeSaver() {
       e_.gen_prefix_ = std::move(prefix_);
@@ -119,6 +122,7 @@ class ElaboratorData {
       e_.gen_block_path_ = std::move(path_);
       e_.gen_loop_consts_ = std::move(consts_);
       e_.gen_const_scope_ = std::move(const_scope_);
+      e_.gen_body_owners_ = std::move(owners_);
     }
     GenerateScopeSaver(const GenerateScopeSaver&) = delete;
     GenerateScopeSaver& operator=(const GenerateScopeSaver&) = delete;
@@ -131,6 +135,7 @@ class ElaboratorData {
     GenBlockConsts consts_;
     ScopeMap const_scope_;
     LocalNameFrame genvar_names_;
+    std::vector<const void*> owners_;
   };
 
  protected:
@@ -211,6 +216,16 @@ class ElaboratorData {
   InferenceFuncs inference_funcs_;
   std::vector<const ModuleDecl*> module_decl_path_;
   std::vector<const RtlirModule*> module_path_;
+  struct FoldedTypeRef {
+    const Expr* operand = nullptr;
+    const void* owner = nullptr;
+    DataType folded;
+  };
+  std::unordered_map<std::string_view, FoldedTypeRef> folded_type_refs_;
+  std::unordered_map<const Expr*, std::string_view> folded_type_ref_names_;
+  std::vector<const void*> gen_body_owners_;
+  std::unordered_map<const RtlirModule*, std::vector<RtlirTypeParamFacts>>
+      place_type_facts_;
   std::unordered_set<std::string_view> chandle_result_funcs_;
   std::unordered_map<std::string_view, std::string_view> var_named_types_;
   using AliasBitRef = std::pair<std::string_view, uint32_t>;

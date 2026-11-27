@@ -12,6 +12,7 @@
 #include "common/packed_range.h"
 #include "common/types.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/rtlir_typedef_facts.h"
 #include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
@@ -102,6 +103,12 @@ int NamedTypeKind(const RtlirDesign& design, bool names_class,
 
 int VpiNamedTypeVariableKind(const RtlirDesign& design, const RtlirModule& mod,
                              std::string_view name) {
+  for (const RtlirTypeParamFacts& facts : mod.type_param_facts) {
+    if (facts.name == name && facts.gen_prefix.empty() &&
+        facts.kind != DataTypeKind::kNamed) {
+      return VpiDataTypeVariableKind(facts.kind);
+    }
+  }
   return NamedTypeKind(design, NamesClass(design, mod.class_decls, name), name);
 }
 

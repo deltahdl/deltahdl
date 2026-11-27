@@ -473,7 +473,19 @@ void Elaborator::TakePendingCheckerActuals(const ModuleDecl* decl,
   checker_tree_actuals_[mod] = std::exchange(pending_checker_tree_actuals_, {});
 }
 
+void Elaborator::EnterModulePath(const ModuleDecl* decl, RtlirModule* mod) {
+  module_decl_path_.push_back(decl);
+  module_path_.push_back(mod);
+  EnterFoldedTypeRefOwner(decl);
+}
+
 void Elaborator::LeaveModuleRecordingTypeParams(RtlirModule* mod) {
+  LeaveFoldedTypeRefOwner(module_decl_path_.back(), mod);
+  if (auto placed = place_type_facts_.extract(mod)) {
+    mod->type_param_facts.insert(mod->type_param_facts.end(),
+                                 placed.mapped().begin(),
+                                 placed.mapped().end());
+  }
   RecordTypeParamFacts(*mod, VisibleTypeParamNames(module_path_),
                        {typedefs_, aggregate_typedef_names_, arena_});
   module_path_.pop_back();
@@ -505,8 +517,7 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);
   RegisterCuEnumLiterals(decl, mod, enum_ctx);
 
-  module_decl_path_.push_back(decl);
-  module_path_.push_back(mod);
+  EnterModulePath(decl, mod);
   generic_port_interfaces_.push_back(
       std::exchange(pending_generic_port_interfaces_, {}));
   ElaborateParamPortList(decl, params, mod);

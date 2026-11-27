@@ -31,10 +31,14 @@ struct TypeNameSources {
 };
 
 struct RtlirModule;
+struct RtlirTypeParamFacts;
 
 void PopulateTypeWidths(const TypeNameSources& src, TypeNameFacts& out);
 void RecordTypeParamFacts(RtlirModule& mod,
                           const std::vector<std::string_view>& names,
+                          const TypeNameSources& src);
+void RecordPlaceTypeFacts(std::vector<RtlirTypeParamFacts>& out,
+                          std::string_view name, std::string_view gen_prefix,
                           const TypeNameSources& src);
 
 }  // namespace delta

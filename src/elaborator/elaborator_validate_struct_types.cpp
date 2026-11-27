@@ -278,7 +278,11 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
                                             const RtlirModule* mod) {
   ResolveMemberTypeRefs(
       dt, arena_, [&](DataType& type) { ResolveTypeRef(type, loc, mod); });
-  if (!dt.type_ref_expr) return {};
+  if (!dt.type_ref_expr) {
+    if (dt.kind == DataTypeKind::kNamed)
+      RefreshFoldedTypeRef(dt.type_name, mod);
+    return {};
+  }
   auto* ref = dt.type_ref_expr;
   CheckTypeRefArgInner(ref, loc, mod);
   const ModuleDecl* decl = module_decl_path_.back();
@@ -301,7 +305,9 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     }
   }
   if (ref->kind != ExprKind::kIdentifier) {
-    AdoptExpressionType(dt, TypeRefExprType(ref, mod), arena_);
+    std::optional<DataType> type = TypeRefExprType(ref, mod);
+    if (!AdoptFoldedTypeRef(dt, ref, type, mod))
+      AdoptExpressionType(dt, type, arena_);
     return {};
   }
   std::string_view enumeration;

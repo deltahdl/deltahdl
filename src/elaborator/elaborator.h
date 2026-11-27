@@ -150,7 +150,18 @@ class Elaborator : public ElaboratorClassRules {
   void ReportUndeclaredTypeName(const ModuleItem* item);
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
   void TakePendingCheckerActuals(const ModuleDecl* decl, RtlirModule* mod);
+  void EnterModulePath(const ModuleDecl* decl, RtlirModule* mod);
   void LeaveModuleRecordingTypeParams(RtlirModule* mod);
+  bool FoldMayDifferByPlace() const;
+  const void* FoldedTypeRefOwner() const;
+  bool AdoptFoldedTypeRef(DataType& dt, const Expr* ref,
+                          const std::optional<DataType>& type,
+                          const RtlirModule* mod);
+  void RecordFoldedTypeRef(std::string_view name, const DataType& type,
+                           const RtlirModule* mod);
+  void RefreshFoldedTypeRef(std::string_view name, const RtlirModule* mod);
+  void EnterFoldedTypeRefOwner(const void* owner);
+  void LeaveFoldedTypeRefOwner(const void* owner, const RtlirModule* mod);
 
   void ElaborateParamPortList(const ModuleDecl* decl, const ParamList& params,
                               RtlirModule* mod);
