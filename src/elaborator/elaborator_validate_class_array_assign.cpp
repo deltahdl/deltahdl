@@ -123,11 +123,7 @@ bool ReportUnpackedDimCountMismatch(const ArrayAssignPair& p,
 }
 
 bool ReportElementTypeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
-  if (!ElementTypesEquivalent(
-          {p.l.elem_type, p.l.elem_width, p.l.elem_is_signed,
-           p.l.elem_is_4state, p.l.elem_type_name},
-          {p.r.elem_type, p.r.elem_width, p.r.elem_is_signed,
-           p.r.elem_is_4state, p.r.elem_type_name})) {
+  if (!ElementTypesEquivalent(p.l.Element(), p.r.Element())) {
     diag.Error(p.loc,
                std::format("array element type mismatch in assignment "
                            "('{}' vs '{}')",
@@ -279,6 +275,9 @@ Elaborator::VarArrayInfo DeclaredArrayInfo(const DataType& type,
   info.elem_width = EvalTypeWidth(type, typedefs);
   info.elem_is_signed = IsSignedType(type, typedefs);
   info.elem_is_4state = Is4stateType(type, typedefs);
+  info.elem_aggregate = ElementAggregate(type, typedefs);
+  info.elem_unpacked_shape =
+      ElementUnpackedShape(type, typedefs, scan.tables.typedef_dims, {});
   info.num_unpacked_dims = static_cast<uint32_t>(dims.size());
   info.unpacked_shape =
       UnpackedShapeOf(type, dims, scan.aggregate_typedefs, ScopeMap{});

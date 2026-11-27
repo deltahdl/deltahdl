@@ -202,6 +202,9 @@ void Elaborator::TrackVarArrayInfo(
   info.elements_are_queues = var.elements_are_queues;
   info.elem_type_name = ElementTypeIdentity(item->data_type, typedefs_);
   info.elem_data_type = &item->data_type;
+  info.elem_aggregate = ElementAggregate(item->data_type, typedefs_);
+  info.elem_unpacked_shape =
+      ElementUnpackedShape(item->data_type, typedefs_, td_array_dims_, scope);
   std::vector<std::string_view> names;
   info.elem_is_unpacked_aggregate =
       IsUnpackedAggregate(FollowTypedefs(item->data_type, typedefs_, names));

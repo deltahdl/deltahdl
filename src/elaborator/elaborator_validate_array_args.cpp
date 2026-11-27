@@ -29,6 +29,7 @@ struct ArrayArgTypeCtx {
   const std::unordered_set<std::string_view>& aggregate_typedefs;
   const ScopeMap& scope;
   DiagEngine& diag;
+  const std::unordered_map<std::string_view, std::vector<Expr*>>& typedef_dims;
 };
 
 static Elaborator::VarArrayInfo FormalArrayInfo(const FunctionArg& arg,
@@ -39,6 +40,9 @@ static Elaborator::VarArrayInfo FormalArrayInfo(const FunctionArg& arg,
   info.elem_width = EvalTypeWidth(arg.data_type, ctx.typedefs);
   info.elem_is_signed = IsSignedType(arg.data_type, ctx.typedefs);
   info.elem_is_4state = Is4stateType(arg.data_type, ctx.typedefs);
+  info.elem_aggregate = ElementAggregate(arg.data_type, ctx.typedefs);
+  info.elem_unpacked_shape = ElementUnpackedShape(arg.data_type, ctx.typedefs,
+                                                  ctx.typedef_dims, ctx.scope);
   info.num_unpacked_dims = static_cast<uint32_t>(arg.unpacked_dims.size());
   info.unpacked_shape = UnpackedShapeOf(arg.data_type, arg.unpacked_dims,
                                         ctx.aggregate_typedefs, ctx.scope);
@@ -103,13 +107,7 @@ static bool CheckArrayArgCompat(const Expr* actual,
     return true;
   }
   if (actual_info.is_assoc && formal_info.is_assoc &&
-      !ElementTypesEquivalent(
-          {actual_info.elem_type, actual_info.elem_width,
-           actual_info.elem_is_signed, actual_info.elem_is_4state,
-           actual_info.elem_type_name},
-          {formal_info.elem_type, formal_info.elem_width,
-           formal_info.elem_is_signed, formal_info.elem_is_4state,
-           formal_info.elem_type_name})) {
+      !ElementTypesEquivalent(actual_info.Element(), formal_info.Element())) {
     diag.Error(actual->range.start,
                "associative array element type mismatch in argument",
                Subclause("7.9.10"));
@@ -152,13 +150,7 @@ static void ReportArrayArgElementMismatch(
     const Expr* actual, std::string_view formal_name,
     const Elaborator::VarArrayInfo& actual_info,
     const Elaborator::VarArrayInfo& formal_info, DiagEngine& diag) {
-  if (ElementTypesEquivalent(
-          {actual_info.elem_type, actual_info.elem_width,
-           actual_info.elem_is_signed, actual_info.elem_is_4state,
-           actual_info.elem_type_name},
-          {formal_info.elem_type, formal_info.elem_width,
-           formal_info.elem_is_signed, formal_info.elem_is_4state,
-           formal_info.elem_type_name})) {
+  if (ElementTypesEquivalent(actual_info.Element(), formal_info.Element())) {
     return;
   }
   diag.Error(actual->range.start,
@@ -239,10 +231,14 @@ void Elaborator::ValidateArrayArgTypes(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
   }
-  const ArrayArgTypeCtx kCtx{
-      all_decls, var_array_info_,          class_names_,
-      typedefs_, aggregate_typedef_names_, array_arg_dim_scope_,
-      diag_};
+  const ArrayArgTypeCtx kCtx{all_decls,
+                             var_array_info_,
+                             class_names_,
+                             typedefs_,
+                             aggregate_typedef_names_,
+                             array_arg_dim_scope_,
+                             diag_,
+                             td_array_dims_};
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkStmtForArrayArgTypes(item->body, kCtx);

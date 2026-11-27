@@ -191,26 +191,45 @@ std::string InModule(std::string_view items) {
 TEST(EquivalentTypesElaboration,
      AnonymousAggregatesOfOneStatementAreEquivalent) {
   ElabFixture f;
-  ElaborateSrc(
-      InModule("  struct {int A; int B;} AB1, AB2;\n"
-               "  union {int A; int B;} U1, U2;\n"
-               "  bit r;\n"
-               "  initial begin AB1 = AB2; U1 = U2; r = (AB1 == AB2); end\n"),
-      f);
+  ElaborateSrc(InModule("  struct {int A; int B;} AB1, AB2;\n"
+                        "  union {int A; int B;} U1, U2;\n"
+                        "  typedef struct {int A; int B;} s_t;\n"
+                        "  typedef s_t alias_t;\n"
+                        "  s_t s, s2;\n"
+                        "  alias_t sa;\n"
+                        "  s_t si = s2;\n"
+                        "  bit r;\n"
+                        "  initial begin\n"
+                        "    AB1 = AB2; U1 = U2; r = (AB1 == AB2);\n"
+                        "    s = s2; s <= sa; r = (s == sa); r = (sa != s2);\n"
+                        "  end\n"),
+               f);
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
+constexpr std::string_view kSeparateAggregates =
+    "  struct {int A; int B;} AB1, AB2;\n"
+    "  struct {int A; int B;} AB3;\n"
+    "  union {int A; int B;} U1, U2;\n"
+    "  union {int A; int B;} U3;\n"
+    "  typedef struct {int A; int B;} s_t;\n"
+    "  typedef struct {int A; int B;} t_t;\n"
+    "  typedef int a_t [2];\n"
+    "  s_t s;\n"
+    "  t_t t;\n"
+    "  a_t a;\n"
+    "  bit r;\n";
+
 TEST(EquivalentTypesElaboration,
-     DISABLED_AnonymousAggregateOfAnotherStatementIsNotEquivalent) {
-  for (std::string_view use : {"AB3 = AB1;", "U3 = U1;", "r = (AB1 == AB3);"}) {
-    std::string src = InModule(
-        "  struct {int A; int B;} AB1, AB2;\n"
-        "  struct {int A; int B;} AB3;\n"
-        "  union {int A; int B;} U1, U2;\n"
-        "  union {int A; int B;} U3;\n"
-        "  bit r;\n"
-        "  initial " +
-        std::string(use) + "\n");
+     AnonymousAggregateOfAnotherStatementIsNotEquivalent) {
+  for (std::string_view use :
+       {"initial AB3 = AB1;", "initial U3 = U1;", "initial r = (AB1 == AB3);",
+        "initial AB3 <= AB1;", "assign AB3 = AB1;",
+        "struct {int A; int B;} AB4 = AB1;", "initial s = t;",
+        "initial r = (s != t);", "initial r = (s == AB1);",
+        "initial r = (s == a);"}) {
+    std::string src = InModule(std::string(kSeparateAggregates) + "  " +
+                               std::string(use) + "\n");
     SCOPED_TRACE(src);
     ElabFixture f;
     ElaborateSrc(src, f);
@@ -248,7 +267,7 @@ TEST(EquivalentTypesElaboration, ArraysOfEquivalentElementsAreEquivalent) {
 }
 
 TEST(EquivalentTypesElaboration,
-     DISABLED_PackedStructureIsEquivalentToABuiltInTypeOfItsShape) {
+     PackedStructureIsEquivalentToABuiltInTypeOfItsShape) {
   ElabFixture f;
   ElaborateSrc(
       InModule("  typedef bit signed [7:0] BYTE;\n"
@@ -296,6 +315,11 @@ constexpr NonEquivalentPair kNonEquivalentPairs[] = {
     {"  int c [int];\n  int d [*];\n", "c = d;", kIndexMismatch, "7.9.9"},
     {"  bit [3:0] m [2][3];\n  bit [3:0] o [3][2];\n", "m = o;",
      "array size mismatch", "7.6"},
+    {"  typedef struct {int A;} s_t;\n  typedef struct {int A;} t_t;\n"
+     "  s_t sa [2];\n  t_t ta [2];\n",
+     "sa = ta;", kElementMismatch, "7.6"},
+    {"  typedef struct {int A;} s_t;\n  s_t sa [2];\n  int ia [2];\n",
+     "sa = ia;", kElementMismatch, "7.6"},
     {"  int dd [];\n  int qq [$];\n  bit r;\n", "r = (dd == qq);",
      kArrayCompare, "6.22.2"},
     {"  int q1 [$];\n  shortint q3 [$];\n  bit r;\n", "r = (q1 == q3);",
@@ -315,7 +339,7 @@ TEST(EquivalentTypesElaboration, NonEquivalentElementsOrIndexesAreReported) {
   }
 }
 
-TEST(EquivalentTypesElaboration, DISABLED_ArrayOfAnintIsNotAnArrayOfInt) {
+TEST(EquivalentTypesElaboration, ArrayOfAnintIsNotAnArrayOfInt) {
   std::string src = InModule(
       "  typedef int anint [0:0];\n"
       "  anint xa [2];\n"
@@ -325,6 +349,26 @@ TEST(EquivalentTypesElaboration, DISABLED_ArrayOfAnintIsNotAnArrayOfInt) {
   ElaborateSrc(src, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), std::string(kElementMismatch),
                             LineHolding(src, "xa = ya"), "7.6"));
+}
+
+TEST(EquivalentTypesElaboration,
+     ArraysOfOneElementArraysOrOfOneStructureAreEquivalent) {
+  ElabFixture f;
+  ElaborateSrc(InModule("  typedef int anint [0:0];\n"
+                        "  typedef int one_t [1];\n"
+                        "  typedef struct {int A;} s_t;\n"
+                        "  typedef s_t alias_t;\n"
+                        "  anint xa [2];\n"
+                        "  one_t za [2];\n"
+                        "  s_t sa [2];\n"
+                        "  alias_t aa [2];\n"
+                        "  bit r;\n"
+                        "  initial begin\n"
+                        "    xa = za; za = xa; sa = aa; aa = sa;\n"
+                        "    r = (sa == aa);\n"
+                        "  end\n"),
+               f);
+  EXPECT_FALSE(f.diag.HasErrors());
 }
 
 constexpr std::string_view kClauseExample =

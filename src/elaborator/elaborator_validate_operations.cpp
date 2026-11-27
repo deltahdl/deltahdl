@@ -137,6 +137,12 @@ void ElaboratorOperationRules::CheckAggregateCompareOp(const Expr* expr) {
   };
   if (!is_aggregate_var(l_name, lit->second)) return;
   if (!is_aggregate_var(r_name, rit->second)) return;
+  auto is_struct_type = [&](std::string_view type_name) {
+    auto it = typedefs_.find(type_name);
+    return it != typedefs_.end() &&
+           IsUnpackedStructOrUnionType(it->second, typedefs_);
+  };
+  if (is_struct_type(lit->second) && is_struct_type(rit->second)) return;
 
   diag_.Error(expr->range.start,
               std::format("comparison of non-equivalent aggregate "

@@ -89,6 +89,14 @@ class ElaboratorData {
     std::string_view elem_type_name = {};
     bool elem_is_unpacked_aggregate = false;
     const DataType* elem_data_type = nullptr;
+    const DataType* elem_aggregate = nullptr;
+    std::vector<std::optional<uint32_t>> elem_unpacked_shape = {};
+
+    [[nodiscard]] ElementTypeInfo Element() const {
+      return {elem_type,          elem_width,     elem_is_signed,
+              elem_is_4state,     elem_type_name, elem_aggregate,
+              elem_unpacked_shape};
+    }
   };
 
   struct GenerateScopeSaver {

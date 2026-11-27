@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
@@ -176,17 +177,40 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
   return Is4stateForEquivalence(a) == Is4stateForEquivalence(b);
 }
 
+static bool IsUnpackedAggregateElement(const ElementTypeInfo& e) {
+  return e.aggregate != nullptr && !IsPackedOrIntegral(*e.aggregate);
+}
+
+static bool IsPackedElement(const ElementTypeInfo& e) {
+  return IsIntegralType(e.kind) ||
+         (e.aggregate != nullptr && IsPackedOrIntegral(*e.aggregate));
+}
+
+static bool SameElementShape(const ElementTypeInfo& a,
+                             const ElementTypeInfo& b) {
+  return std::ranges::equal(
+      a.unpacked_shape, b.unpacked_shape,
+      [](std::optional<uint32_t> x, std::optional<uint32_t> y) {
+        return !x || !y || *x == *y;
+      });
+}
+
 bool ElementTypesEquivalent(const ElementTypeInfo& a,
                             const ElementTypeInfo& b) {
+  if (!SameElementShape(a, b)) return false;
   if (a.kind == DataTypeKind::kNamed || b.kind == DataTypeKind::kNamed) {
     return a.kind == b.kind && a.type_name == b.type_name;
+  }
+  if (IsUnpackedAggregateElement(a) || IsUnpackedAggregateElement(b)) {
+    return IsUnpackedAggregateElement(a) && IsUnpackedAggregateElement(b) &&
+           TypesEquivalent(*a.aggregate, *b.aggregate);
   }
   if (CanonKind(a.kind) == CanonKind(b.kind) && a.is_signed == b.is_signed &&
       a.width == b.width && a.is_4state == b.is_4state) {
     return true;
   }
 
-  if (IsIntegralType(a.kind) && IsIntegralType(b.kind)) {
+  if (IsPackedElement(a) && IsPackedElement(b)) {
     return a.width == b.width && a.width > 0 && a.is_signed == b.is_signed &&
            a.is_4state == b.is_4state;
   }

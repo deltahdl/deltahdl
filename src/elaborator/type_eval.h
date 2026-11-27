@@ -182,6 +182,8 @@ struct ElementTypeInfo {
   bool is_signed;
   bool is_4state;
   std::string_view type_name;
+  const DataType* aggregate = nullptr;
+  std::vector<std::optional<uint32_t>> unpacked_shape = {};
 };
 
 bool ElementTypesEquivalent(const ElementTypeInfo& a, const ElementTypeInfo& b);

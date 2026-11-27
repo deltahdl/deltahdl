@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <optional>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -50,6 +51,35 @@ std::optional<uint32_t> DimSize(const Expr* dim, const ScopeMap& scope) {
 }
 
 }  // namespace
+
+const DataType* ElementAggregate(const DataType& dtype,
+                                 const TypedefMap& typedefs) {
+  std::vector<std::string_view> names;
+  const DataType* resolved = FollowTypedefs(dtype, typedefs, names);
+  const bool kAggregate =
+      resolved != nullptr && (resolved->kind == DataTypeKind::kStruct ||
+                              resolved->kind == DataTypeKind::kUnion);
+  return kAggregate ? resolved : nullptr;
+}
+
+std::vector<std::optional<uint32_t>> ElementUnpackedShape(
+    const DataType& dtype, const TypedefMap& typedefs,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        typedef_dims,
+    const ScopeMap& scope) {
+  std::vector<std::optional<uint32_t>> shape;
+  const DataType* type = &dtype;
+  for (int hops = 0; hops < 16 && type->kind == DataTypeKind::kNamed; ++hops) {
+    auto dims = typedef_dims.find(type->type_name);
+    if (dims != typedef_dims.end()) {
+      for (const Expr* dim : dims->second) shape.push_back(DimSize(dim, scope));
+    }
+    auto td = typedefs.find(type->type_name);
+    if (td == typedefs.end()) break;
+    type = &td->second;
+  }
+  return shape;
+}
 
 std::vector<std::optional<uint32_t>> UnpackedShapeOf(
     const DataType& elem, const std::vector<Expr*>& dims,

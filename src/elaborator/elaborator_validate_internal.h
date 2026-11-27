@@ -302,6 +302,9 @@ int ResolveActualArgIndex(const Expr* expr, size_t formal_index,
                           std::string_view formal_name,
                           size_t positional_count);
 
+bool IsUnpackedStructOrUnionType(const DataType& dtype,
+                                 const TypedefMap& typedefs);
+
 std::unordered_set<std::string_view> UnpackedStructVars(
     const ModuleDecl* decl, const TypedefMap& typedefs);
 

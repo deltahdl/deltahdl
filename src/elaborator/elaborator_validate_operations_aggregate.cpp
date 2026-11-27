@@ -2,7 +2,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <format>
 #include <optional>
+#include <string>
 #include <string_view>
 #include <tuple>
 #include <unordered_map>
@@ -11,6 +13,7 @@
 #include <vector>
 
 #include "common/diagnostic.h"
+#include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_data.h"
@@ -42,13 +45,18 @@ static bool IsUnpackedStructOrUnion(const DataType* d) {
          (d->kind == DataTypeKind::kStruct || d->kind == DataTypeKind::kUnion);
 }
 
+bool IsUnpackedStructOrUnionType(const DataType& dtype,
+                                 const TypedefMap& typedefs) {
+  return IsUnpackedStructOrUnion(EndOfTypedefChain(dtype, typedefs));
+}
+
 std::unordered_set<std::string_view> UnpackedStructVars(
     const ModuleDecl* decl, const TypedefMap& typedefs) {
   std::unordered_set<std::string_view> names;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl || !item->unpacked_dims.empty())
       continue;
-    if (IsUnpackedStructOrUnion(EndOfTypedefChain(item->data_type, typedefs)))
+    if (IsUnpackedStructOrUnionType(item->data_type, typedefs))
       names.insert(item->name);
   }
   return names;
@@ -75,6 +83,7 @@ struct AggregateOperandNames {
   const std::unordered_map<std::string_view, const DataType*>& struct_types;
   const DeclaredNames& declared;
   const DeclarationTypes& types;
+  const std::unordered_map<std::string_view, const DataType*>& struct_written;
 };
 
 bool IsIntegralDeclaredType(const DataType& dtype, const DeclarationTypes& t) {
@@ -290,6 +299,44 @@ bool IsUnpackedMemberOperand(const Expr* e, const AggregateOperandNames& n) {
           : MemberNamedType(*member, n.types.typedefs));
 }
 
+bool NonEquivalentStructs(const Expr* a, const Expr* b,
+                          const AggregateOperandNames& n) {
+  return NamesIn(a, n.structs) && NamesIn(b, n.structs) &&
+         !TypesEquivalent(*n.struct_types.at(a->text),
+                          *n.struct_types.at(b->text));
+}
+
+std::string StructTypeLabel(const Expr* e, const AggregateOperandNames& n) {
+  const DataType* written = n.struct_written.at(e->text);
+  if (written->kind == DataTypeKind::kNamed)
+    return std::format("'{}'", written->type_name);
+  return std::format("the anonymous type of '{}'", e->text);
+}
+
+void CheckStructComparison(const Expr* e, const AggregateOperandNames& n,
+                           DiagEngine& diag) {
+  if (e->kind != ExprKind::kBinary ||
+      (e->op != TokenKind::kEqEq && e->op != TokenKind::kBangEq) ||
+      !NonEquivalentStructs(e->lhs, e->rhs, n))
+    return;
+  diag.Error(
+      e->range.start,
+      std::format("comparison of non-equivalent aggregate types {} and "
+                  "{}",
+                  StructTypeLabel(e->lhs, n), StructTypeLabel(e->rhs, n)),
+      Subclause("6.22.2"));
+}
+
+void CheckStructAssignment(const Expr* lhs, const Expr* rhs, SourceLoc loc,
+                           const AggregateOperandNames& n, DiagEngine& diag) {
+  if (!NonEquivalentStructs(lhs, rhs, n)) return;
+  diag.Error(loc,
+             std::format("assignment between non-equivalent aggregate types "
+                         "{} and {}",
+                         StructTypeLabel(lhs, n), StructTypeLabel(rhs, n)),
+             Subclause("6.22.2"));
+}
+
 bool NamesUnpackedAggregate(const Expr* e, const AggregateOperandNames& n) {
   return NamesIn(e, n.structs) ||
          UnpackedArrayOperand(e, n.declared) != nullptr;
@@ -303,8 +350,7 @@ void CheckConditionalStructOperands(const Expr* e,
   const Expr* f = e->false_expr;
   bool differ = false;
   if (NamesIn(t, n.structs) && NamesIn(f, n.structs)) {
-    differ = !TypesEquivalent(*n.struct_types.at(t->text),
-                              *n.struct_types.at(f->text));
+    differ = NonEquivalentStructs(t, f, n);
   } else {
     differ =
         (NamesUnpackedAggregate(t, n) && IsIntegralOperand(f, n.declared)) ||
@@ -321,6 +367,7 @@ void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
                                DiagEngine& diag) {
   CheckUnpackedArrayOperand(e, n, diag);
   CheckConditionalStructOperands(e, n, diag);
+  CheckStructComparison(e, n, diag);
   if (e->kind == ExprKind::kInside && e->lhs != nullptr &&
       (UnpackedArrayOperand(e->lhs, n.declared) != nullptr ||
        NamesIn(e->lhs, n.structs) || IsUnpackedMemberOperand(e->lhs, n))) {
@@ -388,6 +435,9 @@ void WalkStmtChildrenForAggregateOperands(const Stmt* s,
                                           const AggregateOperandNames& n,
                                           DiagEngine& diag) {
   ReportUntypedPattern(s->condition, diag);
+  if (s->kind == StmtKind::kBlockingAssign ||
+      s->kind == StmtKind::kNonblockingAssign)
+    CheckStructAssignment(s->lhs, s->rhs, s->range.start, n, diag);
   ForEachChildExpr(
       s, [&](Expr* const& e) { WalkExprForAggregateOperands(e, n, diag); });
   ForEachChildStmt(
@@ -407,7 +457,8 @@ void WalkStmtForAggregateOperands(const Stmt* s, const AggregateOperandNames& n,
   ForEachBlockDeclaration(s, [&](const BlockDeclaration& d) {
     DeclareBlockName(d, n.types, inner);
   });
-  AggregateOperandNames scoped{n.structs, n.struct_types, inner, n.types};
+  AggregateOperandNames scoped{n.structs, n.struct_types, inner, n.types,
+                               n.struct_written};
   WalkStmtChildrenForAggregateOperands(s, scoped, diag);
 }
 
@@ -420,16 +471,28 @@ void ElaboratorOperationRules::ValidateAggregateOperands(
   DeclarationTypes types{typedefs_, aggregate_typedef_names_, class_names_};
   DeclaredNames declared = ModuleDeclaredNames(decl, var_array_info_, types);
   std::unordered_map<std::string_view, const DataType*> struct_types;
+  std::unordered_map<std::string_view, const DataType*> struct_written;
   for (const auto* item : decl->items) {
-    if (structs.contains(item->name))
-      struct_types[item->name] = EndOfTypedefChain(item->data_type, typedefs_);
+    if (!structs.contains(item->name)) continue;
+    struct_types[item->name] = EndOfTypedefChain(item->data_type, typedefs_);
+    struct_written[item->name] = &item->data_type;
   }
-  AggregateOperandNames names{structs, struct_types, declared, types};
+  AggregateOperandNames names{structs, struct_types, declared, types,
+                              struct_written};
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind))
       WalkStmtForAggregateOperands(item->body, names, diag_);
-    if (item->kind == ModuleItemKind::kContAssign)
+    if (item->kind == ModuleItemKind::kContAssign) {
+      CheckStructAssignment(item->assign_lhs, item->assign_rhs, item->loc,
+                            names, diag_);
       WalkExprForAggregateOperands(item->assign_rhs, names, diag_);
+    }
+    if (structs.contains(item->name) && item->init_expr != nullptr) {
+      Expr target;
+      target.kind = ExprKind::kIdentifier;
+      target.text = item->name;
+      CheckStructAssignment(&target, item->init_expr, item->loc, names, diag_);
+    }
   }
 }
 
@@ -466,11 +529,6 @@ std::optional<ArrayOperandShape> ArrayOperandShapeOf(
   });
 }
 
-ElementTypeInfo ElementOf(const ElaboratorData::VarArrayInfo& info) {
-  return {info.elem_type, info.elem_width, info.elem_is_signed,
-          info.elem_is_4state, info.elem_type_name};
-}
-
 }  // namespace
 
 std::optional<bool> ElaboratorOperationRules::ArrayOperandsEquivalent(
@@ -480,7 +538,7 @@ std::optional<bool> ElaboratorOperationRules::ArrayOperandsEquivalent(
   if (!l || !r) return std::nullopt;
   const auto& li = *l->info;
   const auto& ri = *r->info;
-  return ElementTypesEquivalent(ElementOf(li), ElementOf(ri)) &&
+  return ElementTypesEquivalent(li.Element(), ri.Element()) &&
          std::tie(li.is_dynamic, li.is_queue, li.is_assoc, li.assoc_index_type,
                   l->dims) == std::tie(ri.is_dynamic, ri.is_queue, ri.is_assoc,
                                        ri.assoc_index_type, r->dims);
