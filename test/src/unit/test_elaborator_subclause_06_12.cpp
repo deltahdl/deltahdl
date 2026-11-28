@@ -368,6 +368,22 @@ TEST(RealDataType, AnyChangeOfAnInheritedThisNestedOrOutOfBlockRealIsAccepted) {
              "  endclass\nendclass\nmodule t;\nendmodule\n"));
 }
 
+TEST(RealDataType,
+     EdgeAndSelectOfAnElementOfATypedefRealArrayFormalAreReported) {
+  const std::string kSrc =
+      "module t;\n  typedef real RB[2];\n  logic y;\n  task tk(RB a);\n"
+      "    @(negedge a[1]);\n    y = a[0][0];\n  endtask\nendmodule\n";
+  EXPECT_TRUE(RealUseReported(kSrc, "negedge a[1]", kEdge));
+  EXPECT_TRUE(RealUseReported(kSrc, "a[0][0]", kBitSelect));
+}
+
+TEST(RealDataType, AnyChangeOfAnElementOfATypedefRealArrayFormalIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("module t;\n  typedef real RB[2];\n  logic y;\n"
+             "  task tk(RB a);\n    @(a[1]);\n    y = a[0] > 0.0;\n"
+             "  endtask\nendmodule\n"));
+}
+
 std::string RealOperands(std::string_view use) {
   return std::string(
              "package k;\n  real pr;\nendpackage\nmodule t;\n"

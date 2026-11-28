@@ -47,9 +47,8 @@ constexpr auto kRealArithmeticOps =
 
 using Frame = std::unordered_map<std::string_view, RealTyped>;
 
-size_t TypedefDimsOnChain(const DataType& type, const RealUseScope& scope) {
+size_t TypedefDimsOnChain(std::string_view name, const RealUseScope& scope) {
   size_t dims = 0;
-  std::string_view name = type.type_name;
   for (int depth = 0; !name.empty() && depth < kMaxTypedefDepth; ++depth) {
     auto written = scope.typedef_dims.find(name);
     if (written != scope.typedef_dims.end()) dims += written->second.size();
@@ -169,12 +168,9 @@ RealTyped TypedOfStructMember(const DataType& aggregate, std::string_view name,
   RealTyped typed;
   typed.found = true;
   typed.kind = it->type_kind;
-  typed.unpacked = it->unpacked_dims.size();
-  if (it->type_kind == DataTypeKind::kNamed) {
-    DataType written;
-    written.type_name = it->type_name;
-    typed.unpacked += TypedefDimsOnChain(written, scope);
-  }
+  typed.unpacked = it->unpacked_dims.empty()
+                       ? TypedefDimsOnChain(it->type_name, scope)
+                       : it->unpacked_dims.size();
   const DataType* own = MemberOwnType(*it, scope.typedefs);
   if (own != nullptr) {
     typed.kind = own->kind;
@@ -425,7 +421,8 @@ RealTyped RealTypedOfDecl(const DataType& type, size_t unpacked,
                           const RealUseScope& scope) {
   RealTyped typed;
   typed.found = true;
-  typed.unpacked = unpacked + TypedefDimsOnChain(type, scope);
+  typed.unpacked =
+      unpacked != 0 ? unpacked : TypedefDimsOnChain(type.type_name, scope);
   if (!type.type_name.empty()) typed.cls = FindClass(type.type_name, scope);
   if (typed.cls != nullptr) return typed;
   const DataType* end = TypeAtChainEnd(type, scope.typedefs);

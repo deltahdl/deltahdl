@@ -185,35 +185,48 @@ void Elaborator::CheckRandsequenceNamesIn(
   });
 }
 
+void Elaborator::ValidatePerDeclarationRulesInScopeItems(
+    const std::vector<ModuleItem*>& items) {
+  ForEachScopeLet(
+      items, [this](ModuleItem* let) { ElaborateLetFormals(let, nullptr); });
+  CheckJumpStatementsIn(items);
+  CheckRandsequenceNamesIn(items);
+  CheckForeachLoopsIn(items);
+  CheckPatternsIn(items);
+  CheckRealUsesIn(items);
+  for (const ModuleItem* item : items) {
+    ReportItemImplicationOperators(*item, diag_);
+    if (item->kind == ModuleItemKind::kFunctionDecl ||
+        item->kind == ModuleItemKind::kTaskDecl) {
+      ReportMisplacedOverrideSpecifiers(*item, diag_);
+    }
+  }
+}
+
+void Elaborator::ValidatePerDeclarationRulesInUnitClass(const ClassDecl* cls) {
+  std::vector<ModuleItem*> methods;
+  ForEachClassBodyItem(cls, [&](const ModuleItem* m) {
+    methods.push_back(const_cast<ModuleItem*>(m));
+  });
+  ForEachScopeLet(
+      methods, [this](ModuleItem* let) { ElaborateLetFormals(let, nullptr); });
+  CheckJumpStatementsIn(methods);
+  CheckRandsequenceNamesIn(methods);
+  CheckForeachLoopsInClass(cls);
+  CheckPatternsInClass(cls);
+  CheckRealUsesInClass(cls);
+  ReportClassImplicationOperators(cls, diag_);
+}
+
 void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   if (unit_ == nullptr) return;
   ValidateUnitScopeTypeRefArgs();
   ElaborateUnitScopeProcedures();
 
-  auto elaborate_let = [this](ModuleItem* let) {
-    ElaborateLetFormals(let, nullptr);
-  };
-  auto run_over = [this,
-                   &elaborate_let](const std::vector<ModuleItem*>& items) {
-    ForEachScopeLet(items, elaborate_let);
-    CheckJumpStatementsIn(items);
-    CheckRandsequenceNamesIn(items);
-    CheckForeachLoopsIn(items);
-    CheckPatternsIn(items);
-    CheckRealUsesIn(items);
-    for (const ModuleItem* item : items) {
-      ReportItemImplicationOperators(*item, diag_);
-      if (item->kind == ModuleItemKind::kFunctionDecl ||
-          item->kind == ModuleItemKind::kTaskDecl) {
-        ReportMisplacedOverrideSpecifiers(*item, diag_);
-      }
-    }
-  };
-
-  run_over(unit_->cu_items);
+  ValidatePerDeclarationRulesInScopeItems(unit_->cu_items);
   CheckUnitLetActualTypes();
   for (const auto* pkg : unit_->packages) {
-    if (pkg != nullptr) run_over(pkg->items);
+    if (pkg != nullptr) ValidatePerDeclarationRulesInScopeItems(pkg->items);
   }
   CheckUnitNettypeUses(unit_, nettype_names_, diag_);
   ForEachUnitDeclaredType(unit_, [this](const DeclaredType& declared) {
@@ -236,17 +249,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
   ReportUnresolvedInPackageSubroutines(unit_, kNames, pkg_provided_names_,
                                        diag_);
   for (const auto* cls : unit_->classes) {
-    std::vector<ModuleItem*> methods;
-    ForEachClassBodyItem(cls, [&](const ModuleItem* m) {
-      methods.push_back(const_cast<ModuleItem*>(m));
-    });
-    ForEachScopeLet(methods, elaborate_let);
-    CheckJumpStatementsIn(methods);
-    CheckRandsequenceNamesIn(methods);
-    CheckForeachLoopsInClass(cls);
-    CheckPatternsInClass(cls);
-    CheckRealUsesInClass(cls);
-    ReportClassImplicationOperators(cls, diag_);
+    ValidatePerDeclarationRulesInUnitClass(cls);
   }
 }
 

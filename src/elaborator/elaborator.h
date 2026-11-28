@@ -674,6 +674,9 @@ class Elaborator : public ElaboratorClassRules {
   void CheckPatternsInClass(const ClassDecl* cls);
   void CheckRealUsesIn(const std::vector<ModuleItem*>& items);
   void CheckRealUsesInClass(const ClassDecl* cls);
+  void ValidatePerDeclarationRulesInScopeItems(
+      const std::vector<ModuleItem*>& items);
+  void ValidatePerDeclarationRulesInUnitClass(const ClassDecl* cls);
   void CheckRandsequenceNamesIn(const std::vector<ModuleItem*>& items);
 
   void ValidatePerDeclarationRulesInUnitScopes();
