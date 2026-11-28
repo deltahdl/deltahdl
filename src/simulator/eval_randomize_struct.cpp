@@ -7,7 +7,6 @@
 
 #include "common/types.h"
 #include "parser/ast_class.h"
-#include "parser/ast_type.h"
 #include "simulator/class_object.h"
 #include "simulator/constraint_solver.h"
 #include "simulator/dyn_struct_member.h"
@@ -34,7 +33,6 @@ const StructTypeInfo* PropertyLayout(std::string_view name,
 
 bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
                           SimContext& ctx, std::vector<RandInfo>& out) {
-  if (m->data_type.kind != DataTypeKind::kNamed) return false;
   const StructTypeInfo* layout = PropertyLayout(m->name, level, ctx);
   if (layout == nullptr || layout->is_packed || layout->is_union) return false;
   for (const StructFieldInfo& field : layout->fields) {
@@ -62,7 +60,7 @@ void AddRandStructDynamicElements(const ClassMember* m,
                                   const ClassTypeInfo* level,
                                   std::vector<RandInfo>& out,
                                   RandomizeCtx& rc) {
-  if (m->is_static || m->data_type.kind != DataTypeKind::kNamed) return;
+  if (m->is_static) return;
   const StructTypeInfo* layout = PropertyLayout(m->name, level, rc.ctx);
   auto whole = rc.obj->properties.find(std::string(m->name));
   if (layout == nullptr || layout->is_packed || layout->is_union ||
