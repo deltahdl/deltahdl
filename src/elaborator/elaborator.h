@@ -385,6 +385,17 @@ class Elaborator : public ElaboratorClassRules {
 
   void PassDollarArguments(ParamList& child_params, const RtlirModule* mod);
 
+  bool NamesADataType(const Expr* value, const RtlirModule* mod) const;
+
+  bool ScopedReadIsParameter(const Expr* access) const;
+
+  void AddScopedParameterReads(const Expr* e, ScopeMap& constants) const;
+
+  void ReportOverrideOperands(const ParamList& child_params,
+                              const ModuleDecl& child_decl,
+                              const RtlirModule* mod,
+                              const ScopeMap& parent_scope);
+
   void PassConfigDollarArguments(
       std::vector<std::pair<std::string_view, Expr*>>& params);
 

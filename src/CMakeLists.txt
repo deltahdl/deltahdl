@@ -194,6 +194,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/embedded_covergroup_rules.cpp
     elaborator/enum_base_typedefs.cpp
     elaborator/typedef_cycles.cpp
+    elaborator/instance_override_operands.cpp
     elaborator/covergroup_variables.cpp
     elaborator/checker_procedure_rules.cpp
     elaborator/checker_instance_assertion.cpp

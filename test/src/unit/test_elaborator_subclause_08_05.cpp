@@ -502,7 +502,7 @@ TEST(ObjectPropertyElaboration,
 }
 
 TEST(ObjectPropertyElaboration,
-     DISABLED_ParameterReadThroughAHandleInAnInstanceOverrideIsReported) {
+     ParameterReadThroughAHandleInAnInstanceOverrideIsReported) {
   ElabFixture f;
   ElabOk(
       "class V #(parameter int W = 7);\n"
@@ -516,7 +516,7 @@ TEST(ObjectPropertyElaboration,
       "endmodule\n",
       f);
   const auto& diags = f.diag.Diagnostics();
-  EXPECT_TRUE(ReportedError(diags, "not a constant expression", 7, "23.10.2"));
+  EXPECT_TRUE(ReportedError(diags, "not a constant expression", 7, "6.20.2"));
   EXPECT_FALSE(ErrorOnLine(diags, 8));
 }
 
