@@ -390,20 +390,19 @@ void ReportForceOverMixture(std::string_view name, SourceLoc loc,
 using SelectShapeMap = std::unordered_map<std::string_view, VarSelectShape>;
 
 struct SelectOperands {
-  const NameSet& variables;
   const NameSet& parameters;
   const SelectShapeMap& shapes;
 };
 
-void CheckRealSelect(const Expr* e, const TypeMap& types,
-                     const SelectOperands& operands, DiagEngine& diag);
+void CheckRealSelect(const Expr* e, const SelectOperands& operands,
+                     DiagEngine& diag);
 void CheckScalarSelect(const Expr* e, const NameSet& scalars, DiagEngine& diag);
 void CheckIndexedPartSelectWidth(const Expr* e, const ScopeMap& scope,
                                  DiagEngine& diag);
 void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
                            DiagEngine& diag);
-void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
-                         const SelectOperands& operands, DiagEngine& diag);
+void CheckRealSelectStmt(const Stmt* s, const SelectOperands& operands,
+                         DiagEngine& diag);
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,
                                      DiagEngine& diag);
 

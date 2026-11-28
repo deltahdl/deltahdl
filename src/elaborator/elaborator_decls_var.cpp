@@ -294,7 +294,6 @@ struct VarDeclNameTables {
   std::unordered_set<std::string_view>& const_var_names;
   std::unordered_map<std::string_view, DataTypeKind>& var_types;
   std::unordered_set<std::string_view>& scalar_var_names;
-  std::unordered_set<std::string_view>& real_var_names;
   std::unordered_set<std::string_view>& packed_array_vars;
   std::unordered_map<std::string_view, std::string_view>& var_named_types;
   std::unordered_map<std::string_view, VarSelectShape>& var_select_shapes;
@@ -353,18 +352,13 @@ void RecordVarSelectShape(
   const bool kIsScalarKind =
       dtype.kind == DataTypeKind::kLogic || dtype.kind == DataTypeKind::kReg ||
       dtype.kind == DataTypeKind::kBit || IsNetTypeKind(dtype.kind);
-  if (!IsRealType(dtype.kind) && !kIsAtom && !kIsPackedAggregate &&
-      !kIsScalarKind) {
-    return;
-  }
+  if (!kIsAtom && !kIsPackedAggregate && !kIsScalarKind) return;
   size_t vector_dims = (dtype.packed_dim_left ? 1 : 0) +
                        dtype.extra_packed_dims.size() +
                        (dtype.has_unsized_packed_dim ? 1 : 0);
   if (kIsAtom || kIsPackedAggregate) ++vector_dims;
   VarSelectShape shape;
   shape.addressable_dims = item->unpacked_dims.size() + vector_dims;
-  shape.element_is_real = IsRealType(dtype.kind);
-  shape.element_is_scalar = !shape.element_is_real;
   shapes[item->name] = shape;
 }
 
@@ -383,8 +377,6 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   }
   tables.var_types[item->name] = item->data_type.kind;
   if (item->unpacked_dims.empty()) {
-    if (IsRealType(item->data_type.kind))
-      tables.real_var_names.insert(item->name);
     if (item->data_type.packed_dim_left)
       tables.packed_array_vars.insert(item->name);
     else if (DeclaresScalar(item->data_type, typedefs))
@@ -733,11 +725,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
        DeclaresNetOrVariable(item->name)},
       "variable", diag_);
 
-  RegisterVarDeclNames(item,
-                       {const_names_, const_var_names_, var_types_,
-                        scalar_var_names_, real_var_names_, packed_array_vars_,
-                        var_named_types_, var_select_shapes_},
-                       typedefs_, diag_);
+  RegisterVarDeclNames(
+      item,
+      {const_names_, const_var_names_, var_types_, scalar_var_names_,
+       packed_array_vars_, var_named_types_, var_select_shapes_},
+      typedefs_, diag_);
   ReportStaticConstReadingVariable(item, mod);
   RegisterVirtualInterfaceVarDecl(
       item,

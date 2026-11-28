@@ -528,36 +528,19 @@ bool IsRealType(DataTypeKind k) {
          k == DataTypeKind::kRealtime;
 }
 
-using TypeMap = std::unordered_map<std::string_view, DataTypeKind>;
-
 using NameSet = std::unordered_set<std::string_view>;
 
-static void CheckRealSelectNode(const Expr* e, const TypeMap& types,
-                                const SelectOperands& operands,
-                                DiagEngine& diag) {
+static void CheckRealParamSelectNode(const Expr* e,
+                                     const SelectOperands& operands,
+                                     DiagEngine& diag) {
   auto name = ExprIdent(e->base);
-  const bool kIsRealVar = !name.empty() && operands.variables.count(name) != 0;
-  const bool kIsRealParam =
-      !name.empty() && operands.parameters.count(name) != 0;
-  if (kIsRealVar || kIsRealParam) {
-    const bool kIsBitSelect =
-        !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
-    const char* const kConstruct = kIsBitSelect ? "bit-select" : "part-select";
-    const char* const kOperand =
-        kIsRealVar ? "real variable" : "real parameter";
-    diag.Error(e->range.start,
-               std::format("{} of a {} is illegal", kConstruct, kOperand),
-               Subclause(kIsRealVar ? "6.12" : "11.5.1"));
-    return;
-  }
-  if (!e->index) return;
-  auto idx = ExprIdent(e->index);
-  if (idx.empty()) return;
-  auto it = types.find(idx);
-  if (it != types.end() && IsRealType(it->second)) {
-    diag.Error(e->range.start, "real type used as index is illegal",
-               Subclause("6.12"));
-  }
+  if (name.empty() || operands.parameters.count(name) == 0) return;
+  const bool kIsBitSelect =
+      !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
+  diag.Error(e->range.start,
+             std::format("{} of a real parameter is illegal",
+                         kIsBitSelect ? "bit-select" : "part-select"),
+             Subclause("11.5.1"));
 }
 
 struct SelectChain {
@@ -584,32 +567,19 @@ static void CheckElementSelectNode(const Expr* e, const SelectShapeMap& shapes,
   auto it = shapes.find(chain.name);
   if (it == shapes.end()) return;
   if (chain.addresses != it->second.addressable_dims + 1) return;
-  const bool kIsBitSelect =
-      !e->index_end && !e->is_part_select_plus && !e->is_part_select_minus;
-  if (it->second.element_is_real) {
-    diag.Error(e->range.start,
-               std::format("{} of a real variable is illegal",
-                           kIsBitSelect ? "bit-select" : "part-select"),
-               Subclause("6.12"));
-    return;
-  }
-  if (it->second.element_is_scalar) {
-    diag.Error(e->range.start,
-               "bit-select or part-select of a scalar is illegal",
-               Subclause("11.5.1"));
-  }
+  diag.Error(e->range.start, "bit-select or part-select of a scalar is illegal",
+             Subclause("11.5.1"));
 }
 
-void CheckRealSelect(const Expr* e, const TypeMap& types,
-                     const SelectOperands& operands, DiagEngine& diag) {
+void CheckRealSelect(const Expr* e, const SelectOperands& operands,
+                     DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSelect && e->base) {
-    CheckRealSelectNode(e, types, operands, diag);
+    CheckRealParamSelectNode(e, operands, diag);
     CheckElementSelectNode(e, operands.shapes, diag);
   }
-  ForEachExprChild(e, [&](const Expr* child) {
-    CheckRealSelect(child, types, operands, diag);
-  });
+  ForEachExprChild(
+      e, [&](const Expr* child) { CheckRealSelect(child, operands, diag); });
 }
 
 static void CheckScalarSelectNode(const Expr* e, const NameSet& scalars,
@@ -671,17 +641,16 @@ void CheckScalarSelectStmt(const Stmt* s, const NameSet& scalars,
       s, [&](const Stmt* sub) { CheckScalarSelectStmt(sub, scalars, diag); });
 }
 
-void CheckRealSelectStmt(const Stmt* s, const TypeMap& types,
-                         const SelectOperands& operands, DiagEngine& diag) {
+void CheckRealSelectStmt(const Stmt* s, const SelectOperands& operands,
+                         DiagEngine& diag) {
   if (!s) return;
-  CheckRealSelect(s->lhs, types, operands, diag);
-  CheckRealSelect(s->rhs, types, operands, diag);
-  CheckRealSelect(s->expr, types, operands, diag);
-  CheckRealSelect(s->condition, types, operands, diag);
-  CheckRealSelect(s->for_cond, types, operands, diag);
-  ForEachChildStmt(s, [&](const Stmt* sub) {
-    CheckRealSelectStmt(sub, types, operands, diag);
-  });
+  CheckRealSelect(s->lhs, operands, diag);
+  CheckRealSelect(s->rhs, operands, diag);
+  CheckRealSelect(s->expr, operands, diag);
+  CheckRealSelect(s->condition, operands, diag);
+  CheckRealSelect(s->for_cond, operands, diag);
+  ForEachChildStmt(
+      s, [&](const Stmt* sub) { CheckRealSelectStmt(sub, operands, diag); });
 }
 
 void CheckIndexedPartSelectWidthStmt(const Stmt* s, const ScopeMap& scope,

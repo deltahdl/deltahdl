@@ -114,24 +114,23 @@ void Elaborator::ValidateItemRules(const ModuleItem* item,
   ValidateSubroutineBodyTargets(item, mod, scope);
   if (item->kind == ModuleItemKind::kContAssign)
     CheckLhsPatternNamedKeys(item->assign_lhs, diag_);
-  ValidateEdgeOnReal(item);
+  ValidateRealUses(item, mod);
   ValidateChandleContAssign(item);
   ValidateVirtualInterfaceContAssign(item);
   ValidateVirtualInterfaceSensitivity(item);
   ValidateClassHandleContAssign(item);
 
-  const SelectOperands kOperands{real_var_names_, real_param_names_,
-                                 var_select_shapes_};
+  const SelectOperands kOperands{real_param_names_, var_select_shapes_};
   if (item->kind == ModuleItemKind::kContAssign) {
-    CheckRealSelect(item->assign_rhs, var_types_, kOperands, diag_);
-    CheckRealSelect(item->assign_lhs, var_types_, kOperands, diag_);
+    CheckRealSelect(item->assign_rhs, kOperands, diag_);
+    CheckRealSelect(item->assign_lhs, kOperands, diag_);
     CheckScalarSelect(item->assign_rhs, scalar_var_names_, diag_);
     CheckScalarSelect(item->assign_lhs, scalar_var_names_, diag_);
     CheckIndexedPartSelectWidth(item->assign_rhs, scope, diag_);
     CheckIndexedPartSelectWidth(item->assign_lhs, scope, diag_);
   }
   if (is_proc && item->body) {
-    CheckRealSelectStmt(item->body, var_types_, kOperands, diag_);
+    CheckRealSelectStmt(item->body, kOperands, diag_);
     CheckScalarSelectStmt(item->body, scalar_var_names_, diag_);
     CheckIndexedPartSelectWidthStmt(item->body, scope, diag_);
   }

@@ -200,6 +200,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckRandsequenceNamesIn(items);
     CheckForeachLoopsIn(items);
     CheckPatternsIn(items);
+    CheckRealUsesIn(items);
     for (const ModuleItem* item : items) {
       ReportItemImplicationOperators(*item, diag_);
       if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -244,6 +245,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitScopes() {
     CheckRandsequenceNamesIn(methods);
     CheckForeachLoopsInClass(cls);
     CheckPatternsInClass(cls);
+    CheckRealUsesInClass(cls);
     ReportClassImplicationOperators(cls, diag_);
   }
 }

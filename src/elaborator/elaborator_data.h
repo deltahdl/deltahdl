@@ -204,7 +204,6 @@ class ElaboratorData {
   std::unordered_set<std::string_view> declared_interconnects_;
   InterconnectMerges interconnect_merges_;
   std::unordered_set<std::string_view> scalar_var_names_;
-  std::unordered_set<std::string_view> real_var_names_;
   std::unordered_set<std::string_view> real_param_names_;
   std::unordered_map<std::string_view, VarSelectShape> var_select_shapes_;
   std::unordered_set<std::string_view> task_names_;

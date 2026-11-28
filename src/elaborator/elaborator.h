@@ -40,6 +40,8 @@ struct AppliedTypeParams;
 struct ContTargetLeaf;
 struct Expr;
 struct PackedBoundNames;
+struct RealTyped;
+struct RealUseScope;
 struct TypeParamAssignments;
 
 class Elaborator : public ElaboratorClassRules {
@@ -580,7 +582,9 @@ class Elaborator : public ElaboratorClassRules {
   bool ValidateEnumLiteral(const EnumMember& member, uint32_t base_width,
                            bool is_2state);
 
-  void ValidateEdgeOnReal(const ModuleItem* item);
+  void ValidateRealUses(const ModuleItem* item, const RtlirModule& mod);
+  RealTyped ModuleRealTyped(std::string_view name,
+                            const RealUseScope& scope) const;
   void ValidateItemConstraints(const ModuleItem* item, const RtlirModule& mod,
                                const ScopeMap& scope);
   void ValidateItemRules(const ModuleItem* item, const RtlirModule& mod,
@@ -668,6 +672,8 @@ class Elaborator : public ElaboratorClassRules {
   void CheckForeachLoopsInClass(const ClassDecl* cls);
   void CheckPatternsIn(const std::vector<ModuleItem*>& items);
   void CheckPatternsInClass(const ClassDecl* cls);
+  void CheckRealUsesIn(const std::vector<ModuleItem*>& items);
+  void CheckRealUsesInClass(const ClassDecl* cls);
   void CheckRandsequenceNamesIn(const std::vector<ModuleItem*>& items);
 
   void ValidatePerDeclarationRulesInUnitScopes();

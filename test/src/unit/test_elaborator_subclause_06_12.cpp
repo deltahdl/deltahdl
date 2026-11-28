@@ -315,7 +315,7 @@ TEST(RealDataType, EdgeOfARealInAnInterfaceProgramAndCheckerIsReported) {
                       "edge r", kEdge));
 }
 
-TEST(RealDataType, DISABLED_EdgeOfARealInAClassPackageOrUnitTaskIsReported) {
+TEST(RealDataType, EdgeOfARealInAClassPackageOrUnitTaskIsReported) {
   EXPECT_TRUE(RealUseReported(
       "class C;\n  real r;\n  task tk();\n    @(posedge r);\n  endtask\n"
       "endclass\nmodule t;\nendmodule\n",
@@ -338,6 +338,36 @@ TEST(RealDataType, AnyChangeOfARealInAClassPackageOrUnitTaskIsAccepted) {
              "task automatic tk();\n  @(r);\nendtask\nmodule t;\nendmodule\n"));
 }
 
+TEST(RealDataType, EdgeOfAnInheritedThisNestedOrOutOfBlockRealIsReported) {
+  EXPECT_TRUE(RealUseReported(
+      "class B;\n  real p;\nendclass\nclass D extends B;\n  task tk();\n"
+      "    @(posedge p);\n  endtask\nendclass\nmodule t;\nendmodule\n",
+      "posedge p", kEdge));
+  EXPECT_TRUE(RealUseReported(
+      "class C;\n  real p;\n  task tk();\n    @(negedge this.p);\n"
+      "  endtask\nendclass\nmodule t;\nendmodule\n",
+      "negedge this.p", kEdge));
+  EXPECT_TRUE(RealUseReported(
+      "class C;\n  real p;\n  extern task tk();\nendclass\n"
+      "task C::tk();\n  @(edge p);\nendtask\nmodule t;\nendmodule\n",
+      "edge p", kEdge));
+  EXPECT_TRUE(
+      RealUseReported("class O;\n  class I;\n    real p;\n    task tk();\n"
+                      "      @(posedge p);\n    endtask\n  endclass\nendclass\n"
+                      "module t;\nendmodule\n",
+                      "posedge p", kEdge));
+}
+
+TEST(RealDataType, AnyChangeOfAnInheritedThisNestedOrOutOfBlockRealIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk("class B;\n  real p;\nendclass\nclass D extends B;\n"
+             "  task tk();\n    @(p or this.p);\n  endtask\nendclass\n"
+             "class C;\n  real p;\n  extern task tk();\nendclass\n"
+             "task C::tk();\n  @(p);\nendtask\nclass O;\n  class I;\n"
+             "    real p;\n    task tk();\n      @(p);\n    endtask\n"
+             "  endclass\nendclass\nmodule t;\nendmodule\n"));
+}
+
 std::string RealOperands(std::string_view use) {
   return std::string(
              "package k;\n  real pr;\nendpackage\nmodule t;\n"
@@ -348,8 +378,7 @@ std::string RealOperands(std::string_view use) {
       .append("\n  endtask\nendmodule\n");
 }
 
-TEST(RealDataType,
-     DISABLED_EdgeOfARealFormalMemberElementOrPropertyIsReported) {
+TEST(RealDataType, EdgeOfARealFormalMemberElementOrPropertyIsReported) {
   const char* const kUses[] = {
       "@(posedge a);",   "@(negedge st.m);",  "@(edge ra[0]);",
       "@(posedge c.p);", "@(negedge k::pr);", "@(posedge t.ra[1]);",
@@ -383,7 +412,7 @@ TEST(RealDataType, EdgeOfARealInEveryProceduralEventControlIsReported) {
   }
 }
 
-TEST(RealDataType, DISABLED_EdgeOfARealAsAClockingOrAssertionEventIsReported) {
+TEST(RealDataType, EdgeOfARealAsAClockingOrAssertionEventIsReported) {
   const char* const kUses[] = {
       "clocking cb @(posedge r); endclocking",
       "a1: assert property (@(posedge r) x);",
@@ -423,8 +452,7 @@ TEST(RealDataType, SelectOfARealInAnInterfaceProgramAndCheckerIsReported) {
       "r[0]", kBitSelect));
 }
 
-TEST(RealDataType,
-     DISABLED_SelectOfARealInAClassPackageOrUnitFunctionIsReported) {
+TEST(RealDataType, SelectOfARealInAClassPackageOrUnitFunctionIsReported) {
   EXPECT_TRUE(RealUseReported(
       "class C;\n  real r;\n  function logic f();\n    return r[0];\n"
       "  endfunction\nendclass\nmodule t;\nendmodule\n",
@@ -474,8 +502,7 @@ TEST(RealDataType, EverySelectFormOfARealIsReported) {
   }
 }
 
-TEST(RealDataType,
-     DISABLED_SelectOfARealFormalMemberPropertyOrPackageVarIsReported) {
+TEST(RealDataType, SelectOfARealFormalMemberPropertyOrPackageVarIsReported) {
   const char* const kUses[] = {
       "y = a[0];",
       "y = st.m[0];",
@@ -494,6 +521,51 @@ TEST(RealDataType, ElementOfARealArrayAndWholeRealOperandsAreAccepted) {
                    "k::pr > 0.0;")));
 }
 
+std::string RealNames(std::string_view use) {
+  return std::string(
+             "real ur;\npackage k;\n  real ir;\nendpackage\nmodule s;\n"
+             "  real r;\nendmodule\nclass G;\n  static real sp;\nendclass\n"
+             "module t;\n  import k::ir;\n  struct { real m; } is;\n"
+             "  typedef real RA[2];\n  RA ta;\n  typedef struct { RA m; } T;\n"
+             "  T tt;\n  s u();\n  logic y;\n  initial begin\n    ")
+      .append(use)
+      .append("\n  end\nendmodule\n");
+}
+
+TEST(RealDataType, EdgeOfARealReachedThroughEveryNameIsReported) {
+  const char* const kUses[] = {
+      "@(posedge is.m);",    "@(negedge u.r);",   "@(edge $unit::ur);",
+      "@(posedge ir);",      "@(negedge G::sp);", "@(edge ta[0]);",
+      "@(posedge tt.m[1]);",
+  };
+  for (const char* use : kUses) {
+    SCOPED_TRACE(use);
+    EXPECT_TRUE(RealUseReported(RealNames(use), use, kEdge));
+  }
+}
+
+TEST(RealDataType, AnyChangeOfARealReachedThroughEveryNameIsAccepted) {
+  EXPECT_TRUE(ElabOk(RealNames(
+      "@(is.m or u.r or $unit::ur or ir or G::sp or ta[0] or tt.m[1]);")));
+}
+
+TEST(RealDataType, SelectOfARealReachedThroughEveryNameIsReported) {
+  const char* const kUses[] = {
+      "y = is.m[0];",  "y = u.r[0];",   "y = $unit::ur[0];", "y = ir[0];",
+      "y = G::sp[0];", "y = ta[0][0];", "y = tt.m[1][0];",
+  };
+  for (const char* use : kUses) {
+    SCOPED_TRACE(use);
+    EXPECT_TRUE(RealUseReported(RealNames(use), use, kBitSelect));
+  }
+}
+
+TEST(RealDataType, ARealReachedThroughEveryNameIsAcceptedWhole) {
+  EXPECT_TRUE(ElabOk(
+      RealNames("y = ta[0] > 0.0 || tt.m[1] > 0.0 || is.m > 0.0 || "
+                "u.r > 0.0 || $unit::ur > 0.0 || ir > 0.0 || G::sp > 0.0;")));
+}
+
 TEST(RealDataType, RealIndexInAProgramAndCheckerIsReported) {
   EXPECT_TRUE(RealUseReported(
       "program p;\n  real r;\n  logic [3:0] v;\n  logic y;\n"
@@ -506,7 +578,7 @@ TEST(RealDataType, RealIndexInAProgramAndCheckerIsReported) {
       "v[r]", kIndex));
 }
 
-TEST(RealDataType, DISABLED_RealIndexInAClassPackageOrUnitFunctionIsReported) {
+TEST(RealDataType, RealIndexInAClassPackageOrUnitFunctionIsReported) {
   EXPECT_TRUE(RealUseReported(
       "class C;\n  real r;\n  logic [3:0] v;\n  function logic f();\n"
       "    return v[r];\n  endfunction\nendclass\nmodule t;\nendmodule\n",
@@ -553,8 +625,7 @@ TEST(RealDataType, RealIndexOfEveryRealTypeReadOrAssignedIsReported) {
                            "initial v[r+:2] = 0;"});
 }
 
-TEST(RealDataType,
-     DISABLED_RealLiteralRealExpressionAndRealRangeIndexAreReported) {
+TEST(RealDataType, RealLiteralRealExpressionAndRealRangeIndexAreReported) {
   ExpectIndexUsesReported({"initial y = v[1.5];", "initial y = v[r * 2];",
                            "initial y = v[2.0:1];"});
 }
@@ -564,6 +635,31 @@ TEST(RealDataType, ConvertedRealIndexFormsAreAccepted) {
       IndexUse("initial begin\n    y = v[int'(1.5)];\n    y = v[int'(q)];\n"
                "    y = v[$rtoi(r * 2)];\n    v[int'(r)] = 1;\n"
                "    v[int'(r)+:2] = 0;\n    y = v[int'(s)];\n  end")));
+}
+
+TEST(RealDataType, EveryRealValuedIndexExpressionIsReported) {
+  ExpectIndexUsesReported({
+      "initial y = v[-r];",
+      "initial y = v[y ? r : 1];",
+      "initial y = v[real'(y)];",
+      "initial y = v[shortreal'(1)];",
+      "initial y = v[$itor(1)];",
+      "initial y = v[$realtime];",
+      "initial y = v[1ns];",
+      "parameter real P = 1.5; initial y = v[P];",
+      "function real g(); return 1.5; endfunction initial y = v[g()];",
+      "initial y = v[1:r];",
+  });
+}
+
+TEST(RealDataType, EveryIntegralIndexExpressionIsAccepted) {
+  EXPECT_TRUE(
+      ElabOk(IndexUse("parameter int P = 1;\n  function int g(); return 1; "
+                      "endfunction\n  initial begin\n    y = v[~y];\n"
+                      "    y = v[y ? 1 : 0];\n    y = v[int'(r)];\n"
+                      "    y = v[$rtoi(1.5)];\n    y = v[$time];\n"
+                      "    y = v[P];\n    y = v[g()];\n    y = v[1:0];\n"
+                      "  end")));
 }
 
 TEST(RealDataType, DISABLED_ARealtimeArrayAssignsToARealArrayAndBack) {

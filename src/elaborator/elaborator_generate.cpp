@@ -41,7 +41,6 @@ void ElaboratorData::SwapModuleScopeNames(ModuleScopeNames& names) {
   std::swap(var_types_, names.var_types);
   std::swap(class_var_types_, names.class_var_types);
   std::swap(scalar_var_names_, names.scalar_vars);
-  std::swap(real_var_names_, names.real_vars);
   std::swap(real_param_names_, names.real_params);
   std::swap(var_select_shapes_, names.select_shapes);
   std::swap(class_var_names_, names.class_vars);
@@ -322,7 +321,6 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   ShadowedEntries class_var_types(class_var_types_, kDataNames);
   ShadowedEntries class_vars(class_var_names_, kDataNames);
   ShadowedEntries scalar_vars(scalar_var_names_, kDataNames);
-  ShadowedEntries real_vars(real_var_names_, kDataNames);
   ShadowedEntries real_params(real_param_names_, kDataNames);
   ShadowedEntries select_shapes(var_select_shapes_, kDataNames);
   for (auto* item : items) {
@@ -359,7 +357,7 @@ void Elaborator::ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
   mod->default_disable_iff = enclosing_default_disable_iff;
   gen_const_scope_ = saved_gen_const_scope;
   RestoreShadowedEntries(var_types, class_var_types, class_vars, scalar_vars,
-                         real_vars, real_params, select_shapes);
+                         real_params, select_shapes);
 }
 
 void Elaborator::ResetPendingElaboration() {

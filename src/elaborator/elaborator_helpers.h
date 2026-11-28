@@ -243,8 +243,6 @@ bool IsRealType(DataTypeKind k);
 
 struct VarSelectShape {
   size_t addressable_dims = 0;
-  bool element_is_real = false;
-  bool element_is_scalar = false;
 };
 
 RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,

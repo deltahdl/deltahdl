@@ -192,7 +192,6 @@ void Elaborator::ResetItemElaborationState() {
   interconnect_names_.clear();
   declared_interconnects_.clear();
   scalar_var_names_.clear();
-  real_var_names_.clear();
   real_param_names_.clear();
   var_select_shapes_.clear();
   var_named_types_.clear();
@@ -244,7 +243,6 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::interconnect_names_) interconnect_names;
   decltype(Elaborator::declared_interconnects_) declared_interconnects;
   decltype(Elaborator::scalar_var_names_) scalar_var_names;
-  decltype(Elaborator::real_var_names_) real_var_names;
   decltype(Elaborator::real_param_names_) real_param_names;
   decltype(Elaborator::var_select_shapes_) var_select_shapes;
   decltype(Elaborator::var_named_types_) var_named_types;
@@ -309,7 +307,6 @@ struct ItemElaborationStateSaver {
     interconnect_names = std::move(e.interconnect_names_);
     declared_interconnects = std::move(e.declared_interconnects_);
     scalar_var_names = std::move(e.scalar_var_names_);
-    real_var_names = std::move(e.real_var_names_);
     real_param_names = std::move(e.real_param_names_);
     var_select_shapes = std::move(e.var_select_shapes_);
     var_named_types = std::move(e.var_named_types_);
@@ -383,7 +380,6 @@ struct ItemElaborationStateSaver {
     e.interconnect_names_ = std::move(interconnect_names);
     e.declared_interconnects_ = std::move(declared_interconnects);
     e.scalar_var_names_ = std::move(scalar_var_names);
-    e.real_var_names_ = std::move(real_var_names);
     e.real_param_names_ = std::move(real_param_names);
     e.var_select_shapes_ = std::move(var_select_shapes);
     e.var_named_types_ = std::move(var_named_types);
@@ -566,7 +562,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                               std::move(var_types_),
                               std::move(class_var_types_),
                               std::move(scalar_var_names_),
-                              std::move(real_var_names_),
                               std::move(real_param_names_),
                               std::move(var_select_shapes_),
                               std::move(class_var_names_),

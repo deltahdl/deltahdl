@@ -23,7 +23,6 @@ struct ModuleScopeNames {
   std::unordered_map<std::string_view, DataTypeKind> var_types;
   std::unordered_map<std::string_view, std::string_view> class_var_types;
   std::unordered_set<std::string_view> scalar_vars;
-  std::unordered_set<std::string_view> real_vars;
   std::unordered_set<std::string_view> real_params;
   std::unordered_map<std::string_view, VarSelectShape> select_shapes;
   std::unordered_set<std::string_view> class_vars;

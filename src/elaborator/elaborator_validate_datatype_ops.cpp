@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -13,67 +12,79 @@
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/real_use_rules.h"
+#include "elaborator/rtlir.h"
 #include "elaborator/sensitivity.h"
 #include "elaborator/type_eval.h"
 #include "elaborator/virtual_interface_modports.h"
 #include "lexer/token.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
-template <typename IsReal>
-static bool HasEdgeOnReal(const std::vector<EventExpr>& events,
-                          IsReal&& is_real) {
-  for (const auto& ev : events) {
-    if (ev.edge == Edge::kNone) continue;
-    auto name = ExprIdent(ev.signal);
-    if (!name.empty() && is_real(name)) return true;
-  }
-  return false;
+void Elaborator::ValidateRealUses(const ModuleItem* item,
+                                  const RtlirModule& mod) {
+  static const std::vector<ModuleItem*> kNoItems;
+  const ModuleDecl* decl =
+      module_decl_path_.empty() ? nullptr : module_decl_path_.back();
+  RealUseScope scope{unit_,
+                     typedefs_,
+                     td_array_dims_,
+                     decl == nullptr ? kNoItems : decl->items,
+                     mod.class_decls,
+                     nullptr,
+                     diag_};
+  scope.outer = [this, &scope](std::string_view name) {
+    return ModuleRealTyped(name, scope);
+  };
+  ReportRealUsesInItem(item, scope);
 }
 
-template <typename IsModuleReal>
-static void ReportEdgeOnRealInStmt(const Stmt* s,
-                                   std::vector<std::string_view>& locals,
-                                   IsModuleReal&& is_module_real,
-                                   DiagEngine& diag) {
-  if (s == nullptr) return;
-  if (s->kind == StmtKind::kVarDecl) {
-    if (IsRealType(s->var_decl_type.kind) && s->var_unpacked_dims.empty())
-      locals.push_back(s->var_name);
-    return;
+RealTyped Elaborator::ModuleRealTyped(std::string_view name,
+                                      const RealUseScope& scope) const {
+  RealTyped typed;
+  if (real_param_names_.contains(name)) {
+    typed.found = true;
+    typed.kind = DataTypeKind::kReal;
+    typed.is_param = true;
+    return typed;
   }
-  auto is_real = [&](std::string_view name) {
-    return std::find(locals.begin(), locals.end(), name) != locals.end() ||
-           is_module_real(name);
-  };
-  if (HasEdgeOnReal(s->events, is_real)) {
-    diag.Error(s->range.start, "edge event on real type is illegal",
-               Subclause("6.12"));
+  auto var = var_types_.find(name);
+  if (var == var_types_.end() || var->second == DataTypeKind::kStruct ||
+      var->second == DataTypeKind::kUnion) {
+    return typed;
   }
-  const size_t kOuter = locals.size();
-  ForEachChildStmt(s, [&](Stmt* const& sub) {
-    ReportEdgeOnRealInStmt(sub, locals, is_module_real, diag);
-  });
-  locals.resize(kOuter);
+  auto array = var_array_info_.find(name);
+  const size_t kUnpacked =
+      array == var_array_info_.end() ? 0 : array->second.num_unpacked_dims;
+  auto named = var_named_types_.find(name);
+  if (named == var_named_types_.end()) {
+    typed.found = true;
+    typed.kind = var->second;
+    typed.unpacked = kUnpacked;
+    return typed;
+  }
+  DataType written;
+  written.kind = DataTypeKind::kNamed;
+  written.type_name = named->second;
+  return RealTypedOfDecl(written, kUnpacked, scope);
 }
 
-void Elaborator::ValidateEdgeOnReal(const ModuleItem* item) {
-  auto is_module_real = [this](std::string_view name) {
-    auto it = var_types_.find(name);
-    return it != var_types_.end() && IsRealType(it->second);
-  };
-  if (IsProceduralItemKind(item->kind) &&
-      HasEdgeOnReal(item->sensitivity, is_module_real)) {
-    diag_.Error(item->loc, "edge event on real type is illegal",
-                Subclause("6.12"));
-  }
-  std::vector<std::string_view> locals;
-  ReportEdgeOnRealInStmt(item->body, locals, is_module_real, diag_);
-  for (const auto* s : item->func_body_stmts)
-    ReportEdgeOnRealInStmt(s, locals, is_module_real, diag_);
+void Elaborator::CheckRealUsesIn(const std::vector<ModuleItem*>& items) {
+  const RealUseScope kScope{unit_,          typedefs_, td_array_dims_, items,
+                            unit_->classes, nullptr,   diag_};
+  ReportRealUsesInItems(items, kScope);
+}
+
+void Elaborator::CheckRealUsesInClass(const ClassDecl* cls) {
+  const RealUseScope kScope{
+      unit_,          typedefs_, td_array_dims_, unit_->cu_items,
+      unit_->classes, nullptr,   diag_};
+  ReportRealUsesInClass(cls, kScope);
 }
 
 static bool IsChandleVar(const Expr* e, const TypeMap& types) {
