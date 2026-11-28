@@ -37,7 +37,7 @@ TEST(UserDefinedTypeElaboration, TypedefNamesAnExistingTypeInEveryScope) {
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_ForwardTypedefDefinedAsItselfIsReportedOnceAtTheDefinition) {
+     ForwardTypedefDefinedAsItselfIsReportedOnceAtTheDefinition) {
   ExpectReportedOnceIn(kDeclarationScopes,
                        "  typedef A;\n"
                        "  typedef A A;\n"
@@ -47,7 +47,7 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_ForwardTypedefDefinedThroughATwoStepCycleIsReported) {
+     ForwardTypedefDefinedThroughATwoStepCycleIsReported) {
   ExpectReportedIn(kDeclarationScopes,
                    "  typedef A;\n"
                    "  typedef A B;\n"
@@ -58,7 +58,7 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_ForwardTypedefDefinedThroughAThreeStepCycleIsReported) {
+     ForwardTypedefDefinedThroughAThreeStepCycleIsReported) {
   ExpectReportedIn(kDeclarationScopes,
                    "  typedef A;\n"
                    "  typedef A B;\n"
@@ -70,7 +70,19 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_EachForwardFormDefinedThroughACycleIsReported) {
+     TypedefNamingAMemberOfACycleIsReportedOnceAtTheCycle) {
+  ExpectReportedOnceIn(kDeclarationScopes,
+                       "  typedef A;\n"
+                       "  typedef A B;\n"
+                       "  typedef B A;\n"
+                       "  typedef B D;\n"
+                       "  D v;\n",
+                       "typedef 'A' does not resolve to a data type",
+                       "typedef B A;", "6.18");
+}
+
+TEST(UserDefinedTypeElaboration,
+     EachForwardFormDefinedThroughACycleIsReported) {
   for (std::string_view form :
        {"class ", "struct ", "enum ", "union ", "interface class "}) {
     SCOPED_TRACE(form);
@@ -86,7 +98,7 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_PackageTypedefsNamingEachOtherThroughTheirPackageAreReported) {
+     PackageTypedefsNamingEachOtherThroughTheirPackageAreReported) {
   ElabFixture f;
   const std::string kSrc =
       "package p;\n"
@@ -104,7 +116,7 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration,
-     DISABLED_TypedefCycleInAClassNothingSpecializesIsReported) {
+     TypedefCycleInAClassNothingSpecializesIsReported) {
   ElabFixture f;
   const std::string kSrc =
       "class C;\n"

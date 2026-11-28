@@ -193,6 +193,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/cross_bin_rules.cpp
     elaborator/embedded_covergroup_rules.cpp
     elaborator/enum_base_typedefs.cpp
+    elaborator/typedef_cycles.cpp
     elaborator/covergroup_variables.cpp
     elaborator/checker_procedure_rules.cpp
     elaborator/checker_instance_assertion.cpp
