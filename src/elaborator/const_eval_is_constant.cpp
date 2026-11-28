@@ -114,7 +114,7 @@ static bool IsConstantMemberAccessExpr(const Expr* expr,
   auto builtin = BuiltinMethodCallIsConstant(expr, scope);
   if (builtin.value_or(false)) return true;
   if (expr->lhs->has_param_spec &&
-      !AllElementsConstant(expr->lhs->elements, scope))
+      !SpecializationValueArgsConstant(expr, scope))
     return false;
   if (!builtin && !expr->is_scope_resolution &&
       IsConstantExpr(expr->lhs, scope))

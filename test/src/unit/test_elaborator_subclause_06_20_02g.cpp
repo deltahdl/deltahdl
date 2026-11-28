@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "common/diagnostic.h"
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
@@ -19,6 +20,9 @@ constexpr std::string_view kDeclarations =
     "endpackage\n"
     "class K;\n"
     "  static int n = 1;\n"
+    "  localparam int q = 5;\n"
+    "endclass\n"
+    "class Y #(type U = int, int W = 1);\n"
     "endclass\n"
     "module m #(int P = 0);\n"
     "endmodule\n"
@@ -101,37 +105,47 @@ void ExpectReportedAtTheInstance(const std::string& src,
                             LineHolding(src, "probe("), "6.20.2"));
 }
 
-TEST(InstanceOverrideOperands, ForbiddenOperandInAnInstanceOverrideIsReported) {
-  for (const Host& host : kHosts) {
-    for (std::string_view target : host.targets) {
-      const std::string kMessage = std::format(
-          "override of parameter 'P' of '{}' is not a constant expression",
-          target);
-      for (std::string_view value :
-           {"v", "w", "top.lp", "K::n", "T::n", "pk::pv", "nf()"}) {
-        for (const std::string& instance :
-             {NamedInstance(target, value), OrderedInstance(target, value)}) {
-          SCOPED_TRACE(std::format("{}: {}", host.name, instance));
-          ExpectReportedAtTheInstance(HostDesign(host, instance), kMessage);
-        }
-      }
+template <typename Check>
+void ForEachWrittenForm(std::string_view target,
+                        std::initializer_list<std::string_view> values,
+                        const Check& check) {
+  for (std::string_view value : values) {
+    for (const std::string& instance :
+         {NamedInstance(target, value), OrderedInstance(target, value)}) {
+      check(instance);
     }
   }
 }
 
-TEST(InstanceOverrideOperands, AllowedOperandInAnInstanceOverrideIsAccepted) {
+template <typename Check>
+void ForEachHostedInstance(std::initializer_list<std::string_view> values,
+                           const Check& check) {
   for (const Host& host : kHosts) {
     for (std::string_view target : host.targets) {
-      for (std::string_view value :
-           {"lp", "pk::pp", "E1", "cf()", "cf() + 1", "$bits(v)"}) {
-        for (const std::string& instance :
-             {NamedInstance(target, value), OrderedInstance(target, value)}) {
-          SCOPED_TRACE(std::format("{}: {}", host.name, instance));
-          ExpectClean(HostDesign(host, instance));
-        }
-      }
+      ForEachWrittenForm(target, values, [&](const std::string& instance) {
+        SCOPED_TRACE(std::format("{}: {}", host.name, instance));
+        check(target, HostDesign(host, instance));
+      });
     }
   }
+}
+
+TEST(InstanceOverrideOperands, ForbiddenOperandInAnInstanceOverrideIsReported) {
+  ForEachHostedInstance(
+      {"v", "w", "top.lp", "K::n", "T::n", "pk::pv", "nf()", "Y#(byte, v)::W"},
+      [](std::string_view target, const std::string& src) {
+        ExpectReportedAtTheInstance(
+            src, std::format("override of parameter 'P' of '{}' is not a "
+                             "constant expression",
+                             target));
+      });
+}
+
+TEST(InstanceOverrideOperands, AllowedOperandInAnInstanceOverrideIsAccepted) {
+  ForEachHostedInstance(
+      {"lp", "pk::pp", "E1", "cf()", "cf() + 1", "$bits(v)", "K::q", "T::q",
+       "Y#(byte, 2)::W", "Y#(.U(byte), .W(2))::W"},
+      [](std::string_view, const std::string& src) { ExpectClean(src); });
 }
 
 TEST(InstanceOverrideOperands, GenvarInAnInstanceOverrideIsAccepted) {
@@ -151,25 +165,23 @@ TEST(InstanceOverrideOperands, GenvarInAnInstanceOverrideIsAccepted) {
 }
 
 constexpr std::initializer_list<std::string_view> kDataTypes = {
-    "int", "e_t", "K", "T", "enum {A}", "struct packed { bit a; }"};
+    "int",
+    "logic [7:0]",
+    "e_t",
+    "K",
+    "T",
+    "enum {A}",
+    "struct packed { bit a; }"};
 
 TEST(InstanceOverrideOperands,
      DataTypeGivenToAValueParameterInAnInstanceOverrideIsReported) {
-  for (const Host& host : kHosts) {
-    for (std::string_view target : host.targets) {
-      const std::string kMessage = std::format(
-          "override of value parameter 'P' of '{}' is a data type, not an "
-          "expression",
-          target);
-      for (std::string_view type : kDataTypes) {
-        for (const std::string& instance :
-             {NamedInstance(target, type), OrderedInstance(target, type)}) {
-          SCOPED_TRACE(std::format("{}: {}", host.name, instance));
-          ExpectReportedAtTheInstance(HostDesign(host, instance), kMessage);
-        }
-      }
-    }
-  }
+  ForEachHostedInstance(
+      kDataTypes, [](std::string_view target, const std::string& src) {
+        ExpectReportedAtTheInstance(
+            src, std::format("override of value parameter 'P' of '{}' is a "
+                             "data type, not an expression",
+                             target));
+      });
 }
 
 TEST(InstanceOverrideOperands,

@@ -11,9 +11,11 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "elaborator/rtlir.h"
+#include "elaborator/type_eval.h"
 #include "parser/ast_class.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
+#include "parser/ast_type.h"
 
 namespace delta {
 
@@ -28,10 +30,25 @@ static bool IsTypeParamOf(const ModuleDecl& decl, std::string_view name) {
 bool Elaborator::NamesADataType(const Expr* value,
                                 const RtlirModule* mod) const {
   if (value->kind == ExprKind::kTypeRef) return true;
+  while (value->kind == ExprKind::kSelect && value->base != nullptr)
+    value = value->base;
   if (value->kind != ExprKind::kIdentifier) return false;
-  return typedefs_.contains(value->text) ||
+  return IsTypeKeyword(value->text) || typedefs_.contains(value->text) ||
          class_names_.contains(value->text) ||
          (mod->decl != nullptr && IsTypeParamOf(*mod->decl, value->text));
+}
+
+const ClassDecl* Elaborator::ScopePrefixClass(std::string_view name) const {
+  const ClassDecl* cls = FindClassDecl(name, unit_);
+  auto bound = typedefs_.find(name);
+  for (int depth = 0; cls == nullptr && bound != typedefs_.end() &&
+                      bound->second.kind == DataTypeKind::kNamed && depth < 32;
+       ++depth) {
+    name = bound->second.type_name;
+    cls = FindClassDecl(name, unit_);
+    bound = typedefs_.find(name);
+  }
+  return cls;
 }
 
 bool Elaborator::ScopedReadIsParameter(const Expr* access) const {
@@ -47,7 +64,7 @@ bool Elaborator::ScopedReadIsParameter(const Expr* access) const {
       return item->kind == ModuleItemKind::kParamDecl && item->name == kName;
     });
   }
-  const ClassDecl* cls = FindClassDecl(kScope, unit_);
+  const ClassDecl* cls = ScopePrefixClass(kScope);
   return cls != nullptr && ClassParamNames(cls).count(kName) != 0;
 }
 
@@ -61,6 +78,21 @@ void Elaborator::AddScopedParameterReads(const Expr* e,
   }
   ForEachExprChild(
       e, [&](const Expr* child) { AddScopedParameterReads(child, constants); });
+}
+
+bool Elaborator::CallsAFunctionNotConstantHere(const Expr* e,
+                                               const ScopeMap& constants) {
+  if (e == nullptr) return false;
+  const auto* funcs = RegisteredConstFuncs();
+  if (e->kind == ExprKind::kCall && funcs != nullptr) {
+    auto it = funcs->find(e->callee);
+    if (it != funcs->end() &&
+        (it->second == nullptr || !IsConstantFunction(it->second, constants)))
+      return true;
+  }
+  return AnyExprChild(e, [&](const Expr* child) {
+    return CallsAFunctionNotConstantHere(child, constants);
+  });
 }
 
 void Elaborator::ReportOverrideOperands(const ParamList& child_params,
@@ -81,7 +113,7 @@ void Elaborator::ReportOverrideOperands(const ParamList& child_params,
     ScopeMap constants = parent_scope;
     AddScopedParameterReads(value, constants);
     if (IsConstantExpr(value, constants) &&
-        !CallsNonConstantFunction(value, constants)) {
+        !CallsAFunctionNotConstantHere(value, constants)) {
       continue;
     }
     diag_.Error(value->range.start,

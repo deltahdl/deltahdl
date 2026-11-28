@@ -232,6 +232,8 @@ SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
 
 bool NamesSpecializedClassParam(const Expr* expr);
 
+bool SpecializationValueArgsConstant(const Expr* expr, const ScopeMap& scope);
+
 std::optional<double> ConstEvalSpecializedClassParamReal(const Expr* expr,
                                                          const ScopeMap& scope);
 

@@ -205,6 +205,23 @@ SpecializationArg ConstEvalSpecializedClassParam(const Expr* expr,
   return target ? target->arg : SpecializationArg{};
 }
 
+static bool BindsTypeParam(const Expr& base, const ClassDecl& decl, size_t j) {
+  std::string_view name =
+      j < base.arg_names.size() ? base.arg_names[j] : std::string_view{};
+  if (name.empty() && j < decl.params.size()) name = decl.params[j].first;
+  return decl.type_param_names.count(name) != 0;
+}
+
+bool SpecializationValueArgsConstant(const Expr* expr, const ScopeMap& scope) {
+  const ClassDecl* decl = SpecializedParamClass(expr);
+  const auto& elems = expr->lhs->elements;
+  for (size_t j = 0; j < elems.size(); ++j) {
+    if (decl != nullptr && BindsTypeParam(*expr->lhs, *decl, j)) continue;
+    if (!IsConstantExpr(elems[j], scope)) return false;
+  }
+  return true;
+}
+
 bool NamesSpecializedClassParam(const Expr* expr) {
   return SpecializedParamClass(expr) != nullptr;
 }

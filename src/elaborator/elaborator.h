@@ -387,9 +387,13 @@ class Elaborator : public ElaboratorClassRules {
 
   bool NamesADataType(const Expr* value, const RtlirModule* mod) const;
 
+  const ClassDecl* ScopePrefixClass(std::string_view name) const;
+
   bool ScopedReadIsParameter(const Expr* access) const;
 
   void AddScopedParameterReads(const Expr* e, ScopeMap& constants) const;
+
+  bool CallsAFunctionNotConstantHere(const Expr* e, const ScopeMap& constants);
 
   void ReportOverrideOperands(const ParamList& child_params,
                               const ModuleDecl& child_decl,
