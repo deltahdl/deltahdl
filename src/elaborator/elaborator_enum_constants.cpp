@@ -24,12 +24,6 @@ namespace {
 
 constexpr size_t kScratchBlockSize = 256;
 
-bool LiteralHasXZ(std::string_view txt) {
-  auto apos = txt.find('\'');
-  if (apos == std::string_view::npos) return false;
-  return txt.substr(apos + 1).find_first_of("xXzZ") != std::string_view::npos;
-}
-
 struct EnumMemberFolder {
   const ScopeMap& scope;
   Arena& arena;
@@ -123,6 +117,12 @@ std::unordered_set<std::string> NamesDeclaredBefore(const PackageDecl* pkg,
 }
 
 }  // namespace
+
+bool LiteralHasXZ(std::string_view txt) {
+  auto apos = txt.find('\'');
+  if (apos == std::string_view::npos) return false;
+  return txt.substr(apos + 1).find_first_of("xXzZ") != std::string_view::npos;
+}
 
 bool ExprContainsXZ(const Expr* e) {
   if (!e) return false;

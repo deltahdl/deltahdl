@@ -10,7 +10,7 @@
 #include "common/source_loc.h"
 #include "elaborator/assertion_walk.h"
 #include "elaborator/const_eval.h"
-#include "elaborator/elaborator_enum_constants.h"
+#include "elaborator/constant_xz_bits.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_validate_internal.h"
 #include "parser/ast_class.h"
@@ -108,7 +108,7 @@ void ReportPackedBounds(const DataType& dtype, SourceLoc loc,
   for (const auto& [left, right] : pairs) {
     for (const Expr* bound : {left, right}) {
       if (bound == nullptr) continue;
-      has_xz = has_xz || ExprContainsXZ(bound);
+      has_xz = has_xz || ValueReachesXZ(bound, names.names_xz_constant);
       non_constant = non_constant || BoundIsNoConstantInteger(bound, names);
     }
   }
@@ -144,7 +144,8 @@ void ReportPackedBoundsOfItem(const ModuleItem& item, bool with_declarations,
 }
 
 void ReportPackedBoundsInScope(const std::vector<ModuleItem*>& items,
-                               const CompilationUnit* unit, DiagEngine& diag) {
+                               const CompilationUnit* unit,
+                               const TypedefMap& typedefs, DiagEngine& diag) {
   std::unordered_set<std::string_view> variables;
   RealParamKinds real_params;
   for (const ModuleItem* item : items) {
@@ -159,14 +160,19 @@ void ReportPackedBoundsInScope(const std::vector<ModuleItem*>& items,
                                   }
                                   return NamesPackageVariable(e, unit);
                                 },
-                                [](const Expr*) { return false; }, real_params};
+                                [](const Expr*) { return false; }, real_params,
+                                [&](const Expr* e) {
+                                  return ScopeConstantHoldsXZ(e, items,
+                                                              {unit, typedefs});
+                                }};
   for (const ModuleItem* item : items) {
     ReportPackedBoundsOfItem(*item, true, kNames, diag);
   }
 }
 
 void ReportPackedBoundsInClass(const ClassDecl& cls,
-                               const CompilationUnit* unit, DiagEngine& diag) {
+                               const CompilationUnit* unit,
+                               const TypedefMap& typedefs, DiagEngine& diag) {
   std::unordered_set<std::string_view> properties;
   for (const ClassMember* member : cls.members) {
     if (member->kind == ClassMemberKind::kProperty && !member->is_param &&
@@ -175,14 +181,17 @@ void ReportPackedBoundsInClass(const ClassDecl& cls,
     }
   }
   const RealParamKinds kNoRealParams;
-  const PackedBoundNames kNames{[&](const Expr* e) {
-                                  if (e->kind == ExprKind::kIdentifier) {
-                                    return properties.contains(e->text);
-                                  }
-                                  return NamesPackageVariable(e, unit);
-                                },
-                                [](const Expr*) { return false; },
-                                kNoRealParams};
+  const PackedBoundNames kNames{
+      [&](const Expr* e) {
+        if (e->kind == ExprKind::kIdentifier) {
+          return properties.contains(e->text);
+        }
+        return NamesPackageVariable(e, unit);
+      },
+      [](const Expr*) { return false; }, kNoRealParams,
+      [&](const Expr* e) {
+        return ClassConstantHoldsXZ(e, cls, {unit, typedefs});
+      }};
   for (const ClassMember* member : cls.members) {
     if (member->kind == ClassMemberKind::kProperty && !member->is_param) {
       ReportPackedBounds(member->data_type, member->loc, kNames, diag);

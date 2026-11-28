@@ -16,6 +16,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/constant_xz_bits.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_internal.h"
@@ -355,6 +356,9 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
     ResolveParamConstValue(pd, item, kIsType, kScope, arena_);
     RecordUntypedRealParam(pd, item, real_param_names_);
   }
+  pd.value_has_xz = ParamValueHoldsXZ(
+      pd, &item->data_type, *mod, {gen_prefix_scopes_, RegisteredGenPrefixes()},
+      {unit_, typedefs_});
   mod->params.push_back(pd);
 
   const_names_.insert(item->name);

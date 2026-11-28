@@ -222,7 +222,7 @@ TEST(VectorSpecification, XOrZInRangeIsErrorInEveryPlace) {
   }
 }
 
-TEST(VectorSpecification, DISABLED_XOrZFromAParameterInRangeIsError) {
+TEST(VectorSpecification, XOrZFromAParameterInRangeIsError) {
   ElabFixture f;
   Elaborate(
       "module m;\n"
@@ -230,10 +230,147 @@ TEST(VectorSpecification, DISABLED_XOrZFromAParameterInRangeIsError) {
       "  localparam Z = 1'bz;\n"
       "  logic [P:0] a;\n"
       "  logic [3:Z] b;\n"
+      "  parameter bit [3:0] B = 4'bx;\n"
+      "  typedef bit [3:0] nib_t;\n"
+      "  localparam nib_t N = 4'bz;\n"
+      "  parameter K = 4'b0011;\n"
+      "  logic [B:0] c;\n"
+      "  logic [N:0] d;\n"
+      "  logic [K:0] e;\n"
       "endmodule\n",
       f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, 4, "7.4.1"));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, 5, "7.4.1"));
+  for (uint32_t line : {10U, 11U, 12U}) {
+    EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), line)) << line;
+  }
+}
+
+TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
+  ElabFixture f;
+  Elaborate(
+      "parameter CU = 1'bx;\n"
+      "logic [CU:0] cu;\n"
+      "package p;\n"
+      "  parameter PP = 2'bx1;\n"
+      "  logic [PP:0] a;\n"
+      "endpackage\n"
+      "class C #(parameter CP = 1'bz);\n"
+      "  localparam CL = 1'bx;\n"
+      "  logic [CP:0] a;\n"
+      "  logic [CL:0] b;\n"
+      "endclass\n"
+      "class D;\n"
+      "  localparam DL = 1'bx;\n"
+      "endclass\n"
+      "interface i;\n"
+      "  localparam L = 'x;\n"
+      "  logic [L:0] a;\n"
+      "endinterface\n"
+      "program q;\n"
+      "  localparam L = 'z;\n"
+      "  logic [L:0] a;\n"
+      "endprogram\n"
+      "module m #(parameter H = 1'bx)\n"
+      "    (input logic [H:0] pa);\n"
+      "  import p::*;\n"
+      "  localparam Q = H + 1;\n"
+      "  wire [Q:0] w;\n"
+      "  logic [3:0] u [Q:0];\n"
+      "  typedef logic [p::PP:0] T;\n"
+      "  struct packed { logic [H:0] f; } s;\n"
+      "  function logic [H:0] fn();\n"
+      "  endfunction\n"
+      "  initial begin\n"
+      "    logic [H:0] v;\n"
+      "  end\n"
+      "  if (1) begin : g\n"
+      "    localparam G = 1'bz;\n"
+      "    logic [G:0] b;\n"
+      "  end\n"
+      "  logic [PP:0] k;\n"
+      "  logic [$unit::CU:0] n;\n"
+      "  logic [D::DL:0] r;\n"
+      "  i ii();\n"
+      "  q qq();\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2U, 5U, 9U, 10U, 17U, 21U, 24U, 27U, 29U, 30U, 31U, 34U,
+                        38U, 40U, 41U, 42U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, line, "7.4.1"))
+        << line;
+  }
+  EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                            "unpacked dimension range shall not contain x or z",
+                            28, "7.4.2"));
+}
+
+TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
+  ElabFixture f;
+  Elaborate(
+      "parameter CU = 1'b1;\n"
+      "logic [CU:0] cu;\n"
+      "package p;\n"
+      "  parameter PP = 2'b01;\n"
+      "  parameter bit PB = 1'bx;\n"
+      "  logic [PP:0] a;\n"
+      "  logic [PB:0] b;\n"
+      "endpackage\n"
+      "class C #(parameter CP = 1'b1);\n"
+      "  localparam int CL = 1'bx;\n"
+      "  logic [CP:0] a;\n"
+      "  logic [CL:0] b;\n"
+      "endclass\n"
+      "class D;\n"
+      "  localparam int DL = 'x;\n"
+      "endclass\n"
+      "module m #(parameter H = 1'b1, parameter bit HB = 1'bz)\n"
+      "    (input logic [H:0] pa);\n"
+      "  import p::*;\n"
+      "  localparam Q = H + HB;\n"
+      "  wire [Q:0] w;\n"
+      "  logic [3:0] u [Q:0];\n"
+      "  if (1) begin : g\n"
+      "    localparam G = 1'b0;\n"
+      "    logic [G:0] b;\n"
+      "  end\n"
+      "  logic [PB:0] k;\n"
+      "  logic [p::PP:0] n;\n"
+      "  logic [D::DL:0] r;\n"
+      "endmodule\n",
+      f);
+  EXPECT_FALSE(f.has_errors);
+}
+
+TEST(VectorSpecification, XOrZFromAnOverriddenParameterInRangeIsError) {
+  ElabFixture f;
+  Elaborate(
+      "module literal_override #(parameter P = 3);\n"
+      "  logic [P:0] a;\n"
+      "endmodule\n"
+      "module parent_override #(parameter P = 3);\n"
+      "  logic [P:0] a;\n"
+      "endmodule\n"
+      "module known_override #(parameter P = 1'bx);\n"
+      "  logic [P:0] a;\n"
+      "endmodule\n"
+      "module body_override;\n"
+      "  parameter P = 3;\n"
+      "  logic [P:0] a;\n"
+      "endmodule\n"
+      "module m;\n"
+      "  localparam X = 1'bz;\n"
+      "  literal_override #(4'bx) o();\n"
+      "  parent_override #(.P(X)) n();\n"
+      "  known_override #(.P(3)) k();\n"
+      "  body_override #(.P(2'bx0)) b();\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {2U, 5U, 12U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, line, "7.4.1"))
+        << line;
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 8));
 }
 
 TEST(VectorSpecification, NonConstantOrRealBoundIsError) {

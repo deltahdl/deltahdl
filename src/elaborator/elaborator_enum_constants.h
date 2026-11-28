@@ -33,6 +33,8 @@ const DataType* EnumDeclaringConstantOfClass(const ClassDecl& cls,
                                              std::string_view name,
                                              const ScopeMap& scope);
 
+bool LiteralHasXZ(std::string_view txt);
+
 bool ExprContainsXZ(const Expr* e);
 
 std::vector<RtlirEnumMember> FoldEnumMembers(

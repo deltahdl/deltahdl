@@ -807,11 +807,11 @@ void Elaborator::ValidatePackageItems() {
       }
     }
     ReportPackageSubroutineStaticInits(pkg, diag_);
-    ReportPackedBoundsInScope(pkg->items, unit_, diag_);
+    ReportPackedBoundsInScope(pkg->items, unit_, typedefs_, diag_);
   }
-  ReportPackedBoundsInScope(unit_->cu_items, unit_, diag_);
+  ReportPackedBoundsInScope(unit_->cu_items, unit_, typedefs_, diag_);
   for (const auto* cls : unit_->classes) {
-    ReportPackedBoundsInClass(*cls, unit_, diag_);
+    ReportPackedBoundsInClass(*cls, unit_, typedefs_, diag_);
   }
   ReportScopeNets(unit_->cu_items,
                   "a net declaration with an implicit continuous assignment "

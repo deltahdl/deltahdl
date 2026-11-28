@@ -612,6 +612,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     elaborator/chandle_events.cpp
     elaborator/local_variable_paths.cpp
     elaborator/packed_bound_rules.cpp
+    elaborator/constant_xz_bits.cpp
     elaborator/elaborator_process.cpp
     elaborator/elaborator_process_validate.cpp
     elaborator/elaborator_resolve.cpp

@@ -12,11 +12,11 @@
 #include "common/source_loc.h"
 #include "elaborator/aggregate_shape.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/constant_xz_bits.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_enum_constants.h"
 #include "elaborator/packed_bound_rules.h"
 #include "elaborator/type_eval.h"
-#include "lexer/token.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -396,19 +396,16 @@ void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc,
 }
 
 void Elaborator::ValidateUnpackedDimRange(const std::vector<Expr*>& dims,
-                                          SourceLoc loc) {
-  for (const auto* dim : dims) {
-    if (!dim) continue;
-    if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      if (ExprContainsXZ(dim->lhs) || ExprContainsXZ(dim->rhs)) {
+                                          SourceLoc loc,
+                                          const RtlirModule* mod) {
+  WithModuleBoundNames(mod, [&](const PackedBoundNames& names) {
+    for (const auto* dim : dims) {
+      if (ValueReachesXZ(dim, names.names_xz_constant)) {
         diag_.Error(loc, "unpacked dimension range shall not contain x or z",
                     Subclause("7.4.2"));
       }
-    } else if (ExprContainsXZ(dim)) {
-      diag_.Error(loc, "unpacked dimension range shall not contain x or z",
-                  Subclause("7.4.2"));
     }
-  }
+  });
 }
 
 static bool HasPredefinedWidthType(const DataType& dtype,

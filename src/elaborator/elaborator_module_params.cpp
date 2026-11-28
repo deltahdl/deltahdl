@@ -15,6 +15,7 @@
 #include "common/source_loc.h"
 #include "elaborator/const_eval.h"
 #include "elaborator/const_eval_internal.h"
+#include "elaborator/constant_xz_bits.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/dollar_contexts.h"
 #include "elaborator/dollar_parameter_values.h"
@@ -561,6 +562,9 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
     }
     CheckTypeParamValueAssignable(decl, i, pval, scope, tp_ctx);
     ResolvePackedStructParam(pd, param_type, pval, scope);
+    pd.value_has_xz = ParamValueHoldsXZ(
+        pd, param_type, *mod, {gen_prefix_scopes_, RegisteredGenPrefixes()},
+        {unit_, typedefs_});
     mod->params.push_back(pd);
   }
 }

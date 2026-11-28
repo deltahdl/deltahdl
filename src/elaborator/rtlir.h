@@ -263,6 +263,7 @@ struct RtlirParamDecl {
   const struct ParamDefaultMismatch* default_mismatch = nullptr;
   GenBlockConsts defparam_value_consts;
   bool value_is_shortreal = false;
+  bool value_has_xz = false;
 };
 
 struct RtlirPortBinding {

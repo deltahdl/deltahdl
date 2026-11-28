@@ -22,6 +22,7 @@
 #include "elaborator/class_base_resolution.h"
 #include "elaborator/class_default_specialization.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/constant_xz_bits.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator.h"
 #include "elaborator/elaborator_array_shape.h"
@@ -670,7 +671,11 @@ void Elaborator::WithModuleBoundNames(
       [&](const Expr* e) {
         return CallsNonConstantFunction(e, constants_of());
       },
-      real_params};
+      real_params,
+      [&](const Expr* e) {
+        return ModuleConstantHoldsXZ(e, *mod, gen_prefix_scopes_,
+                                     {unit_, typedefs_});
+      }};
   fn(kNames);
 }
 
@@ -764,7 +769,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   ElaborateUnpackedDims(
       item, td_array_dims_,
       {{typedefs_, class_names_}, BuildParamScope(mod), diag_, item->loc}, var);
-  ValidateUnpackedDimRange(item->unpacked_dims, item->loc);
+  ValidateUnpackedDimRange(item->unpacked_dims, item->loc, mod);
 
   TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 

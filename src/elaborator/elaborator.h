@@ -546,7 +546,8 @@ class Elaborator : public ElaboratorClassRules {
   void ValidatePackedDimRange(const DataType& dtype, SourceLoc loc,
                               const RtlirModule* mod);
 
-  void ValidateUnpackedDimRange(const std::vector<Expr*>& dims, SourceLoc loc);
+  void ValidateUnpackedDimRange(const std::vector<Expr*>& dims, SourceLoc loc,
+                                const RtlirModule* mod);
 
   void ValidatePackedDimOnPredefinedType(const DataType& dtype, SourceLoc loc);
 
