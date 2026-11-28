@@ -288,14 +288,18 @@ TEST(RealDataType, BitsOfARealVariableIsItsBinaryFormatsWidth) {
             "64 32 64 64 32 64\n");
 }
 
-TEST(RealDataType, DISABLED_BitsOfARealTypeKeywordIsItsBinaryFormatsWidth) {
+TEST(RealDataType, BitsOfARealTypeKeywordIsItsBinaryFormatsWidth) {
   SimFixture f;
-  EXPECT_EQ(RunCapture("module t;\n"
-                       "  initial $display(\"%0d %0d %0d\", $bits(real), "
-                       "$bits(shortreal), $bits(realtime));\n"
-                       "endmodule\n",
-                       f),
-            "64 32 64\n");
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  localparam int P = $bits(real), Q = $bits(shortreal),"
+                 " R = $bits(realtime), I = $bits(int);\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\", "
+                 "$bits(real), $bits(shortreal), $bits(realtime), "
+                 "$bits(int), P, Q, R, I);\n"
+                 "endmodule\n",
+                 f),
+      "64 32 64 32 64 32 64 32\n");
 }
 
 TEST(RealDataType, RealtimeIsTheSameTypeAsReal) {

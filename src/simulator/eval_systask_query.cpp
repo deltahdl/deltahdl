@@ -167,6 +167,11 @@ static uint32_t IntegralKeywordBits(std::string_view name) {
   return 0;
 }
 
+static uint32_t RealKeywordBits(std::string_view name) {
+  if (name == "real" || name == "realtime") return 64;
+  return name == "shortreal" ? 32 : 0;
+}
+
 static std::vector<PackedRange> TypeNameDims(std::string_view name,
                                              SimContext& ctx, Arena& arena) {
   if (uint32_t bits = IntegralKeywordBits(name); bits > 0) {
@@ -487,6 +492,7 @@ uint64_t UnpackedDimsTimes(uint64_t bits, const std::vector<Expr*>& dims,
 uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
                      int depth) {
   if (uint32_t bits = IntegralKeywordBits(name); bits > 0) return bits;
+  if (uint32_t bits = RealKeywordBits(name); bits > 0) return bits;
   const ModuleItem* item = ctx.FindTypedefItem(name);
   if (item == nullptr || item->unpacked_dims.empty() || depth > 8) {
     uint32_t width =

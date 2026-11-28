@@ -87,6 +87,12 @@ static std::optional<int64_t> IntegralKeywordWidth(std::string_view kw) {
   return std::nullopt;
 }
 
+static std::optional<int64_t> RealKeywordWidth(std::string_view kw) {
+  if (kw == "real" || kw == "realtime") return 64;
+  if (kw == "shortreal") return 32;
+  return std::nullopt;
+}
+
 static std::optional<int64_t> RangedKeywordBits(const Expr* a,
                                                 const ScopeMap& scope) {
   if (a->kind != ExprKind::kSelect || !a->index || !a->index_end ||
@@ -187,6 +193,7 @@ static std::optional<int64_t> RegisteredTypedefBits(std::string_view name,
 static std::optional<int64_t> IdentifierBits(const Expr* a,
                                              const ScopeMap& scope) {
   if (auto w = IntegralKeywordWidth(a->text)) return w;
+  if (auto w = RealKeywordWidth(a->text)) return w;
   if (auto w = RegisteredTypedefBits(a->text, scope)) return w;
   if (const RtlirParamDecl* pd = RegisteredParamNamed(a->text))
     return ParamDeclBits(*pd);
