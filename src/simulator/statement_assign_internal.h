@@ -42,6 +42,9 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
 
 bool IsRealMemberKind(DataTypeKind kind);
 
+Logic4Vec MemberStoreBits(const Logic4Vec& val, DataTypeKind kind,
+                          uint32_t width, Arena& arena);
+
 void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,

@@ -519,8 +519,7 @@ static Logic4Vec WidenToHolder(Logic4Vec held, uint32_t holder_width,
 
 static Logic4Vec FieldBits(const FieldTarget& target, const Logic4Vec& rhs_val,
                            Arena& arena) {
-  return ResizeToWidth(MemberBitsOf(rhs_val, target.member_kind, arena),
-                       target.width, arena);
+  return MemberStoreBits(rhs_val, target.member_kind, target.width, arena);
 }
 
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,

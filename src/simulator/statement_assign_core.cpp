@@ -237,8 +237,7 @@ static bool TryContainerElementMemberWrite(const Expr* lhs,
       ElementBeforeMemberWrite(select, m.layout->total_width, ctx, arena);
   DepositBitField(
       element, m.offset,
-      ResizeToWidth(MemberBitsOf(rhs_val, m.field->type_kind, arena),
-                    m.field->width, arena),
+      MemberStoreBits(rhs_val, m.field->type_kind, m.field->width, arena),
       m.field->width);
   PerformBlockingAssign(select, element, ctx, arena);
   return true;
@@ -320,13 +319,22 @@ Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
   return ResizeToWidth(rhs_val, target_width, arena);
 }
 
+Logic4Vec MemberStoreBits(const Logic4Vec& val, DataTypeKind kind,
+                          uint32_t width, Arena& arena) {
+  const bool kRealMember = IsRealMemberKind(kind);
+  if (kind == DataTypeKind::kString || (!kRealMember && !val.is_real))
+    return ResizeToWidth(MemberBitsOf(val, kind, arena), width, arena);
+  Logic4Vec bits = ConvertRealForKnownLhs(val, kRealMember, width, arena);
+  bits.is_real = false;
+  return bits;
+}
+
 Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                               const Variable& var, SimContext& ctx,
                               Arena& arena) {
   uint32_t target_width = var.value.width;
   auto name = LhsIdentName(lhs);
-  if (name.empty()) return ResizeToWidth(rhs_val, target_width, arena);
-  bool lhs_is_real = var.is_real || ctx.NameIsRealHere(name);
+  bool lhs_is_real = var.is_real || (!name.empty() && ctx.NameIsRealHere(name));
   return ConvertRealForKnownLhs(rhs_val, lhs_is_real, target_width, arena);
 }
 

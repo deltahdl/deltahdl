@@ -604,7 +604,7 @@ TEST(RealConversion, ARealRoundsToTheNearestIntegerInEveryPlace) {
   });
 }
 
-TEST(RealConversion, DISABLED_ARealWrittenToAMemberRoundsToTheMembersType) {
+TEST(RealConversion, ARealWrittenToAMemberRoundsToTheMembersType) {
   ExpectEveryPlaceRounds({
       {"unpacked structure member", "",
        "  real n = @;\n  struct { int m; } s;\n", "    s.m = n;\n", "s.m"},
@@ -631,6 +631,22 @@ TEST(RealConversion, DISABLED_ARealWrittenToAMemberRoundsToTheMembersType) {
       {"member of an array element", "",
        "  real n = @;\n  struct { int m; } s[2];\n", "    s[1].m = n;\n",
        "s[1].m"},
+  });
+}
+
+TEST(RealConversion, ARealWrittenThroughAHierarchicalNameRounds) {
+  ExpectEveryPlaceRounds({
+      {"downward name, blocking assignment", "module c;\n  int i;\nendmodule\n",
+       "  real n = @;\n  c u();\n", "    u.i = n;\n", "u.i"},
+      {"downward name, nonblocking assignment",
+       "module c;\n  int i;\nendmodule\n", "  real n = @;\n  c u();\n",
+       "    u.i <= n;\n", "u.i"},
+      {"upward name, blocking assignment",
+       "module c;\n  real n = @;\n  initial t.i = n;\nendmodule\n",
+       "  int i;\n  c u();\n", "", "i"},
+      {"upward name, nonblocking assignment",
+       "module c;\n  real n = @;\n  initial t.i <= n;\nendmodule\n",
+       "  int i;\n  c u();\n", "", "i"},
   });
 }
 
