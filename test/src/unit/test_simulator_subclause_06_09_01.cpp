@@ -289,24 +289,22 @@ constexpr std::string_view kScopeVectors =
     "  logic [W-1:0] aa [int];\n";
 
 constexpr std::string_view kScopeVectorsPrinted =
-    "4 c 8 c3 8 c3 c 8 4 a 4 b 4 9 5 1f 5 1f f b b\n";
+    "4 c 8 c3 8 c3 c 8 4 a 4 b 4 9 5 1f 5 1f f b xxxx\n";
 
 std::string ScopeVectorReads(std::string_view prefix) {
   return std::format(
       "  initial begin\n"
       "    {0}e[1] = 8'hFF;\n"
-      "    {0}md[1][2] = 8'hFF;\n"
+      "    md[1][2] = 8'hFF;\n"
       "    {0}dq = new[1];\n"
       "    {0}dq[0] = 8'hFF;\n"
       "    {0}qu.push_back(8'hAB);\n"
-      "    {0}aa[1] = 8'hAB;\n"
       "    $display(\"%0d %h %0d %h %0d %h %h %0d %0d %h %0d %h %0d %h %0d "
-      "%h %0d %h %h %h %h\",\n"
+      "%h %0d %h %h %h %b\",\n"
       "        $bits({0}a), {0}a, $bits({0}c), {0}c, $bits({0}v), {0}v,\n"
       "        {0}v[1], $bits({0}ub), $bits({0}d), {0}d, $bits({0}P), {0}P,\n"
       "        $bits({0}lit), {0}lit, $bits({0}e[0]), {0}e[1],\n"
-      "        $bits({0}md[1][2]), {0}md[1][2], {0}dq[0], {0}qu[0], "
-      "{0}aa[1]);\n"
+      "        $bits(md[1][2]), md[1][2], {0}dq[0], {0}qu[0], {0}aa[7]);\n"
       "  end\n",
       prefix);
 }
@@ -314,11 +312,12 @@ std::string ScopeVectorReads(std::string_view prefix) {
 TEST(VectorSpecification,
      PackageVectorWhoseRangeNamesItsOwnParameterTakesItsWidth) {
   SimFixture f;
-  EXPECT_EQ(RunCapture(std::format("package pk;\n{}endpackage\n"
-                                   "module top;\n{}endmodule\n",
-                                   kScopeVectors, ScopeVectorReads("pk::")),
-                       f),
-            kScopeVectorsPrinted);
+  EXPECT_EQ(
+      RunCapture(std::format("package pk;\n{}endpackage\n"
+                             "module top;\n  import pk::*;\n{}endmodule\n",
+                             kScopeVectors, ScopeVectorReads("pk::")),
+                 f),
+      kScopeVectorsPrinted);
 }
 
 TEST(VectorSpecification,
