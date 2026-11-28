@@ -6,16 +6,19 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
 #include "elaborator/assoc_index_type.h"
+#include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator_items_internal.h"
 #include "elaborator/queue_dim.h"
 #include "elaborator/std_package.h"
 #include "elaborator/type_eval.h"
+#include "parser/ast_design.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
@@ -143,22 +146,33 @@ static bool PackedTypeIs4State(const DataType& dtype,
   return Is4stateType(type->kind);
 }
 
-static bool IsValidNetType(const DataType& dtype, const TypedefMap& typedefs);
+static bool NamesObjectType(const DataType& dtype, const NetTypeNames& names) {
+  const DataType* type = &dtype;
+  for (int hops = 0; hops < kMaxTypedefHops; ++hops) {
+    if (type->kind != DataTypeKind::kNamed) return false;
+    auto it = FindTypedefEntry(*type, names.typedefs);
+    if (it == names.typedefs.end()) return names.names_object_type(*type);
+    type = &it->second;
+  }
+  return false;
+}
 
-static bool IsValidNetMember(const StructMember& m,
-                             const TypedefMap& typedefs) {
-  if (m.nested_type != nullptr) return IsValidNetType(*m.nested_type, typedefs);
+static bool IsValidNetType(const DataType& dtype, const NetTypeNames& names);
+
+static bool IsValidNetMember(const StructMember& m, const NetTypeNames& names) {
+  if (m.nested_type != nullptr) return IsValidNetType(*m.nested_type, names);
   if (m.type_kind == DataTypeKind::kNamed) {
-    const DataType* named = MemberNamedType(m, typedefs);
-    return named == nullptr || IsValidNetType(*named, typedefs);
+    const DataType* named = MemberNamedType(m, names.typedefs);
+    return named != nullptr ? IsValidNetType(*named, names)
+                            : !names.names_object_type(MemberWrittenType(m));
   }
   return Is4stateType(m.type_kind);
 }
 
 static bool UnpackedMembersAreValid(const DataType& dtype,
-                                    const TypedefMap& typedefs) {
+                                    const NetTypeNames& names) {
   for (const auto& m : dtype.struct_members) {
-    if (!IsValidNetMember(m, typedefs)) return false;
+    if (!IsValidNetMember(m, names)) return false;
   }
   return true;
 }
@@ -169,28 +183,27 @@ static bool IsUnpackedAggregate(const DataType& dtype) {
          !dtype.is_packed && !dtype.is_soft;
 }
 
-static bool IsValidNetType(const DataType& dtype, const TypedefMap& typedefs) {
-  std::vector<std::string_view> names;
-  const DataType* type = FollowTypedefs(dtype, typedefs, names);
+static bool IsValidNetType(const DataType& dtype, const NetTypeNames& names) {
+  if (NamesObjectType(dtype, names)) return false;
+  std::vector<std::string_view> chain;
+  const DataType* type = FollowTypedefs(dtype, names.typedefs, chain);
   if (type == nullptr) return true;
-  if (IsUnpackedAggregate(*type))
-    return UnpackedMembersAreValid(*type, typedefs);
+  if (IsUnpackedAggregate(*type)) return UnpackedMembersAreValid(*type, names);
   DataTypeKind k = type->kind;
   if (DataTypeToNetType(k) != NetType::kWire || k == DataTypeKind::kWire) {
     return true;
   }
-  return PackedTypeIs4State(*type, typedefs);
+  return PackedTypeIs4State(*type, names.typedefs);
 }
 
 void ValidateNetDataTypeIs4State(const DataType& dtype,
-                                 const TypedefMap& typedefs, DiagEngine& diag,
+                                 const NetTypeNames& names, DiagEngine& diag,
                                  SourceLoc loc) {
   if (dtype.is_interconnect) return;
-  std::vector<std::string_view> names;
-  const DataType* type = FollowTypedefs(dtype, typedefs, names);
-  if (type == nullptr) return;
-  if (IsUnpackedAggregate(*type)) {
-    if (!UnpackedMembersAreValid(*type, typedefs)) {
+  std::vector<std::string_view> chain;
+  const DataType* type = FollowTypedefs(dtype, names.typedefs, chain);
+  if (type != nullptr && IsUnpackedAggregate(*type)) {
+    if (!UnpackedMembersAreValid(*type, names)) {
       diag.Error(loc,
                  "unpacked struct/union net member must be a valid net "
                  "data type",
@@ -198,8 +211,34 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
     }
     return;
   }
-  if (!IsValidNetType(*type, typedefs)) {
+  if (!IsValidNetType(dtype, names)) {
     diag.Error(loc, "net data type must be 4-state", Subclause("6.7.1"));
+  }
+}
+
+static DataType PackageNetType(const DataType& type, const PackageDecl& pkg) {
+  DataType scoped = InPackageScope(type, pkg);
+  if (scoped.scope_name.empty() &&
+      CovergroupNamed(pkg.items, scoped.type_name) != nullptr)
+    scoped.scope_name = pkg.name;
+  return scoped;
+}
+
+void ReportUnitScopeNetDataTypes(
+    const CompilationUnit& unit, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
+  const NetTypeNames kNames =
+      ObjectAwareNetTypeNames(typedefs, class_names, nullptr, &unit);
+  for (const ModuleItem* item : unit.cu_items) {
+    if (item->kind == ModuleItemKind::kNetDecl)
+      ValidateNetDataTypeIs4State(item->data_type, kNames, diag, item->loc);
+  }
+  for (const PackageDecl* pkg : unit.packages) {
+    for (const ModuleItem* item : pkg->items) {
+      if (item->kind != ModuleItemKind::kNetDecl) continue;
+      ValidateNetDataTypeIs4State(PackageNetType(item->data_type, *pkg), kNames,
+                                  diag, item->loc);
+    }
   }
 }
 
@@ -212,12 +251,7 @@ static bool IsLegalNettypeMember(const StructMember& m,
   if (m.nested_type != nullptr) {
     return IsLegalNettypeElement(*m.nested_type, tables);
   }
-  DataType own;
-  own.kind = m.type_kind;
-  own.type_name = m.type_name;
-  own.scope_name = m.scope_name;
-  own.outer_scope_names = m.outer_scope_names;
-  return IsLegalNettypeDataType(own, tables);
+  return IsLegalNettypeDataType(MemberWrittenType(m), tables);
 }
 
 static bool IsLegalNettypeElement(const DataType& type,
@@ -252,6 +286,17 @@ static bool NamesStdClass(const DataType& type) {
       StdPackageMemberNamed(type.type_name);
   return member.has_value() &&
          KindOfStdPackageMember(*member) == StdPackageMemberKind::kClass;
+}
+
+NetTypeNames ObjectAwareNetTypeNames(
+    const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names,
+    const RtlirModule* mod, const CompilationUnit* unit) {
+  return {typedefs, [&class_names, mod, unit](const DataType& type) {
+            return class_names.count(NamedTypeKey(type)) != 0 ||
+                   NamesStdClass(type) ||
+                   DeclaredCovergroup(type, mod, unit) != nullptr;
+          }};
 }
 
 bool IsLegalNettypeDataType(const DataType& dtype,

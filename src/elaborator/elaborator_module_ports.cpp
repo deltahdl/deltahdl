@@ -208,6 +208,7 @@ struct PortElabContext {
   Arena& arena;
   RtlirModule* mod;
   const TypeShapeTables& shapes;
+  const NetTypeNames& net_types;
 };
 
 static const DataType* ResolvedPortAggregate(const ModuleDecl* decl,
@@ -259,7 +260,8 @@ static void ValidateNetPortDataType(const ModuleDecl* decl,
                                     const PortElabContext& ctx) {
   if (decl->decl_kind == ModuleDeclKind::kChecker) return;
   if (port_is_var) return;
-  ValidateNetDataTypeIs4State(port.data_type, ctx.typedefs, ctx.diag, port.loc);
+  ValidateNetDataTypeIs4State(port.data_type, ctx.net_types, ctx.diag,
+                              port.loc);
 }
 
 static void TrackNonAnsiPortType(const ModuleDecl* decl, const PortDecl& port,
@@ -594,6 +596,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
   CheckDuplicatePortNames(decl, ansi_port_names_, diag_);
 
   const TypeShapeTables kShapes{typedefs_, td_array_dims_, class_names_};
+  const NetTypeNames kNetTypes =
+      ObjectAwareNetTypeNames(typedefs_, class_names_, mod, unit_);
   PortElabContext ctx{typedefs_,
                       param_scope,
                       non_ansi_complete_ports_,
@@ -602,7 +606,8 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
                       diag_,
                       arena_,
                       mod,
-                      kShapes};
+                      kShapes,
+                      kNetTypes};
 
   DeclarePortExprObjects(decl, mod, ctx);
   RecordPortExprDecls(decl, mod);

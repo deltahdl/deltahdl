@@ -363,6 +363,7 @@ void Elaborator::RunPreElaborationValidations() {
   ReportTypeParametersSetToNoTypes(*unit_, diag_);
 
   RegisterCuScopeItems();
+  ReportUnitScopeNetDataTypes(*unit_, typedefs_, class_names_, diag_);
 
   ValidatePortAndModportDeclarations();
 

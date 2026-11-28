@@ -27,35 +27,6 @@ Expr* MakeIdentifier(std::string_view text, SourceLoc loc, Arena& arena) {
   return id;
 }
 
-const CovergroupDecl* CovergroupNamed(const std::vector<ModuleItem*>& items,
-                                      std::string_view name) {
-  for (const ModuleItem* item : items) {
-    if (item->kind == ModuleItemKind::kCovergroupDecl && item->name == name) {
-      return item->covergroup;
-    }
-  }
-  return nullptr;
-}
-
-const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
-                                        std::string_view pkg_name,
-                                        std::string_view name) {
-  for (const PackageDecl* pkg : unit->packages) {
-    if (pkg->name == pkg_name) return CovergroupNamed(pkg->items, name);
-  }
-  return nullptr;
-}
-
-const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
-                                         const RtlirModule* mod,
-                                         const CompilationUnit* unit) {
-  if (dt.kind != DataTypeKind::kNamed) return nullptr;
-  if (!dt.scope_name.empty()) {
-    return PackageCovergroup(unit, dt.scope_name, dt.type_name);
-  }
-  return VisibleCovergroup(dt.type_name, mod, unit);
-}
-
 void AddCovergroupEventProcess(std::string_view var_name,
                                const CovergroupDecl& cg, SourceLoc loc,
                                RtlirModule* mod, Arena& arena) {
@@ -87,9 +58,39 @@ void AddCovergroupEventProcess(std::string_view var_name,
 
 }  // namespace
 
+const CovergroupDecl* CovergroupNamed(const std::vector<ModuleItem*>& items,
+                                      std::string_view name) {
+  for (const ModuleItem* item : items) {
+    if (item->kind == ModuleItemKind::kCovergroupDecl && item->name == name) {
+      return item->covergroup;
+    }
+  }
+  return nullptr;
+}
+
+const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
+                                        std::string_view pkg_name,
+                                        std::string_view name) {
+  for (const PackageDecl* pkg : unit->packages) {
+    if (pkg->name == pkg_name) return CovergroupNamed(pkg->items, name);
+  }
+  return nullptr;
+}
+
+const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
+                                         const RtlirModule* mod,
+                                         const CompilationUnit* unit) {
+  if (dt.kind != DataTypeKind::kNamed) return nullptr;
+  if (!dt.scope_name.empty()) {
+    return PackageCovergroup(unit, dt.scope_name, dt.type_name);
+  }
+  return VisibleCovergroup(dt.type_name, mod, unit);
+}
+
 const CovergroupDecl* VisibleCovergroup(std::string_view name,
                                         const RtlirModule* mod,
                                         const CompilationUnit* unit) {
+  if (mod == nullptr) return CovergroupNamed(unit->cu_items, name);
   if (const CovergroupDecl* own = CovergroupNamed(mod->let_decls, name)) {
     return own;
   }

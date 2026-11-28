@@ -13,15 +13,27 @@
 
 namespace delta {
 
+struct CompilationUnit;
 struct DataType;
 struct Expr;
 struct ModuleItem;
+struct RtlirModule;
 
 struct TypeShapeTables {
   const TypedefMap& typedefs;
   const std::unordered_map<std::string_view, std::vector<Expr*>>& typedef_dims;
   const std::unordered_set<std::string_view>& class_names;
 };
+
+struct NetTypeNames {
+  const TypedefMap& typedefs;
+  std::function<bool(const DataType&)> names_object_type;
+};
+
+NetTypeNames ObjectAwareNetTypeNames(
+    const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names,
+    const RtlirModule* mod, const CompilationUnit* unit);
 
 const DataType* FollowTypedefs(const DataType& dtype,
                                const TypedefMap& typedefs,
@@ -34,8 +46,12 @@ void ValidateNetDeclaratorDims(const std::vector<Expr*>& dims,
                                SourceLoc loc);
 
 void ValidateNetDataTypeIs4State(const DataType& dtype,
-                                 const TypedefMap& typedefs, DiagEngine& diag,
+                                 const NetTypeNames& names, DiagEngine& diag,
                                  SourceLoc loc);
+
+void ReportUnitScopeNetDataTypes(
+    const CompilationUnit& unit, const TypedefMap& typedefs,
+    const std::unordered_set<std::string_view>& class_names, DiagEngine& diag);
 
 bool TypedefDimsAreFixedSize(const DataType& dtype,
                              const TypeShapeTables& tables);

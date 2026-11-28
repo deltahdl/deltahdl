@@ -385,6 +385,13 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
     return true;
   }
 
+  if (Match(TokenKind::kKwVirtual)) {
+    auto inner = ParseVirtualInterfaceType();
+    ApplyNetInfo(inner, dtype);
+    dtype = inner;
+    return true;
+  }
+
   auto inner_kind = TokenToTypeKind(CurrentToken().kind);
   if (inner_kind && !IsNetTypeToken(CurrentToken().kind)) {
     if (dtype.kind != DataTypeKind::kTrireg) dtype.kind = *inner_kind;

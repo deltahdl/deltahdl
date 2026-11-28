@@ -582,12 +582,14 @@ TEST(NetDataType, TypesResolvingToNothingAreNotReported) {
 
   for (const DataType* type :
        {&to_a, &packed_missing, &packed_dangling, &unpacked}) {
-    ValidateNetDataTypeIs4State(*type, kTable, f.diag, SourceLoc{});
+    ValidateNetDataTypeIs4State(*type,
+                                {kTable, [](const DataType&) { return false; }},
+                                f.diag, SourceLoc{});
   }
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-TEST(NetDataType, DISABLED_ClassCovergroupAndVirtualInterfaceNetsAreRejected) {
+TEST(NetDataType, ClassCovergroupAndVirtualInterfaceNetsAreRejected) {
   const std::string kHead =
       "class C;\n"
       "endclass\n"
@@ -597,19 +599,35 @@ TEST(NetDataType, DISABLED_ClassCovergroupAndVirtualInterfaceNetsAreRejected) {
       "endpackage\n"
       "interface I;\n"
       "endinterface\n"
+      "class P #(int N = 1);\n"
+      "endclass\n"
       "module m;\n"
       "  typedef C CT;\n"
       "  typedef struct { C c; } S;\n"
+      "  typedef P#(2) P2;\n"
+      "  typedef virtual I VI;\n"
       "  covergroup cg;\n"
       "  endgroup\n";
   for (const char* decl :
-       {"  wire C w;\n", "  wire CT w;\n", "  wire p::D w;\n",
-        "  wire C w [2];\n", "  wire S w;\n", "  wire cg w;\n",
-        "  wire virtual I w;\n"}) {
+       {"  wire C w;\n", "  tri C w;\n", "  wire CT w;\n", "  wire p::D w;\n",
+        "  wire C w [2];\n", "  wire P2 w;\n", "  wire semaphore w;\n",
+        "  wire std::mailbox w;\n", "  wire cg w;\n", "  wire virtual I w;\n",
+        "  wire virtual interface I w;\n", "  wire VI w;\n"}) {
     ElabFixture f;
     ElaborateSrc(kHead + decl + "endmodule\n", f);
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "net data type must be 4-state", 14, "6.7.1"))
+                              "net data type must be 4-state", 18, "6.7.1"))
+        << decl;
+  }
+  for (const char* decl :
+       {"  wire S w;\n", "  wire struct { logic a; CT c; } w;\n",
+        "  wire struct { p::D d; } w;\n", "  wire struct { cg g; } w;\n"}) {
+    ElabFixture f;
+    ElaborateSrc(kHead + decl + "endmodule\n", f);
+    EXPECT_TRUE(ReportedError(
+        f.diag.Diagnostics(),
+        "unpacked struct/union net member must be a valid net data type", 18,
+        "6.7.1"))
         << decl;
   }
   ElabFixture f;
@@ -617,36 +635,98 @@ TEST(NetDataType, DISABLED_ClassCovergroupAndVirtualInterfaceNetsAreRejected) {
                    "  typedef struct { logic c; } L;\n"
                    "  wire logic w;\n"
                    "  wire L v;\n"
+                   "  C h;\n"
+                   "  virtual I vi;\n"
                    "endmodule\n",
                f);
   EXPECT_FALSE(f.has_errors);
 }
 
-TEST(NetDataType, DISABLED_ClassNetIsRejectedInEveryPlace) {
+std::string WithNetType(std::string_view text, std::string_view type) {
+  std::string src(text);
+  src.replace(src.find("TYPE"), 4, type);
+  return src;
+}
+
+TEST(NetDataType, ObjectTwoStateAndRealNetsAreRejectedInEveryPlace) {
   struct Place {
-    const char* src;
+    std::string_view text;
     uint32_t line;
   };
+  const std::string kPrelude =
+      "interface I;\n"
+      "endinterface\n"
+      "class C;\n"
+      "endclass\n"
+      "typedef C CT;\n"
+      "covergroup cg;\n"
+      "endgroup\n";
   for (const Place& place : {
-           Place{"class C;\nendclass\nwire C w;\n", 3},
-           Place{"class C;\nendclass\nmodule m(input wire C w);\nendmodule\n",
-                 3},
-           Place{"class C;\nendclass\ninterface i;\n  wire C w;\n"
-                 "endinterface\n",
-                 4},
-           Place{"class C;\nendclass\nprogram q;\n  wire C w;\nendprogram\n",
-                 4},
-           Place{"class C;\nendclass\nmodule m;\n  if (1) begin : g\n"
-                 "    wire C w;\n  end\nendmodule\n",
-                 5},
+           Place{"module top;\n  wire TYPE w;\nendmodule\n", 9},
+           Place{"interface host;\n  wire TYPE w;\nendinterface\n"
+                 "module top;\n  host h();\nendmodule\n",
+                 9},
+           Place{"program host;\n  wire TYPE w;\nendprogram\n"
+                 "module top;\n  host h();\nendmodule\n",
+                 9},
+           Place{"module top;\n  if (1) begin : g\n    wire TYPE w;\n  end\n"
+                 "endmodule\n",
+                 10},
+           Place{"module top;\n  for (genvar k = 0; k < 1; k++) begin : g\n"
+                 "    wire TYPE w;\n  end\nendmodule\n",
+                 10},
+           Place{"wire TYPE w;\nmodule top;\nendmodule\n", 8},
+           Place{"package q;\n  wire TYPE w;\nendpackage\n"
+                 "module top;\nendmodule\n",
+                 9},
+           Place{"module top(input wire TYPE w);\nendmodule\n", 8},
+           Place{"module top(w);\n  input wire TYPE w;\nendmodule\n", 9},
+           Place{"interface host(input wire TYPE w);\nendinterface\n"
+                 "module top;\n  host h();\nendmodule\n",
+                 8},
+           Place{"program host(input wire TYPE w);\nendprogram\n"
+                 "module top;\n  host h();\nendmodule\n",
+                 8},
        }) {
+    for (std::string_view type :
+         {"C", "CT", "cg", "virtual I", "semaphore", "bit", "real"}) {
+      ElabFixture f;
+      ElaborateSrc(kPrelude + WithNetType(place.text, type), f);
+      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                                "net data type must be 4-state", place.line,
+                                "6.7.1"))
+          << type << " in\n"
+          << place.text;
+    }
     ElabFixture f;
-    ElaborateSrc(place.src, f);
-    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                              "net data type must be 4-state", place.line,
-                              "6.7.1"))
-        << place.src;
+    ElaborateSrc(kPrelude + WithNetType(place.text, "logic [1:0]"), f);
+    EXPECT_FALSE(f.has_errors) << place.text;
   }
+}
+
+TEST(NetDataType, PackageOwnClassAndCovergroupNetsAreRejected) {
+  ElabFixture f;
+  ElaborateSrc(
+      "package q;\n"
+      "  class D;\n"
+      "  endclass\n"
+      "  covergroup cg;\n"
+      "  endgroup\n"
+      "  typedef D DT;\n"
+      "  wire D a;\n"
+      "  wire cg b;\n"
+      "  wire DT c;\n"
+      "  wire q::D e;\n"
+      "  wire logic [1:0] g;\n"
+      "endpackage\n"
+      "module top;\n"
+      "endmodule\n",
+      f);
+  for (uint32_t line : {7U, 8U, 9U, 10U}) {
+    EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
+                              "net data type must be 4-state", line, "6.7.1"));
+  }
+  EXPECT_FALSE(ErrorOnLine(f.diag.Diagnostics(), 11));
 }
 
 }  // namespace

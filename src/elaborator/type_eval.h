@@ -123,6 +123,8 @@ DataTypeKind ResolvedTypeKind(const DataType& dtype,
 const DataType* TypeAtChainEnd(const DataType& dtype,
                                const TypedefMap& typedefs);
 
+DataType MemberWrittenType(const StructMember& m);
+
 const DataType* MemberNamedType(const StructMember& m,
                                 const TypedefMap& typedefs);
 

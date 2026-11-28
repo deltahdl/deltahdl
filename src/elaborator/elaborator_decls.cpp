@@ -447,13 +447,13 @@ PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
 static void ValidateNetDeclDataType(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& nettype_names,
-    const TypeShapeTables& tables, DiagEngine& diag) {
+    const TypeShapeTables& tables, const NetTypeNames& names,
+    DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       nettype_names.count(NamedTypeKey(item->data_type)) != 0) {
     return;
   }
-  ValidateNetDataTypeIs4State(item->data_type, tables.typedefs, diag,
-                              item->loc);
+  ValidateNetDataTypeIs4State(item->data_type, names, diag, item->loc);
   ValidateNetTypedefDims(item->data_type, tables, diag, item->loc);
 }
 
@@ -546,7 +546,9 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   ValidatePackedDimRange(item->data_type, item->loc, mod);
 
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
-  ValidateNetDeclDataType(item, nettype_names_, kShapeTables, diag_);
+  ValidateNetDeclDataType(
+      item, nettype_names_, kShapeTables,
+      ObjectAwareNetTypeNames(typedefs_, class_names_, mod, unit_), diag_);
   ValidateNetDeclaratorDims(item->unpacked_dims, kShapeTables, diag_,
                             item->loc);
   EmitDeclarationEnumMembers(item, true, mod);
