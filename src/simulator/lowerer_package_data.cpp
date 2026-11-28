@@ -431,11 +431,46 @@ static void RecordPackageDataRange(const ModuleItem* item, std::string_view pkg,
                     ctx.FindVariable(PackageDataKey(item, pkg)), ctx, arena);
 }
 
+static bool IsRunningVectorTypedef(const ModuleItem* item) {
+  if (item->kind != ModuleItemKind::kTypedef) return false;
+  const DataType& type = item->typedef_type;
+  return type.packed_dim_left != nullptr && type.kind != DataTypeKind::kNamed &&
+         type.kind != DataTypeKind::kStruct &&
+         type.kind != DataTypeKind::kUnion &&
+         type.kind != DataTypeKind::kEnum && PackedDimProduct(type) == 0;
+}
+
+static void FitScopeTypedefWidth(const ModuleItem* item, std::string_view pkg,
+                                 SimContext& ctx, Arena& arena) {
+  if (!IsRunningVectorTypedef(item)) return;
+  auto* key = arena.Create<std::string>(std::string(pkg) +
+                                        "::" + std::string(item->name));
+  if (ctx.FindTypeKind(*key) == DataTypeKind::kNamed) *key = item->name;
+  uint32_t width = DeclaredTypeWidth(item->typedef_type, ctx);
+  if (width != 0) ctx.RegisterTypeWidth(*key, width);
+}
+
+static void FitPackageDataWidth(const ModuleItem* item, std::string_view pkg,
+                                SimContext& ctx, Arena& arena) {
+  if (item->kind != ModuleItemKind::kVarDecl) return;
+  std::string key = PackageDataKey(item, pkg);
+  Variable* var = ctx.FindVariable(key);
+  if (var == nullptr) return;
+  uint32_t width =
+      PackageDataWidth(WithPackageOwnType(item, pkg, ctx, arena), key, ctx);
+  if (width == var->value.width) return;
+  var->value = MakeLogic4Vec(arena, width);
+  if (var->is_4state) FillWithX(var->value);
+  var->value.is_signed = var->is_signed;
+}
+
 static void InitScopeDataItems(const std::vector<ModuleItem*>& items,
                                std::string_view pkg, SimContext& ctx,
                                Arena& arena) {
   ctx.PushScope(pkg);
   for (auto* item : items) {
+    FitScopeTypedefWidth(item, pkg, ctx, arena);
+    FitPackageDataWidth(item, pkg, ctx, arena);
     RecordPackageDataRange(item, pkg, ctx, arena);
     InitPackageDataItem(item, pkg, ctx, arena);
   }
