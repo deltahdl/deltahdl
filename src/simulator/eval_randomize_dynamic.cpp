@@ -309,9 +309,11 @@ void WriteAssocElement(ClassObject* obj, const RandInfo& ri,
 
 void WriteStructMember(ClassObject* obj, const RandInfo& ri,
                        const Logic4Vec& lv) {
-  Logic4Vec& whole = obj->properties.at(ri.struct_base);
+  Logic4Vec& whole = RandStructStore(obj, ri);
   DepositBitField(whole, ri.struct_offset, lv, ri.var.width);
-  obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] = whole;
+  if (!ri.is_static)
+    obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] =
+        whole;
 }
 
 void WriteSolvedValue(ClassObject* obj, const RandInfo& ri,

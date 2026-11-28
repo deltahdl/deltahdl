@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "common/arena.h"
 #include "common/types.h"
 #include "parser/ast_class.h"
 #include "simulator/class_object.h"
@@ -49,11 +50,31 @@ bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
     info.var.width = field.width;
     info.var.is_signed = field.is_signed;
     info.var.BindDomainToDeclaredRange();
+    info.is_static = m->is_static;
     info.struct_base = std::string(m->name);
     info.struct_offset = field.bit_offset;
     out.push_back(std::move(info));
   }
   return true;
+}
+
+Logic4Vec& RandStructStore(ClassObject* obj, const RandInfo& ri) {
+  auto& store = ri.is_static ? ri.level->static_properties : obj->properties;
+  return store.at(ri.struct_base);
+}
+
+void HoldStructMember(ClassObject* obj, RandInfo& ri, Arena& arena) {
+  const Logic4Vec& whole = RandStructStore(obj, ri);
+  if (ri.dyn_field == nullptr) {
+    ri.var.value = ri.var.ValueFromBits(
+        ExtractBitField(arena, whole, ri.struct_offset, ri.var.width)
+            .ToUint64());
+    return;
+  }
+  const QueueObject* held = DynMemberQueue(
+      ExtractBitField(arena, whole, ri.struct_offset, ri.dyn_field->width));
+  ri.var.value = ri.var.ValueFromBits(
+      held->elements.at(static_cast<size_t>(ri.array_index)).ToUint64());
 }
 
 void AddRandStructDynamicElements(const ClassMember* m,

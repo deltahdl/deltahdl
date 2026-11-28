@@ -446,7 +446,7 @@ bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
   }
   for (auto& part : parts) {
     solver.SetNameScope(part.prefix);
-    PrepareRandVariables(part.obj, part.rands, nullptr, solver);
+    PrepareRandVariables(part.obj, part.rands, nullptr, solver, part.rc->arena);
   }
   solver.SetNameScope("");
   if (!solver.SolveWith({})) return false;

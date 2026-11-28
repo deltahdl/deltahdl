@@ -76,6 +76,10 @@ struct RandInfo {
 bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
                           SimContext& ctx, std::vector<RandInfo>& out);
 
+Logic4Vec& RandStructStore(ClassObject* obj, const RandInfo& ri);
+
+void HoldStructMember(ClassObject* obj, RandInfo& ri, Arena& arena);
+
 struct JointVarScope;
 
 struct RandomizeCtx {
@@ -253,7 +257,7 @@ bool RandomizeEachObject(const std::vector<JointObject>& objects,
                          Arena& arena);
 void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
                           const std::unordered_set<std::string>* inline_random,
-                          ConstraintSolver& solver);
+                          ConstraintSolver& solver, Arena& arena);
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active);
 std::unordered_map<std::string, bool>& RandModesOf(ClassObject* obj,

@@ -440,4 +440,25 @@ TEST(RandSizedArray, AFixedArrayOfHandlesKeepsItsObjects) {
             "1 2 1 1\n");
 }
 
+TEST(RandUnpackedStruct, AStaticStructuresMembersAreDrawnIntoItsSharedStore) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("class P;\n"
+                       "  typedef struct { rand bit [3:0] a; int crc; } h_t;\n"
+                       "  static rand h_t h;\n"
+                       "  static rand struct { rand bit [3:0] b; } s;\n"
+                       "  constraint c { h.a == 6; s.b == 11; }\n"
+                       "endclass\n"
+                       "module t;\n"
+                       "  initial begin\n"
+                       "    static P p = new;\n"
+                       "    static P q = new;\n"
+                       "    p.h.crc = 77;\n"
+                       "    $display(\"%0d %0d %0d %0d\", p.randomize(), "
+                       "q.h.a, q.s.b, q.h.crc);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 6 11 77\n");
+}
+
 }  // namespace

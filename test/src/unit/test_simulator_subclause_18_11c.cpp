@@ -219,4 +219,29 @@ TEST(InlineRandomControlCases, AnArgumentNamesThePropertyNotTheCallersName) {
             "9 1\n");
 }
 
+TEST(InlineRandomControlCases, AStructureLeftOutOfTheListKeepsItsMembers) {
+  EXPECT_EQ(
+      RunSrc(InModule("class C;\n"
+                      "  typedef struct {\n"
+                      "    rand bit [3:0] a;\n"
+                      "    rand byte d[] = {1, 2, 3, 4};\n"
+                      "  } h_t;\n"
+                      "  rand bit [3:0] k;\n"
+                      "  rand h_t h;\n"
+                      "  rand struct { rand bit [3:0] b; } s;\n"
+                      "  constraint c { k == 3; }\n"
+                      "endclass\n",
+                      "    static C o = new;\n"
+                      "    static int held = 0;\n"
+                      "    o.h.a = 5;\n"
+                      "    o.s.b = 9;\n"
+                      "    repeat (8) begin\n"
+                      "      void'(o.randomize(k));\n"
+                      "      if (o.k == 3 && o.h.a == 5 && o.s.b == 9 &&\n"
+                      "          o.h.d[0] == 1 && o.h.d[3] == 4) held++;\n"
+                      "    end\n"
+                      "    $display(\"%0d %0d\", held, o.h.d.size());\n")),
+      "8 4\n");
+}
+
 }  // namespace

@@ -175,6 +175,26 @@ TEST(RandModeCases, AWholeStructureTurnsEveryMemberOff) {
             "16 0 0\n");
 }
 
+TEST(RandModeCases, AMemberOfATypedefStructureKeepsItsValueWhileOff) {
+  EXPECT_EQ(RunSrc(InModule("class C;\n"
+                            "  typedef struct { rand bit [3:0] a, b; } p_t;\n"
+                            "  rand p_t s;\n"
+                            "  constraint k { s.b != 9; }\n"
+                            "endclass\n",
+                            "    static C c = new;\n"
+                            "    static int held = 0;\n"
+                            "    c.s.a = 5;\n"
+                            "    c.s.b = 9;\n"
+                            "    c.s.a.rand_mode(0);\n"
+                            "    repeat (16) begin\n"
+                            "      void'(c.randomize());\n"
+                            "      if (c.s.a == 5 && c.s.b != 9) held++;\n"
+                            "    end\n"
+                            "    $display(\"%0d %0d %0d\", held, "
+                            "c.s.a.rand_mode(), c.s.b.rand_mode());\n")),
+            "16 0 1\n");
+}
+
 std::string ThroughAMethod(const std::string& off) {
   return InModule(
       "class C;\n"

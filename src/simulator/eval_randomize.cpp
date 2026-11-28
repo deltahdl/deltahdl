@@ -295,23 +295,29 @@ static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
   ri.var.shared_randc_domain = *domain;
 }
 
+static void HoldRandVariable(ClassObject* obj, RandInfo& ri, Arena& arena) {
+  ri.var.enabled = false;
+  if (!ri.struct_base.empty()) {
+    HoldStructMember(obj, ri, arena);
+    return;
+  }
+  const auto& held = ri.is_static && ri.level != nullptr
+                         ? ri.level->static_properties
+                         : obj->properties;
+  auto pit = held.find(ri.name);
+  if (pit != held.end())
+    ri.var.value = ri.var.ValueFromBits(pit->second.ToUint64());
+}
+
 void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
                           const std::unordered_set<std::string>* inline_random,
-                          ConstraintSolver& solver) {
+                          ConstraintSolver& solver, Arena& arena) {
   for (auto& ri : rands) {
     ri.var.CollapseEmptyDomain();
     BindRandcHistory(obj, ri);
     bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
                                            : IsObjectRandActive(obj, ri.name);
-    if (!active) {
-      const auto& held = ri.is_static && ri.level != nullptr
-                             ? ri.level->static_properties
-                             : obj->properties;
-      auto pit = held.find(ri.name);
-      if (pit != held.end())
-        ri.var.value = ri.var.ValueFromBits(pit->second.ToUint64());
-      ri.var.enabled = false;
-    }
+    if (!active) HoldRandVariable(obj, ri, arena);
     solver.AddVariable(ri.var);
   }
 }
@@ -377,7 +383,7 @@ bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
   CollectConstraintBlocks(obj->type, rands, rc, solver);
   if (call.inline_block != nullptr)
     AddInlineConstraintBlock(call, rands, rc, solver);
-  PrepareRandVariables(obj, rands, call.inline_random, solver);
+  PrepareRandVariables(obj, rands, call.inline_random, solver, arena);
   return solver.SolveWith({});
 }
 
