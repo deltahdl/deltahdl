@@ -29,6 +29,14 @@ struct Lookup {
   [[nodiscard]] Lookup Next() const { return {scope, hops + 1}; }
 };
 
+bool IsUnitName(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier && e->scope_prefix == "$unit";
+}
+
+bool IsLocalName(const Expr* e) {
+  return e->kind == ExprKind::kIdentifier && e->scope_prefix.empty();
+}
+
 bool IsScopedName(const Expr* e) {
   return e->kind == ExprKind::kMemberAccess && e->is_scope_resolution &&
          e->lhs != nullptr && e->rhs != nullptr &&
@@ -99,7 +107,7 @@ bool ClassNameHoldsXZ(std::string_view name, const ClassDecl& cls,
 
 bool ClassScopeNameHoldsXZ(const Expr* e, const ClassDecl& cls,
                            const Lookup& look) {
-  if (e->kind == ExprKind::kIdentifier && DeclaresClassConstant(cls, e->text)) {
+  if (IsLocalName(e) && DeclaresClassConstant(cls, e->text)) {
     return ClassNameHoldsXZ(e->text, cls, look);
   }
   return NameHoldsXZ(e, look.scope.unit->cu_items, look);
@@ -130,9 +138,6 @@ bool ClassNameHoldsXZ(std::string_view name, const ClassDecl& cls,
 bool ScopedNameHoldsXZ(const Expr* e, const Lookup& look) {
   std::string_view scope_name = e->lhs->text;
   std::string_view name = e->rhs->text;
-  if (scope_name == "$unit") {
-    return ParamOfItemsHoldsXZ(name, look.scope.unit->cu_items, look);
-  }
   if (const PackageDecl* pkg = FindPackage(look.scope.unit, scope_name)) {
     return ParamOfItemsHoldsXZ(name, pkg->items, look);
   }
@@ -143,7 +148,10 @@ bool ScopedNameHoldsXZ(const Expr* e, const Lookup& look) {
 bool NameHoldsXZ(const Expr* e, const std::vector<ModuleItem*>& items,
                  const Lookup& look) {
   if (IsScopedName(e)) return ScopedNameHoldsXZ(e, look);
-  if (e->kind != ExprKind::kIdentifier) return false;
+  if (IsUnitName(e)) {
+    return ParamOfItemsHoldsXZ(e->text, look.scope.unit->cu_items, look);
+  }
+  if (!IsLocalName(e)) return false;
   if (FindParamItem(items, e->text) != nullptr) {
     return ParamOfItemsHoldsXZ(e->text, items, look);
   }
@@ -202,7 +210,7 @@ bool ModuleConstantHoldsXZ(const Expr* name, const RtlirModule& mod,
                            const GenBlockPrefixes& scopes,
                            const XzConstantScope& scope) {
   const Lookup kLook{scope, 0};
-  if (name->kind == ExprKind::kIdentifier) {
+  if (IsLocalName(name)) {
     if (const RtlirParamDecl* param =
             VisibleValueParam(mod, name->text, scopes)) {
       return param->value_has_xz;

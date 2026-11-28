@@ -258,6 +258,8 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "  logic [PQ:0] c;\n"
       "endpackage\n"
       "package p2;\n"
+      "  parameter CU = 1;\n"
+      "  logic [$unit::CU:0] u;\n"
       "  import p::*;\n"
       "  logic [PP:0] a;\n"
       "endpackage\n"
@@ -267,6 +269,11 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "  logic [CL:0] b;\n"
       "  localparam CM = CP + 1;\n"
       "  logic [CM:0] c;\n"
+      "  logic [CU:0] d;\n"
+      "endclass\n"
+      "class E;\n"
+      "  localparam CU = 1;\n"
+      "  logic [$unit::CU:0] a;\n"
       "endclass\n"
       "class D;\n"
       "  localparam DL = 1'bx;\n"
@@ -279,6 +286,14 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "  localparam L = 'z;\n"
       "  logic [L:0] a;\n"
       "endprogram\n"
+      "checker ck;\n"
+      "  logic [CU:0] ck1;\n"
+      "  logic [p::PP:0] ck2;\n"
+      "endchecker\n"
+      "module shadow;\n"
+      "  localparam CU = 1;\n"
+      "  logic [$unit::CU:0] a;\n"
+      "endmodule\n"
       "module m #(parameter H = 1'bx)\n"
       "    (input logic [H:0] pa);\n"
       "  import p::*;\n"
@@ -301,16 +316,18 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "  logic [D::DL:0] r;\n"
       "  i ii();\n"
       "  q qq();\n"
+      "  ck cc();\n"
       "endmodule\n",
       f);
-  for (uint32_t line : {2U, 5U, 7U, 11U, 15U, 16U, 18U, 25U, 29U, 32U, 35U, 37U,
-                        38U, 39U, 42U, 46U, 48U, 49U, 50U}) {
+  for (uint32_t line :
+       {2U,  5U,  7U,  11U, 13U, 17U, 18U, 20U, 21U, 25U, 32U, 36U, 39U,
+        40U, 44U, 47U, 50U, 52U, 53U, 54U, 57U, 61U, 63U, 64U, 65U}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, line, "7.4.1"))
         << line;
   }
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "unpacked dimension range shall not contain x or z",
-                            36, "7.4.2"));
+                            51, "7.4.2"));
 }
 
 TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
@@ -327,6 +344,8 @@ TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
       "  logic [PQ:0] c;\n"
       "endpackage\n"
       "package p2;\n"
+      "  parameter CU = 1'bx;\n"
+      "  logic [$unit::CU:0] u;\n"
       "  import p::*;\n"
       "  logic [PP:0] a;\n"
       "endpackage\n"
@@ -336,10 +355,23 @@ TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
       "  logic [CL:0] b;\n"
       "  localparam CM = CP + 1;\n"
       "  logic [CM:0] c;\n"
+      "  logic [CU:0] d;\n"
+      "endclass\n"
+      "class E;\n"
+      "  localparam CU = 1'bx;\n"
+      "  logic [$unit::CU:0] a;\n"
       "endclass\n"
       "class D;\n"
       "  localparam int DL = 'x;\n"
       "endclass\n"
+      "checker ck;\n"
+      "  logic [CU:0] ck1;\n"
+      "  logic [p::PP:0] ck2;\n"
+      "endchecker\n"
+      "module shadow;\n"
+      "  localparam CU = 1'bx;\n"
+      "  logic [$unit::CU:0] a;\n"
+      "endmodule\n"
       "module m #(parameter H = 1'b1, parameter bit HB = 1'bz)\n"
       "    (input logic [H:0] pa);\n"
       "  import p::*;\n"
@@ -353,6 +385,7 @@ TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
       "  logic [PB:0] k;\n"
       "  logic [p::PP:0] n;\n"
       "  logic [D::DL:0] r;\n"
+      "  ck cc();\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
