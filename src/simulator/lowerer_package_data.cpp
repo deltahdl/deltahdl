@@ -450,6 +450,28 @@ static void FitScopeTypedefWidth(const ModuleItem* item, std::string_view pkg,
   if (width != 0) ctx.RegisterTypeWidth(*key, width);
 }
 
+static void RefitVariableValue(Variable* var, uint32_t width, Arena& arena) {
+  var->value = MakeLogic4Vec(arena, width);
+  if (var->is_4state) FillWithX(var->value);
+  var->value.is_signed = var->is_signed;
+}
+
+static void RefitPackageAggregate(std::string_view key, uint32_t width,
+                                  SimContext& ctx, Arena& arena) {
+  if (QueueObject* q = ctx.FindQueue(key)) q->elem_width = width;
+  if (AssocArrayObject* aa = ctx.FindAssocArray(key)) aa->elem_width = width;
+  ArrayInfo* info = ctx.FindArrayInfo(key);
+  if (info == nullptr) return;
+  info->elem_width = width;
+  if (info->is_dynamic) return;
+  std::vector<std::string> suffixes;
+  CollectElementSuffixes(*info, 0, "", suffixes);
+  for (const std::string& suffix : suffixes) {
+    if (Variable* elem = ctx.FindVariable(std::string(key) + suffix))
+      RefitVariableValue(elem, width, arena);
+  }
+}
+
 static void FitPackageDataWidth(const ModuleItem* item, std::string_view pkg,
                                 SimContext& ctx, Arena& arena) {
   if (item->kind != ModuleItemKind::kVarDecl) return;
@@ -459,9 +481,8 @@ static void FitPackageDataWidth(const ModuleItem* item, std::string_view pkg,
   uint32_t width =
       PackageDataWidth(WithPackageOwnType(item, pkg, ctx, arena), key, ctx);
   if (width == var->value.width) return;
-  var->value = MakeLogic4Vec(arena, width);
-  if (var->is_4state) FillWithX(var->value);
-  var->value.is_signed = var->is_signed;
+  RefitVariableValue(var, width, arena);
+  RefitPackageAggregate(key, width, ctx, arena);
 }
 
 static void InitScopeDataItems(const std::vector<ModuleItem*>& items,

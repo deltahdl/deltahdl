@@ -282,18 +282,32 @@ constexpr std::string_view kScopeVectors =
     "  t d = 4'hA;\n"
     "  localparam logic [W-1:0] P = 4'hB;\n"
     "  logic [3:0] lit = 4'h9;\n"
-    "  logic [W:0] e [2];\n";
+    "  logic [W:0] e [2];\n"
+    "  logic [W:0] md [2][3];\n"
+    "  logic [W-1:0] dq [];\n"
+    "  logic [W-1:0] qu [$];\n"
+    "  logic [W-1:0] aa [int];\n";
 
 constexpr std::string_view kScopeVectorsPrinted =
-    "4 c 8 c3 8 c3 c 8 4 a 4 b 4 9 5\n";
+    "4 c 8 c3 8 c3 c 8 4 a 4 b 4 9 5 1f 5 1f f b b\n";
 
 std::string ScopeVectorReads(std::string_view prefix) {
   return std::format(
-      "  initial $display(\"%0d %h %0d %h %0d %h %h %0d %0d %h %0d %h %0d %h "
-      "%0d\",\n"
-      "      $bits({0}a), {0}a, $bits({0}c), {0}c, $bits({0}v), {0}v,\n"
-      "      {0}v[1], $bits({0}ub), $bits({0}d), {0}d, $bits({0}P), {0}P,\n"
-      "      $bits({0}lit), {0}lit, $bits({0}e[0]));\n",
+      "  initial begin\n"
+      "    {0}e[1] = 8'hFF;\n"
+      "    {0}md[1][2] = 8'hFF;\n"
+      "    {0}dq = new[1];\n"
+      "    {0}dq[0] = 8'hFF;\n"
+      "    {0}qu.push_back(8'hAB);\n"
+      "    {0}aa[1] = 8'hAB;\n"
+      "    $display(\"%0d %h %0d %h %0d %h %h %0d %0d %h %0d %h %0d %h %0d "
+      "%h %0d %h %h %h %h\",\n"
+      "        $bits({0}a), {0}a, $bits({0}c), {0}c, $bits({0}v), {0}v,\n"
+      "        {0}v[1], $bits({0}ub), $bits({0}d), {0}d, $bits({0}P), {0}P,\n"
+      "        $bits({0}lit), {0}lit, $bits({0}e[0]), {0}e[1],\n"
+      "        $bits({0}md[1][2]), {0}md[1][2], {0}dq[0], {0}qu[0], "
+      "{0}aa[1]);\n"
+      "  end\n",
       prefix);
 }
 

@@ -1,10 +1,12 @@
 #ifndef DELTA_SIMULATOR_LOWERER_REGISTER_H_
 #define DELTA_SIMULATOR_LOWERER_REGISTER_H_
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "common/types.h"
 #include "elaborator/const_eval.h"
@@ -131,6 +133,9 @@ void AliasUnitDataItems(const RtlirDesign* design, const RtlirModule* mod,
                         Arena& arena);
 void AliasVariableKinds(std::string_view key, std::string_view qname,
                         SimContext& ctx, Arena& arena);
+void CollectElementSuffixes(const ArrayInfo& info, size_t dim,
+                            const std::string& prefix,
+                            std::vector<std::string>& out);
 bool ModuleDeclaresName(const RtlirModule* mod, std::string_view name);
 void InitPackageDataVariables(const RtlirDesign* design, SimContext& ctx,
                               Arena& arena);

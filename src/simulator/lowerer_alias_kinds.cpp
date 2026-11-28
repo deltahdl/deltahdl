@@ -11,9 +11,9 @@
 
 namespace delta {
 
-static void CollectElementSuffixes(const ArrayInfo& info, size_t dim,
-                                   const std::string& prefix,
-                                   std::vector<std::string>& out) {
+void CollectElementSuffixes(const ArrayInfo& info, size_t dim,
+                            const std::string& prefix,
+                            std::vector<std::string>& out) {
   bool multi = !info.dim_sizes.empty();
   size_t dims = multi ? info.dim_sizes.size() : 1;
   if (dim == dims) {
