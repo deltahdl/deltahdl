@@ -652,6 +652,7 @@ TEST(NetDataType, ObjectTwoStateAndRealNetsAreRejectedInEveryPlace) {
   struct Place {
     std::string_view text;
     uint32_t line;
+    bool is_port = false;
   };
   const std::string kPrelude =
       "interface I;\n"
@@ -679,22 +680,29 @@ TEST(NetDataType, ObjectTwoStateAndRealNetsAreRejectedInEveryPlace) {
            Place{"package q;\n  wire TYPE w;\nendpackage\n"
                  "module top;\nendmodule\n",
                  9},
-           Place{"module top(input wire TYPE w);\nendmodule\n", 8},
-           Place{"module top(w);\n  input wire TYPE w;\nendmodule\n", 9},
+           Place{"module top(input wire TYPE w);\nendmodule\n", 8, true},
+           Place{"module top(input TYPE w);\nendmodule\n", 8, true},
+           Place{"module top(w);\n  input wire TYPE w;\nendmodule\n", 8, true},
            Place{"interface host(input wire TYPE w);\nendinterface\n"
                  "module top;\n  host h();\nendmodule\n",
-                 8},
+                 8, true},
            Place{"program host(input wire TYPE w);\nendprogram\n"
                  "module top;\n  host h();\nendmodule\n",
-                 8},
+                 8, true},
        }) {
     for (std::string_view type :
          {"C", "CT", "cg", "virtual I", "semaphore", "bit", "real"}) {
       ElabFixture f;
       ElaborateSrc(kPrelude + WithNetType(place.text, type), f);
-      EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
-                                "net data type must be 4-state", place.line,
-                                "6.7.1"))
+      const bool kPortOfVirtualInterface = place.is_port && type == "virtual I";
+      EXPECT_TRUE(
+          kPortOfVirtualInterface
+              ? ReportedError(f.diag.Diagnostics(),
+                              "virtual interface cannot be used as a port type",
+                              place.line, "25.9")
+              : ReportedError(f.diag.Diagnostics(),
+                              "net data type must be 4-state", place.line,
+                              "6.7.1"))
           << type << " in\n"
           << place.text;
     }

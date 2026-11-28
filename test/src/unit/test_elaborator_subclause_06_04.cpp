@@ -477,8 +477,8 @@ TEST(SingularAggregateTypes, ClassHandlePortDefaultAccepted) {
       "class P #(int N = 1);\n"
       "endclass\n";
   for (const char* port : {"C h", "p::PC h", "c_t h", "IC h", "P #(8) h"}) {
-    EXPECT_TRUE(ElabOk(std::format("{}module t(input {} = null);\nendmodule\n",
-                                   kClasses, port)))
+    EXPECT_TRUE(ElabOk(std::format(
+        "{}module t(input var {} = null);\nendmodule\n", kClasses, port)))
         << port;
   }
 }
@@ -487,9 +487,9 @@ TEST(SingularAggregateTypes, ClassHandlePortDefaultAcceptedOnEveryHeader) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
              "endclass\n"
-             "interface i(input C h = null);\n"
+             "interface i(input var C h = null);\n"
              "endinterface\n"
-             "program q(input C h = null);\n"
+             "program q(input var C h = null);\n"
              "endprogram\n"
              "module t;\n"
              "  i u();\n"

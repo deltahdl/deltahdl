@@ -494,7 +494,7 @@ TEST(ClassParameterWithoutDefault, TypeWrittenInsideAnotherDeclaration) {
                                                          "module m;\n"
                                                          "endmodule\n")},
       {"structure member", InModule("  typedef struct { Mem@ h; } st_t;\n")},
-      {"port", InUnit("module child(input Mem@ h);\n"
+      {"port", InUnit("module child(input var Mem@ h);\n"
                       "endmodule\n"
                       "module m;\n"
                       "  child c(.h(null));\n"
