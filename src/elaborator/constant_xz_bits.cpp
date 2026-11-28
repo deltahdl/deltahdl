@@ -119,13 +119,12 @@ bool ClassNameHoldsXZ(std::string_view name, const ClassDecl& cls,
         i < cls.param_types.size() ? cls.param_types[i] : kUntyped;
     return HoldsXZ(type, cls.params[i].second, kNames, look);
   }
-  for (const ClassMember* m : cls.members) {
-    if (m->kind == ClassMemberKind::kProperty && m->is_param &&
-        m->name == name) {
-      return HoldsXZ(m->data_type, m->init_expr, kNames, look);
-    }
-  }
-  return false;
+  auto member = std::ranges::find_if(cls.members, [&](const ClassMember* m) {
+    return m->kind == ClassMemberKind::kProperty && m->is_param &&
+           m->name == name;
+  });
+  return member != cls.members.end() &&
+         HoldsXZ((*member)->data_type, (*member)->init_expr, kNames, look);
 }
 
 bool ScopedNameHoldsXZ(const Expr* e, const Lookup& look) {

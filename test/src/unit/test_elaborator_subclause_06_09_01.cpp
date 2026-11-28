@@ -254,11 +254,19 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "package p;\n"
       "  parameter PP = 2'bx1;\n"
       "  logic [PP:0] a;\n"
+      "  parameter PQ = PP + 1;\n"
+      "  logic [PQ:0] c;\n"
+      "endpackage\n"
+      "package p2;\n"
+      "  import p::*;\n"
+      "  logic [PP:0] a;\n"
       "endpackage\n"
       "class C #(parameter CP = 1'bz);\n"
       "  localparam CL = 1'bx;\n"
       "  logic [CP:0] a;\n"
       "  logic [CL:0] b;\n"
+      "  localparam CM = CP + 1;\n"
+      "  logic [CM:0] c;\n"
       "endclass\n"
       "class D;\n"
       "  localparam DL = 1'bx;\n"
@@ -295,14 +303,14 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "  q qq();\n"
       "endmodule\n",
       f);
-  for (uint32_t line : {2U, 5U, 9U, 10U, 17U, 21U, 24U, 27U, 29U, 30U, 31U, 34U,
-                        38U, 40U, 41U, 42U}) {
+  for (uint32_t line : {2U, 5U, 7U, 11U, 15U, 16U, 18U, 25U, 29U, 32U, 35U, 37U,
+                        38U, 39U, 42U, 46U, 48U, 49U, 50U}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kXzInRange, line, "7.4.1"))
         << line;
   }
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "unpacked dimension range shall not contain x or z",
-                            28, "7.4.2"));
+                            36, "7.4.2"));
 }
 
 TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
@@ -315,11 +323,19 @@ TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
       "  parameter bit PB = 1'bx;\n"
       "  logic [PP:0] a;\n"
       "  logic [PB:0] b;\n"
+      "  parameter PQ = PP + 1;\n"
+      "  logic [PQ:0] c;\n"
+      "endpackage\n"
+      "package p2;\n"
+      "  import p::*;\n"
+      "  logic [PP:0] a;\n"
       "endpackage\n"
       "class C #(parameter CP = 1'b1);\n"
       "  localparam int CL = 1'bx;\n"
       "  logic [CP:0] a;\n"
       "  logic [CL:0] b;\n"
+      "  localparam CM = CP + 1;\n"
+      "  logic [CM:0] c;\n"
       "endclass\n"
       "class D;\n"
       "  localparam int DL = 'x;\n"
