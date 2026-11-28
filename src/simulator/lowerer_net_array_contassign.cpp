@@ -30,7 +30,7 @@ struct DimSpan {
   }
 
   [[nodiscard]] int64_t At(size_t k) const {
-    const int64_t kOffset = static_cast<int64_t>(k);
+    const auto kOffset = static_cast<int64_t>(k);
     return left <= right ? left + kOffset : left - kOffset;
   }
 };
