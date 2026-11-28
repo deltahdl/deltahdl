@@ -29,6 +29,17 @@ static std::string_view NestedLayoutName(const StructMember& m, Arena& arena) {
                                     "::" + std::string(m.type_name));
 }
 
+static DataTypeKind FieldKind(const StructMember& m, std::string_view name,
+                              const SimContext& ctx) {
+  if (m.type_kind != DataTypeKind::kNamed || m.nested_type != nullptr)
+    return m.type_kind;
+  const DataTypeKind kNamedKind = ctx.FindTypeKind(name);
+  const bool kReal = kNamedKind == DataTypeKind::kReal ||
+                     kNamedKind == DataTypeKind::kShortreal ||
+                     kNamedKind == DataTypeKind::kRealtime;
+  return kReal ? kNamedKind : m.type_kind;
+}
+
 static void RecordDeclRange(const StructMember& m, StructFieldInfo& fi) {
   if (!m.extra_packed_dims.empty() || m.packed_dim_left == nullptr ||
       m.packed_dim_right == nullptr)
@@ -109,6 +120,7 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
       fi.dyn_max_size = QueueDimMaxSize(m.unpacked_dims.front());
     }
     if (!m.type_name.empty()) fi.type_name = NestedLayoutName(m, arena);
+    fi.type_kind = FieldKind(m, fi.type_name, ctx);
     if (UnpackedMemberBounds(m, &fi.elem_left, &fi.elem_right))
       fi.elem_count = UnpackedMemberCount(m);
     if (!m.unpacked_dims.empty()) fi.unpacked_dims = &m.unpacked_dims;

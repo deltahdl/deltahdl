@@ -234,7 +234,7 @@ TEST(RealDataType, RealAndRealtimeHoldTheNearestBinary64InEveryPlace) {
       kTenthAsBinary64);
 }
 
-TEST(RealDataType, DISABLED_AVariableOfARealTypedefHoldsTheNearestBinary64) {
+TEST(RealDataType, AVariableOfARealTypedefHoldsTheNearestBinary64) {
   ExpectEveryReadBack(
       {
           {"module real typedef initializer", "",

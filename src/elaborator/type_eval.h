@@ -53,6 +53,8 @@ DataType EnumArrayElement(const DataType& dtype);
 
 bool IsStringType(const DataType& type, const TypedefMap& typedefs);
 
+bool ResolvesToRealType(const DataType& type, const TypedefMap& typedefs);
+
 bool IsTypeKeyword(std::string_view key);
 bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind);
 

@@ -262,9 +262,7 @@ void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
   var.is_string = IsStringType(item->data_type, typedefs);
-  var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
-                 item->data_type.kind == DataTypeKind::kShortreal ||
-                 item->data_type.kind == DataTypeKind::kRealtime);
+  var.is_real = ResolvesToRealType(item->data_type, typedefs);
 }
 
 void TagUserNettypeNet(

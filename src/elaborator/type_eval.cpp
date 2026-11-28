@@ -479,6 +479,14 @@ bool IsStringType(const DataType& dtype, const TypedefMap& typedefs) {
   return dtype.kind == DataTypeKind::kString;
 }
 
+bool ResolvesToRealType(const DataType& dtype, const TypedefMap& typedefs) {
+  const auto* resolved = FindNamedType(dtype, typedefs);
+  if (resolved) return ResolvesToRealType(*resolved, typedefs);
+  return dtype.kind == DataTypeKind::kReal ||
+         dtype.kind == DataTypeKind::kShortreal ||
+         dtype.kind == DataTypeKind::kRealtime;
+}
+
 bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) return Is4stateType(*resolved, typedefs);
