@@ -1,9 +1,15 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
+#include <format>
 #include <initializer_list>
+#include <string>
+#include <string_view>
 
 #include "fixture_elaborator.h"
+#include "helpers_net_body_places.h"
 #include "helpers_reported_error.h"
 
 using namespace delta;
@@ -643,6 +649,56 @@ TEST(ContAssignStatementElaboration, NetDeclaredAfterItsContAssignIsError) {
       f);
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'n'", 3, "6.5"));
+}
+
+constexpr std::string_view kNettypeTargetDecls =
+    "  typedef int TI [3];\n"
+    "  nettype TI wTI;\n"
+    "  nettype logic [1:0] T2;\n";
+
+constexpr std::string_view kNettypeTargetNets =
+    "  wTI a;\n"
+    "  wTI m [2];\n"
+    "  T2 p [2];\n";
+
+struct NettypeTarget {
+  std::string_view assign;
+  bool reported;
+};
+
+constexpr std::array<NettypeTarget, 6> kNettypeTargets = {{
+    {"  assign a = '{1, 2, 3};\n", false},
+    {"  assign a[0] = 1;\n", true},
+    {"  assign m[1] = '{4, 5, 6};\n", false},
+    {"  assign m[1][0] = 4;\n", true},
+    {"  assign p[1] = 2'b01;\n", false},
+    {"  assign p[1][0] = 1'b0;\n", true},
+}};
+
+TEST(ContAssignStatementElaboration,
+     NettypeNetArrayElementsAreWholeTargetsWhereverDeclared) {
+  for (const NetBodyPlace& place : kNetBodyPlaces) {
+    for (const NettypeTarget& target : kNettypeTargets) {
+      SCOPED_TRACE(std::format("{}: {}", place.name, target.assign));
+      const std::string kBefore =
+          std::format("{}{}{}{}", place.head, kNettypeTargetDecls, place.open,
+                      kNettypeTargetNets);
+      ElabFixture f;
+      Elaborate(std::format("{}{}{}{}", kBefore, target.assign, place.close,
+                            place.tail),
+                f);
+      if (target.reported) {
+        EXPECT_TRUE(ReportedError(
+            f.diag.Diagnostics(),
+            "a continuous assignment to a net of a user-defined nettype "
+            "drives the whole net and cannot index or select into it",
+            static_cast<uint32_t>(std::ranges::count(kBefore, '\n') + 1),
+            "10.3.2"));
+      } else {
+        EXPECT_FALSE(f.has_errors);
+      }
+    }
+  }
 }
 
 }  // namespace

@@ -125,6 +125,7 @@ struct RtlirNet {
 
   bool refers_outward = false;
   bool default_is_zero = false;
+  uint32_t nettype_value_dims = 0;
 };
 
 struct RtlirVariable {

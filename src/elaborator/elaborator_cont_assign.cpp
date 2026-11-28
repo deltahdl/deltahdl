@@ -277,9 +277,11 @@ void ValidatePrimitiveDrivenTerminals(
   }
 }
 
-static size_t UnpackedDimsOfNet(std::string_view name, const RtlirModule* mod) {
+static size_t ArrayDimsOfNet(std::string_view name, const RtlirModule* mod) {
   for (const auto& n : mod->nets)
-    if (n.name == name) return n.num_unpacked_dims;
+    if (n.name == name)
+      return n.num_unpacked_dims -
+             std::min(n.num_unpacked_dims, n.nettype_value_dims);
   return 0;
 }
 
@@ -325,7 +327,11 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
   bool is_var = !is_net && !leaf.has_member;
   if (is_var) ValidateContAssignVarLeaf(item, leaf.root);
   if (nettype_net_names_.count(leaf.root) != 0 &&
-      (leaf.has_member || leaf.selects > UnpackedDimsOfNet(leaf.root, mod))) {
+      (leaf.has_member ||
+       leaf.selects >
+           ArrayDimsOfNet(DeclaredScopedName(leaf.root, gen_prefix_scopes_,
+                                             declared_names_),
+                          mod))) {
     diag_.Error(item->loc,
                 "a continuous assignment to a net of a user-defined nettype "
                 "drives the whole net and cannot index or select into it",
