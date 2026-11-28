@@ -141,17 +141,20 @@ TEST(ParameterOfTypeReferenceSim,
                  "  int na [3];\n"
                  "  localparam type(na) PTA = '{1, 2, 3};\n"
                  "  localparam int SA [3] = '{1, 2, 3};\n"
+                 "  function automatic int psizes();\n"
+                 "    return $size(PTA) * 10 + $size(SA);\n"
+                 "  endfunction\n"
                  "endpackage\n"
                  "int ua [2];\n"
                  "localparam type(ua) UTA = '{4, 5};\n"
                  "localparam int USA [2] = '{4, 5};\n"
                  "module top;\n"
                  "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\",\n"
-                 "      $size(pk::PTA), pk::PTA[2], $size(pk::SA), pk::SA[2],\n"
+                 "      pk::psizes(), pk::PTA[2], pk::PTA[0], pk::SA[2],\n"
                  "      $size(UTA), UTA[1], $size(USA), USA[1]);\n"
                  "endmodule\n",
                  f),
-      "3 3 3 3 2 5 2 5\n");
+      "33 3 1 3 2 5 2 5\n");
 }
 
 TEST(ScopeDeclarationTypeRefSim, ScopedTypedefKeepsItsUnpackedDimensions) {
