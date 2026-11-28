@@ -317,6 +317,7 @@ TEST(VectorSpecification, XOrZFromAConstantInRangeIsErrorInEveryPlace) {
       "  i ii();\n"
       "  q qq();\n"
       "  ck cc();\n"
+      "  shadow sh();\n"
       "endmodule\n",
       f);
   for (uint32_t line :
@@ -386,6 +387,7 @@ TEST(VectorSpecification, KnownConstantInRangeIsAcceptedInEveryPlace) {
       "  logic [p::PP:0] n;\n"
       "  logic [D::DL:0] r;\n"
       "  ck cc();\n"
+      "  shadow sh();\n"
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
