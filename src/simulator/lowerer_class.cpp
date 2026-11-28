@@ -340,7 +340,7 @@ static void CollectClassMembers(ClassTypeInfo* info, const ClassDecl* cls,
     if (member->kind == ClassMemberKind::kProperty) {
       const DataType& type = *TypeOfThisNamed(&member->data_type, info, ctx);
       std::string_view key =
-          member->is_param
+          member->is_param || !ClassHasValueParams(*cls)
               ? InPlaceAggregateLayoutKey(cls->name, member->name, type, ctx)
               : std::string_view{};
       if (key.empty()) key = PropertyTypeKey(type, *info, *cls, params, ctx);
