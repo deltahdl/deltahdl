@@ -7,6 +7,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "elaborator/const_eval.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
@@ -97,6 +98,29 @@ static const Expr* ParamValueExpr(const RtlirParamDecl& p) {
   return p.override_expr != nullptr ? p.override_expr : p.default_value;
 }
 
+static bool HasOneUnsizedDim(const RtlirParamDecl& p) {
+  return p.unpacked_dims != nullptr && p.unpacked_dims->size() == 1 &&
+         (p.unpacked_dims->front() == nullptr ||
+          IsQueueDim(p.unpacked_dims->front()));
+}
+
+static QueueObject* CreateParamQueue(const RtlirParamDecl& p, const Expr* dim,
+                                     std::string_view full, SimContext& ctx) {
+  ParamStorageShape shape = ParamStorageShapeOf(p);
+  bool is_4state = DeclaredTypeIs4State(*ParamValueType(p), ctx);
+  ctx.CreateVariable(full, shape.width);
+  QueueObject* q =
+      ctx.CreateQueue(full, shape.width, QueueDimMaxSize(dim), is_4state);
+  q->is_signed = shape.is_signed;
+  if (dim != nullptr) return q;
+  ArrayInfo info;
+  info.is_dynamic = true;
+  info.elem_width = shape.width;
+  info.is_4state = is_4state;
+  ctx.RegisterArray(full, info);
+  return q;
+}
+
 static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
   bool found = false;
   ForEachSubExpr(expr, [&](const Expr* e) {
@@ -162,6 +186,13 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   if (p.is_unbounded) {
     ctx_.RegisterUnboundedParam(full);
     ctx_.CreateVariable(full, 32);
+    return;
+  }
+  if (HasOneUnsizedDim(p)) {
+    QueueObject* q = CreateParamQueue(p, p.unpacked_dims->front(), full, ctx_);
+    FillParamValue(p, [this, &p, q] {
+      InitQueueFromDeclInit(q, ParamValueExpr(p), ctx_, arena_);
+    });
     return;
   }
   if (!p.unpacked_bounds.empty()) {

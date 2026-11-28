@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -14,6 +15,7 @@
 #include "elaborator/elaborator_helpers.h"
 #include "elaborator/elaborator_items_params.h"
 #include "elaborator/elaborator_validate_internal.h"
+#include "elaborator/queue_dim.h"
 #include "elaborator/rtlir.h"
 #include "elaborator/rtlir_scopes.h"
 #include "elaborator/type_eval.h"
@@ -225,7 +227,10 @@ std::optional<PartState> RootState(const Expr* root, const ScopeMap& scope) {
 }
 
 std::optional<RtlirUnpackedDim> ShapeDim(const PartShape& shape) {
-  return FoldUnpackedDimBounds(shape.dims[shape.dim_at], *shape.scope);
+  const Expr* dim = shape.dims[shape.dim_at];
+  if (dim == nullptr || IsQueueDim(dim))
+    return RtlirUnpackedDim{0, std::numeric_limits<int32_t>::max() - 1};
+  return FoldUnpackedDimBounds(dim, *shape.scope);
 }
 
 std::optional<int64_t> PositionOf(const PartShape& shape, const Expr* index,
