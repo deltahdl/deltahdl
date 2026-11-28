@@ -133,4 +133,24 @@ TEST(NettypeSimulation,
                                    "1 3 4 6 0 0\n");
 }
 
+TEST(NettypeSimulation, PackageArrayTypedefAndAliasNettypesHoldTheArray) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("package pk;\n"
+                       "  typedef int TI [3];\n"
+                       "endpackage\n"
+                       "module t;\n"
+                       "  nettype pk::TI wP;\n"
+                       "  nettype wP wQ;\n"
+                       "  wP a;\n"
+                       "  wP u;\n"
+                       "  wQ b;\n"
+                       "  assign a = '{7, 8, 9};\n"
+                       "  assign b = '{4, 5, 6};\n"
+                       "  initial #1 $display(\"%0d %0d %0d %0d %0d\", a[0], "
+                       "a[2], u[1], b[0], b[2]);\n"
+                       "endmodule\n",
+                       f),
+            "7 9 0 4 6\n");
+}
+
 }  // namespace

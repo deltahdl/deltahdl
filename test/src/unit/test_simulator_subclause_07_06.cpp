@@ -561,6 +561,57 @@ TEST(ArrayAssignmentSim, NetArraySliceAndPatternDrivenByPosition) {
             "zz 30 40 zz 4 5 6\n");
 }
 
+TEST(ArrayAssignmentSim, NetArrayIndexedSlicesFollowTheDeclaredDirection) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] V [4] = '{8'd10, 8'd20, 8'd30, 8'd40};\n"
+                       "  wire [7:0] A [0:3];\n"
+                       "  wire [7:0] D [3:0];\n"
+                       "  assign A[1+:2] = V[2+:2];\n"
+                       "  assign D[2-:2] = V[1-:2];\n"
+                       "  initial #1 $display(\"%h %0d %0d %h %h %0d %0d %h\", "
+                       "A[0], A[1], A[2], A[3], D[3], D[2], D[1], D[0]);\n"
+                       "endmodule\n",
+                       f),
+            "zz 30 40 zz zz 10 20 zz\n");
+}
+
+TEST(ArrayAssignmentSim,
+     NetArrayDrivenByKeyedDefaultReplicatedAndNestedPatterns) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("module t;\n"
+                 "  logic [7:0] V2 [2] = '{8'd1, 8'd2};\n"
+                 "  wire [7:0] K [3:0];\n"
+                 "  wire [7:0] R [4];\n"
+                 "  wire [7:0] Q [2][2];\n"
+                 "  wire [7:0] F [2][2];\n"
+                 "  assign K = '{1: 8'd5, default: 8'd7};\n"
+                 "  assign R = '{2 {8'd3, 8'd4}};\n"
+                 "  assign Q = '{V2, '{8'd5, 8'd6}};\n"
+                 "  assign F = '{default: 8'd9};\n"
+                 "  initial #1 $display(\"%0d %0d %0d %0d %0d %0d %0d %0d "
+                 "%0d %0d %0d %0d %0d\", K[3], K[1], K[0], R[0], R[1], "
+                 "R[2], R[3], Q[0][0], Q[0][1], Q[1][0], Q[1][1], "
+                 "F[0][0], F[1][1]);\n"
+                 "endmodule\n",
+                 f),
+      "7 5 7 3 4 3 4 1 2 5 6 9 9\n");
+}
+
+TEST(ArrayAssignmentSim, NetArrayElementAtAnUnknownIndexIsNotDriven) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  localparam logic [1:0] BAD = 2'bx1;\n"
+                       "  wire [7:0] X [2];\n"
+                       "  assign X[BAD] = 8'h5;\n"
+                       "  assign X[1] = 8'h6;\n"
+                       "  initial #1 $display(\"%h %h\", X[0], X[1]);\n"
+                       "endmodule\n",
+                       f),
+            "zz 06\n");
+}
+
 constexpr std::string_view kNetArrayDrives =
     "  logic [7:0] V [2] = '{8'h11, 8'h22};\n"
     "  wire [7:0] W [2];\n"

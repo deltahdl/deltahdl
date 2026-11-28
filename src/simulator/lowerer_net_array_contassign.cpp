@@ -1,9 +1,9 @@
 #include "simulator/lowerer_net_array_contassign.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include <iterator>
 #include <optional>
 #include <utility>
 #include <vector>
@@ -13,6 +13,7 @@
 #include "elaborator/rtlir.h"
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
+#include "simulator/pattern_type_key.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 
@@ -26,6 +27,11 @@ struct DimSpan {
 
   [[nodiscard]] size_t Count() const {
     return static_cast<size_t>(std::llabs(right - left)) + 1;
+  }
+
+  [[nodiscard]] int64_t At(size_t k) const {
+    const int64_t kOffset = static_cast<int64_t>(k);
+    return left <= right ? left + kOffset : left - kOffset;
   }
 };
 
@@ -60,8 +66,7 @@ bool KnownIndex(const Expr* e, SimContext& ctx, int64_t& out) {
   return true;
 }
 
-bool NarrowSpan(const Expr* select, bool last, SimContext& ctx, DimSpan& span) {
-  if (select->is_part_select_plus || select->is_part_select_minus) return false;
+bool NarrowSpan(const Expr* select, SimContext& ctx, DimSpan& span) {
   int64_t first = 0;
   if (!KnownIndex(select->index, ctx, first)) return false;
   if (select->index_end == nullptr) {
@@ -69,15 +74,21 @@ bool NarrowSpan(const Expr* select, bool last, SimContext& ctx, DimSpan& span) {
     return true;
   }
   int64_t second = 0;
-  if (!last || !KnownIndex(select->index_end, ctx, second)) return false;
-  span = {first, second};
+  if (!KnownIndex(select->index_end, ctx, second)) return false;
+  if (!select->is_part_select_plus && !select->is_part_select_minus) {
+    span = {first, second};
+    return true;
+  }
+  const int64_t kLow = select->is_part_select_plus ? first : first - second + 1;
+  const int64_t kHigh = kLow + second - 1;
+  span = span.left <= span.right ? DimSpan{kLow, kHigh} : DimSpan{kHigh, kLow};
   return true;
 }
 
 std::optional<ArrayRef> ResolveArrayRef(Expr* e, SimContext& ctx) {
   std::vector<const Expr*> chain;
   Expr* root = e;
-  while (root->kind == ExprKind::kSelect && root->base != nullptr) {
+  while (root->kind == ExprKind::kSelect) {
     chain.push_back(root);
     root = root->base;
   }
@@ -90,8 +101,7 @@ std::optional<ArrayRef> ResolveArrayRef(Expr* e, SimContext& ctx) {
   if (chain.size() > ref.spans.size()) return std::nullopt;
   size_t depth = 0;
   for (auto it = chain.rbegin(); it != chain.rend(); ++it, ++depth) {
-    if (!NarrowSpan(*it, std::next(it) == chain.rend(), ctx, ref.spans[depth]))
-      return std::nullopt;
+    if (!NarrowSpan(*it, ctx, ref.spans[depth])) return std::nullopt;
     ref.fixed[depth] = (*it)->index_end == nullptr;
   }
   return ref;
@@ -101,12 +111,11 @@ std::vector<std::vector<int64_t>> LeafAddresses(
     const std::vector<DimSpan>& spans) {
   std::vector<std::vector<int64_t>> leaves(1);
   for (const DimSpan& span : spans) {
-    const int64_t kStep = span.left <= span.right ? 1 : -1;
     std::vector<std::vector<int64_t>> next;
     for (const std::vector<int64_t>& prefix : leaves) {
       for (size_t k = 0; k < span.Count(); ++k) {
         next.push_back(prefix);
-        next.back().push_back(span.left + kStep * static_cast<int64_t>(k));
+        next.back().push_back(span.At(k));
       }
     }
     leaves = std::move(next);
@@ -129,30 +138,80 @@ Expr* ElementAt(Expr* root, const std::vector<int64_t>& address, Arena& arena) {
   return element;
 }
 
-bool FlattenPattern(Expr* e, const std::vector<DimSpan>& free, size_t depth,
-                    std::vector<Expr*>& out) {
-  if (depth == free.size()) {
-    out.push_back(e);
+struct PatternWalk {
+  const std::vector<DimSpan>& free;
+  SimContext& ctx;
+  Arena& arena;
+  std::vector<Expr*>& out;
+};
+
+bool AppendArrayLeaves(Expr* e, const PatternWalk& walk) {
+  std::optional<ArrayRef> source = ResolveArrayRef(e, walk.ctx);
+  if (!source) return false;
+  for (const std::vector<int64_t>& address : LeafAddresses(source->spans))
+    walk.out.push_back(ElementAt(source->root, address, walk.arena));
+  return true;
+}
+
+Expr* PositionalItem(const Expr* pattern, size_t pos) {
+  const std::vector<Expr*>& items = pattern->elements;
+  if (items.size() == 1 && items[0]->is_pattern_replication) {
+    const std::vector<Expr*>& body = items[0]->elements;
+    return body.empty() ? nullptr : body[pos % body.size()];
+  }
+  return pos < items.size() ? items[pos] : nullptr;
+}
+
+Expr* KeyedItem(const Expr* pattern, int64_t index, const PatternWalk& walk,
+                bool& by_default) {
+  const Expr* found = IndexKeyedItem(pattern, static_cast<uint32_t>(index),
+                                     walk.ctx, walk.arena);
+  by_default = found == nullptr;
+  if (by_default) found = DefaultKeyedItem(pattern);
+  auto it = std::ranges::find(pattern->elements, found);
+  return it == pattern->elements.end() ? nullptr : *it;
+}
+
+size_t LeavesBelow(const std::vector<DimSpan>& free, size_t depth) {
+  size_t count = 1;
+  for (size_t d = depth; d < free.size(); ++d) count *= free[d].Count();
+  return count;
+}
+
+bool FlattenPattern(Expr* e, size_t depth, const PatternWalk& walk);
+
+bool FlattenItem(Expr* item, bool by_default, size_t depth,
+                 const PatternWalk& walk) {
+  if (depth == walk.free.size()) {
+    walk.out.push_back(item);
     return true;
   }
-  if (e->kind != ExprKind::kAssignmentPattern || !e->pattern_keys.empty() ||
-      e->is_pattern_replication || e->elements.size() != free[depth].Count())
-    return false;
-  for (Expr* item : e->elements) {
-    if (!FlattenPattern(item, free, depth + 1, out)) return false;
+  if (item->kind == ExprKind::kAssignmentPattern)
+    return FlattenPattern(item, depth, walk);
+  if (!by_default) return AppendArrayLeaves(item, walk);
+  walk.out.insert(walk.out.end(), LeavesBelow(walk.free, depth), item);
+  return true;
+}
+
+bool FlattenPattern(Expr* e, size_t depth, const PatternWalk& walk) {
+  const DimSpan& span = walk.free[depth];
+  for (size_t k = 0; k < span.Count(); ++k) {
+    bool by_default = false;
+    Expr* item = e->pattern_keys.empty()
+                     ? PositionalItem(e, k)
+                     : KeyedItem(e, span.At(k), walk, by_default);
+    if (item == nullptr) return false;
+    if (!FlattenItem(item, by_default, depth + 1, walk)) return false;
   }
   return true;
 }
 
 bool SourceLeaves(Expr* rhs, const std::vector<DimSpan>& free, SimContext& ctx,
                   Arena& arena, std::vector<Expr*>& out) {
+  const PatternWalk kWalk{free, ctx, arena, out};
   if (rhs->kind == ExprKind::kAssignmentPattern)
-    return FlattenPattern(rhs, free, 0, out);
-  std::optional<ArrayRef> source = ResolveArrayRef(rhs, ctx);
-  if (!source) return false;
-  for (const std::vector<int64_t>& address : LeafAddresses(source->spans))
-    out.push_back(ElementAt(source->root, address, arena));
-  return true;
+    return FlattenPattern(rhs, 0, kWalk);
+  return AppendArrayLeaves(rhs, kWalk);
 }
 
 }  // namespace
@@ -161,8 +220,7 @@ bool SplitNetArrayContAssign(const RtlirContAssign& ca, SimContext& ctx,
                              Arena& arena,
                              std::vector<RtlirContAssign>& pieces) {
   const Expr* root = ca.lhs;
-  while (root->kind == ExprKind::kSelect && root->base != nullptr)
-    root = root->base;
+  while (root->kind == ExprKind::kSelect) root = root->base;
   if (root->kind != ExprKind::kIdentifier || ctx.FindNet(root->text) == nullptr)
     return false;
   std::optional<ArrayRef> target = ResolveArrayRef(ca.lhs, ctx);
@@ -175,9 +233,8 @@ bool SplitNetArrayContAssign(const RtlirContAssign& ca, SimContext& ctx,
   const std::vector<std::vector<int64_t>> kLeaves =
       LeafAddresses(target->spans);
   std::vector<Expr*> sources;
-  if (!SourceLeaves(ca.rhs, free, ctx, arena, sources) ||
-      sources.size() != kLeaves.size())
-    return false;
+  if (!SourceLeaves(ca.rhs, free, ctx, arena, sources)) return false;
+  if (sources.size() != kLeaves.size()) return false;
   for (size_t k = 0; k < kLeaves.size(); ++k) {
     RtlirContAssign piece = ca;
     piece.lhs = ElementAt(target->root, kLeaves[k], arena);
