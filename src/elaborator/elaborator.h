@@ -385,6 +385,9 @@ class Elaborator : public ElaboratorClassRules {
 
   void PassDollarArguments(ParamList& child_params, const RtlirModule* mod);
 
+  void PassConfigDollarArguments(
+      std::vector<std::pair<std::string_view, Expr*>>& params);
+
   bool ContainsDollarSubexpr(const Expr* e) const;
 
   void ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,

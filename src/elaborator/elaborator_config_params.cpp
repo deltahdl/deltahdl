@@ -160,6 +160,15 @@ void ReportUnappliedOverrides(const std::vector<std::string_view>& unapplied,
 
 }  // namespace
 
+void Elaborator::PassConfigDollarArguments(
+    std::vector<std::pair<std::string_view, Expr*>>& params) {
+  if (module_path_.empty()) return;
+  for (auto& assignment : params) {
+    Expr* dollar = DollarPassedBy(assignment.second, module_path_.back());
+    if (dollar != nullptr) assignment.second = dollar;
+  }
+}
+
 void Elaborator::ApplyConfigParamOverrides(
     const ModuleItem* item, const ModuleDecl* child_decl,
     Elaborator::ParamList& child_params, const ScopeMap& parent_scope,
@@ -183,11 +192,8 @@ void Elaborator::ApplyConfigParamOverrides(
       assignment.second =
           ResolveParentReference(assignment.second, parent_path, parent_scope,
                                  config_ancestor_scopes_, arena_);
-      Expr* dollar = module_path_.empty() ? nullptr
-                                          : DollarPassedBy(assignment.second,
-                                                           module_path_.back());
-      if (dollar != nullptr) assignment.second = dollar;
     }
+    PassConfigDollarArguments(params);
     ReportUnappliedOverrides(
         ApplyConfigOverrideParams(
             child_decl,

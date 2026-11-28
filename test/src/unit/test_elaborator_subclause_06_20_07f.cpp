@@ -1,7 +1,9 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string_view>
 
+#include "elaborator/rtlir.h"
 #include "fixture_elaborator.h"
 #include "helpers_config_params.h"
 #include "helpers_dollar_param_reports.h"
@@ -712,6 +714,83 @@ TEST(DollarConstantElaboration,
                                line, "6.20.7"))
         << line;
   }
+}
+
+const RtlirParamDecl* ParamOfChild(const RtlirModule* parent,
+                                   std::string_view inst,
+                                   std::string_view param) {
+  for (const auto& child : parent->children) {
+    if (child.simple_inst_name != inst || child.resolved == nullptr) continue;
+    for (const auto& p : child.resolved->params) {
+      if (p.name == param) return &p;
+    }
+  }
+  return nullptr;
+}
+
+const RtlirModule* ChildNamed(const RtlirModule* parent,
+                              std::string_view inst) {
+  for (const auto& child : parent->children) {
+    if (child.simple_inst_name == inst) return child.resolved;
+  }
+  return nullptr;
+}
+
+TEST(DollarConstantElaboration,
+     InstanceOverrideNamingADollarParameterPassesDollarOnInEveryPlace) {
+  ElabFixture f;
+  auto* design = Elaborate(
+      "module s #(parameter int N = 4);\n"
+      "endmodule\n"
+      "module b;\n"
+      "  parameter int N = 4;\n"
+      "endmodule\n"
+      "module mid #(parameter M = 4);\n"
+      "  s #(.N(M)) leaf();\n"
+      "endmodule\n"
+      "module t;\n"
+      "  parameter int P = $;\n"
+      "  parameter int Q = 5;\n"
+      "  s #(.N(P)) a();\n"
+      "  s #(P) c();\n"
+      "  s #(.N(Q)) d();\n"
+      "  b #(.N(P)) e();\n"
+      "  mid #(.M(P)) h();\n"
+      "  mid #(.M(Q)) k();\n"
+      "  if (1) begin : g\n"
+      "    localparam int G = $;\n"
+      "    s #(.N(P)) ga();\n"
+      "    s #(P) gc();\n"
+      "    s #(.N(G)) gl();\n"
+      "    s #(.N(Q)) gd();\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  ASSERT_NE(design, nullptr);
+  EXPECT_FALSE(f.has_errors);
+  const RtlirModule* top = design->top_modules[0];
+  for (std::string_view inst : {"a", "c", "e", "ga", "gc", "gl"}) {
+    const RtlirParamDecl* n = ParamOfChild(top, inst, "N");
+    ASSERT_NE(n, nullptr) << inst;
+    EXPECT_TRUE(n->is_unbounded) << inst;
+  }
+  for (std::string_view inst : {"d", "gd"}) {
+    const RtlirParamDecl* n = ParamOfChild(top, inst, "N");
+    ASSERT_NE(n, nullptr) << inst;
+    EXPECT_FALSE(n->is_unbounded) << inst;
+    EXPECT_EQ(n->resolved_value, 5) << inst;
+  }
+  const RtlirModule* h = ChildNamed(top, "h");
+  const RtlirModule* k = ChildNamed(top, "k");
+  ASSERT_NE(h, nullptr);
+  ASSERT_NE(k, nullptr);
+  const RtlirParamDecl* h_leaf = ParamOfChild(h, "leaf", "N");
+  const RtlirParamDecl* k_leaf = ParamOfChild(k, "leaf", "N");
+  ASSERT_NE(h_leaf, nullptr);
+  ASSERT_NE(k_leaf, nullptr);
+  EXPECT_TRUE(h_leaf->is_unbounded);
+  EXPECT_FALSE(k_leaf->is_unbounded);
+  EXPECT_EQ(k_leaf->resolved_value, 5);
 }
 
 TEST(DollarConstantElaboration,

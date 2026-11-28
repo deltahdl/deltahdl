@@ -283,46 +283,31 @@ TEST(RangeSystemFunctionSim,
 TEST(RangeSystemFunctionSim,
      InstanceOverrideNamingADollarParameterIsUnbounded) {
   SimFixture f;
-  EXPECT_EQ(RunCapture("module s #(parameter int N = 4);\n"
-                       "  bit run_ub;\n"
-                       "  initial run_ub = $isunbounded(N);\n"
-                       "endmodule\n"
-                       "module b;\n"
-                       "  parameter int N = 4;\n"
-                       "  bit run_ub;\n"
-                       "  initial run_ub = $isunbounded(N);\n"
-                       "endmodule\n"
-                       "module mid #(parameter M = 4);\n"
-                       "  s #(.N(M)) leaf();\n"
-                       "endmodule\n"
-                       "module t;\n"
-                       "  parameter int P = $;\n"
-                       "  parameter int Q = 5;\n"
-                       "  s #(.N(P)) a();\n"
-                       "  s #(P) c();\n"
-                       "  s #(.N(Q)) d();\n"
-                       "  b #(.N(P)) e();\n"
-                       "  mid #(.M(P)) h();\n"
-                       "  mid #(.M(Q)) k();\n"
-                       "  if (1) begin : g\n"
-                       "    localparam int G = $;\n"
-                       "    s #(.N(P)) a();\n"
-                       "    s #(P) c();\n"
-                       "    s #(.N(G)) l();\n"
-                       "  end\n"
-                       "  initial #1 $display(\"%0d%0d %0d%0d %0d%0d%0d %0d%0d "
-                       "%0d%0d %0d%0d%0d %0d%0d %0d %0d%0d\",\n"
-                       "    $isunbounded(a.N), a.run_ub,\n"
-                       "    $isunbounded(c.N), c.run_ub,\n"
-                       "    $isunbounded(d.N), d.run_ub, d.N,\n"
-                       "    $isunbounded(e.N), e.run_ub,\n"
-                       "    $isunbounded(h.M), h.leaf.run_ub,\n"
-                       "    $isunbounded(k.M), k.leaf.run_ub, k.leaf.N,\n"
-                       "    $isunbounded(g.a.N), g.a.run_ub, g.c.run_ub,\n"
-                       "    $isunbounded(g.l.N), g.l.run_ub);\n"
-                       "endmodule\n",
-                       f),
-            "11 11 005 11 11 005 11 1 11\n");
+  EXPECT_EQ(
+      RunCapture("module s #(parameter int N = 4);\n"
+                 "endmodule\n"
+                 "module b;\n"
+                 "  parameter int N = 4;\n"
+                 "endmodule\n"
+                 "module mid #(parameter M = 4);\n"
+                 "  s #(.N(M)) leaf();\n"
+                 "endmodule\n"
+                 "module t;\n"
+                 "  parameter int P = $;\n"
+                 "  parameter int Q = 5;\n"
+                 "  s #(.N(P)) a();\n"
+                 "  s #(P) c();\n"
+                 "  s #(.N(Q)) d();\n"
+                 "  b #(.N(P)) e();\n"
+                 "  mid #(.M(P)) h();\n"
+                 "  mid #(.M(Q)) k();\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                 "    $isunbounded(a.N), $isunbounded(c.N),\n"
+                 "    $isunbounded(d.N), d.N, $isunbounded(e.N),\n"
+                 "    $isunbounded(h.M), $isunbounded(k.M), k.leaf.N);\n"
+                 "endmodule\n",
+                 f),
+      "1 1 0 5 1 1 0 5\n");
 }
 
 }  // namespace
