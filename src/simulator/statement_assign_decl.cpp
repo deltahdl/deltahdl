@@ -509,9 +509,7 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
   uint32_t width = is_virtual_interface || is_class
                        ? 64
                        : DeclaredTypeWidth(stmt->var_decl_type, ctx);
-  bool is_real = (stmt->var_decl_type.kind == DataTypeKind::kReal ||
-                  stmt->var_decl_type.kind == DataTypeKind::kShortreal ||
-                  stmt->var_decl_type.kind == DataTypeKind::kRealtime);
+  bool is_real = DeclaredTypeIsReal(stmt->var_decl_type, ctx);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
   BindBlockLocalLayout(stmt, width, ctx, arena);
   if (stmt->var_init == nullptr)
