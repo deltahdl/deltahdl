@@ -19,6 +19,12 @@ constexpr std::initializer_list<std::string_view> kDeclarationScopes = {
     "module",           "interface",      "program", "package",
     "compilation unit", "generate block", "class"};
 
+constexpr std::initializer_list<std::string_view> kEveryTypedefPlace = {
+    "module",         "interface", "program",
+    "checker",        "package",   "compilation unit",
+    "generate block", "class",     "function",
+    "task",           "block"};
+
 uint32_t WidthOf(const RtlirDesign* design, std::string_view name) {
   if (design == nullptr || design->top_modules.empty()) return 0;
   for (const auto& v : design->top_modules[0]->variables) {
@@ -38,7 +44,7 @@ TEST(UserDefinedTypeElaboration, TypedefNamesAnExistingTypeInEveryScope) {
 
 TEST(UserDefinedTypeElaboration,
      ForwardTypedefDefinedAsItselfIsReportedOnceAtTheDefinition) {
-  ExpectReportedOnceIn(kDeclarationScopes,
+  ExpectReportedOnceIn(kEveryTypedefPlace,
                        "  typedef A;\n"
                        "  typedef A A;\n"
                        "  A v;\n",
@@ -48,7 +54,7 @@ TEST(UserDefinedTypeElaboration,
 
 TEST(UserDefinedTypeElaboration,
      ForwardTypedefDefinedThroughATwoStepCycleIsReported) {
-  ExpectReportedIn(kDeclarationScopes,
+  ExpectReportedIn(kEveryTypedefPlace,
                    "  typedef A;\n"
                    "  typedef A B;\n"
                    "  typedef B A;\n"
@@ -59,7 +65,7 @@ TEST(UserDefinedTypeElaboration,
 
 TEST(UserDefinedTypeElaboration,
      ForwardTypedefDefinedThroughAThreeStepCycleIsReported) {
-  ExpectReportedIn(kDeclarationScopes,
+  ExpectReportedIn(kEveryTypedefPlace,
                    "  typedef A;\n"
                    "  typedef A B;\n"
                    "  typedef B C;\n"
@@ -71,7 +77,7 @@ TEST(UserDefinedTypeElaboration,
 
 TEST(UserDefinedTypeElaboration,
      TypedefNamingAMemberOfACycleIsReportedOnceAtTheCycle) {
-  ExpectReportedOnceIn(kDeclarationScopes,
+  ExpectReportedOnceIn(kEveryTypedefPlace,
                        "  typedef A;\n"
                        "  typedef A B;\n"
                        "  typedef B A;\n"
@@ -91,7 +97,7 @@ TEST(UserDefinedTypeElaboration,
                        "  typedef A B;\n"
                        "  typedef B A;\n"
                        "  A v;\n";
-    ExpectReportedIn(kDeclarationScopes, body,
+    ExpectReportedIn(kEveryTypedefPlace, body,
                      "typedef 'A' does not resolve to a data type",
                      "typedef B A;", "6.18");
   }
@@ -134,7 +140,7 @@ TEST(UserDefinedTypeElaboration,
 }
 
 TEST(UserDefinedTypeElaboration, ForwardTypedefChainEndingInADataTypeResolves) {
-  ExpectCleanIn(kDeclarationScopes,
+  ExpectCleanIn(kEveryTypedefPlace,
                 "  typedef A;\n"
                 "  typedef A B;\n"
                 "  typedef int A;\n"

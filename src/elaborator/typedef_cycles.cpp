@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <format>
 #include <string_view>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -21,7 +21,8 @@ namespace {
 struct TypedefScope {
   std::string_view package;
   std::vector<ModuleItem*> definitions;
-  std::unordered_set<std::string_view> forward_names;
+  std::unordered_map<std::string_view, size_t> forward_at;
+  std::unordered_map<const ModuleItem*, size_t> order;
 };
 
 class TypedefCycles {
@@ -40,7 +41,7 @@ class TypedefCycles {
 
  private:
   void Scope(const std::vector<ModuleItem*>& items, std::string_view package) {
-    TypedefScope scope{package, {}, {}};
+    TypedefScope scope{package, {}, {}, {}};
     for (ModuleItem* item : items) Gather(item, scope);
     Break(scope);
     for (ModuleItem* item : items) Nested(*item);
@@ -51,8 +52,10 @@ class TypedefCycles {
         item->data_type.kind == DataTypeKind::kVoid) {
       return;
     }
+    const size_t kAt = scope.order.size();
+    scope.order[item] = kAt;
     if (item->typedef_type.kind == DataTypeKind::kImplicit) {
-      scope.forward_names.insert(item->name);
+      scope.forward_at.try_emplace(item->name, kAt);
       return;
     }
     scope.definitions.push_back(item);
@@ -85,7 +88,7 @@ class TypedefCycles {
   }
 
   void Statements(const std::vector<Stmt*>& stmts) {
-    TypedefScope scope{{}, {}, {}};
+    TypedefScope scope{{}, {}, {}, {}};
     for (Stmt* s : stmts) {
       if (s != nullptr && s->kind == StmtKind::kBlockItemDecl)
         Gather(s->decl_item, scope);
@@ -106,7 +109,7 @@ class TypedefCycles {
   }
 
   void Class(ClassDecl& cls) {
-    TypedefScope scope{{}, {}, {}};
+    TypedefScope scope{{}, {}, {}, {}};
     for (ClassMember* member : cls.members) Gather(member->typedef_item, scope);
     Break(scope);
     for (ClassMember* member : cls.members) {
@@ -130,7 +133,13 @@ class TypedefCycles {
     for (const ModuleItem* other : scope.definitions) {
       if (other->name == type.type_name) next = other;
     }
-    return next;
+    if (next == nullptr || !type.scope_name.empty()) return next;
+    const size_t kAt = scope.order.at(&def);
+    auto forward = scope.forward_at.find(type.type_name);
+    const bool kDeclaredBefore =
+        scope.order.at(next) < kAt ||
+        (forward != scope.forward_at.end() && forward->second < kAt);
+    return kDeclaredBefore ? next : nullptr;
   }
 
   static std::vector<const ModuleItem*> CycleThrough(
@@ -146,9 +155,7 @@ class TypedefCycles {
   }
 
   static size_t PositionOf(const ModuleItem* item, const TypedefScope& scope) {
-    size_t at = 0;
-    while (scope.definitions[at] != item) ++at;
-    return at;
+    return scope.order.at(item);
   }
 
   static bool ClosesCycle(const std::vector<const ModuleItem*>& cycle,
@@ -163,7 +170,7 @@ class TypedefCycles {
   static bool HasForwardTypedef(const std::vector<const ModuleItem*>& cycle,
                                 const TypedefScope& scope) {
     for (const ModuleItem* member : cycle) {
-      if (scope.forward_names.count(member->name) != 0) return true;
+      if (scope.forward_at.count(member->name) != 0) return true;
     }
     return false;
   }
