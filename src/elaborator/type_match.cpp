@@ -32,7 +32,8 @@ static bool IsSimpleBitVector(DataTypeKind kind) {
 }
 
 static DataTypeKind CanonKind(DataTypeKind k) {
-  return k == DataTypeKind::kReg ? DataTypeKind::kLogic : k;
+  if (k == DataTypeKind::kReg) return DataTypeKind::kLogic;
+  return k == DataTypeKind::kRealtime ? DataTypeKind::kReal : k;
 }
 
 static bool VectorMatchesPredef(const DataType& vec, const DataType& predef,

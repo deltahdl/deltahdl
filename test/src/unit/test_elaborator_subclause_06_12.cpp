@@ -678,7 +678,7 @@ TEST(RealDataType, EveryIntegralIndexExpressionIsAccepted) {
                       "  end")));
 }
 
-TEST(RealDataType, DISABLED_ARealtimeArrayAssignsToARealArrayAndBack) {
+TEST(RealDataType, ARealtimeArrayAssignsToARealArrayAndBack) {
   EXPECT_TRUE(
       ElabOk("module t;\n  real a[2];\n  realtime b[2];\n"
              "  initial begin\n    a = b;\n    b = a;\n  end\nendmodule\n"));

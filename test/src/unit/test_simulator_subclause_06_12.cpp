@@ -298,7 +298,7 @@ TEST(RealDataType, DISABLED_BitsOfARealTypeKeywordIsItsBinaryFormatsWidth) {
             "64 32 64\n");
 }
 
-TEST(RealDataType, DISABLED_RealtimeIsTheSameTypeAsReal) {
+TEST(RealDataType, RealtimeIsTheSameTypeAsReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
                        "  real r;\n  realtime q;\n  shortreal s;\n"
