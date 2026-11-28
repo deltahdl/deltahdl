@@ -12,6 +12,7 @@
 #include "common/diagnostic.h"
 #include "common/source_loc.h"
 #include "common/types.h"
+#include "elaborator/aggregate_shape.h"
 #include "elaborator/assoc_index_type.h"
 #include "elaborator/covergroup_variables.h"
 #include "elaborator/elaborator_items_internal.h"

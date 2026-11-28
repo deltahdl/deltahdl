@@ -168,18 +168,14 @@ const DataType* TypeAtChainEnd(const DataType& dtype,
   return type;
 }
 
-DataType MemberWrittenType(const StructMember& m) {
+const DataType* MemberNamedType(const StructMember& m,
+                                const TypedefMap& typedefs) {
   DataType named;
   named.kind = m.type_kind;
   named.type_name = m.type_name;
   named.scope_name = m.scope_name;
   named.outer_scope_names = m.outer_scope_names;
-  return named;
-}
-
-const DataType* MemberNamedType(const StructMember& m,
-                                const TypedefMap& typedefs) {
-  return FindNamedType(MemberWrittenType(m), typedefs);
+  return FindNamedType(named, typedefs);
 }
 
 static const DataType* NestedAggregateSource(const StructMember& m,
