@@ -197,7 +197,7 @@ TEST_F(NetIndicesOfARun, AggregateNettypeNetsAreTheirOwnKinds) {
   EXPECT_EQ(KindOf(By("top.e")), vpiEnumNet);
 }
 
-TEST_F(NetIndicesOfARun, DISABLED_AnUnpackedArrayNettypeNetIsAnArrayNet) {
+TEST_F(NetIndicesOfARun, AnUnpackedArrayNettypeNetIsAnArrayNet) {
   Run("typedef real ua_t [0:1]; nettype ua_t uan_t;\n"
       "module top; uan_t a; endmodule\n");
   EXPECT_EQ(KindOf(By("top.a")), vpiArrayNet);

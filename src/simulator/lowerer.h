@@ -113,6 +113,8 @@ class Lowerer {
   void MakeNamedSpecializations();
   void InitializeStaticLocals();
   void LowerContAssign(const RtlirContAssign& ca, bool from_program);
+  bool SplitWholeNetArrayAssign(const RtlirContAssign& ca,
+                                std::vector<RtlirContAssign>& pieces);
   void LowerBidirSwitch(const RtlirBidirSwitch& sw, bool from_program);
   void LowerUdpInst(const RtlirUdpInst& inst, bool from_program);
   void LowerSequenceMonitors(const RtlirModule* mod);

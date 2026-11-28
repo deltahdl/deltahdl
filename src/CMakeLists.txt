@@ -455,6 +455,7 @@ add_library(deltahdl_lib ${DELTAHDL_LIB_LINKAGE}
     simulator/statement_coverage.cpp
     simulator/toggle_coverage.cpp
     simulator/lowerer.cpp
+    simulator/lowerer_net_array_contassign.cpp
     simulator/lowerer_net_arrays.cpp
     simulator/lowerer_params.cpp
     simulator/lowerer_always_comb.cpp

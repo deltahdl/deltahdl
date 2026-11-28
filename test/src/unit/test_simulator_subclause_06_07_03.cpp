@@ -2,8 +2,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <format>
-#include <initializer_list>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -11,6 +9,7 @@
 #include "common/arena.h"
 #include "common/types.h"
 #include "fixture_simulator.h"
+#include "helpers_net_body_places.h"
 #include "helpers_switch_network.h"
 #include "simulator/lowerer.h"
 #include "simulator/net.h"
@@ -373,7 +372,7 @@ TEST(NettypeInitialization,
 }
 
 TEST(NettypeInitialization,
-     DISABLED_UndrivenUnpackedArrayNettypeNetElementsDefaultToZero) {
+     UndrivenUnpackedArrayNettypeNetElementsDefaultToZero) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -443,35 +442,8 @@ constexpr std::string_view kDefaultNets =
     "        l, w);\n"
     "  end\n";
 
-struct NetPlace {
-  std::string_view name;
-  std::string_view head;
-  std::string_view open;
-  std::string_view close;
-  std::string_view tail;
-};
-
-constexpr std::initializer_list<NetPlace> kNetPlaces = {
-    {"module", "module top;\n", "", "", "endmodule\n"},
-    {"interface", "interface host;\n", "", "",
-     "endinterface\nmodule top;\n  host h();\nendmodule\n"},
-    {"program", "program host;\n", "", "",
-     "endprogram\nmodule top;\n  host h();\nendmodule\n"},
-    {"if generate block", "module top;\n", "  if (1) begin : g\n", "  end\n",
-     "endmodule\n"},
-    {"loop generate block", "module top;\n",
-     "  for (genvar k = 0; k < 1; k++) begin : g\n", "  end\n", "endmodule\n"},
-};
-
 TEST(NettypeInitialization,
      UndrivenNettypeNetsTakeTheirDefaultsWhereverDeclared) {
-  for (const NetPlace& place : kNetPlaces) {
-    SCOPED_TRACE(place.name);
-    SimFixture f;
-    EXPECT_EQ(RunCapture(std::format("{}{}{}{}{}{}", place.head,
-                                     kDefaultNettypes, place.open, kDefaultNets,
-                                     place.close, place.tail),
-                         f),
-              "0000 0\n0000 0 5 a x 7 xxxx zzzz\n");
-  }
+  ExpectPrintedInEveryNetBodyPlace(kDefaultNettypes, kDefaultNets,
+                                   "0000 0\n0000 0 5 a x 7 xxxx zzzz\n");
 }

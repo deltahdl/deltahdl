@@ -5,6 +5,7 @@
 #include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_net_body_places.h"
 #include "simulator/lowerer.h"
 
 using namespace delta;
@@ -69,8 +70,7 @@ TEST(NettypeSimulation, ResolvedNettypeNetCarriesResolveFunc) {
   EXPECT_EQ(net->resolve_func, "Tsum");
 }
 
-TEST(NettypeSimulation,
-     DISABLED_UnpackedArrayNettypeNetHoldsTheArrayItIsDriven) {
+TEST(NettypeSimulation, UnpackedArrayNettypeNetHoldsTheArrayItIsDriven) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -85,8 +85,7 @@ TEST(NettypeSimulation,
   EXPECT_EQ(out, "1.0 5.0\n");
 }
 
-TEST(NettypeSimulation,
-     DISABLED_ArrayOfUnpackedArrayNettypeNetsHoldsEachArray) {
+TEST(NettypeSimulation, ArrayOfUnpackedArrayNettypeNetsHoldsEachArray) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -113,6 +112,25 @@ TEST(NettypeSimulation, UnpackedStructNettypeNetHoldsTheStructItIsDriven) {
       "endmodule\n",
       f);
   EXPECT_EQ(out, "7 2.5\n");
+}
+
+constexpr std::string_view kArrayNettype =
+    "  typedef int TI [3];\n"
+    "  nettype TI wTI;\n";
+
+constexpr std::string_view kArrayNettypeNets =
+    "  wTI a;\n"
+    "  wTI m [2];\n"
+    "  wTI u;\n"
+    "  assign a = '{1, 2, 3};\n"
+    "  assign m[1] = '{4, 5, 6};\n"
+    "  initial #1 $display(\"%0d %0d %0d %0d %0d %0d\", a[0], a[2], m[1][0],\n"
+    "      m[1][2], m[0][1], u[2]);\n";
+
+TEST(NettypeSimulation,
+     UnpackedArrayNettypeNetsHoldTheirArraysWhereverDeclared) {
+  ExpectPrintedInEveryNetBodyPlace(kArrayNettype, kArrayNettypeNets,
+                                   "1 3 4 6 0 0\n");
 }
 
 }  // namespace

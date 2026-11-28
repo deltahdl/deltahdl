@@ -435,6 +435,20 @@ static std::string_view AdoptTypedefArrayDims(
   return typedef_name;
 }
 
+static void AppendNettypeArrayDims(
+    std::string_view nettype, const TypedefMap& typedefs,
+    const std::unordered_map<std::string_view, std::vector<Expr*>>&
+        td_array_dims,
+    std::vector<Expr*>& dims) {
+  auto type_it = typedefs.find(nettype);
+  if (type_it == typedefs.end()) return;
+  const DataType& type = type_it->second;
+  if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) return;
+  auto dims_it = td_array_dims.find(type.type_name);
+  if (dims_it == td_array_dims.end()) return;
+  dims.insert(dims.end(), dims_it->second.begin(), dims_it->second.end());
+}
+
 bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind != DataTypeKind::kNamed) return false;
   auto it = nettype_names_.find(NamedTypeKey(item->data_type));
@@ -453,6 +467,8 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   }
   item->data_type.is_net = true;
   item->kind = ModuleItemKind::kNetDecl;
+  AppendNettypeArrayDims(nettype, typedefs_, td_array_dims_,
+                         item->unpacked_dims);
   nettype_net_names_.insert(item->name);
   ElaborateNetDecl(item, mod);
   TagUserNettypeNet(nettype, mod->nets.back(), nettype_resolve_funcs_);

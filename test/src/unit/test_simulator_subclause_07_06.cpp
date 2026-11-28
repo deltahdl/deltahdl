@@ -1,8 +1,10 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <string_view>
 
 #include "fixture_simulator.h"
+#include "helpers_net_body_places.h"
 #include "helpers_reported_error.h"
 #include "helpers_scheduler.h"
 #include "simulator/lowerer.h"
@@ -496,7 +498,7 @@ TEST(ArrayAssignmentSim, SourceConcatenatingSlicesAndItems) {
             "6 a b c hello d e\n5 9 4 9 4\n3 a b x\n");
 }
 
-TEST(ArrayAssignmentSim, DISABLED_ClauseWireArrayExampleCopiesBothWays) {
+TEST(ArrayAssignmentSim, ClauseWireArrayExampleCopiesBothWays) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
                        "  logic [7:0] V1 [10:1]; logic [7:0] V2 [10];\n"
@@ -511,6 +513,69 @@ TEST(ArrayAssignmentSim, DISABLED_ClauseWireArrayExampleCopiesBothWays) {
                        "endmodule\n",
                        f),
             "30 3 30 3\n");
+}
+
+TEST(ArrayAssignmentSim, EqualRangeIntegerAndDeclarationAssignedNetArrays) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  integer V [2] = '{5, 9};\n"
+                       "  wire integer W [2];\n"
+                       "  assign W = V;\n"
+                       "  wire integer D [2] = V;\n"
+                       "  initial #1 $display(\"%0d %0d %0d %0d\", W[0], W[1], "
+                       "D[0], D[1]);\n"
+                       "endmodule\n",
+                       f),
+            "5 9 5 9\n");
+}
+
+TEST(ArrayAssignmentSim, NetArrayFollowsALaterChangeOfItsSource) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] V [3];\n"
+                       "  wire [7:0] W [3];\n"
+                       "  assign W = V;\n"
+                       "  initial begin\n"
+                       "    V = '{8'd1, 8'd2, 8'd3};\n"
+                       "    #1 $display(\"%0d %0d\", W[0], W[2]);\n"
+                       "    V[2] = 8'd7;\n"
+                       "    #1 $display(\"%0d %0d\", W[0], W[2]);\n"
+                       "  end\n"
+                       "endmodule\n",
+                       f),
+            "1 3\n1 7\n");
+}
+
+TEST(ArrayAssignmentSim, NetArraySliceAndPatternDrivenByPosition) {
+  SimFixture f;
+  EXPECT_EQ(RunCapture("module t;\n"
+                       "  logic [7:0] V [4] = '{8'd10, 8'd20, 8'd30, 8'd40};\n"
+                       "  wire [7:0] S [4];\n"
+                       "  wire [7:0] P [3:1];\n"
+                       "  assign S[1:2] = V[2:3];\n"
+                       "  assign P = '{8'd4, 8'd5, 8'd6};\n"
+                       "  initial #1 $display(\"%h %0d %0d %h %0d %0d %0d\", "
+                       "S[0], S[1], S[2], S[3], P[3], P[2], P[1]);\n"
+                       "endmodule\n",
+                       f),
+            "zz 30 40 zz 4 5 6\n");
+}
+
+constexpr std::string_view kNetArrayDrives =
+    "  logic [7:0] V [2] = '{8'h11, 8'h22};\n"
+    "  wire [7:0] W [2];\n"
+    "  n8_t NW [2];\n"
+    "  wire [7:0] E [2];\n"
+    "  assign W = V;\n"
+    "  assign NW = V;\n"
+    "  assign E[1] = V[0];\n"
+    "  initial #1 $display(\"%h %h %h %h %h %h\", W[0], W[1], NW[0], NW[1],\n"
+    "      E[0], E[1]);\n";
+
+TEST(ArrayAssignmentSim,
+     WholeNetArrayDrivenFromAVariableArrayWhereverDeclared) {
+  ExpectPrintedInEveryNetBodyPlace("  nettype logic [7:0] n8_t;\n",
+                                   kNetArrayDrives, "11 22 11 22 zz 11\n");
 }
 
 }  // namespace

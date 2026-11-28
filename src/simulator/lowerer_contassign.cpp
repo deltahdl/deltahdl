@@ -22,6 +22,7 @@
 #include "simulator/interconnect_drive.h"
 #include "simulator/lowerer.h"
 #include "simulator/lowerer_contassign_driver.h"
+#include "simulator/lowerer_net_array_contassign.h"
 #include "simulator/module_path_delay.h"
 #include "simulator/net.h"
 #include "simulator/process.h"
@@ -308,19 +309,25 @@ static Net* NetNamedBy(const Expr* e, SimContext& ctx) {
 }
 
 static Net* NetArrayElementNamedBy(const Expr* e, SimContext& ctx) {
-  if (e->kind != ExprKind::kSelect || e->index_end != nullptr ||
-      e->base == nullptr || e->base->kind != ExprKind::kIdentifier ||
-      e->index == nullptr) {
-    return nullptr;
+  std::vector<const Expr*> indices;
+  const Expr* root = e;
+  while (root->kind == ExprKind::kSelect && root->index_end == nullptr &&
+         root->base != nullptr && root->index != nullptr) {
+    indices.push_back(root->index);
+    root = root->base;
   }
-  std::string_view name = e->base->text;
+  if (indices.empty() || root->kind != ExprKind::kIdentifier) return nullptr;
+  std::string_view name = root->text;
   if (ctx.FindArrayInfo(name) == nullptr || ctx.FindNet(name) == nullptr) {
     return nullptr;
   }
-  Logic4Vec idx = EvalExpr(e->index, ctx, ctx.GetArena());
-  if (!idx.IsKnown()) return nullptr;
-  return ctx.FindNet(std::string(name) + "[" + std::to_string(idx.ToUint64()) +
-                     "]");
+  std::string key(name);
+  for (auto it = indices.rbegin(); it != indices.rend(); ++it) {
+    Logic4Vec idx = EvalExpr(*it, ctx, ctx.GetArena());
+    if (!idx.IsKnown()) return nullptr;
+    key += "[" + std::to_string(idx.ToUint64()) + "]";
+  }
+  return ctx.FindNet(key);
 }
 
 static ContAssignDriver MakeContAssignDriver(const Expr* lhs, SimContext& ctx) {
@@ -618,7 +625,26 @@ static int64_t PresetDelayedDriver(const ContAssignParams& p,
   return slot;
 }
 
+bool Lowerer::SplitWholeNetArrayAssign(const RtlirContAssign& ca,
+                                       std::vector<RtlirContAssign>& pieces) {
+  if (ca.source_item == nullptr) return false;
+  Process stand_in;
+  stand_in.stand_in = true;
+  stand_in.inst_prefix = inst_prefix_;
+  stand_in.gen_prefixes.assign(ca.gen_block_prefixes.begin(),
+                               ca.gen_block_prefixes.end());
+  InstallGenBlockConsts(ca.gen_block_consts, &stand_in);
+  CallerStandIn in_scope(&stand_in, ctx_);
+  return SplitNetArrayContAssign(ca, ctx_, arena_, pieces);
+}
+
 void Lowerer::LowerContAssign(const RtlirContAssign& ca, bool from_program) {
+  std::vector<RtlirContAssign> pieces;
+  if (SplitWholeNetArrayAssign(ca, pieces)) {
+    for (const RtlirContAssign& piece : pieces)
+      LowerContAssign(piece, from_program);
+    return;
+  }
   auto* p = arena_.Create<Process>();
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
