@@ -52,10 +52,6 @@ const ClassDecl* Elaborator::ScopePrefixClass(std::string_view name) const {
 }
 
 bool Elaborator::ScopedReadIsParameter(const Expr* access) const {
-  if (access->lhs == nullptr || access->rhs == nullptr ||
-      access->lhs->kind != ExprKind::kIdentifier) {
-    return false;
-  }
   const std::string_view kScope = access->lhs->text;
   const std::string_view kName = access->rhs->text;
   for (const PackageDecl* pkg : unit_->packages) {
