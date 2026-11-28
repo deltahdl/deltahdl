@@ -278,6 +278,14 @@ void TagUserNettypeNet(
   }
 }
 
+bool NettypeDefaultIsZero(const DataType& type, const TypedefMap& typedefs) {
+  if (Is4stateType(type, typedefs)) return false;
+  const DataType* resolved = &type;
+  while (const DataType* next = FindNamedType(*resolved, typedefs))
+    resolved = next;
+  return resolved->kind != DataTypeKind::kStruct || resolved->is_packed;
+}
+
 }  // namespace
 
 struct VarDeclNameTables {
@@ -448,6 +456,8 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   nettype_net_names_.insert(item->name);
   ElaborateNetDecl(item, mod);
   TagUserNettypeNet(nettype, mod->nets.back(), nettype_resolve_funcs_);
+  mod->nets.back().default_is_zero =
+      NettypeDefaultIsZero(item->data_type, typedefs_);
   return true;
 }
 

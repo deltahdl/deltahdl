@@ -257,8 +257,7 @@ TEST(StructAssignmentSimulation, NetWithoutNettypeIgnoresMemberDefaults) {
       "zz zz\nzz zz 01 02 ff xx\n");
 }
 
-TEST(StructAssignmentSimulation,
-     DISABLED_NetOfAUserDefinedNettypeKeepsMemberDefaults) {
+TEST(StructAssignmentSimulation, NetOfAUserDefinedNettypeKeepsMemberDefaults) {
   SimFixture f;
   EXPECT_EQ(
       RunCapture(

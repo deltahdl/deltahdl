@@ -124,6 +124,7 @@ struct RtlirNet {
   SourceLoc implicit_ref_loc;
 
   bool refers_outward = false;
+  bool default_is_zero = false;
 };
 
 struct RtlirVariable {

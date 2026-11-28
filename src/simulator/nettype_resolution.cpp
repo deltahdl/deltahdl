@@ -10,6 +10,7 @@
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/net.h"
+#include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/sim_context_types.h"
 #include "simulator/variable.h"
@@ -71,13 +72,17 @@ void AttachNettypeResolution(Net& net, std::string_view func_name,
     ctx.RegisterArray(kDriversName, info);
     return EvalExpr(call, ctx, arena);
   };
+  Scheduler& sched = ctx.GetScheduler();
+  Event* event = sched.GetEventPool().Acquire();
+  event->kind = EventKind::kEvaluation;
+  event->callback = [&net, &ctx]() { net.Resolve(ctx.GetArena()); };
+  sched.ScheduleEvent(SimTime{0}, Region::kActive, event);
 }
 
 bool ResolveThroughNettypeFunction(Net& net, Arena& arena) {
   if (!net.is_user_nettype || !net.resolve_hook) return false;
   std::vector<Logic4Vec> all = net.drivers;
   all.insert(all.end(), net.switch_drivers.begin(), net.switch_drivers.end());
-  if (all.empty()) return false;
   net.resolved->value = net.resolve_hook(all, arena);
   net.resolved->NotifyWatchers();
   return true;

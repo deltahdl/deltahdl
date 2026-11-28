@@ -28,6 +28,7 @@
 #include "simulator/dpi_formal_type.h"
 #include "simulator/dpi_runtime.h"
 #include "simulator/eval_function_internal.h"
+#include "simulator/eval_member_path.h"
 #include "simulator/evaluation.h"
 #include "simulator/expr_walk.h"
 #include "simulator/lowerer.h"
@@ -216,6 +217,18 @@ uint64_t NetDecayTicks(const RtlirNet& net, const TimeScale& scale,
   return DelayToTicks(net.decay_ticks, scale, precision);
 }
 
+static void SetNettypeNetDefault(std::string_view name, const RtlirNet& net,
+                                 Variable& storage, SimContext& ctx,
+                                 Arena& arena) {
+  const StructTypeInfo* layout = ctx.GetVariableStructType(name);
+  if (layout != nullptr && !layout->is_packed) {
+    storage.value = NonexistentAggregateElement(*layout, ctx, arena);
+  } else if (net.default_is_zero) {
+    for (uint32_t i = 0; i < storage.value.nwords; ++i)
+      storage.value.words[i] = {0, 0};
+  }
+}
+
 Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
                       const TimeScale& scale, SimContext& ctx, Arena& arena) {
   auto* created = ctx.CreateNet(
@@ -227,6 +240,8 @@ Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
   created->delay = NetDelayTicks(net, scale, ctx, arena);
   RecordPackedRange(net.dtype, created->resolved, ctx, arena);
   RegisterAggregateLayout(name, net.dtype, net.width, ctx, arena);
+  if (net.is_user_nettype)
+    SetNettypeNetDefault(name, net, *created->resolved, ctx, arena);
   return created;
 }
 

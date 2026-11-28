@@ -2,7 +2,10 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <format>
+#include <initializer_list>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "common/arena.h"
@@ -294,8 +297,7 @@ TEST(NettypeInitialization, InitialValueVisibleToProcedureAtTimeZero) {
   EXPECT_EQ(res->value.words[0].bval & 0x3, 0x0u);
 }
 
-TEST(NettypeInitialization,
-     DISABLED_UndrivenTwoStateIntegralNettypeNetsDefaultToZero) {
+TEST(NettypeInitialization, UndrivenTwoStateIntegralNettypeNetsDefaultToZero) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -343,7 +345,7 @@ TEST(NettypeInitialization,
 }
 
 TEST(NettypeInitialization,
-     DISABLED_UndrivenUnpackedStructNettypeNetTakesItsMemberInitializers) {
+     UndrivenUnpackedStructNettypeNetTakesItsMemberInitializers) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -387,7 +389,7 @@ TEST(NettypeInitialization,
 }
 
 TEST(NettypeInitialization,
-     DISABLED_TwoStateNettypeNetHoldsItsDefaultForAProcedureAtTimeZero) {
+     TwoStateNettypeNetHoldsItsDefaultForAProcedureAtTimeZero) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -401,7 +403,7 @@ TEST(NettypeInitialization,
 }
 
 TEST(NettypeInitialization,
-     DISABLED_UndrivenResolvedNettypeNetTakesItsFunctionOfNoDrivers) {
+     UndrivenResolvedNettypeNetTakesItsFunctionOfNoDrivers) {
   SimFixture f;
   auto out = RunCapture(
       "module t;\n"
@@ -418,4 +420,58 @@ TEST(NettypeInitialization,
       "endmodule\n",
       f);
   EXPECT_EQ(out, "7 1010\n");
+}
+
+constexpr std::string_view kDefaultNettypes =
+    "  typedef struct { int a = 5; bit [3:0] b = 4'hA; logic c; } s_t;\n"
+    "  function automatic int rsum(input int d[]);\n"
+    "    rsum = 7;\n"
+    "    foreach (d[k]) rsum += d[k];\n"
+    "  endfunction\n"
+    "  nettype bit [3:0] b_t;\n"
+    "  nettype int i_t;\n"
+    "  nettype s_t n_t;\n"
+    "  nettype int r_t with rsum;\n"
+    "  nettype logic [3:0] l_t;\n";
+
+constexpr std::string_view kDefaultNets =
+    "  b_t b; i_t i; n_t n; r_t r; l_t l;\n"
+    "  wire [3:0] w;\n"
+    "  initial begin\n"
+    "    $display(\"%b %0d\", b, i);\n"
+    "    #1 $display(\"%b %0d %0d %h %b %0d %b %b\", b, i, n.a, n.b, n.c, r,\n"
+    "        l, w);\n"
+    "  end\n";
+
+struct NetPlace {
+  std::string_view name;
+  std::string_view head;
+  std::string_view open;
+  std::string_view close;
+  std::string_view tail;
+};
+
+constexpr std::initializer_list<NetPlace> kNetPlaces = {
+    {"module", "module top;\n", "", "", "endmodule\n"},
+    {"interface", "interface host;\n", "", "",
+     "endinterface\nmodule top;\n  host h();\nendmodule\n"},
+    {"program", "program host;\n", "", "",
+     "endprogram\nmodule top;\n  host h();\nendmodule\n"},
+    {"if generate block", "module top;\n", "  if (1) begin : g\n", "  end\n",
+     "endmodule\n"},
+    {"loop generate block", "module top;\n",
+     "  for (genvar k = 0; k < 1; k++) begin : g\n", "  end\n", "endmodule\n"},
+};
+
+TEST(NettypeInitialization,
+     UndrivenNettypeNetsTakeTheirDefaultsWhereverDeclared) {
+  for (const NetPlace& place : kNetPlaces) {
+    SCOPED_TRACE(place.name);
+    SimFixture f;
+    EXPECT_EQ(RunCapture(std::format("{}{}{}{}{}{}", place.head,
+                                     kDefaultNettypes, place.open, kDefaultNets,
+                                     place.close, place.tail),
+                         f),
+              "0000 0\n0000 0 5 a x 7 xxxx zzzz\n");
+  }
 }
