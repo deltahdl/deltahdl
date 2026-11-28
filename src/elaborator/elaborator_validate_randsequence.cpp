@@ -185,10 +185,15 @@ void Elaborator::CheckRandsequenceNamesIn(
   });
 }
 
-void Elaborator::ValidatePerDeclarationRulesInScopeItems(
+void Elaborator::ElaborateScopeLetFormals(
     const std::vector<ModuleItem*>& items) {
   ForEachScopeLet(
       items, [this](ModuleItem* let) { ElaborateLetFormals(let, nullptr); });
+}
+
+void Elaborator::ValidatePerDeclarationRulesInScopeItems(
+    const std::vector<ModuleItem*>& items) {
+  ElaborateScopeLetFormals(items);
   CheckJumpStatementsIn(items);
   CheckRandsequenceNamesIn(items);
   CheckForeachLoopsIn(items);
@@ -208,8 +213,7 @@ void Elaborator::ValidatePerDeclarationRulesInUnitClass(const ClassDecl* cls) {
   ForEachClassBodyItem(cls, [&](const ModuleItem* m) {
     methods.push_back(const_cast<ModuleItem*>(m));
   });
-  ForEachScopeLet(
-      methods, [this](ModuleItem* let) { ElaborateLetFormals(let, nullptr); });
+  ElaborateScopeLetFormals(methods);
   CheckJumpStatementsIn(methods);
   CheckRandsequenceNamesIn(methods);
   CheckForeachLoopsInClass(cls);
