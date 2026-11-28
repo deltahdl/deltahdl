@@ -115,6 +115,7 @@ struct PropertyFieldWindow {
   uint32_t total_width = 0;
   DataTypeKind member_kind = DataTypeKind::kImplicit;
   bool valid = false;
+  bool is_signed = false;
 };
 
 PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,

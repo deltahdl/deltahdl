@@ -133,9 +133,11 @@ Logic4Vec ResolveClassFieldChain(ClassObject* obj,
   PropertyFieldWindow window = ResolveClassPropertyField(
       declared_type ? declared_type : obj->type, field_path, ctx);
   if (window.valid) {
-    return MemberValueOf(
+    Logic4Vec member = MemberValueOf(
         ExtractBitField(arena, handle_val, window.bit_offset, window.width),
         window.member_kind, arena);
+    member.is_signed = window.is_signed;
+    return member;
   }
   auto* next_obj = ctx.GetClassObject(handle_val.ToUint64());
   if (!next_obj) return ReadClassField(obj, declared_type, field_path, arena);

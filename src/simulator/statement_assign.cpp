@@ -133,10 +133,12 @@ PropertyFieldWindow ResolveClassPropertyField(const ClassTypeInfo* type,
   if (prop == nullptr || prop->type_name.empty()) return window;
   const StructTypeInfo* info = ctx.FindStructType(prop->type_name);
   if (info == nullptr) return window;
-  if (!ResolveStructFieldPath(info, path.substr(dot + 1), &window.bit_offset,
-                              &window.width, &window.member_kind)) {
-    return window;
-  }
+  const StructFieldInfo* field =
+      ResolveStructField(info, path.substr(dot + 1), &window.bit_offset);
+  if (field == nullptr) return window;
+  window.width = field->width;
+  window.member_kind = field->type_kind;
+  window.is_signed = field->is_signed;
   window.property = first;
   window.total_width = info->total_width;
   window.valid = true;
