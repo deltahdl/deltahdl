@@ -73,7 +73,7 @@ session and the files are recalled by relevance — see [recording-what-a-sessio
 - [A push starts a run per workflow](a-push-starts-a-run-per-workflow.md) — one commit can start several runs and `--limit 1` picks one; watch every run the commit lists.
 - [Watching a CI run](watching-a-ci-run.md) — `gh run watch <id> --interval 60 --exit-status` in the background; the default poll trips the secondary rate limit.
 - [Long-running commands in the background](long-running-commands-in-the-background.md) — anything over about a minute, a CI watch included, runs with `run_in_background: true`.
-- [Waiting while anything runs in the background](waiting-while-anything-runs-in-the-background.md) — a background command is its turn's last call; until its notification, nothing but waiting, except what the user instructs, done at once.
+- [Waiting while anything runs in the background](waiting-while-anything-runs-in-the-background.md) — a background command is its turn's last call; until its notification, wait, but file issues and do what the user instructs at any time, at once.
 - [Fixing a red run after a push](fixing-a-red-run.md) — fix your push's red run, caused or inherited, in a push of its own first; red only on `assert-coverage` holds nothing up.
 - [Read the sv-tests log first](reading-the-sv-tests-log-first.md) — deltahdl's own output is already under every FAIL line.
 - [sv-tests is a suite](sv-tests-is-a-suite-not-a-corpus.md) — write suite, revision, deltahdl and evaluate; never corpus, runner, score or the tool.

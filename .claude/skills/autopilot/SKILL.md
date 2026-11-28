@@ -25,7 +25,7 @@ Every `start` form creates these.
 | `4,19,34,49 * * * *` | `REMINDER: Every section of ~/IEEE 1800-2023.pdf has been swept and a test written for each case of each rule it states: a plain name passes, and DISABLED_ marks what deltahdl does not yet do, so take a case's test to be under test/ already.` |
 | `5,20,35,50 * * * *` | `REMINDER: Before proposing or adding a test, search all of test/ for one that already shows the case, open it, trace the code it runs, and add yours once you can name what it would catch that the existing one would not.` |
 | `6,21,36,51 * * * *` | `REMINDER: Before deleting or weakening a test, establish what it asserts, what the standard requires and which remaining test shows each of its correct cases, and say so in the commit that removes it.` |
-| `7,22,37,52 * * * *` | `REMINDER: While anything runs in the background, whether a CI run, a sweep of gh calls or any other command, only wait until its notification arrives, except for what the user instructs, which is done in full at once.` |
+| `7,22,37,52 * * * *` | `REMINDER: While anything runs in the background, whether a CI run, a sweep of gh calls or any other command, wait until its notification arrives before resuming the work, and file an issue, or do what the user instructs, at any time and at once.` |
 | `8,23,38,53 * * * *` | `REMINDER: Start a background command as the last call of a turn.` |
 | `9,24,39,54 * * * *` | `REMINDER: A case of the rule in hand goes on the issue of the problem it falls in, so one that the fix in hand corrects joins that fix.` |
 | `10,25,40,55 * * * *` | `REMINDER: Put a finding related to the issues the push is solving in that push, and file every other finding.` |
