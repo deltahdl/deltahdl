@@ -515,13 +515,18 @@ static Logic4Vec WidenToHolder(Logic4Vec held, uint32_t holder_width,
   return ResizeToWidth(held, holder_width, arena);
 }
 
+static Logic4Vec FieldBits(const FieldTarget& target, const Logic4Vec& rhs_val,
+                           Arena& arena) {
+  return ResizeToWidth(MemberBitsOf(rhs_val, target.member_kind, arena),
+                       target.width, arena);
+}
+
 void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena) {
   switch (target.kind) {
     case FieldTarget::Kind::kBits:
       DepositBitField(target.var->value, target.bit_offset,
-                      MemberBitsOf(rhs_val, target.member_kind, arena),
-                      target.width);
+                      FieldBits(target, rhs_val, arena), target.width);
       target.var->NotifyWatchers();
       return;
     case FieldTarget::Kind::kVariable:
@@ -540,8 +545,7 @@ void WriteResolvedField(const FieldTarget& target, const Logic4Vec& rhs_val,
       Logic4Vec updated =
           WidenToHolder(OwnRhsWords(held, arena), target.holder_width, arena);
       DepositBitField(updated, target.bit_offset,
-                      MemberBitsOf(rhs_val, target.member_kind, arena),
-                      target.width);
+                      FieldBits(target, rhs_val, arena), target.width);
       SetClassField(target.obj, target.type, target.field, updated, arena);
       if (target.notify) target.notify->NotifyWatchers();
       if (target.obj) ctx.NotifyClassHandleWatchers(target.obj->handle);

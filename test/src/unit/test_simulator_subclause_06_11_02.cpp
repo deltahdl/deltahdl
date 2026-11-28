@@ -739,7 +739,7 @@ TEST(TwoStateAndFourState, ConversionsIntoAClassAStructAndAPackage) {
       "-3 253 05\n-3 253 05\n-3 253 05\n253 05\n");
 }
 
-TEST(TwoStateAndFourState, DISABLED_SignedValueWidenedIntoAMemberSignExtends) {
+TEST(TwoStateAndFourState, SignedValueWidenedIntoAMemberSignExtends) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef struct { int ss; } S;\n"
                        "typedef struct packed { int ps; } P;\n"

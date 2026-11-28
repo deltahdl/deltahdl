@@ -26,9 +26,7 @@ namespace delta {
 
 static Logic4Vec MemberBits(const Logic4Vec& val, uint32_t width,
                             Arena& arena) {
-  if (val.fills_width && width > val.width)
-    return FillUnbasedUnsized(val, width, arena);
-  return ExtractBitField(arena, val, 0, width);
+  return ResizeToWidth(val, width, arena);
 }
 
 static Logic4Vec PackedArrayItem(const Expr* item,
