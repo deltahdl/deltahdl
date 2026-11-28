@@ -446,6 +446,25 @@ TEST(DynamicArrayNewSimulation, NewFillsA4StateArrayWithX) {
   EXPECT_EQ(out, "xxxx 1 0 xxxx 1 0\n");
 }
 
+TEST(DynamicArrayNewSimulation, SelectWithinAnElementReadsItsBits) {
+  SimFixture f;
+  std::string out = RunCapture(
+      "module t;\n"
+      "  logic [7:0] d [];\n"
+      "  logic [7:0] fd [2][];\n"
+      "  initial begin\n"
+      "    d = new[2];\n"
+      "    d[1] = 8'h9A;\n"
+      "    fd[1] = new[1];\n"
+      "    fd[1][0] = 8'h6C;\n"
+      "    $display(\"%b %b %b %h %b %b %b\", d[1][3], d[1][2], d[5][3],\n"
+      "             d[1][7:4], fd[1][0][3], fd[1][0][4], fd[1][3][3]);\n"
+      "  end\n"
+      "endmodule\n",
+      f);
+  EXPECT_EQ(out, "1 0 x 9 1 0 x\n");
+}
+
 TEST(DynamicArrayNewSimulation, NewSizesADynamicSubarrayOfAFixedArray) {
   SimFixture f;
   std::string out = RunCapture(

@@ -105,10 +105,12 @@ static bool HasOneUnsizedDim(const RtlirParamDecl& p) {
 }
 
 static QueueObject* CreateParamQueue(const RtlirParamDecl& p, const Expr* dim,
-                                     std::string_view full, SimContext& ctx) {
+                                     std::string_view full, SimContext& ctx,
+                                     Arena& arena) {
   ParamStorageShape shape = ParamStorageShapeOf(p);
   bool is_4state = DeclaredTypeIs4State(*ParamValueType(p), ctx);
   ctx.CreateVariable(full, shape.width);
+  BindParamLayout(p, full, shape.width, ctx, arena);
   QueueObject* q =
       ctx.CreateQueue(full, shape.width, QueueDimMaxSize(dim), is_4state);
   q->is_signed = shape.is_signed;
@@ -181,6 +183,24 @@ void Lowerer::FillParamValue(const RtlirParamDecl& p,
   FillInValueScope(p, fill);
 }
 
+bool Lowerer::LowerUnpackedParam(const RtlirParamDecl& p,
+                                 std::string_view full) {
+  if (HasOneUnsizedDim(p)) {
+    QueueObject* q =
+        CreateParamQueue(p, p.unpacked_dims->front(), full, ctx_, arena_);
+    FillParamValue(p, [this, &p, q] {
+      InitQueueFromDeclInit(q, ParamValueExpr(p), ctx_, arena_);
+    });
+    return true;
+  }
+  if (p.unpacked_bounds.empty()) return false;
+  RtlirVariable var = CreateParamArray(p, full, ctx_, arena_);
+  FillParamValue(p, [this, &p, full, var]() mutable {
+    FillParamArray(full, var, ParamValueExpr(p), ctx_, arena_);
+  });
+  return true;
+}
+
 void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
                          std::string_view full) {
   if (p.is_unbounded) {
@@ -188,20 +208,7 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
     ctx_.CreateVariable(full, 32);
     return;
   }
-  if (HasOneUnsizedDim(p)) {
-    QueueObject* q = CreateParamQueue(p, p.unpacked_dims->front(), full, ctx_);
-    FillParamValue(p, [this, &p, q] {
-      InitQueueFromDeclInit(q, ParamValueExpr(p), ctx_, arena_);
-    });
-    return;
-  }
-  if (!p.unpacked_bounds.empty()) {
-    RtlirVariable var = CreateParamArray(p, full, ctx_, arena_);
-    FillParamValue(p, [this, &p, full, var]() mutable {
-      FillParamArray(full, var, ParamValueExpr(p), ctx_, arena_);
-    });
-    return;
-  }
+  if (LowerUnpackedParam(p, full)) return;
   if (!p.is_resolved && !UnfoldedParamEvaluable(p, ctx_)) return;
   if (p.is_real_value) {
     Logic4Vec real = ToDeclaredReal(

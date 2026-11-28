@@ -82,6 +82,7 @@ class Lowerer {
   void LowerParams(const RtlirModule* mod);
   void LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
                   std::string_view full);
+  bool LowerUnpackedParam(const RtlirParamDecl& p, std::string_view full);
   void FillParamValue(const RtlirParamDecl& p, std::function<void()> fill);
   void FillInValueScope(const RtlirParamDecl& p,
                         const std::function<void()>& fill);

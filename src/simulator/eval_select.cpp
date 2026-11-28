@@ -218,10 +218,20 @@ static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
+static bool ChainReadsQueueElement(const Expr* expr, SimContext& ctx,
+                                   Arena& arena) {
+  for (const Expr* p = expr->base; p != nullptr && p->kind == ExprKind::kSelect;
+       p = p->base) {
+    const QueueObject* q = FindQueueOfBase(p->base, ctx, arena);
+    if (q != nullptr && !q->elements_are_queues) return true;
+  }
+  return false;
+}
+
 static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   const ArrayInfo* info = FindRootArrayInfo(expr, ctx);
-  if (info == nullptr) return false;
+  if (info == nullptr || ChainReadsQueueElement(expr, ctx, arena)) return false;
   out =
       NonexistentElementOf(expr, info->is_4state, info->elem_width, ctx, arena);
   return true;

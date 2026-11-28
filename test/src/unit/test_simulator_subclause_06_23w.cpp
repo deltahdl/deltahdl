@@ -133,6 +133,27 @@ TEST(ParameterOfTypeReferenceSim, TakesTheOperandsUnpackedDimension) {
   }
 }
 
+TEST(ParameterOfTypeReferenceSim,
+     PackageAndUnitParametersTakeTheOperandsUnpackedDimension) {
+  SimFixture f;
+  EXPECT_EQ(
+      RunCapture("package pk;\n"
+                 "  int na [3];\n"
+                 "  localparam type(na) PTA = '{1, 2, 3};\n"
+                 "  localparam int SA [3] = '{1, 2, 3};\n"
+                 "endpackage\n"
+                 "int ua [2];\n"
+                 "localparam type(ua) UTA = '{4, 5};\n"
+                 "localparam int USA [2] = '{4, 5};\n"
+                 "module top;\n"
+                 "  initial $display(\"%0d %0d %0d %0d %0d %0d %0d %0d\",\n"
+                 "      $size(pk::PTA), pk::PTA[2], $size(pk::SA), pk::SA[2],\n"
+                 "      $size(UTA), UTA[1], $size(USA), USA[1]);\n"
+                 "endmodule\n",
+                 f),
+      "3 3 3 3 2 5 2 5\n");
+}
+
 TEST(ScopeDeclarationTypeRefSim, ScopedTypedefKeepsItsUnpackedDimensions) {
   for (std::string_view place :
        {"module", "interface", "program", "generate block"}) {

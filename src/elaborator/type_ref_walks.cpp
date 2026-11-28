@@ -906,7 +906,8 @@ void ResolveUnitScopeTypeNames(
         for (ModuleItem* item : items) {
           if (item->kind == ModuleItemKind::kTypedef) {
             ResolveTypedefTypeRef(*item, {}, resolve, arena);
-          } else if (item->kind == ModuleItemKind::kVarDecl) {
+          } else if (item->kind == ModuleItemKind::kVarDecl ||
+                     item->kind == ModuleItemKind::kParamDecl) {
             ResolveLocalTypeRef(item->data_type, item->unpacked_dims, item->loc,
                                 {}, resolve);
           } else if (item->kind == ModuleItemKind::kClassDecl) {
